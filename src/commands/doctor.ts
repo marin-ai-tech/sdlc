@@ -1,0 +1,145 @@
+import { spawnSync } from 'node:child_process';
+import * as path from 'node:path';
+import { c, line, printJson, reportFailure } from '../cli/output.js';
+import { loadConfig } from '../core/config.js';
+import { listActiveChanges } from '../core/changes.js';
+import { isFile, readText } from '../core/fs-utils.js';
+import { gitIdentity, isGitRepo } from '../core/git.js';
+import { evaluateChange } from '../core/lifecycle.js';
+import { openspecVersion, resolveOpenSpec, runOpenSpec } from '../core/openspec.js';
+import { findProjectRoot, projectPaths } from '../core/project.js';
+import { readYamlObject } from '../core/yaml-io.js';
+import { harnessStamp, REQUIRED_NOTICE } from '../core/license.js';
+import { LOG_PATH, readLog } from '../core/log.js';
+import { assessLicense, detectProjectLicense } from '../core/project-license.js';
+import { harnessVersion } from '../core/version.js';
+import { readManifest, sha256 } from '../integrations/manifest.js';
+import { SETTINGS_PATH } from '../integrations/settings.js';
+
+interface Check {
+  check: string;
+  status: 'ok' | 'warn' | 'error';
+  message: string;
+  fix?: string;
+}
+
+function versionAtLeast(version: string, min: [number, number, number]): boolean {
+  const parts = version.replace(/^v/, '').split('.').map((n) => parseInt(n, 10));
+  for (let i = 0; i < 3; i += 1) {
+    const a = parts[i] ?? 0;
+    if (a > min[i]) return true;
+    if (a < min[i]) return false;
+  }
+  return true;
+}
+
+function onPath(bin: string): boolean {
+  const probe = process.platform === 'win32'
+    ? spawnSync('where', [bin], { encoding: 'utf-8' })
+    : spawnSync('sh', ['-c', `command -v ${bin}`], { encoding: 'utf-8' });
+  return probe.status === 0;
+}
+
+export async function doctorCommand(opts: { json?: boolean }): Promise<void> {
+  try {
+    const checks: Check[] = [];
+    const add = (check: string, status: Check['status'], message: string, fix?: string) =>
+      checks.push({ check, status, message, ...(fix ? { fix } : {}) });
+
+    add('node', versionAtLeast(process.versions.node, [20, 19, 0]) ? 'ok' : 'error', `Node.js ${process.versions.node}`, 'Install Node.js 20.19 or newer.');
+    add('harness', 'ok', `scdl ${harnessVersion()}`);
+
+    const root = findProjectRoot();
+    const bin = resolveOpenSpec();
+    const osVersion = openspecVersion(root ?? process.cwd());
+    if (!osVersion) add('openspec', 'error', `OpenSpec CLI not runnable (${bin.source}: ${bin.command})`, 'Reinstall the harness or `npm install -g @fission-ai/openspec`.');
+    else add('openspec', versionAtLeast(osVersion, [1, 13, 2]) ? 'ok' : 'warn', `OpenSpec ${osVersion} (${bin.source})`, 'The harness is tested with OpenSpec >= 1.13.2.');
+
+    if (!root) {
+      add('project', 'error', 'No openspec/ directory in this directory or its parents.', 'Run `sdlc init`.');
+    } else {
+      const paths = projectPaths(root);
+      add('project', 'ok', `root ${root}`);
+      let config;
+      try {
+        config = loadConfig(paths.sdlcConfig);
+        add('sdlc.yaml', isFile(paths.sdlcConfig) ? 'ok' : 'error',
+          isFile(paths.sdlcConfig) ? `enforcement ${config.enforcement.mode}, tools ${config.tools.join(', ') || 'none'}` : 'openspec/sdlc.yaml missing',
+          'Run `sdlc init`.');
+      } catch (error) {
+        add('sdlc.yaml', 'error', error instanceof Error ? error.message : String(error));
+      }
+      const osConfig = (() => { try { return readYamlObject(paths.openspecConfig); } catch { return undefined; } })();
+      add('openspec config', osConfig ? 'ok' : 'warn', osConfig ? `default schema ${String(osConfig.schema ?? 'spec-driven')}` : 'openspec/config.yaml missing or invalid');
+
+      if (isFile(path.join(paths.schemasDir, 'sdlc', 'schema.yaml'))) {
+        const r = runOpenSpec(['schema', 'validate', 'sdlc'], { cwd: root });
+        add('sdlc schema', r.ok ? 'ok' : 'error', r.ok ? 'openspec/schemas/sdlc is valid' : (r.stderr || r.stdout).trim().split('\n').slice(-2).join(' '));
+      } else {
+        add('sdlc schema', 'error', 'openspec/schemas/sdlc is not installed', 'Run `sdlc update`.');
+      }
+
+      const manifest = readManifest(root);
+      const entries = Object.entries(manifest.files);
+      const missing = entries.filter(([rel]) => !isFile(path.join(root, rel))).map(([rel]) => rel);
+      const edited = entries.filter(([rel, e]) => {
+        const text = readText(path.join(root, rel));
+        return text !== undefined && sha256(text) !== e.sha256;
+      }).map(([rel]) => rel);
+      const outdated = manifest.harness !== harnessVersion() ||
+        (config !== undefined && manifest.license !== undefined && manifest.license !== harnessStamp(config).license);
+      add('generated files', missing.length > 0 ? 'error' : edited.length > 0 || (outdated && entries.length > 0) ? 'warn' : entries.length > 0 ? 'ok' : 'warn',
+        `${entries.length} tracked, ${missing.length} missing, ${edited.length} edited locally${outdated ? ` (generated by scdl ${manifest.harness}${manifest.license ? `, license ${manifest.license}` : ''})` : ''}`,
+        missing.length > 0 || outdated ? 'Run `sdlc update`.' : edited.length > 0 ? 'Edited files are kept by `sdlc update`; use --force to restore them.' : undefined);
+
+      if (config) {
+        const license = assessLicense(config.license, detectProjectLicense(root));
+        add('license', license.status, license.message, license.fix);
+        add('project log', 'ok', config.log.enabled ? `${readLog(root).length} entries in ${LOG_PATH}` : 'off (log.enabled in openspec/sdlc.yaml)');
+        if (config.tools.includes('claude')) {
+          const settings = readText(path.join(root, SETTINGS_PATH)) ?? '';
+          add('claude hooks', /hook pre-tool/.test(settings) ? 'ok' : 'warn',
+            /hook pre-tool/.test(settings) ? `installed in ${SETTINGS_PATH}` : `not found in ${SETTINGS_PATH} (gates are advisory only)`, 'Run `sdlc update`.');
+        }
+        if (config.tools.includes('opencode')) {
+          add('opencode plugin', isFile(path.join(root, '.opencode', 'plugins', 'sdlc.js')) ? 'ok' : 'warn', '.opencode/plugins/sdlc.js', 'Run `sdlc update`.');
+        }
+        const cliBin = config.cli.split(/\s+/)[0];
+        add('cli on PATH', onPath(cliBin) ? 'ok' : 'warn', `\`${cliBin}\` ${onPath(cliBin) ? 'is' : 'is not'} on PATH (hooks, plugin and skills call \`${config.cli}\`)`,
+          'Install globally (`npm install -g scdl`) or set `cli: npx sdlc` in openspec/sdlc.yaml and run `sdlc update`.');
+        add('verify commands', config.verify.commands.length > 0 ? 'ok' : 'warn',
+          config.verify.commands.length > 0 ? config.verify.commands.map((v) => v.name).join(', ') : 'none configured - the verify gate cannot pass',
+          'Add build/test/lint commands under verify.commands in openspec/sdlc.yaml.');
+        add('review policy', isFile(path.join(root, config.review.policy)) ? 'ok' : 'warn', config.review.policy, 'Run `sdlc init` to create a starter REVIEW.md.');
+        for (const ref of listActiveChanges(paths)) {
+          try {
+            const view = evaluateChange(root, ref, config, { skipFingerprint: true });
+            add(`change ${ref.id}`, 'ok', `stage ${view.stage}`);
+          } catch (error) {
+            add(`change ${ref.id}`, 'error', error instanceof Error ? error.message : String(error));
+          }
+        }
+      }
+      if (!isGitRepo(root)) add('git', 'warn', 'not a git repository: approvals and evidence cannot be tied to commits', 'Run `git init`.');
+      else {
+        const id = gitIdentity(root);
+        add('git', id.email ? 'ok' : 'warn', id.email ? `identity ${id.name ?? ''} <${id.email}>` : 'git user.email not set (needed to record approvals)', 'git config user.email you@example.com');
+      }
+    }
+
+    const errors = checks.filter((ch) => ch.status === 'error').length;
+    if (opts.json) {
+      printJson({ healthy: errors === 0, checks });
+    } else {
+      line(c.dim(REQUIRED_NOTICE));
+      for (const ch of checks) {
+        const icon = ch.status === 'ok' ? c.green('✓') : ch.status === 'warn' ? c.yellow('!') : c.red('✗');
+        line(`${icon} ${ch.check.padEnd(16)} ${ch.message}`);
+        if (ch.fix && ch.status !== 'ok') line(`  ${''.padEnd(16)} ${c.dim(`fix: ${ch.fix}`)}`);
+      }
+    }
+    if (errors > 0) process.exitCode = 1;
+  } catch (error) {
+    reportFailure(error, opts.json);
+  }
+}

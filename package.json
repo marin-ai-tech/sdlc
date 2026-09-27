@@ -1,0 +1,60 @@
+{
+  "name": "scdl",
+  "version": "0.1.0",
+  "description": "AI-native SDLC harness for Claude Code and OpenCode, built on OpenSpec",
+  "keywords": [
+    "sdlc",
+    "openspec",
+    "claude-code",
+    "opencode",
+    "spec-driven",
+    "ai-native",
+    "agents"
+  ],
+  "homepage": "https://github.com/marin-ai-tech/scdl",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/marin-ai-tech/scdl"
+  },
+  "license": "SEE LICENSE IN LICENSE",
+  "author": "marin-ai technologies (https://github.com/marin-ai-tech)",
+  "type": "module",
+  "bin": {
+    "sdlc": "./bin/sdlc.js",
+    "scdl": "./bin/sdlc.js"
+  },
+  "files": [
+    "dist",
+    "bin",
+    "schemas",
+    "assets",
+    "LICENSE",
+    "LICENSES",
+    "NOTICE.md",
+    "COMMERCIAL-LICENSE.md"
+  ],
+  "scripts": {
+    "compile": "tsc -p tsconfig.json",
+    "dev": "tsc -p tsconfig.json --watch",
+    "pretest": "tsc -p tsconfig.json",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "prepublishOnly": "tsc -p tsconfig.json"
+  },
+  "engines": {
+    "node": ">=20.19.0"
+  },
+  "dependencies": {
+    "@fission-ai/openspec": "^1.13.2",
+    "commander": "^14.0.0",
+    "picomatch": "^4.0.2",
+    "yaml": "^2.8.3"
+  },
+  "devDependencies": {
+    "@types/node": "^20.19.43",
+    "@types/picomatch": "^4.0.0",
+    "typescript": "^6.0.3",
+    "vitest": "^4.1.11"
+  }
+}

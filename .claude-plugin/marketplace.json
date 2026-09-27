@@ -1,0 +1,23 @@
+{
+  "name": "scdl",
+  "owner": {
+    "name": "marin-ai technologies",
+    "url": "https://github.com/marin-ai-tech"
+  },
+  "description": "AI-native SDLC harness for Claude Code, built on OpenSpec",
+  "plugins": [
+    {
+      "name": "sdlc",
+      "source": "./plugin",
+      "description": "AI-native SDLC workflows with human gates, verification evidence and review, built on OpenSpec",
+      "version": "0.1.0",
+      "category": "development",
+      "tags": [
+        "sdlc",
+        "openspec",
+        "spec-driven",
+        "governance"
+      ]
+    }
+  ]
+}

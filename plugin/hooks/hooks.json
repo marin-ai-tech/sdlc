@@ -1,0 +1,40 @@
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "startup|resume|clear|compact",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "sdlc hook session-start",
+            "timeout": 30
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "Edit|Write|MultiEdit|NotebookEdit|Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "command -v sdlc >/dev/null 2>&1 && sdlc hook pre-tool || true",
+            "timeout": 30,
+            "statusMessage": "SDLC gate check"
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "command -v sdlc >/dev/null 2>&1 && sdlc hook stop || true",
+            "timeout": 120
+          }
+        ]
+      }
+    ]
+  }
+}

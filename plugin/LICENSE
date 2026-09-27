@@ -1,0 +1,50 @@
+scdl is dual-licensed. You may use it under the Community License (free of
+charge) or under a Commercial License (paid, royalty-bearing).
+
+Required Notice: Copyright (c) 2026 marin-ai technologies (https://github.com/marin-ai-tech/scdl)
+
+1. Community License
+
+   The PolyForm Noncommercial License 1.0.0
+   (LICENSES/PolyForm-Noncommercial-1.0.0.md,
+   https://polyformproject.org/licenses/noncommercial/1.0.0),
+   together with the scdl Additional Permissions 1.0
+   (LICENSES/scdl-Additional-Permissions.md, included with every copy of
+   scdl and published at https://github.com/marin-ai-tech/scdl).
+
+   In short, you may use, copy, modify and distribute scdl, keeping the
+   Required Notice above with every copy, for:
+   - any noncommercial purpose, including personal use and use by charitable,
+     educational, research, public health, public safety, environmental and
+     government organizations;
+   - open-source projects: projects whose complete source code is publicly
+     available under an OSI-approved license, also when a company maintains
+     them;
+   - a 30-day evaluation by a business before it buys a commercial license.
+
+2. Commercial License
+
+   Any other use requires a commercial license from the licensor, for which
+   royalties are due. This includes in particular use by or on behalf of a
+   business on code that is not an open-source project: private repositories,
+   internal systems, proprietary products, client work, hosted services, and
+   redistribution in a commercial product. See COMMERCIAL-LICENSE.md.
+
+Your content
+
+   The licensor claims no rights in content that you or your agents create with
+   scdl, such as intents, specifications, designs, plans, tasks, verification
+   and review records, and code. The artifact templates
+   (schemas/sdlc/templates/*, assets/records/*) and the starter REVIEW.md, once
+   they have become part of your artifacts, may be used, modified and
+   distributed by you without restriction. The provenance comments that scdl
+   writes into artifacts and logs record the scdl version and the license it
+   was used under; they do not place your content under that license.
+
+Third-party material
+
+   Portions adapted from OpenSpec remain available under the MIT License. See
+   NOTICE.md and LICENSES/MIT-OpenSpec.txt.
+
+The summaries in this file are for convenience only. The license texts they
+refer to, and for commercial use the signed commercial agreement, govern.

@@ -1,0 +1,30 @@
+---
+id: spec
+title: "SDLC: Spec"
+description: Turn an accepted intent into the requirements and design spec (Stage 2, Design) - OpenSpec proposal.md, delta specs and design.md with policies applied and areas of concern flagged. Use after the intent gate is approved, or when the user asks to write or refine requirements or the design.
+command-description: Stage 2 (Design) - write proposal, delta specs and design from the accepted intent
+argument-hint: "[change-id]"
+---
+Write the requirements and design spec - Stage 2 (Design): `proposal.md`, delta specs under `specs/`, and `design.md`. Policy is applied while the spec is written, not discovered in a review weeks later.
+
+{{contract}}
+
+**Input**: {{input}}
+
+**Steps**
+
+1. **Check the gate.** `sdlc status --change <id> --json`: the `intent` gate must be `approved`, `waived` or `n/a`. Otherwise stop and report who must approve it.
+2. **Load policy.** Read CLAUDE.md / AGENTS.md conventions and REVIEW.md. Load every available skill that encodes a relevant organizational policy (security, privacy, compliance, API design, UX, brand, data handling).
+3. **Write the artifacts in dependency order.** For each of `proposal`, `specs`, `design` that is not done:
+   - `sdlc instructions <artifact> --change <id> --json`
+   - read its `dependencies` from disk (always re-read; people edit them)
+   - inspect the relevant code, tests and configuration read-only, proportional to the change (delegate broad exploration to the `sdlc-researcher` subagent to keep this context clean)
+   - write the file at `resolvedOutputPath` following `template` and `instruction`; apply `context` and `rules` as constraints without copying them
+4. **Validate**: `sdlc validate --change <id>`. It runs `openspec validate --strict` plus the harness's delta checks (MODIFIED/REMOVED/RENAMED headers must exist in the main spec). Fix every error.
+5. **Flag concerns.** `design.md` must list every area of concern with its owner - conflicting policies, security or privacy risk, migrations, compatibility breaks, unanswered intent questions. Never resolve a policy conflict silently.
+6. **Stop at the gate.** Summarize: capabilities touched, requirements added/modified/removed, open concerns and who owns each. Then give the product owner the approval command: `sdlc approve spec --change <id>` (for `risk: high` a tech lead also runs `sdlc approve spec --change <id> --as tech-lead`). Planning continues with {{cmd:plan}} only after approval.
+
+**Guardrails**
+- Planning only: no code edits.
+- Ask about ambiguity that changes scope, externally visible behavior, compatibility or acceptance criteria; record minor assumptions in the artifacts.
+- Specs describe behavior; implementation detail goes to design.md and plan.md.

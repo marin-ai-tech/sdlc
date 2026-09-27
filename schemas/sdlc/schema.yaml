@@ -1,0 +1,251 @@
+name: sdlc
+version: 1
+description: AI-native SDLC (Anthropic playbook) on OpenSpec - intent → proposal → specs + design → plan → tasks
+artifacts:
+  - id: intent
+    generates: intent.md
+    description: Stage 1 (Plan) - the originator's intent, captured once, in their own words
+    template: intent.md
+    instruction: |
+      Capture the INTENT behind this change: a one-page proto-spec in the
+      originator's own words that a product owner can accept or reject.
+
+      Brainstorm before writing. Ask the questions an analyst would ask, one
+      or two at a time, until the idea is concrete:
+      - What can the affected users not do today? Who exactly is affected?
+      - What does better look like, observable from their side?
+      - Which constraints apply (policy, security, privacy, compliance,
+        compatibility, deadlines)? What is explicitly out of scope?
+      - How will we know it worked (a measurable signal)?
+      Do not ask about things the codebase or existing specs already answer:
+      read them instead (`sdlc openspec list --specs`, then
+      `sdlc openspec show "<spec-id>" --type spec`).
+
+      Sections (keep every heading, write "None" when a section is empty):
+      - Header line: Author (name and team), Status (always `draft` - only the
+        product owner's `sdlc approve intent` makes it accepted), Source
+        (idea, ticket <id>, incident <id>, alert, or scan).
+      - **Problem**: what cannot be done today and the evidence for it. For an
+        incident, alert or scan finding, include the anomaly, its evidence
+        (metric, log excerpt, finding id) and the affected window.
+      - **Proposed outcome**: the end state in user terms, not the solution.
+      - **Affected users and systems**.
+      - **Constraints**: every policy or technical constraint that must hold.
+      - **Success measures**: leading and lagging signals.
+      - **Out of scope**.
+      - **Open questions**: unknowns the product owner or design stage must
+        answer.
+
+      Rules:
+      - No technical design, file names, or task lists - those belong to
+        design.md and plan.md. The intent must survive a change of approach.
+      - Keep it under one page. Use the originator's vocabulary; correct
+        misunderstandings with them before finishing.
+      - When the intent mirrors an external record (Jira, ServiceNow, an
+        incident tracker), write its id in the Source line so the two stay
+        linked.
+    requires: []
+
+  - id: proposal
+    generates: proposal.md
+    description: Stage 2 (Design) - why this change is needed and which capabilities it touches
+    template: proposal.md
+    instruction: |
+      Create the proposal that turns the ACCEPTED intent (intent.md) into an
+      engineering scope. Read intent.md first; the proposal must answer its
+      open questions or carry them forward explicitly.
+
+      Sections:
+      - **Why**: 1-3 sentences (50-1000 characters) on the problem and why now.
+        Reference intent.md instead of restating it.
+      - **What Changes**: bullet list of concrete changes. Mark breaking changes
+        with **BREAKING**.
+      - **Capabilities**: which specs will be created or modified:
+        - **New Capabilities**: each becomes `specs/<capability-path>/spec.md`.
+          Use kebab-case path segments and follow the project's existing spec
+          organization.
+        - **Modified Capabilities**: existing capabilities whose REQUIREMENTS
+          change. Use the exact existing path under `openspec/specs/`.
+      - **Impact**: affected code, APIs, dependencies, systems, and teams.
+      - **Intent coverage**: how each Open question from intent.md is answered
+        or where it is carried forward.
+
+      Research existing specs before filling Capabilities: run
+      `sdlc openspec list --specs` for the capability inventory, then
+      `sdlc openspec show "<spec-id>" --type spec --json --no-scenarios` for
+      related ones, and read relevant specs in full before deciding what is
+      covered. Reuse an existing capability path rather than inventing a
+      near-duplicate.
+
+      Every change must declare at least one capability or opt out of specs:
+      `openspec validate` rejects a change with zero deltas unless the
+      change's `.openspec.yaml` sets `skip_specs: true`. Use `skip_specs` only
+      when no externally visible behavior changes (pure refactor, tooling,
+      docs). Never invent a requirement to satisfy validation.
+
+      Keep it concise (1-2 pages). Why and what, not how.
+    requires:
+      - intent
+
+  - id: specs
+    generates: "specs/**/*.md"
+    description: Stage 2 (Design) - requirement deltas (behavior contract) per capability
+    template: spec.md
+    instruction: |
+      Create delta spec files that define WHAT the system must do. A spec is a
+      behavior contract, not an implementation plan.
+
+      Good spec content: observable behavior, inputs/outputs/error conditions,
+      external constraints (security, privacy, reliability, compatibility), and
+      testable scenarios. Keep out: class/function names, library choices,
+      step-by-step implementation (design.md and plan.md hold those).
+
+      Apply the organization's policies while writing: if skills exist for
+      security, privacy, compliance, API or UX standards, load and follow them
+      now. A policy the requirements cannot satisfy is an Area of Concern for
+      design.md, never something to silently drop.
+
+      Create one spec file per capability listed in the proposal:
+      - New capability: `specs/<capability-path>/spec.md` using the exact path
+        from the proposal. Its first section is `## Purpose` (one or two
+        sentences, 50+ characters).
+      - Modified capability: use the exact existing path from
+        `openspec/specs/<capability-path>/`. Do NOT add `## Purpose`.
+
+      Delta operations (use `##` headers):
+      - **ADDED Requirements**: new behavior
+      - **MODIFIED Requirements**: changed behavior - copy the ENTIRE existing
+        requirement block (header through all scenarios) and edit it; partial
+        content loses detail at archive time
+      - **REMOVED Requirements**: must include **Reason** and **Migration**
+      - **RENAMED Requirements**: name changes only, FROM:/TO: format
+
+      Format:
+      - Each requirement: `### Requirement: <name>` then a statement using
+        SHALL/MUST.
+      - Each scenario: `#### Scenario: <name>` (exactly 4 hashtags) with
+        **WHEN**/**THEN** bullets. Every requirement needs at least one
+        scenario - each scenario is a future test case.
+
+      Run `sdlc openspec validate "<change>" --strict` after writing and fix
+      every issue it reports.
+    requires:
+      - proposal
+
+  - id: design
+    generates: design.md
+    description: Stage 2 (Design) - technical approach, policy compliance, and flagged areas of concern
+    template: design.md
+    instruction: |
+      Create the design that explains HOW the change fits the existing
+      codebase, and flag every area of concern before engineering starts.
+      Inspect the relevant code, tests and configuration first (read-only).
+
+      Sections:
+      - **Context**: current state and constraints needed to explain the
+        approach. Point to proposal.md for motivation.
+      - **Goals / Non-Goals**: design-level boundaries only.
+      - **Decisions**: key technical choices with rationale and the
+        alternatives considered.
+      - **Policy compliance**: which organizational policies (skills, CLAUDE.md
+        or AGENTS.md rules, REVIEW.md passes) apply and how the design
+        satisfies each. Name the skill or document and its version/commit when
+        known - this is the governance record of which policy was in force.
+      - **Areas of concern**: every point an analyst would escalate -
+        conflicting policies, security or privacy risk, data migration,
+        compatibility breaks, unanswered intent questions. Format each as a
+        checkbox: `- [ ] <concern> — owner: <policy owner or role> —
+        resolution: <pending | how it was resolved>`. The product owner
+        resolves each with its owner before approving the spec gate.
+      - **Risks / Trade-offs**: `[Risk] → Mitigation`.
+      - **Migration and rollback**: deploy steps and how to undo them, when
+        relevant.
+      - **Open questions**: only unknowns that cannot change the specs, the
+        approach, or the plan. Anything that could must be asked now.
+
+      Keep it proportional: a small change gets a short design, but the
+      Policy compliance and Areas of concern sections are always present
+      (write "None identified" when that is true).
+    requires:
+      - proposal
+
+  - id: plan
+    generates: plan.md
+    description: Stage 3 (Build) - the implementation plan an engineer approves before any code is written
+    template: plan.md
+    instruction: |
+      Produce the implementation plan from the APPROVED spec (proposal.md,
+      specs/, design.md). Nothing is implemented without an accepted plan, so
+      the plan must be complete enough that an engineer who never saw this
+      conversation could implement the change from it alone.
+
+      Work like plan mode: read the codebase without changing it. In Claude
+      Code, prefer running this step in plan mode and presenting the plan for
+      acceptance before writing the file; in OpenCode, use the plan agent or
+      stay read-only until the plan is written.
+
+      Interview the engineer and interrogate the plan before finalizing:
+      what could this change break, which step is riskiest, which options did
+      you decide against and why.
+
+      Sections:
+      - **Files that change**: concrete paths (new / modified / deleted) with
+        one line each on what changes.
+      - **Order of work**: numbered steps; mark steps that are independent and
+        could run in parallel sessions or worktrees.
+      - **Risks**: what could break, the riskiest step, and how each risk is
+        contained.
+      - **Alternatives considered**: options not chosen and why.
+      - **Proof**: the tests and checks that prove the change works - name the
+        test files and cases (one per spec scenario where practical), the
+        commands (`sdlc verify` runs the configured ones), and any visual or
+        manual evidence. For a bug fix, the first step writes a failing test
+        that reproduces the bug.
+      - **Rollback**: how to undo the change if it misbehaves after release.
+
+      When implementation later departs from this plan, update plan.md in the
+      same commit as the code - the review compares the diff with this file.
+    requires:
+      - specs
+      - design
+
+  - id: tasks
+    generates: tasks.md
+    description: Stage 3 (Build) - trackable implementation checklist derived from the plan
+    template: tasks.md
+    instruction: |
+      Break plan.md's Order of work into a trackable checklist. The apply and
+      build workflows parse the checkboxes to track progress: only `- [x]`
+      counts as done; every other marker reads as unfinished.
+
+      Guidelines:
+      - Group related tasks under `## N. <group>` headings, in dependency order.
+      - Each task is a checkbox: `- [ ] N.M <task>`, small enough for one
+        session, and states how it is verified (test, command, or observable
+        result) in its own description.
+      - Each group lands the tests and documentation its own work calls for;
+        do not collect testing or docs into a final group.
+      - For a bug fix, task 1.1 writes the failing test that reproduces the bug
+        and confirms it fails for the expected reason.
+      - The final group holds only integration checks, ending with
+        `- [ ] N.M Run sdlc verify and confirm every required check passes`.
+
+      Check design.md Open questions first: resolve with the user anything that
+      would change what gets built.
+    requires:
+      - plan
+
+apply:
+  requires: [tasks]
+  tracks: tasks.md
+  instruction: |
+    Implement the APPROVED plan (check `sdlc status` - the plan gate must be
+    approved). Read intent.md, proposal.md, specs/, design.md, plan.md and
+    tasks.md first. Work through pending tasks in order and keep a feedback
+    loop: after each task group run the relevant checks (the commands listed
+    by `sdlc verify --list`) and fix the code, never the tests, until they pass.
+    Mark a task `- [x]` only when its specified behavior is fully implemented
+    and verified. When the implementation departs from plan.md, update plan.md
+    in the same commit. Pause and ask when a task is unclear, when a design
+    issue appears, or when the work exceeds what the spec describes.
+    When all tasks are done, run `sdlc verify` to record the evidence.
