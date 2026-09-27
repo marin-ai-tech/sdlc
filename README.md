@@ -171,7 +171,7 @@ node bin/sdlc.js plugin build plugin --marketplace   # regenerate the committed 
 
 ## Documentation
 
-Research and design (Russian) are in [`docs/ru/`](docs/ru/README.md):
+Research and design are in [`docs/en/`](docs/en/README.md):
 - OpenSpec analysis
 - the playbook mapping
 - community reviews and other harnesses (Spec Kit, BMAD, Kiro, cc-sdd, superpowers…)
