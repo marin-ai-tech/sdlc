@@ -2,10 +2,13 @@
 id: status
 title: "SDLC: Status"
 description: Show the SDLC dashboard - every active change with its stage (plan, design, build, test, deploy), gate states, approvals, verification and review status, and who must act next. Use when the user asks for status, progress, what is blocked, or what needs approval.
+when-to-use: The user asks for status, progress, blockers, or approvals.
 command-description: Show SDLC status - stages, gates, and who must act next
 argument-hint: "[change-id]"
 ---
 Show where every change stands in the SDLC and who must act next.
+
+{{inject:status --json}}
 
 {{contract}}
 

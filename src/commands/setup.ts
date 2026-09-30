@@ -36,6 +36,7 @@ export interface InitOptions {
   mode?: string;
   hooks?: boolean;
   opsx?: boolean;
+  statusline?: boolean;
   language?: string;
   force?: boolean;
   json?: boolean;
@@ -125,7 +126,7 @@ function printInstall(result: InstallResult, config: SdlcConfig): void {
   for (const kept of result.files.kept) {
     warn(`kept ${kept} (edited locally; run with --force to overwrite)`);
   }
-  if (result.claudeHooks !== 'absent' && result.claudeHooks !== 'unchanged') {
+    if (result.claudeHooks !== 'absent' && result.claudeHooks !== 'unchanged') {
     line(`  Claude Code hooks: ${result.claudeHooks} in .claude/settings.json`);
   }
   if (result.tools.length > 0) {
@@ -160,6 +161,7 @@ export async function initCommand(target: string | undefined, opts: InitOptions)
     config.tools = tools;
     config.delivery = assertDelivery(opts.delivery) ?? config.delivery;
     config.cli = opts.cli ?? config.cli;
+    config.statusline = opts.statusline || config.statusline;
     config.enforcement.mode = assertMode(opts.mode) ?? config.enforcement.mode;
     let detectedCommands: string[] = [];
     if (!hadConfig && config.verify.commands.length === 0) {
@@ -194,6 +196,7 @@ export async function initCommand(target: string | undefined, opts: InitOptions)
         tools,
         files: result.files,
         claudeHooks: result.claudeHooks,
+        statusLine: result.statusLine,
         reviewPolicy: reviewCreated ? config.review.policy : undefined,
         ...(opsx ? { opsx } : {}),
       });
@@ -213,6 +216,7 @@ export async function initCommand(target: string | undefined, opts: InitOptions)
     line(`  ${stampText(stamp)}`);
     if (license.status !== 'ok') warn(`${license.message}. ${license.fix ?? ''}`.trim());
     printInstall(result, config);
+    if (result.statusLine === 'kept (user-defined)') warn('kept user-defined Claude Code status line');
   } catch (error) {
     reportFailure(error, opts.json);
   }

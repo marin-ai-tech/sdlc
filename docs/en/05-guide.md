@@ -17,7 +17,7 @@ sdlc doctor                            # check the installation
 - copies the schema to `openspec/schemas/sdlc/` and creates `openspec/sdlc.yaml`. Verification commands are detected automatically from `package.json`, `Makefile`, `pyproject`, `go.mod` or `Cargo.toml`;
 - generates skills, commands, subagents and hooks (Claude) or a plugin (OpenCode), plus `REVIEW.md` if it does not exist.
 
-Useful flags: `--mode block` — strict enforcement; `--cli "npx sdlc"` — if the CLI is installed locally in the project (`npm i -D github:marin-ai-tech/scdl`); `--opsx` — also install OpenSpec's own `/opsx:*` workflows alongside; `--delivery skills|commands|both`; `--no-hooks`.
+Useful flags: `--mode block` — strict enforcement; `--cli "npx sdlc"` — if the CLI is installed locally in the project (`npm i -D github:marin-ai-tech/scdl`); `--opsx` — also install OpenSpec's own `/opsx:*` workflows alongside; `--delivery skills|commands|both`; `--no-hooks`; `--statusline` — install the Claude Code status line.
 
 **Claude Code plugin (organization-wide):**
 ```text
@@ -52,6 +52,20 @@ At any point, `/sdlc:next` (`/sdlc-next`) runs the next step or tells you who mu
 
 **A human runs approvals in their own terminal.** Inside an agent session, `sdlc approve` refuses to run. This is by design.
 
+
+
+### Getting around
+
+- `sdlc help [topic] [--json]` and `/sdlc:help` (`/sdlc-help`) list workflows and CLI commands and say who runs each one (agent or person).
+- After a state-changing command, the CLI prints a `Next:` hint (who acts next and how; the exact command when a person must act) and adds `next` to JSON. With no active change, session-start context names the next ready backlog item.
+- `sdlc status --change <id>` draws a stage stepper and a task bar; `sdlc backlog list` draws a bar per epic. Markdown reports include Mermaid diagrams with sanitized labels.
+
+```text
+intent ● ─ spec ○ ─ plan ○ ─ build ○ ─ verify ○ ─ review ○ ─ archive ○
+tasks      █████░░░░░  2/4
+```
+
+- Claude Code status line: `sdlc statusline` prints one line (`change · stage · who acts`). Opt in with `sdlc init --statusline`. A user-defined status line is never replaced; `sdlc uninstall` removes only the scdl one.
 
 ### Backlog and epics
 

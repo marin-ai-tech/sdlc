@@ -95,6 +95,25 @@ function stripOurs(hooks: HooksConfig): HooksConfig {
 
 export type SettingsChange = 'installed' | 'updated' | 'unchanged' | 'removed' | 'absent';
 
+function oursStatusLine(value: unknown): boolean {
+  if (!value || typeof value !== 'object') return false;
+  const line = value as Record<string, unknown>;
+  return line.type === 'command' && typeof line.command === 'string'
+    && /^(?:sdlc|scdl|npx sdlc) statusline$/.test(line.command);
+}
+
+export function mergeClaudeStatusLine(root: string, cli: string, install: boolean, dryRun = false): string {
+  const settings = readSettings(root);
+  const existing = settings.statusLine;
+  if (existing !== undefined && !oursStatusLine(existing)) return 'kept (user-defined)';
+  if (install && existing && (existing as Record<string, unknown>).command === `${cli} statusline`) return 'unchanged';
+  if (!install && existing === undefined) return 'absent';
+  if (install) settings.statusLine = { type: 'command', command: `${cli} statusline` };
+  else delete settings.statusLine;
+  if (!dryRun) writeTextAtomic(path.join(root, SETTINGS_PATH), `${JSON.stringify(settings, null, 2)}\n`);
+  return install ? 'installed' : 'removed';
+}
+
 export function mergeClaudeHooks(root: string, cli: string, install: boolean, dryRun = false): SettingsChange {
   const settings = readSettings(root);
   const before = JSON.stringify(settings);

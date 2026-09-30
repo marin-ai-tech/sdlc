@@ -2,6 +2,19 @@
 
 All notable changes to scdl. Versions follow [Semantic Versioning](https://semver.org/); while the major version is 0, a minor version may change behavior.
 
+## 0.5.0 — 2026-09-30
+
+### Added
+- **`sdlc help [topic] [--json]`** and the **`/sdlc:help`** workflow: every workflow with its invocation in Claude Code and OpenCode, every CLI command with usage, example and who runs it (an agent or a person).
+- **`Next:` hints**: commands that change state (`new`, `approve`, `reject`, `waive`, `verify`, `archive`, `track set`, `defer add`, `backlog start`, `import`) end with who acts next and how — the exact command when a person must act — and add `next` to their JSON. The session-start context names the next ready backlog item when no change is active.
+- **Questions with choices and todo lists in the tools' own UI**: workflows ask through Claude Code's `AskUserQuestion` or OpenCode's `question` tool with 2–4 choices; `/sdlc:build` mirrors `tasks.md` into the todo list (TodoWrite / `todowrite`); `/sdlc:status`, `/sdlc:next` and `/sdlc:help` inline live CLI output. Tool names are rendered per tool, never mixed.
+- **Progress drawing**: a stage stepper and a task bar in `sdlc status --change`, a bar per epic in `sdlc backlog list`, Mermaid diagrams (lifecycle per change, epic progress) in the Markdown report with sanitized labels.
+- **Claude Code status line**: `sdlc statusline` (one line: change · stage · who acts), opt-in with `sdlc init --statusline`; a user-defined status line is never replaced.
+
+### Changed
+- The workflow contract states that an answer in chat is never an approval: human decisions are commands the person runs in their own terminal.
+- One list of human-only commands drives both `sdlc help` and the hook; the hook now also denies `sdlc license set` from agents.
+
 ## 0.4.0 — 2026-09-30
 
 ### Added

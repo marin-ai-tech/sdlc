@@ -6,6 +6,7 @@ import { harnessPackageDir } from '../core/openspec-schema.js';
 
 /** Workflow ids in the order they are presented to people. */
 export const WORKFLOW_IDS = [
+  'help',
   'next',
   'status',
   'explore',
@@ -30,6 +31,7 @@ export interface WorkflowTemplate {
   description: string;
   commandDescription: string;
   argumentHint?: string;
+  whenToUse?: string;
   body: string;
 }
 
@@ -73,6 +75,7 @@ export function loadWorkflow(id: WorkflowId): WorkflowTemplate {
     description,
     commandDescription: str('command-description') ?? description,
     ...(str('argument-hint') ? { argumentHint: str('argument-hint') } : {}),
+    ...(str('when-to-use') ? { whenToUse: str('when-to-use') } : {}),
     body,
   };
 }

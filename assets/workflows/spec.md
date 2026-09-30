@@ -21,7 +21,7 @@ Write the requirements and design spec - Stage 2 (Design): `proposal.md`, delta 
    - inspect the relevant code, tests and configuration read-only, proportional to the change (delegate broad exploration to the `sdlc-researcher` subagent to keep this context clean)
    - write the file at `resolvedOutputPath` following `template` and `instruction`; apply `context` and `rules` as constraints without copying them
 4. **Validate**: `sdlc validate --change <id>`. It runs `openspec validate --strict` plus the harness's delta checks (MODIFIED/REMOVED/RENAMED headers must exist in the main spec). Fix every error.
-5. **Flag concerns.** `design.md` must list every area of concern with its owner - conflicting policies, security or privacy risk, migrations, compatibility breaks, unanswered intent questions. Never resolve a policy conflict silently.
+5. **Flag concerns.** `design.md` must list every area of concern with its owner - conflicting policies, security or privacy risk, migrations, compatibility breaks, unanswered intent questions. For design alternatives, use {{tool:ask}} with 2-4 choices and a recommended one. Never resolve a policy conflict silently.
 6. **Stop at the gate.** Summarize: capabilities touched, requirements added/modified/removed, open concerns and who owns each. Then give the product owner the approval command: `sdlc approve spec --change <id>` (for `risk: high` a tech lead also runs `sdlc approve spec --change <id> --as tech-lead`). Planning continues with {{cmd:plan}} only after approval.
 
 **Guardrails**

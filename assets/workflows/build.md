@@ -14,7 +14,7 @@ Implement the approved plan - Stage 3 (Build). Every step checks its own work be
 **Steps**
 
 1. **Check the gate.** `sdlc status --change <id> --json`: the `plan` gate must be `approved` (or `waived`). If it is `stale`, the plan changed after approval: stop and ask the engineer to re-approve. If it is pending, stop - do not implement an unapproved plan.
-2. **Load context from disk**: intent.md, proposal.md, specs/, design.md, plan.md, tasks.md. Run `sdlc verify --list` to learn the project's checks.
+2. **Load context from disk**: intent.md, proposal.md, specs/, design.md, plan.md, tasks.md. Put the `tasks.md` items into {{tool:todo}} at the start and keep it in step as tasks are checked. `tasks.md` stays the source of truth. Run `sdlc verify --list` to learn the project's checks.
 3. **Parallel streams.** If plan.md marks independent steps `[parallel]` and they touch different files, suggest running them in separate worktrees/sessions; tasks that share files stay sequential in this session.
 4. **Bug-fix protocol** (`kind: bugfix`): the first task writes a test that reproduces the bug. Run it, confirm it fails for the expected reason, commit it, then run `sdlc tests lock --change <id>` - from then on the harness blocks edits to test files, so the fix has to change the code.
 5. **Work the tasks in order.** For each pending task:

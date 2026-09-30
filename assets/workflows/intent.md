@@ -17,10 +17,10 @@ Capture an idea as `intent.md` - Stage 1 (Plan). The intent is the originator's 
    ```bash
    sdlc new <name> --kind <feature|bugfix|refactor|chore|docs|security|incident> --risk <low|medium|high> [--source-type ticket --source-ref <id>]
    ```
-   Infer kind and risk; ask only when unclear. Risk is `high` for security, privacy, payments, data migration, compliance, or a wide blast radius.
+   Infer kind and risk; when unclear use {{tool:ask}} with 2-4 plausible choices and a recommended one. Risk is `high` for security, privacy, payments, data migration, compliance, or a wide blast radius.
 2. **Get the instructions**: `sdlc instructions intent --change <name> --json`. Use `template` as the structure, follow `instruction`, treat `context` and `rules` as constraints (never copy them into the file), write to `resolvedOutputPath`.
    If the change's source is an exploration, or the user points to `openspec/explorations/<slug>.md`, read that note first. Do not ask again what it already answers; carry its unresolved questions into intent's Open questions.
-3. **Brainstorm until the idea is concrete.** Ask the questions an analyst would ask - scope, affected users, constraints, what success looks like - one or two at a time. Read the code and existing specs (`sdlc openspec list --specs`) instead of asking what they already answer.
+3. **Brainstorm until the idea is concrete.** For open questions with a small answer set, use {{tool:ask}} with 2-4 choices and a recommended one. Ask about scope, users, constraints and success one or two at a time. Read the code and existing specs (`sdlc openspec list --specs`) first.
 4. **Write `intent.md`** with `Status: draft`. No solution design, file names or task lists.
 5. **Confirm with the originator** and correct anything misunderstood.
 6. **Stop at the gate.** Tell the user the intent is ready for the product owner, who accepts it with `sdlc approve intent --change <name>` or sends it back with `sdlc reject intent --change <name> --note "<why>"`. The spec is written only after acceptance ({{cmd:spec}}).

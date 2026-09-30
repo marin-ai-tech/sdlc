@@ -1,5 +1,6 @@
 import { loadProject } from '../cli/context.js';
 import { line, printJson, reportFailure } from '../cli/output.js';
+import { formatNextLine, resolveNext } from '../cli/next-hint.js';
 import { addDeferred, closeDeferred, readDeferred } from '../core/deferred.js';
 import { SdlcError } from '../core/errors.js';
 import { formatIdentity, gitIdentity } from '../core/git.js';
@@ -35,8 +36,20 @@ export function deferAdd(title: string, opts: { why?: string; change?: string; f
     const by = formatIdentity(gitIdentity(ctx.root));
     const item = addDeferred(ctx.root, { title, why: opts.why, change: opts.change, finding: opts.finding, revisit: opts.revisit, by });
     appendLog(ctx.root, ctx.config, { event: 'deferred.added', change: item.change, by, detail: `${item.id} ${item.title}` }, ctx.stamp);
-    if (opts.json) printJson({ item, harness: ctx.stamp });
-    else line(`${item.id} ${item.title}`);
+    let next;
+    if (opts.change) {
+      try {
+        next = resolveNext(ctx, opts.change);
+      } catch {
+        next = undefined;
+      }
+    }
+    if (opts.json) printJson({ item, harness: ctx.stamp, ...(next ? { next } : {}) });
+    else {
+      line(`${item.id} ${item.title}`);
+      const hint = next ? formatNextLine(ctx, next) : undefined;
+      if (hint) line(hint);
+    }
   } catch (error) { reportFailure(error, opts.json); }
 }
 

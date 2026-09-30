@@ -1,5 +1,6 @@
 import { loadProject, recordChangeEvent } from '../cli/context.js';
 import { line, printJson, reportFailure } from '../cli/output.js';
+import { emitNextHint, resolveNext } from '../cli/next-hint.js';
 import { agentEnvironment } from '../core/agent-env.js';
 import { readChangeState, TRACKS, type Track } from '../core/change-state.js';
 import { resolveChange } from '../core/changes.js';
@@ -28,8 +29,12 @@ export async function trackSetCommand(trackArg: string, opts: TrackOptions): Pro
     delete state.track_suggestion;
     recordChangeEvent(ctx, ref, state, 'track.set', formatIdentity(gitIdentity(ctx.root)),
       `${previous} → ${track}${opts.note ? `: ${opts.note}` : ''}`);
-    if (opts.json) printJson({ change: ref.id, track, previous, harness: ctx.stamp });
-    else line(`Track for ${ref.id}: ${previous} → ${track}`);
+    const next = resolveNext(ctx, ref.id);
+    if (opts.json) printJson({ change: ref.id, track, previous, harness: ctx.stamp, ...(next ? { next } : {}) });
+    else {
+      line(`Track for ${ref.id}: ${previous} → ${track}`);
+      emitNextHint(ctx, ref.id);
+    }
   } catch (error) {
     reportFailure(error, opts.json);
   }

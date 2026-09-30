@@ -1,6 +1,7 @@
 import * as path from 'node:path';
 import { loadProject, recordChangeEvent } from '../cli/context.js';
 import { c, line, printJson, reportFailure } from '../cli/output.js';
+import { emitNextHint, resolveNext } from '../cli/next-hint.js';
 import { readChangeState } from '../core/change-state.js';
 import { resolveChange } from '../core/changes.js';
 import { readChangeDeltas } from '../core/deltas.js';
@@ -73,9 +74,10 @@ export async function verifyCommand(opts: VerifyOptions): Promise<void> {
     applyVerifyToState(state, run, ctx.stamp);
     recordChangeEvent(ctx, ref, state, `verify.${run.status}`, formatIdentity(gitIdentity(ctx.root)),
       run.checks.map((ch) => `${ch.name}=${ch.exit_code ?? 'timeout'}`).join(' '));
+    const next = resolveNext(ctx, ref.id);
     if (opts.json) {
       printJson({ change: ref.id, status: run.status, at: run.at, commit: run.commit, dirty: run.dirty, checks: run.checks,
-        evidence: file, harness: ctx.stamp });
+        evidence: file, harness: ctx.stamp, ...(next ? { next } : {}) });
     } else {
       for (const check of run.checks) {
         const ok = check.exit_code === 0;
@@ -86,6 +88,7 @@ export async function verifyCommand(opts: VerifyOptions): Promise<void> {
         ? `${c.green('Verification passed')} - evidence recorded in ${path.relative(process.cwd(), file)}`
         : `${c.red('Verification failed')} - fix the code (not the tests) and run \`sdlc verify\` again.`);
       if (only) line(c.dim('Partial runs (--only) record evidence but never pass the verify gate.'));
+      emitNextHint(ctx, ref.id);
     }
     if (run.status !== 'passed') process.exitCode = 1;
   } catch (error) {

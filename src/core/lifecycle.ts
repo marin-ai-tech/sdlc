@@ -93,6 +93,8 @@ export interface NextAction {
     | 'fix-findings'
     | 'release'
     | 'archive'
+    /** No active change: start the first ready backlog item (`sdlc backlog start`). */
+    | 'start-backlog-item'
     | 'none';
   /** Workflow id of the skill/command that performs the action (e.g. `spec`). */
   workflow?: string;

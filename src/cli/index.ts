@@ -1,4 +1,6 @@
 import { Command } from 'commander';
+import { helpCommand } from '../commands/help.js';
+import { statuslineCommand } from '../commands/statusline.js';
 import { archiveCommand, auditCommand, logCommand, validateCommand } from '../commands/lifecycle-ops.js';
 import { licenseCommand } from '../commands/license.js';
 import { instructionsCommand, newCommand, nextCommand, statusCommand } from '../commands/changes.js';
@@ -23,23 +25,89 @@ import { backlogAdd, backlogClose, backlogEpicAdd, backlogList, backlogMove, bac
 export function buildProgram(): Command {
   const program = new Command();
   const backlog = program.command('backlog').description('Manage planned changes in priority order');
-  backlog.command('epic').command('add <title>').option('--goal <text>').option('--json').action((title, opts) => backlogEpicAdd(title, opts));
-  backlog.command('add <title>').option('--epic <E-id>').option('--kind <kind>').option('--risk <risk>').option('--outcome <text>').option('--accept <text>', '', (value, previous: string[]) => [...previous, value], [] as string[]).option('--depends <B-id>', '', (value, previous: string[]) => [...previous, value], [] as string[]).option('--source-type <type>').option('--source-ref <ref>').option('--json').action((title, opts) => backlogAdd(title, opts));
-  backlog.command('list').option('--epic <E-id>').option('--status <status>').option('--ready').option('--json').action(opts => backlogList(opts));
-  backlog.command('next').option('--json').action(opts => backlogNext(opts));
-  backlog.command('start <B-id>').option('--change <id>').option('--json').action((id, opts) => backlogStart(id, opts));
-  backlog.command('move <B-id>').option('--top').option('--before <B-id>').option('--after <B-id>').option('--epic <E-id>').option('--json').action((id, opts) => backlogMove(id, opts));
-  backlog.command('drop <B-id>').option('--note <text>').option('--json').action((id, opts) => backlogClose(id, 'dropped', opts));
-  backlog.command('done <B-id>').option('--note <text>').option('--json').action((id, opts) => backlogClose(id, 'done', opts));
+  backlog.command('epic').description('Manage backlog epics')
+    .command('add <title>').description('Add an epic')
+    .option('--goal <text>', 'goal of the epic')
+    .option('--json', 'output JSON')
+    .action((title, opts) => backlogEpicAdd(title, opts));
+  backlog.command('add <title>').description('Add a backlog item')
+    .option('--epic <E-id>', 'parent epic id')
+    .option('--kind <kind>', 'kind of change')
+    .option('--risk <risk>', 'risk level')
+    .option('--outcome <text>', 'desired outcome')
+    .option('--accept <text>', 'acceptance criterion',
+      (value, previous: string[]) => [...previous, value], [] as string[])
+    .option('--depends <B-id>', 'backlog dependency id',
+      (value, previous: string[]) => [...previous, value], [] as string[])
+    .option('--source-type <type>', 'origin type')
+    .option('--source-ref <ref>', 'origin reference')
+    .option('--json', 'output JSON')
+    .action((title, opts) => backlogAdd(title, opts));
+  backlog.command('list').description('List backlog items')
+    .option('--epic <E-id>', 'filter by epic id')
+    .option('--status <status>', 'filter by status')
+    .option('--ready', 'show ready items')
+    .option('--json', 'output JSON')
+    .action(opts => backlogList(opts));
+  backlog.command('next').description('Show the next ready backlog item')
+    .option('--json', 'output JSON')
+    .action(opts => backlogNext(opts));
+  backlog.command('start <B-id>').description('Start a backlog item as a change')
+    .option('--change <id>', 'change id')
+    .option('--json', 'output JSON')
+    .action((id, opts) => backlogStart(id, opts));
+  backlog.command('move <B-id>').description('Reorder a backlog item')
+    .option('--top', 'move to the top')
+    .option('--before <B-id>', 'place before this item')
+    .option('--after <B-id>', 'place after this item')
+    .option('--epic <E-id>', 'move into this epic')
+    .option('--json', 'output JSON')
+    .action((id, opts) => backlogMove(id, opts));
+  backlog.command('drop <B-id>').description('Drop a backlog item')
+    .option('--note <text>', 'reason for dropping')
+    .option('--json', 'output JSON')
+    .action((id, opts) => backlogClose(id, 'dropped', opts));
+  backlog.command('done <B-id>').description('Mark a backlog item done')
+    .option('--note <text>', 'completion note')
+    .option('--json', 'output JSON')
+    .action((id, opts) => backlogClose(id, 'done', opts));
   const defer = program.command('defer').description('Manage consciously deferred work');
-  defer.command('add <title>').option('--why <text>').option('--change <id>').option('--finding <F-id>').option('--revisit <text>').option('--json').action((title, opts) => deferAdd(title, opts));
-  defer.command('list').option('--open').option('--change <id>').option('--json').action((opts) => deferList(opts));
-  defer.command('close <D-id>').option('--status <status>').option('--note <text>').option('--json').action((id, opts) => deferClose(id, opts));
+  defer.command('add <title>').description('Record deferred work')
+    .option('--why <text>', 'reason for deferring')
+    .option('--change <id>', 'related change id')
+    .option('--finding <F-id>', 'related finding id')
+    .option('--revisit <text>', 'when to revisit')
+    .option('--json', 'output JSON')
+    .action((title, opts) => deferAdd(title, opts));
+  defer.command('list').description('List deferred work')
+    .option('--open', 'show open items')
+    .option('--change <id>', 'filter by change id')
+    .option('--json', 'output JSON')
+    .action((opts) => deferList(opts));
+  defer.command('close <D-id>').description('Resolve deferred work')
+    .option('--status <status>', 'resolution status')
+    .option('--note <text>', 'resolution note')
+    .option('--json', 'output JSON')
+    .action((id, opts) => deferClose(id, opts));
   const layout = program.command('layout').description('Check or create the AI-ready project layout');
-  layout.command('check').option('--json', 'output JSON').action((opts) => layoutCommand('check', opts));
-  layout.command('scaffold').option('--dry-run', 'show planned files').option('--json', 'output JSON').action((opts) => layoutCommand('scaffold', opts));
-  layout.command('adapt').option('--dry-run', 'show planned files').option('--json', 'output JSON').action((opts) => layoutCommand('adapt', opts));
-  layout.command('convert').option('--apply', 'apply conversion').option('--in-place', 'convert the current working copy').option('--worktree <path>', 'new worktree path').option('--branch <name>', 'new branch name').option('--json', 'output JSON').action((opts) => layoutCommand('convert', opts));
+  layout.command('check').description('Check the project layout')
+    .option('--json', 'output JSON')
+    .action((opts) => layoutCommand('check', opts));
+  layout.command('scaffold').description('Create the recommended layout')
+    .option('--dry-run', 'show planned files')
+    .option('--json', 'output JSON')
+    .action((opts) => layoutCommand('scaffold', opts));
+  layout.command('adapt').description('Adapt an existing project layout')
+    .option('--dry-run', 'show planned files')
+    .option('--json', 'output JSON')
+    .action((opts) => layoutCommand('adapt', opts));
+  layout.command('convert').description('Convert the project layout')
+    .option('--apply', 'apply conversion')
+    .option('--in-place', 'convert the current working copy')
+    .option('--worktree <path>', 'new worktree path')
+    .option('--branch <name>', 'new branch name')
+    .option('--json', 'output JSON')
+    .action((opts) => layoutCommand('convert', opts));
   program
     .name('sdlc')
     .description('AI-native SDLC harness (Anthropic playbook) for Claude Code and OpenCode, built on OpenSpec.')
@@ -57,6 +125,7 @@ export function buildProgram(): Command {
     .option('--mode <mode>', 'enforcement mode: off | warn | block')
     .option('--no-hooks', 'do not install Claude Code hooks')
     .option('--opsx', "also install OpenSpec's own /opsx workflows for the same tools")
+    .option('--statusline', 'install the Claude Code status line')
     .option('--language <language>', 'artifact language for a new OpenSpec config')
     .option('--force', 'overwrite generated files even if edited locally')
     .option('--json', 'output JSON')
@@ -94,13 +163,23 @@ export function buildProgram(): Command {
     .option('--json', 'output JSON')
     .action((name, opts) => newCommand(name, opts));
 
-  const explore = program.command('explore').description('Create or list optional exploration notes before intent')
-    .argument('[slug]').option('--json', 'output JSON')
+  const explore = program.command('explore')
+    .description('Create or list optional exploration notes before intent')
+    .argument('[slug]', 'exploration note slug')
+    .option('--json', 'output JSON')
     .action((slug, opts) => { if (slug) exploreCommand(slug, opts); });
-  explore.command('list').option('--json', 'output JSON').action((opts) => exploreListCommand(opts));
+  explore.command('list').description('List exploration notes')
+    .option('--json', 'output JSON')
+    .action((opts) => exploreListCommand(opts));
   program.command('import').description('Import planning artifacts')
-    .command('bmad <path>').option('--change <id>').option('--to-backlog').option('--kind <kind>').option('--risk <risk>')
-    .option('--dry-run').option('--json').action((input, opts) => importBmadCommand(input, opts));
+    .command('bmad <path>').description('Import a BMAD planning artifact')
+    .option('--change <id>', 'target change id')
+    .option('--to-backlog', 'import as backlog items')
+    .option('--kind <kind>', 'kind of change')
+    .option('--risk <risk>', 'risk level')
+    .option('--dry-run', 'preview import')
+    .option('--json', 'output JSON')
+    .action((input, opts) => importBmadCommand(input, opts));
 
   program
     .command('status')
@@ -110,6 +189,11 @@ export function buildProgram(): Command {
     .option('--markdown', 'markdown report (for pull requests and wikis)')
     .option('--json', 'output JSON')
     .action((opts) => statusCommand(opts));
+
+  program.command('help [topic]').description('Show workflows and commands')
+    .option('--json', 'output JSON').action((topic, opts) => helpCommand(topic, opts));
+  program.command('statusline').description('Print the Claude Code status line')
+    .action(() => statuslineCommand());
 
   program.command('track').description('Manage the change track')
     .command('set <track>')

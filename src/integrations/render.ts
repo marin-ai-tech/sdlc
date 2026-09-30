@@ -36,6 +36,24 @@ const PLAN_MODE: Record<Surface, string> = {
   'opencode-agent': '',
 };
 
+const ASK: Record<Surface, string> = {
+  skill: 'the AskUserQuestion tool in Claude Code or the `question` tool in OpenCode',
+  'plugin-skill': 'the AskUserQuestion tool',
+  'claude-command': 'the AskUserQuestion tool',
+  'opencode-command': 'the `question` tool',
+  'claude-agent': 'ask the user, offering choices',
+  'opencode-agent': 'ask the user, offering choices',
+};
+
+const TODO: Record<Surface, string> = {
+  skill: 'TodoWrite in Claude Code or `todowrite` in OpenCode',
+  'plugin-skill': 'TodoWrite',
+  'claude-command': 'TodoWrite',
+  'opencode-command': '`todowrite`',
+  'claude-agent': 'a task list',
+  'opencode-agent': 'a task list',
+};
+
 /** Rewrites `sdlc ` invocations to the configured CLI prefix (for `npx sdlc` pins). */
 export function applyCliPrefix(text: string, cli: string): string {
   if (cli === 'sdlc') return text;
@@ -55,6 +73,13 @@ export function renderBody(body: string, options: RenderOptions): string {
     .replace(/\{\{cmd:([a-z-]+)\}\}/g, (_m, id: string) => commandRef(id, surface))
     .replace(/\{\{skill:<workflow>\}\}/g, surface === 'plugin-skill' ? '`sdlc:<workflow>`' : '`sdlc-<workflow>`')
     .replace(/\{\{skill:([a-z-]+)\}\}/g, (_m, id: string) => (surface === 'plugin-skill' ? `\`sdlc:${id}\`` : `\`sdlc-${id}\``))
+    .replace(/\{\{tool:ask\}\}/g, ASK[surface])
+    .replace(/\{\{tool:todo\}\}/g, TODO[surface])
+    .replace(/\{\{inject:([^}]+)\}\}/g, (_m, args: string) => {
+      const command = `${options.cli} ${args}`;
+      if (surface.endsWith('-agent')) return `Run \`${command}\`.`;
+      return `!\`${command}\`\nIf the output above is missing, run \`${command}\`.`;
+    })
     .replace(/\{\{plan-mode\}\}/g, PLAN_MODE[surface]);
   out = applyCliPrefix(out, options.cli);
   const leftover = out.match(/\{\{[^}]+\}\}/);

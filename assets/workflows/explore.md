@@ -2,6 +2,7 @@
 id: explore
 title: "SDLC: Explore"
 description: Research and pressure-test an idea before deciding whether to write intent.
+when-to-use: The user wants to explore an idea, compare alternatives, or decide whether to proceed.
 command-description: Research an idea before intent
 argument-hint: "<idea or slug>"
 ---
@@ -19,7 +20,7 @@ Explore an idea without starting a change. An exploration can end here and never
 4. Delegate external and codebase research to the `sdlc-researcher` subagent. Record findings and their sources under **Research**, distinguishing evidence from inference.
 5. Write two or three comparable **Alternatives**, including “do nothing”. Compare expected benefit, effort, and what each leaves unresolved.
 6. **Pressure test** each option through four named lenses. For each, state the assumption and how it could fail: **user** (who actually needs this, and how do we know?), **technical** (what could make it infeasible?), **cost** (build and run), and **risk** (security, privacy, compliance, reversibility).
-7. Recommend **proceed**, **reshape**, or **stop**, with reasons and open questions. A weak idea may stop here; do not create a change merely to close the exploration.
+7. Recommend **proceed**, **reshape**, or **stop**, with reasons and open questions. Use {{tool:ask}} to offer those three choices, mark the recommendation, and explain each consequence. A weak idea may stop here.
 8. If proceeding, add the idea with `sdlc backlog add <title> --outcome <outcome> --accept <measure> --source-type exploration --source-ref openspec/explorations/<slug>.md`. The backlog priority determines when it starts. Once started, continue with {{cmd:intent}}.
 
 **Guardrails**

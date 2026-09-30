@@ -109,14 +109,21 @@ OpenCode has no Stop hook, so `verify_before_stop` does not apply there.
 | Subagents | `.claude/agents/sdlc-{verifier,reviewer,researcher,simplifier}.md` (`tools: Read, Grep, Glob, Bash`) | `.opencode/agents/sdlc-*.md` (`mode: subagent`, a `permission` map; a Claude-style `tools:` line would break OpenCode startup) |
 | Rules | hooks in `.claude/settings.json` | plugin `.opencode/plugins/sdlc.js` |
 | Distribution | project-level install **or** the Claude Code plugin from this repository's marketplace (`/plugin install sdlc@scdl`) | project-level install |
+| Question tool | AskUserQuestion (2–4 choices) | `question` (choices + free text) |
+| Todo list | TodoWrite mirrors `tasks.md` during `/sdlc:build` (`tasks.md` stays the source of truth) | `todowrite` mirrors `tasks.md` during `/sdlc-build` |
+| Live CLI injection | inline live output of `sdlc … --json` in `/sdlc:status`, `/sdlc:next`, `/sdlc:help` via the tool `!` injection (fallback: run the same command) | same `!` injection form |
 
-Eleven workflows: `next`, `status`, `intent`, `spec`, `plan`, `build`, `verify`, `review`, `release`, `archive`, `triage`. The bodies are intentionally short (3–5 KB versus 10–22 KB in OpenSpec). The agent gets state, templates and instructions from the CLI at run time (`sdlc status/next/instructions --json`).
+Thirteen workflows: `help`, `next`, `status`, `explore`, `intent`, `spec`, `plan`, `build`, `verify`, `review`, `release`, `archive`, `triage`. The bodies are intentionally short (3–5 KB versus 10–22 KB in OpenSpec). The agent gets state, templates and instructions from the CLI at run time (`sdlc status/next/instructions --json`).
 
 Templates are written once (`assets/workflows/*.md`) and rendered for each surface. `{{cmd:x}}` references become `/sdlc:x` or `/sdlc-x`, `{{input}}` becomes `$ARGUMENTS` or a description, and `sdlc` becomes the configured prefix (`npx sdlc` for a local install).
 
+An answer in chat is never an approval: gate approvals, `track set`, `backlog move`/`drop`, `license set` and other human decisions are commands the person runs in their own terminal. Offer the choice, explain the consequences, and give the exact command.
+
+`HUMAN_COMMANDS` in `src/core/help-catalog.ts` is the one list that drives both `sdlc help` (actor: human) and the hook denials. It includes `approve`, `reject`, `waive`, `tests unlock`, `track set`, `backlog move`, `backlog drop`, and `license set`.
+
 ## 4.7. CLI commands
 
-`init`, `update`, `uninstall`, `new`, `status [--markdown]`, `next`, `instructions`, `approve|reject|waive`, `tests lock|unlock`, `verify [--list|--check]`, `review context|check`, `validate`, `archive`, `audit`, `log`, `license [set]`, `doctor`, `hook`, `plugin build`, `openspec …` (pass-through call to the bundled OpenSpec). Every command has `--json` with `{severity, code, message, fix}` diagnostics, as in OpenSpec.
+`init [--statusline]`, `update`, `uninstall`, `new`, `status [--markdown]`, `help [topic]`, `statusline`, `next`, `instructions`, `approve|reject|waive`, `tests lock|unlock`, `verify [--list|--check]`, `review context|check`, `validate`, `archive`, `audit`, `log`, `license [set]`, `doctor`, `hook`, `plugin build`, `openspec …` (pass-through call to the bundled OpenSpec). Every command has `--json` with `{severity, code, message, fix}` diagnostics, as in OpenSpec.
 
 Planning commands include `sdlc explore <slug> | list`, `sdlc track set <full|lite> --change <id>`, `sdlc defer add | list | close`, `sdlc backlog add | epic add | list | next | start | move | drop | done`, and `sdlc import bmad <path> (--change <id> | --to-backlog) [--dry-run]`. BMAD PRD, SPEC and architecture spine map to intent, proposal, specs, design and deferred work; with `--to-backlog`, BMAD epics/tickets (or a PRD/SPEC) become backlog epics and items. Imported change artifacts start without approvals and require `sdlc validate`.
 

@@ -59,6 +59,7 @@ export function renderClaudePlugin(cli = 'sdlc'): PluginFile[] {
         '---',
         `name: ${id}`,
         `description: ${yamlString(wf.description)}`,
+        ...(wf.whenToUse ? [`when_to_use: ${yamlString(wf.whenToUse)}`] : []),
         ...(wf.argumentHint ? [`argument-hint: ${yamlString(wf.argumentHint)}`] : []),
         `license: ${yamlString(LICENSE_SUMMARY)}`,
         `compatibility: ${yamlString(`Requires the sdlc CLI (${cli}) from the scdl package.`)}`,

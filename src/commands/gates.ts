@@ -1,5 +1,6 @@
 import { loadProject, recordChangeEvent } from '../cli/context.js';
 import { c, line, printJson, reportFailure, warn } from '../cli/output.js';
+import { emitNextHint, resolveNext } from '../cli/next-hint.js';
 import { agentEnvironment } from '../core/agent-env.js';
 import { provenance, readChangeState, type GateState } from '../core/change-state.js';
 import { resolveChange } from '../core/changes.js';
@@ -113,13 +114,14 @@ export async function approveCommand(gateArg: string, opts: DecisionOptions): Pr
 
     const after = evaluateChange(ctx.root, ref, ctx.config);
     const status = after.gates.find((g) => g.id === gate)!;
+    const next = resolveNext(ctx, ref.id);
     if (opts.json) {
-      printJson({ change: ref.id, gate, role, by: identity, status: status.status, missingRoles: status.missingRoles, next: after.next });
+      printJson({ change: ref.id, gate, role, by: identity, status: status.status, missingRoles: status.missingRoles, ...(next ? { next } : {}) });
       return;
     }
     line(`${c.green('✓')} ${gate} gate: ${identity} approved as ${role} ${c.dim(`(${evaluation.digest.slice(7, 19)})`)}`);
     if (status.status !== 'approved') line(`  still needed: ${status.missingRoles.join(', ')}`);
-    line(`  next: ${after.next.message}`);
+    emitNextHint(ctx, ref.id);
   } catch (error) {
     reportFailure(error, opts.json);
   }
@@ -145,8 +147,13 @@ export async function rejectCommand(gateArg: string, opts: DecisionOptions): Pro
       },
     };
     recordChangeEvent(ctx, ref, state, `gate.${gate}.rejected`, identity, opts.note);
-    if (opts.json) return printJson({ change: ref.id, gate, status: 'rejected', by: identity, note: opts.note });
+    const next = resolveNext(ctx, ref.id);
+    if (opts.json) {
+      printJson({ change: ref.id, gate, status: 'rejected', by: identity, note: opts.note, ...(next ? { next } : {}) });
+      return;
+    }
     line(`${c.red('✗')} ${gate} gate rejected by ${identity}: ${opts.note}`);
+    emitNextHint(ctx, ref.id);
   } catch (error) {
     reportFailure(error, opts.json);
   }
@@ -167,8 +174,13 @@ export async function waiveCommand(gateArg: string, opts: DecisionOptions): Prom
       waived: { by: identity, at: new Date().toISOString(), note: opts.note, ...provenance(ctx.stamp) },
     };
     recordChangeEvent(ctx, ref, state, `gate.${gate}.waived`, identity, opts.note);
-    if (opts.json) return printJson({ change: ref.id, gate, status: 'waived', by: identity, note: opts.note });
+    const next = resolveNext(ctx, ref.id);
+    if (opts.json) {
+      printJson({ change: ref.id, gate, status: 'waived', by: identity, note: opts.note, ...(next ? { next } : {}) });
+      return;
+    }
     line(`${c.yellow('~')} ${gate} gate waived by ${identity}: ${opts.note}`);
+    emitNextHint(ctx, ref.id);
   } catch (error) {
     reportFailure(error, opts.json);
   }

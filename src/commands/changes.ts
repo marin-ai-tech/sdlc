@@ -1,6 +1,8 @@
 import * as path from 'node:path';
 import { loadProject, recordChangeEvent, type ProjectContext } from '../cli/context.js';
 import { c, gateBadge, line, printJson, reportFailure, warn } from '../cli/output.js';
+import { bar, stepper } from '../cli/progress.js';
+import { emitNextHint, resolveNext } from '../cli/next-hint.js';
 import {
   CHANGE_KINDS,
   newChangeState,
@@ -116,16 +118,15 @@ export async function newCommand(name: string, opts: NewOptions): Promise<void> 
 
     const state = readChangeState(changeDir);
 
-    const view = evaluateChange(root, { id: name, dir: changeDir, archived: false }, config, { skipFingerprint: true });
+    const next = resolveNext(ctx, name);
     if (opts.json) {
-      printJson({ change: { id: name, path: changeDir, schema, kind, risk, track, ...(trackSuggestion ? { trackSuggestion } : {}), ...(state.source ? { source: state.source } : {}) }, next: view.next, root: { path: paths.root } });
+      printJson({ change: { id: name, path: changeDir, schema, kind, risk, track, ...(trackSuggestion ? { trackSuggestion } : {}), ...(state.source ? { source: state.source } : {}) }, ...(next ? { next } : {}), root: { path: paths.root } });
       return;
     }
     line(c.bold(`Created change ${name}`) + c.dim(` (${schema} schema, ${kind}, risk ${risk}, ${track} track)`));
     if (agentRequestedLite) warn(`An agent cannot select lite; ask a person to run ${config.cli} track set lite --change ${name}.`);
     line(`  ${path.relative(process.cwd(), changeDir) || changeDir}`);
-    line(`  next: ${view.next.message}`);
-    if (view.next.cli) line(`        ${c.cyan(view.next.cli)}`);
+    emitNextHint(ctx, name);
   } catch (error) {
     reportFailure(error, opts.json, { change: null });
   }
@@ -162,7 +163,11 @@ function printDetailed(view: LifecycleView, warnings: string[], invocationHint: 
   line(`  stage      ${c.bold(view.stageTitle)}`);
   if (view.source) line(`  source     ${view.source.type}${view.source.ref ? ` ${view.source.ref}` : ''}${view.source.url ? ` ${view.source.url}` : ''}`);
   line(`  artifacts  ${view.artifacts.map((a) => `${a.id} ${a.status === 'done' ? c.green('✓') : a.status === 'skipped' ? c.dim('~') : a.status === 'ready' ? c.yellow('○') : c.dim('·')}`).join('  ')}`);
-  line(`  tasks      ${view.tasks.total === 0 ? c.dim('none yet') : `${view.tasks.complete}/${view.tasks.total}`}`);
+  line(`  ${stepper(view)}`);
+  const taskBar = view.tasks.total === 0
+    ? c.dim('none yet')
+    : `${bar(view.tasks.complete, view.tasks.total)}  ${view.tasks.complete}/${view.tasks.total}`;
+  line(`  tasks      ${taskBar}`);
   line('  gates');
   for (const g of view.gates) {
     const who = g.approvals.map((a) => `${a.by} as ${a.role}`).join('; ');

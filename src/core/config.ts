@@ -48,6 +48,7 @@ export interface SdlcConfig {
   schema: string;
   /** How agents and hooks invoke the harness CLI: `sdlc`, or e.g. `npx sdlc` for a project-local install. */
   cli: string;
+  statusline: boolean;
   tools: string[];
   delivery: Delivery;
   gates: Record<ApprovalGateId, GateConfig> & { verify: { required: boolean } };
@@ -132,6 +133,7 @@ export function defaultConfig(): SdlcConfig {
     version: 1,
     schema: 'sdlc',
     cli: 'sdlc',
+    statusline: false,
     tools: [],
     delivery: 'both',
     gates: {
@@ -215,6 +217,7 @@ export function parseConfig(raw: Raw, file = 'openspec/sdlc.yaml'): SdlcConfig {
   }
   config.schema = asString(raw.schema, where('schema')) ?? config.schema;
   config.cli = asString(raw.cli, where('cli')) ?? config.cli;
+  config.statusline = asBool(raw.statusline, where('statusline')) ?? config.statusline;
   if (!/^[A-Za-z0-9@._/ -]+$/.test(config.cli)) {
     throw new SdlcError('invalid_config', `${where('cli')} may only contain letters, digits, spaces and . _ / @ -`);
   }
@@ -403,6 +406,7 @@ export function serializeConfig(config: SdlcConfig): Record<string, unknown> {
     version: 1,
     schema: config.schema,
     cli: config.cli,
+    statusline: config.statusline,
     tools: config.tools,
     delivery: config.delivery,
     gates,

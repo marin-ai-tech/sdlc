@@ -7,6 +7,8 @@ import { isWithin, toPosix } from './fs-utils.js';
 import { harnessStamp, stampText } from './license.js';
 import { evaluateChange, sharedFingerprint, type LifecycleView } from './lifecycle.js';
 import type { ProjectPaths } from './project.js';
+import { HUMAN_COMMANDS } from './help-catalog.js';
+import { nextBacklogItem, readBacklog } from './backlog.js';
 
 /**
  * Deterministic guardrails behind the advisory skills - the playbook's
@@ -82,7 +84,10 @@ function matcher(globs: string[]): (p: string) => boolean {
   return (p) => m(p);
 }
 
-const APPROVAL_COMMAND = /\b(?:sdlc|scdl)(?:\.js)?\s+(?:approve|reject|waive|tests\s+unlock|track\s+set|backlog\s+(?:move|drop))\b/;
+// Every human-only catalog command is guarded here, including license set.
+const APPROVAL_COMMAND = new RegExp(
+  `\\b(?:sdlc|scdl)(?:\\.js)?\\s+(?:${HUMAN_COMMANDS.map((name) => name.replace(/ /g, '\\s+')).join('|')})\\b`
+);
 /** Harness records only the CLI writes: per-change `.sdlc.yaml` and the project log. */
 const STATE_FILE_WRITE = /\.sdlc\.yaml|\.sdlc\/log\.jsonl/;
 const STATE_FILE = /(^|\/)\.sdlc\.yaml$|^openspec\/\.sdlc\/log\.jsonl$/;
@@ -231,7 +236,12 @@ export function evaluateToolCall(call: ToolCall, ctx: PolicyContext): Decision {
 /** Short lifecycle summary injected at session start (Claude SessionStart / OpenCode session). */
 export function sessionSummary(ctx: PolicyContext): string | undefined {
   const changes = listActiveChanges(ctx.paths);
-  if (changes.length === 0) return undefined;
+  if (changes.length === 0) {
+    const item = nextBacklogItem(readBacklog(ctx.paths.root));
+    if (!item) return undefined;
+    const start = `${ctx.config.cli} backlog start ${item.id}`;
+    return `Next backlog item: ${item.id} ${item.title}. Start with \`${start}\`.`;
+  }
   const lines = [`SDLC harness (${stampText(harnessStamp(ctx.config))}): active changes in openspec/changes (run \`sdlc status\` for details).`];
   for (const ref of changes.slice(0, 8)) {
     try {

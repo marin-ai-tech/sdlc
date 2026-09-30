@@ -1,5 +1,7 @@
 import { loadProject } from '../cli/context.js';
 import { line, printJson, reportFailure } from '../cli/output.js';
+import { bar } from '../cli/progress.js';
+import { emitNextHint, resolveNext } from '../cli/next-hint.js';
 import {
   addBacklogItem,
   addEpic,
@@ -173,7 +175,13 @@ export function backlogList(opts: Options): void {
       if (!section.length && epic.id === 'Unassigned') {
         continue;
       }
-      line(`${epic.id} ${epic.title}`.trim());
+      let epicBar = '';
+      if ('done' in epic && typeof epic.done === 'number') {
+        const done = epic.done;
+        const total = epic.open + epic.inProgress + done;
+        epicBar = `  ${bar(done, total)}  ${done}/${total}`;
+      }
+      line(`${epic.id} ${epic.title}${epicBar}`.trim());
       if (section.length) {
         printListTable(section);
       }
@@ -281,8 +289,12 @@ export function backlogStart(id: string, opts: Options): void {
     const state = readChangeState(dir);
     const change = { id: changeId, kind: state.kind, risk: state.risk, track: state.track,
       ...(state.track_suggestion ? { trackSuggestion: state.track_suggestion } : {}) };
-    if (opts.json) printJson({ item: started, change, harness: ctx.stamp });
-    else line(`Started ${id} as ${changeId}.`);
+    const next = resolveNext(ctx, changeId);
+    if (opts.json) printJson({ item: started, change, harness: ctx.stamp, ...(next ? { next } : {}) });
+    else {
+      line(`Started ${id} as ${changeId}.`);
+      emitNextHint(ctx, changeId);
+    }
   } catch (error) {
     reportFailure(error, opts.json);
   }

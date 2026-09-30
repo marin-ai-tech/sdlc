@@ -33,6 +33,7 @@ export function renderSkills(ctx: RenderContext): GeneratedFile[] {
       '---',
       `name: ${name}`,
       `description: ${yamlString(wf.description)}`,
+      ...(wf.whenToUse ? [`when_to_use: ${yamlString(wf.whenToUse)}`] : []),
       `license: ${yamlString(LICENSE_SUMMARY)}`,
       `compatibility: ${yamlString(`Requires the sdlc CLI (${ctx.cli}) from the scdl package; works in Claude Code and OpenCode.`)}`,
       `allowed-tools: ${allowedToolsFor(ctx.cli)}`,

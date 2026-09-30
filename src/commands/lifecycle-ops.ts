@@ -2,6 +2,7 @@ import * as path from 'node:path';
 import { createInterface } from 'node:readline/promises';
 import { loadProject, type ProjectContext } from '../cli/context.js';
 import { c, line, printJson, reportFailure, warn } from '../cli/output.js';
+import { emitNextHint, resolveNext } from '../cli/next-hint.js';
 import { agentEnvironment } from '../core/agent-env.js';
 import { appendHistory, readChangeState, writeChangeState, type ChangeState, type HistoryEvent } from '../core/change-state.js';
 import { listActiveChanges, listArchivedChanges, resolveChange, type ChangeRef } from '../core/changes.js';
@@ -180,8 +181,9 @@ export async function archiveCommand(id: string | undefined, opts: ArchiveOption
         }
       }
     }
+    const next = resolveNext(ctx);
     if (opts.json) {
-      printJson({ archive: { change: ref.id, ...archive, forced: open.length > 0 }, root: { path: ctx.root }, harness: ctx.stamp });
+      printJson({ archive: { change: ref.id, ...archive, forced: open.length > 0 }, root: { path: ctx.root }, harness: ctx.stamp, ...(next ? { next } : {}) });
       return;
     }
     line(`${c.green('✓')} archived ${ref.id} → ${path.relative(ctx.root, archive.path)}`);
@@ -190,6 +192,7 @@ export async function archiveCommand(id: string | undefined, opts: ArchiveOption
       line(`  specs: +${t.added ?? 0} added, ~${t.modified ?? 0} modified, -${t.removed ?? 0} removed, ${t.renamed ?? 0} renamed`);
     }
     for (const w of archive.warnings ?? []) warn(w);
+    emitNextHint(ctx);
   } catch (error) {
     reportFailure(error, opts.json, { archive: null });
   }

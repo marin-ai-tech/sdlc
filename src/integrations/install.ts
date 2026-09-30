@@ -8,7 +8,7 @@ import { harnessVersion } from '../core/version.js';
 import { claudeAdapter } from './claude.js';
 import { applyFiles, type ApplyReport } from './manifest.js';
 import { opencodeAdapter } from './opencode.js';
-import { mergeClaudeHooks, type SettingsChange } from './settings.js';
+import { mergeClaudeHooks, mergeClaudeStatusLine, type SettingsChange } from './settings.js';
 import { renderSkills } from './skills.js';
 import { TOOL_IDS, type GeneratedFile, type RenderContext, type ToolAdapter, type ToolId } from './types.js';
 
@@ -70,6 +70,7 @@ export interface InstallResult {
   tools: ToolId[];
   files: ApplyReport;
   claudeHooks: SettingsChange;
+  statusLine: string;
 }
 
 export function installIntegrations(
@@ -90,7 +91,10 @@ export function installIntegrations(
   const claudeHooks = tools.includes('claude') || fs.existsSync(path.join(root, '.claude', 'settings.json'))
     ? mergeClaudeHooks(root, config.cli, wantHooks, options.dryRun)
     : 'absent';
-  return { tools, files: report, claudeHooks };
+  const statusLine = tools.includes('claude') || fs.existsSync(path.join(root, '.claude', 'settings.json'))
+    ? mergeClaudeStatusLine(root, config.cli, tools.includes('claude') && config.statusline, options.dryRun)
+    : 'absent';
+  return { tools, files: report, claudeHooks, statusLine };
 }
 
 /**
@@ -113,5 +117,8 @@ export function uninstallIntegrations(root: string, options: { force?: boolean; 
   const claudeHooks = fs.existsSync(path.join(root, '.claude', 'settings.json'))
     ? mergeClaudeHooks(root, 'sdlc', false, options.dryRun)
     : 'absent';
-  return { tools: [], files: report, claudeHooks };
+  const statusLine = fs.existsSync(path.join(root, '.claude', 'settings.json'))
+    ? mergeClaudeStatusLine(root, 'sdlc', false, options.dryRun)
+    : 'absent';
+  return { tools: [], files: report, claudeHooks, statusLine };
 }

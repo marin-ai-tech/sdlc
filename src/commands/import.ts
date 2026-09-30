@@ -2,6 +2,7 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { loadProject, recordChangeEvent } from '../cli/context.js';
 import { line, printJson, reportFailure } from '../cli/output.js';
+import { emitNextHint, resolveNext } from '../cli/next-hint.js';
 import { readChangeState } from '../core/change-state.js';
 import { assertValidChangeId } from '../core/changes.js';
 import { addDeferred } from '../core/deferred.js';
@@ -77,6 +78,11 @@ export function importBmadCommand(input: string, opts: { change?: string; toBack
     const by = formatIdentity(gitIdentity(ctx.root));
     for (const item of plan.deferred) addDeferred(ctx.root, { ...item, change: changeId, by });
     recordChangeEvent(ctx, { id: changeId, dir }, readChangeState(dir), 'change.imported', by, input);
-    if (opts.json) printJson(plan); else line(`Imported BMAD artifacts into ${changeId}.`);
+    const next = resolveNext(ctx, changeId);
+    if (opts.json) printJson({ ...plan, ...(next ? { next } : {}) });
+    else {
+      line(`Imported BMAD artifacts into ${changeId}.`);
+      emitNextHint(ctx, changeId);
+    }
   } catch (error) { reportFailure(error, opts.json); }
 }
