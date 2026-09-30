@@ -18,9 +18,19 @@ import { deferAdd, deferClose, deferList } from '../commands/defer.js';
 import { trackSetCommand } from '../commands/track.js';
 import { exploreCommand, exploreListCommand } from '../commands/explore.js';
 import { importBmadCommand } from '../commands/import.js';
+import { backlogAdd, backlogClose, backlogEpicAdd, backlogList, backlogMove, backlogNext, backlogStart } from '../commands/backlog.js';
 
 export function buildProgram(): Command {
   const program = new Command();
+  const backlog = program.command('backlog').description('Manage planned changes in priority order');
+  backlog.command('epic').command('add <title>').option('--goal <text>').option('--json').action((title, opts) => backlogEpicAdd(title, opts));
+  backlog.command('add <title>').option('--epic <E-id>').option('--kind <kind>').option('--risk <risk>').option('--outcome <text>').option('--accept <text>', '', (value, previous: string[]) => [...previous, value], [] as string[]).option('--depends <B-id>', '', (value, previous: string[]) => [...previous, value], [] as string[]).option('--source-type <type>').option('--source-ref <ref>').option('--json').action((title, opts) => backlogAdd(title, opts));
+  backlog.command('list').option('--epic <E-id>').option('--status <status>').option('--ready').option('--json').action(opts => backlogList(opts));
+  backlog.command('next').option('--json').action(opts => backlogNext(opts));
+  backlog.command('start <B-id>').option('--change <id>').option('--json').action((id, opts) => backlogStart(id, opts));
+  backlog.command('move <B-id>').option('--top').option('--before <B-id>').option('--after <B-id>').option('--epic <E-id>').option('--json').action((id, opts) => backlogMove(id, opts));
+  backlog.command('drop <B-id>').option('--note <text>').option('--json').action((id, opts) => backlogClose(id, 'dropped', opts));
+  backlog.command('done <B-id>').option('--note <text>').option('--json').action((id, opts) => backlogClose(id, 'done', opts));
   const defer = program.command('defer').description('Manage consciously deferred work');
   defer.command('add <title>').option('--why <text>').option('--change <id>').option('--finding <F-id>').option('--revisit <text>').option('--json').action((title, opts) => deferAdd(title, opts));
   defer.command('list').option('--open').option('--change <id>').option('--json').action((opts) => deferList(opts));
@@ -89,7 +99,7 @@ export function buildProgram(): Command {
     .action((slug, opts) => { if (slug) exploreCommand(slug, opts); });
   explore.command('list').option('--json', 'output JSON').action((opts) => exploreListCommand(opts));
   program.command('import').description('Import planning artifacts')
-    .command('bmad <path>').requiredOption('--change <id>').option('--kind <kind>').option('--risk <risk>')
+    .command('bmad <path>').option('--change <id>').option('--to-backlog').option('--kind <kind>').option('--risk <risk>')
     .option('--dry-run').option('--json').action((input, opts) => importBmadCommand(input, opts));
 
   program

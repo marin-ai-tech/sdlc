@@ -2,6 +2,19 @@
 
 All notable changes to scdl. Versions follow [Semantic Versioning](https://semver.org/); while the major version is 0, a minor version may change behavior.
 
+## 0.4.0 — 2026-09-30
+
+### Added
+- **Backlog in the repository**: `openspec/backlog.md` lists planned changes (one item = one future OpenSpec change) grouped by epics; the order in the file is the priority; ids are never reused. An item is ready when it has an outcome, at least one acceptance criterion and every dependency is done — readiness is computed, never stored.
+- `sdlc backlog add | epic add | list | next | start | move | drop | done`. `start` turns a ready item into a change (kind, risk and source from the item, track rules unchanged) with a draft `intent.md`; the intent gate still needs the product owner. `move` and `drop` are human decisions: refused in agent sessions and denied by the hook.
+- Archiving a change closes its backlog item (and a deferred-work item the item came from), which unblocks the items that depend on it.
+- `sdlc next` with no active change proposes the first ready backlog item.
+- `sdlc import bmad <path> --to-backlog [--dry-run]`: BMAD-METHOD epics and tickets (`tickets.toml`, epic and story files) or a PRD/SPEC become backlog epics and items with their acceptance criteria and dependencies.
+- The report and the dashboard show the backlog: counts, progress per epic, what is next and what is blocked.
+
+### Changed
+- `/sdlc:explore` hands a proceeding idea to the backlog; `/sdlc:next` starts the proposed backlog item.
+
 ## 0.3.0 — 2026-09-30
 
 ### Added

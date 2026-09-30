@@ -1,0 +1,15 @@
+# tickets.toml — a container's agreed children. tickets.py reads it.
+# The order of the tables is the build order.
+
+[[epic]]
+id = 1
+slug = "epic-pricing-rules"
+title = "Pricing rules"
+covers = ["P1", "P2"]
+
+[[epic]]
+id = 2
+slug = "epic-cart-rules"
+title = "Shoppers manage their cart"
+covers = ["C1", "C2", "C3"]
+after = [{ epic = 1, needs = "the one-function pricing contract" }]

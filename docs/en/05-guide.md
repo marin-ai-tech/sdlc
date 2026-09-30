@@ -52,6 +52,29 @@ At any point, `/sdlc:next` (`/sdlc-next`) runs the next step or tells you who mu
 
 **A human runs approvals in their own terminal.** Inside an agent session, `sdlc approve` refuses to run. This is by design.
 
+
+### Backlog and epics
+
+Planned work lives in `openspec/backlog.md` before an OpenSpec change exists. Epics group items under a goal; each item is one future change. File order is priority. Status is in the heading (`open`, `in-progress`, `done`, `dropped`). Readiness is computed: an open item is ready when it has an Outcome, at least one Acceptance criterion, and every `Depends on` item is `done`. Ids (`B<n>`, `E<n>`) are never reused.
+
+```markdown
+# Backlog
+
+## E1 Claims self-service
+Goal: policyholders see claim status without calling support.
+
+### B1 [open] Show claim stage in the portal
+- **Kind**: feature
+- **Risk**: medium
+- **Outcome**: policyholders see the stage of each open claim
+- **Acceptance**:
+  - a claim in review shows "in review"
+  - another policyholder's claim is never listed
+- **Depends on**: B4
+```
+
+Commands: `sdlc backlog epic add <title> [--goal]`, `sdlc backlog add <title> [--epic --kind --risk --outcome --accept --depends --source-type --source-ref]`, `list [--epic --status --ready]`, `next`, `start <B-id> [--change <id>]` (creates the change and a draft `intent.md`, sets the item to `in-progress`), `move <B-id> (--top | --before | --after | --epic)` and `drop <B-id> --note` (human-only), `done <B-id> --note`. Flow: ready item → `backlog start` → change lifecycle → `sdlc archive` marks the item `done`. With no active change, `sdlc next` proposes the next ready item.
+
 ### Explore before intent
 
 Use `/sdlc:explore` (`/sdlc-explore`) to research and pressure-test an idea. `sdlc explore <slug>` creates `openspec/explorations/<slug>.md`; `sdlc explore list` lists notes. Start a linked change with `sdlc new <id> --source-type exploration --source-ref openspec/explorations/<slug>.md`. Exploration is optional and does not approve intent.
@@ -96,6 +119,10 @@ Record postponed work with `sdlc defer add <title> --why <text> [--change <id>] 
 ### Import BMAD planning
 
 Run `sdlc import bmad <path> --change <id> [--dry-run]` on BMAD PRD, SPEC and architecture spine artifacts. The importer keeps source copies under `sources/bmad/` and maps PRD vision to `intent.md`, SPEC purpose to `proposal.md`, capabilities or PRD requirements to `specs/`, architecture decisions to `design.md`, and deferred bullets to `openspec/deferred-work.md`. Nothing is approved by the import. Review the output and run `sdlc validate --change <id>`.
+
+### BMAD epics and tickets into the backlog
+
+Run `sdlc import bmad <path> --to-backlog [--dry-run]` to load BMAD into `openspec/backlog.md` instead of a change. Supply exactly one of `--change` or `--to-backlog`. From `tickets.toml` / `bmad-ticket` output: each epic becomes a backlog epic, each entry an item (`story` → `feature`, `bug` → `bugfix`, `spike` → `chore`); acceptance comes from the story's criteria when present, otherwise `verify`; `after` becomes `Depends on`. From a PRD or SPEC without tickets: one epic named after the document, requirements as items. Nothing is started or approved by the import.
 
 ## 5.3. Configuring `openspec/sdlc.yaml`
 

@@ -1,0 +1,18 @@
+[[entry]]
+id = 1
+type = "story"
+title = "Change item quantity"
+description = "The shopper changes the quantity of an item and the total updates at once."
+verify = "Changing a quantity from 1 to 3 triples that line and updates the total."
+after = ["1.1"]
+risk = "low"
+
+[[entry]]
+id = 2
+type = "story"
+title = "A shopper applies a discount code and sees the new total"
+description = "Adds code validation to the pricing call and shows the refusal reason."
+verify = "A valid code lowers the total; an expired one is refused with its reason."
+after = [1, "epic-pricing-rules"]
+risk = "medium"
+refine = true

@@ -69,7 +69,7 @@ export function detectBmadDocs(root: string, input: string): BmadDoc[] {
   return docs;
 }
 
-function sections(body: string): Sections {
+export function sections(body: string): Sections {
   const result: Sections = new Map();
   const headings = [...body.matchAll(/^##\s+(?:\d+\.\s*)?(.+)$/gm)];
   for (let index = 0; index < headings.length; index++) {
@@ -80,7 +80,7 @@ function sections(body: string): Sections {
   return result;
 }
 
-function requirementsFromSpec(spec: Sections): Requirement[] {
+export function requirementsFromSpec(spec: Sections): Requirement[] {
   const capabilities = section(spec, 'Capabilities');
   const pattern = /^- \*\*(CAP-\d+)\*\*\s*\n\s+- \*\*intent:\*\* (.+)\n\s+- \*\*success:\*\* (.+)/gm;
   return [...capabilities.matchAll(pattern)].map((match) => ({
@@ -92,7 +92,7 @@ function requirementsFromSpec(spec: Sections): Requirement[] {
   }));
 }
 
-function requirementsFromPrd(body: string): Requirement[] {
+export function requirementsFromPrd(body: string): Requirement[] {
   const requirements: Requirement[] = [];
   const pattern = /^(### 4\.\d+ (.+)|#### (FR-\d+): (.+))$/gm;
   let group = 'features';

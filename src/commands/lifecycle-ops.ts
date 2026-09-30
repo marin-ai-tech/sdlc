@@ -16,6 +16,8 @@ import { stampText } from '../core/license.js';
 import { appendLog, readLog } from '../core/log.js';
 import { changeMarkdown, tryStampArtifacts } from '../core/stamp.js';
 import { aggregateMetrics, changeMetrics } from '../core/metrics.js';
+import { readBacklog, setBacklogStatus } from '../core/backlog.js';
+import { closeDeferred, readDeferred } from '../core/deferred.js';
 
 interface ValidationIssue {
   source: 'openspec' | 'sdlc';
@@ -165,6 +167,19 @@ export async function archiveCommand(id: string | undefined, opts: ArchiveOption
       ...(by ? { by } : {}),
       detail: `archived as ${archive.archivedAs}${detail ? `; ${detail}` : ''}`,
     }, ctx.stamp);
+    const source = before.source;
+    if (source?.type === 'backlog' && source.ref && /^B\d+$/.test(source.ref)) {
+      const item = readBacklog(ctx.root).items.find(entry => entry.id === source.ref);
+      if (item?.status === 'in-progress' && item.change === ref.id) {
+        setBacklogStatus(ctx.root, item.id, 'done', { note: `archived as ${archive.archivedAs}` });
+        appendLog(ctx.root, ctx.config, { event: 'backlog.done', change: ref.id,
+          ...(by ? { by } : {}), detail: `${item.id} archived as ${archive.archivedAs}` }, ctx.stamp);
+        const deferred = item.source?.match(/^deferred (D\d+)$/)?.[1];
+        if (deferred && readDeferred(ctx.root).some(entry => entry.id === deferred && entry.status === 'open')) {
+          closeDeferred(ctx.root, deferred, 'done', `implemented by ${ref.id}`);
+        }
+      }
+    }
     if (opts.json) {
       printJson({ archive: { change: ref.id, ...archive, forced: open.length > 0 }, root: { path: ctx.root }, harness: ctx.stamp });
       return;

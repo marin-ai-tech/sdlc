@@ -52,6 +52,7 @@ Sources: OpenSpec GitHub issues/discussions, the CHANGELOG, comparative reviews 
 What was taken from them (and what to avoid):
 
 In 0.3.0 BMAD influenced optional `/sdlc:explore` pressure tests, review lenses with checked coverage, track suggestions confirmed by a person, a deferred-work registry, and `sdlc import bmad` for planning artifacts.
+In 0.4.0 BMAD's tickets and epics idea became the repository backlog (`openspec/backlog.md`) with `sdlc import bmad --to-backlog`.
 - **One template source, rendered for each tool** — as in Spec Kit and ospec-workflow. In cc-sdd, separate per-agent template trees drift apart over time.
 - **A manifest of installed files with hashes**, so that only untouched files are removed or updated (Spec Kit).
 - **A single hook dispatcher** for Claude Code (settings.json) and OpenCode (a generated JS plugin: `tool.execute.before/after`, `experimental.chat.system.transform`) — Spec Kit, ospec-workflow.

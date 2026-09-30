@@ -26,6 +26,7 @@ import { readYamlObject, writeYaml } from '../core/yaml-io.js';
 import { readAsset } from '../integrations/assets.js';
 import { agentEnvironment } from '../core/agent-env.js';
 import { suggestTrack } from '../core/track.js';
+import { nextBacklogItem, readBacklog } from '../core/backlog.js';
 
 function oneOf<T extends string>(value: string | undefined, allowed: readonly T[], flag: string): T | undefined {
   if (value === undefined) return undefined;
@@ -64,22 +65,40 @@ export function createChange(name: string, opts: NewOptions): { ctx: ProjectCont
   const kind = oneOf<ChangeKind>(opts.kind, CHANGE_KINDS, '--kind') ?? 'feature';
   const risk = oneOf<RiskLevel>(opts.risk, RISK_LEVELS, '--risk') ?? 'medium';
   const suggested = suggestTrack(kind, risk);
+  const requestedTrack = oneOf<Track>(opts.track, TRACKS, '--track');
+  const agentRequestedLite = requestedTrack === 'lite' && !!agentEnvironment();
+  const track = requestedTrack === 'lite' && !agentRequestedLite ? 'lite' : 'full';
   const sourceType = oneOf<SourceType>(opts.sourceType, SOURCE_TYPES, '--source-type');
   const schema = opts.schema ?? config.schema;
   loadSchemaInfo(schema, root);
-  const result = runOpenSpecJson<{ change?: { id: string; path: string } }>(['new', 'change', name, '--schema', schema], root);
+  validateExplorationSource(root, sourceType, opts.sourceRef);
+  const args = ['new', 'change', name, '--schema', schema];
+  if (opts.description) args.push('--description', opts.description);
+  const result = runOpenSpecJson<{ change?: { id: string; path: string } }>(args, root);
   if (!result.ok || !result.data?.change) throw new SdlcError('openspec_new_failed', `openspec new change failed: ${openspecFailure(result.data, result.raw)}`);
   const dir = result.data.change.path;
-  const state = newChangeState({ kind, risk, track: 'full', ...(sourceType ? { source: { type: sourceType, ...(opts.sourceRef ? { ref: opts.sourceRef } : {}) } } : {}) });
-  if (suggested.track === 'lite') state.track_suggestion = suggested;
-  recordChangeEvent(ctx, { id: name, dir }, state, 'change.created', formatIdentity(gitIdentity(root)), `schema ${schema}, full track`);
+  if (opts.skipSpecs) {
+    const metaFile = path.join(dir, '.openspec.yaml');
+    const meta = readYamlObject(metaFile) ?? { schema };
+    meta.skip_specs = true;
+    writeYaml(metaFile, meta);
+  }
+  const source = sourceType || opts.sourceRef || opts.sourceUrl
+    ? { type: sourceType ?? 'other', ...(opts.sourceRef ? { ref: opts.sourceRef } : {}),
+      ...(opts.sourceUrl ? { url: opts.sourceUrl } : {}) } : undefined;
+  const state = newChangeState({ kind, risk, track, ...(source ? { source } : {}) });
+  const suggestion = agentRequestedLite
+    ? { track: 'lite' as const, reasons: ['An agent requested the lite track.', ...suggested.reasons] }
+    : !requestedTrack && suggested.track === 'lite' ? suggested : undefined;
+  if (suggestion) state.track_suggestion = suggestion;
+  recordChangeEvent(ctx, { id: name, dir }, state, 'change.created', formatIdentity(gitIdentity(root)),
+    `schema ${schema}, ${track} track`);
   return { ctx, dir };
 }
 
 export async function newCommand(name: string, opts: NewOptions): Promise<void> {
   try {
-    assertValidChangeId(name);
-    const ctx = loadProject();
+    const { ctx, dir: changeDir } = createChange(name, opts);
     const { root, paths, config } = ctx;
     const kind = oneOf<ChangeKind>(opts.kind, CHANGE_KINDS, '--kind') ?? 'feature';
     const risk = oneOf<RiskLevel>(opts.risk, RISK_LEVELS, '--risk') ?? 'medium';
@@ -95,31 +114,7 @@ export async function newCommand(name: string, opts: NewOptions): Promise<void> 
     const schema = opts.schema ?? config.schema;
     loadSchemaInfo(schema, root); // fail early with a clear message
 
-    const args = ['new', 'change', name, '--schema', schema];
-    if (opts.description) args.push('--description', opts.description);
-    const result = runOpenSpecJson<{ change?: { id: string; path: string } }>(args, root);
-    if (!result.ok || !result.data?.change) {
-      throw new SdlcError('openspec_new_failed', `openspec new change failed: ${openspecFailure(result.data, result.raw)}`);
-    }
-    const changeDir = result.data.change.path;
-
-    if (opts.skipSpecs) {
-      const metaFile = path.join(changeDir, '.openspec.yaml');
-      const meta = readYamlObject(metaFile) ?? { schema };
-      meta.skip_specs = true;
-      writeYaml(metaFile, meta);
-    }
-    const state = newChangeState({
-      kind,
-      risk,
-      track,
-      ...(sourceType || opts.sourceRef || opts.sourceUrl
-        ? { source: { type: sourceType ?? 'other', ...(opts.sourceRef ? { ref: opts.sourceRef } : {}), ...(opts.sourceUrl ? { url: opts.sourceUrl } : {}) } }
-        : {}),
-    });
-    if (trackSuggestion) state.track_suggestion = trackSuggestion;
-    recordChangeEvent(ctx, { id: name, dir: changeDir }, state, 'change.created', formatIdentity(gitIdentity(root)),
-      `schema ${schema}, ${track} track`);
+    const state = readChangeState(changeDir);
 
     const view = evaluateChange(root, { id: name, dir: changeDir, archived: false }, config, { skipFingerprint: true });
     if (opts.json) {
@@ -275,6 +270,16 @@ export async function statusCommand(opts: StatusOptions): Promise<void> {
 export async function nextCommand(opts: { change?: string; json?: boolean }): Promise<void> {
   try {
     const ctx = loadProject();
+    if (!opts.change && listActiveChanges(ctx.paths).length === 0) {
+      const item = nextBacklogItem(readBacklog(ctx.root));
+      if (item) {
+        const next = { actor: 'agent', action: 'start-backlog-item', item: item.id,
+          message: `Start backlog item ${item.id}: ${item.title}.`, cli: `${ctx.config.cli} backlog start ${item.id}` };
+        if (opts.json) printJson({ change: null, stage: null, next, root: { path: ctx.root } });
+        else line(`${item.id}: ${next.message}\n$ ${next.cli}`);
+        return;
+      }
+    }
     const ref = resolveChange(ctx.paths, opts.change);
     const view = evaluateChange(ctx.root, ref, ctx.config);
     if (opts.json) {

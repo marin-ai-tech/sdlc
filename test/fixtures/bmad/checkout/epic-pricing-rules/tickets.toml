@@ -1,0 +1,27 @@
+[[entry]]
+id = 1
+type = "story"
+title = "Pricing function contract"
+description = "Defines price(cart) -> total and moves the cart page onto it."
+verify = "The cart page and the payment step show the same total for the same cart."
+covers = ["P1"]
+after = []
+risk = "medium"
+
+[[entry]]
+id = 2
+type = "spike"
+title = "Can the tax engine answer within 300 ms"
+description = "Measures the tax engine latency on the slowest supported device."
+verify = "A latency report with p95 on the slowest device exists."
+after = []
+risk = "low"
+
+[[entry]]
+id = 3
+type = "bug"
+title = "Rounding differs between cart and payment"
+description = "Fixes half-cent rounding so both use banker's rounding."
+verify = "A cart totalling 10.005 shows 10.00 in cart and payment."
+after = [1]
+risk = "low"

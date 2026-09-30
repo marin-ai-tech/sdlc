@@ -22,6 +22,7 @@ import { readLog } from '../core/log.js';
 import { detectLayout } from '../core/layout.js';
 import { readText } from '../core/fs-utils.js';
 import { readDeferred, type DeferredItem } from '../core/deferred.js';
+import { epicProgress, readBacklog, type BacklogItem } from '../core/backlog.js';
 
 export interface ReportOptions {
   /** ISO date (YYYY-MM-DD) or timestamp: events and "moved in period" start here. Unset = everything. */
@@ -92,11 +93,42 @@ export interface ReportModel {
   events: LogEntry[];
   layout: LayoutReport;
   deferred: { open: number; items: DeferredItem[] };
+  backlog: {
+    counts: { open: number; 'in-progress': number; done: number; dropped: number };
+    epics: Array<{ id: string; title: string; goal?: string; total: number; open: number; inProgress: number; done: number; dropped: number }>;
+    /** Up to 5 open ready items in priority order. */
+    next: BacklogItem[];
+    /** Open items whose blockedBy is not empty. */
+    blocked: BacklogItem[];
+  };
 }
 
 function deferredWork(root: string): ReportModel['deferred'] {
   const items = readDeferred(root).filter((item) => item.status === 'open').sort((a, b) => Number(a.id.slice(1)) - Number(b.id.slice(1)));
   return { open: items.length, items };
+}
+
+function backlogWork(root: string): ReportModel['backlog'] {
+  const backlog = readBacklog(root);
+  const counts = {
+    open: backlog.items.filter((item) => item.status === 'open').length,
+    'in-progress': backlog.items.filter((item) => item.status === 'in-progress').length,
+    done: backlog.items.filter((item) => item.status === 'done').length,
+    dropped: backlog.items.filter((item) => item.status === 'dropped').length,
+  };
+  const epics = epicProgress(backlog).map(({ epic, total, open, inProgress, done, dropped }) => ({
+    id: epic.id,
+    title: epic.title,
+    ...(epic.goal ? { goal: epic.goal } : {}),
+    total,
+    open,
+    inProgress,
+    done,
+    dropped,
+  }));
+  const next = backlog.items.filter((item) => item.ready).slice(0, 5);
+  const blocked = backlog.items.filter((item) => item.status === 'open' && item.blockedBy.length > 0);
+  return { counts, epics, next, blocked };
 }
 
 function parseSince(value?: string): string | undefined {
@@ -198,5 +230,6 @@ export function buildReport(ctx: ProjectContext, opts: ReportOptions = {}): Repo
     events: periodEvents(ctx.root, since, opts.change),
     layout: detectLayout(ctx.root, ctx.config.layout),
     deferred: deferredWork(ctx.root),
+    backlog: backlogWork(ctx.root),
   };
 }

@@ -40,6 +40,38 @@ function leadTimes(model: ReportModel): string[] {
   ];
 }
 
+
+function backlog(model: ReportModel): string[] {
+  const { counts, epics, next, blocked } = model.backlog;
+  const lines = [
+    '## Backlog', '',
+    `Open: ${counts.open} · In progress: ${counts['in-progress']} · Done: ${counts.done} · Dropped: ${counts.dropped}`,
+    '',
+  ];
+  if (epics.length) {
+    lines.push('| Epic | Done / total | In progress |', '| --- | ---: | ---: |');
+    for (const epic of epics) {
+      lines.push(`| ${cell(`${epic.id} ${epic.title}`)} | ${epic.done}/${epic.total} | ${epic.inProgress} |`);
+    }
+    lines.push('');
+  }
+  lines.push('### Next', '');
+  if (next.length) {
+    for (const item of next) lines.push(`- ${cell(item.id)} — ${cell(item.title)}`);
+  } else {
+    lines.push('- (none)');
+  }
+  lines.push('', '### Blocked', '');
+  if (blocked.length) {
+    for (const item of blocked) {
+      lines.push(`- ${cell(item.id)} — ${cell(item.title)} (blocked by ${cell(item.blockedBy.join(', '))})`);
+    }
+  } else {
+    lines.push('- (none)');
+  }
+  lines.push('');
+  return lines;
+}
 function deferred(model: ReportModel): string[] {
   return ['## Deferred work', '', '| ID | Title | Change | Revisit when |', '| --- | --- | --- | --- |',
     ...model.deferred.items.map((item) => `| ${cell(item.id)} | ${cell(item.title)} | ${cell(item.change)} | ${cell(item.revisit)} |`), ''];
@@ -77,6 +109,7 @@ export function renderReportMarkdown(model: ReportModel): string {
     '',
     ...stages(model),
     ...changes(model),
+    ...backlog(model),
     ...deferred(model),
     ...leadTimes(model),
     ...events(model),
