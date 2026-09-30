@@ -50,12 +50,14 @@ Sources: OpenSpec GitHub issues/discussions, the CHANGELOG, comparative reviews 
 | **Tessl** | gather → spec → approve → implement → verify | `specs/*.spec.md` (`targets`, `[@test]`) | via tessl | via tessl | rules + evals |
 
 What was taken from them (and what to avoid):
+
+In 0.3.0 BMAD influenced optional `/sdlc:explore` pressure tests, review lenses with checked coverage, track suggestions confirmed by a person, a deferred-work registry, and `sdlc import bmad` for planning artifacts.
 - **One template source, rendered for each tool** — as in Spec Kit and ospec-workflow. In cc-sdd, separate per-agent template trees drift apart over time.
 - **A manifest of installed files with hashes**, so that only untouched files are removed or updated (Spec Kit).
 - **A single hook dispatcher** for Claude Code (settings.json) and OpenCode (a generated JS plugin: `tool.execute.before/after`, `experimental.chat.system.transform`) — Spec Kit, ospec-workflow.
 - **Approvals in a state file, not in the chat** (cc-sdd `spec.json`, ospec-workflow `state.yaml`). But without hooks this remains "trust-based", which is why the harness has deterministic checks.
-- **Routing by change size** (ospec-workflow: hotfix/lite/standard) — hence the lite track. BMAD goes further and lets the build step pick the depth after investigating the change; the harness keeps the choice with a person (`--track`).
-- **Upstream thinking tools** (BMAD: brainstorming, PRFAQ, multi-persona pressure tests, parallel research) have no counterpart in the harness, which starts at `intent.md`. BMAD in turn has no deterministic gates, content-bound approvals or recorded verification evidence, so the two combine rather than compete.
+- **Routing by change size** (ospec-workflow: hotfix/lite/standard) — hence the lite track. BMAD lets the build step pick the depth after investigating the change; the harness suggests a track and keeps confirmation with a person (`sdlc track set`).
+- **Upstream thinking tools** (BMAD: brainstorming, PRFAQ, multi-persona pressure tests, parallel research) informed optional `/sdlc:explore` before `intent.md`. BMAD in turn has no deterministic gates, content-bound approvals or recorded verification evidence, so the two combine rather than compete.
 - Spec Kit removed `context: fork` for large reports because of context bloat, so the harness subagents return short reports.
 
 ## 3.3. Harness requirements derived from the reviews

@@ -9,6 +9,7 @@ import {
 } from './change-state.js';
 import type { ChangeRef } from './changes.js';
 import { digestFiles, withoutCheckboxState } from './digest.js';
+import { readDeferred } from './deferred.js';
 import { isFile, readText } from './fs-utils.js';
 import { isGitRepo, worktreeFingerprint } from './git.js';
 import {
@@ -18,7 +19,7 @@ import {
   type ArtifactState,
   type SchemaInfo,
 } from './openspec-schema.js';
-import { parseFindings, summarizeFindings, type FindingSummary } from './review.js';
+import { checkCoverage, parseCoverage, parseFindings, summarizeFindings, type FindingSummary } from './review.js';
 import { parseTasks, type TaskProgress } from './tasks.js';
 
 /**
@@ -112,6 +113,7 @@ export interface LifecycleView {
   kind: ChangeState['kind'];
   risk: ChangeState['risk'];
   track: ChangeState['track'];
+  trackSuggestion?: ChangeState['track_suggestion'];
   source?: ChangeState['source'];
   stage: StageId;
   stageTitle: string;
@@ -340,7 +342,9 @@ export function evaluateChange(
   let review: LifecycleView['review'];
   let reviewBlocked: string | undefined = upstreamOpen;
   if (isFile(reviewFile)) {
-    const summary = summarizeFindings(parseFindings(readText(reviewFile) ?? ''), config.review.blockOn);
+    const content = readText(reviewFile) ?? '';
+    const findings = parseFindings(content);
+    const summary = summarizeFindings(findings, config.review.blockOn);
     review = {
       total: summary.total,
       open: summary.open,
@@ -351,6 +355,13 @@ export function evaluateChange(
     if (!reviewBlocked && summary.blocking.length > 0) {
       reviewBlocked = `${summary.blocking.length} open blocking finding(s) in review.md`;
     }
+    const coverage = checkCoverage(findings, parseCoverage(content), [...config.review.passes, ...config.review.lenses]);
+    if (!reviewBlocked && config.review.requireLensCoverage && (coverage.missing.length || coverage.unchecked.length)) {
+      reviewBlocked = `review coverage missing: ${coverage.missing.join(', ')}; unchecked: ${coverage.unchecked.join(', ')}`;
+    }
+    const knownDeferred = new Set(readDeferred(root).map((item) => item.id));
+    const missingDeferred = findings.filter((finding) => finding.deferredTo && !knownDeferred.has(finding.deferredTo)).map((finding) => finding.deferredTo);
+    if (!reviewBlocked && missingDeferred.length) reviewBlocked = `missing deferred registry ids: ${missingDeferred.join(', ')}`;
   } else if (!reviewBlocked) {
     reviewBlocked = 'no review.md yet (run the review workflow)';
   }
@@ -390,6 +401,7 @@ export function evaluateChange(
     kind: state.kind,
     risk: state.risk,
     track: state.track,
+    ...(state.track_suggestion ? { trackSuggestion: state.track_suggestion } : {}),
     ...(state.source ? { source: state.source } : {}),
     stage,
     stageTitle: STAGE_TITLES[stage],
@@ -400,7 +412,9 @@ export function evaluateChange(
     verification,
     testsLocked: state.tests_locked === true,
     next: { actor: 'none', action: 'none', message: '' },
-    warnings,
+    warnings: state.track_suggestion
+      ? [...warnings, `Track ${state.track_suggestion.track} suggested; confirm with \`${config.cli} track set ${state.track_suggestion.track} --change ${ref.id}\`.`]
+      : warnings,
   };
   view.next = nextAction(view, config, mapping);
   return view;

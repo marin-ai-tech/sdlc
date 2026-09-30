@@ -8,6 +8,7 @@ import { harnessPackageDir } from '../core/openspec-schema.js';
 export const WORKFLOW_IDS = [
   'next',
   'status',
+  'explore',
   'intent',
   'spec',
   'plan',
@@ -88,4 +89,3 @@ export function loadAgent(id: AgentId): AgentTemplate {
     body,
   };
 }
-

@@ -14,7 +14,7 @@ export const CHANGE_KINDS = ['feature', 'bugfix', 'refactor', 'chore', 'docs', '
 export type ChangeKind = (typeof CHANGE_KINDS)[number];
 export const RISK_LEVELS = ['low', 'medium', 'high'] as const;
 export type RiskLevel = (typeof RISK_LEVELS)[number];
-export const SOURCE_TYPES = ['idea', 'ticket', 'incident', 'alert', 'scan', 'review', 'other'] as const;
+export const SOURCE_TYPES = ['idea', 'ticket', 'incident', 'alert', 'scan', 'review', 'exploration', 'bmad', 'other'] as const;
 export type SourceType = (typeof SOURCE_TYPES)[number];
 /**
  * `full` runs every gate. `lite` is the fast path for bounded work (a small
@@ -98,6 +98,7 @@ export interface ChangeState {
   kind: ChangeKind;
   risk: RiskLevel;
   track: Track;
+  track_suggestion?: { track: Track; reasons: string[] };
   created: string;
   source?: { type: SourceType; ref?: string; url?: string };
   links?: Record<string, string>;
@@ -152,6 +153,7 @@ export function readChangeState(changeDir: string): ChangeState {
   const gates = (raw.gates && typeof raw.gates === 'object' ? raw.gates : {}) as ChangeState['gates'];
   const source = raw.source && typeof raw.source === 'object' ? (raw.source as Record<string, unknown>) : undefined;
   const harness = raw.harness && typeof raw.harness === 'object' ? (raw.harness as Record<string, unknown>) : undefined;
+  const suggestion = raw.track_suggestion && typeof raw.track_suggestion === 'object' ? raw.track_suggestion as Record<string, unknown> : undefined;
   return {
     version: 1,
     ...(harness && typeof harness.scdl === 'string' && typeof harness.license === 'string'
@@ -160,6 +162,8 @@ export function readChangeState(changeDir: string): ChangeState {
     kind: oneOf(raw.kind, CHANGE_KINDS, 'feature'),
     risk: oneOf(raw.risk, RISK_LEVELS, 'medium'),
     track: oneOf(raw.track, TRACKS, 'full'),
+    ...(suggestion && typeof suggestion.track === 'string' && (TRACKS as readonly string[]).includes(suggestion.track) && Array.isArray(suggestion.reasons) && suggestion.reasons.every((r) => typeof r === 'string')
+      ? { track_suggestion: { track: suggestion.track as Track, reasons: suggestion.reasons as string[] } } : {}),
     created: typeof raw.created === 'string' ? raw.created : '',
     ...(source
       ? {
@@ -187,6 +191,7 @@ export function writeChangeState(changeDir: string, state: ChangeState, stamp?: 
     kind: state.kind,
     risk: state.risk,
     track: state.track,
+    ...(state.track_suggestion ? { track_suggestion: state.track_suggestion } : {}),
     created: state.created || new Date().toISOString(),
     ...(state.source ? { source: state.source } : {}),
     ...(state.links && Object.keys(state.links).length > 0 ? { links: state.links } : {}),

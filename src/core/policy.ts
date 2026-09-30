@@ -82,7 +82,7 @@ function matcher(globs: string[]): (p: string) => boolean {
   return (p) => m(p);
 }
 
-const APPROVAL_COMMAND = /\b(?:sdlc|scdl)(?:\.js)?\s+(?:approve|reject|waive|tests\s+unlock)\b/;
+const APPROVAL_COMMAND = /\b(?:sdlc|scdl)(?:\.js)?\s+(?:approve|reject|waive|tests\s+unlock|track\s+set)\b/;
 /** Harness records only the CLI writes: per-change `.sdlc.yaml` and the project log. */
 const STATE_FILE_WRITE = /\.sdlc\.yaml|\.sdlc\/log\.jsonl/;
 const STATE_FILE = /(^|\/)\.sdlc\.yaml$|^openspec\/\.sdlc\/log\.jsonl$/;
@@ -142,7 +142,7 @@ export function evaluateToolCall(call: ToolCall, ctx: PolicyContext): Decision {
       return {
         decision: 'deny',
         rule: 'separation-of-duties',
-        reason: 'Gate approvals, rejections, waivers and test unlocks are human decisions: the agent that produced the work cannot approve it. Ask the responsible person to run the command in their own terminal.',
+        reason: 'Gate approvals, rejections, waivers, test unlocks and track selection are human decisions: the agent that produced the work cannot approve it. Ask the responsible person to run the command in their own terminal.',
       };
     }
     if (STATE_FILE_WRITE.test(cmd) && WRITE_OPS.test(cmd)) {

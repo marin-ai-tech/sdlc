@@ -36,11 +36,14 @@
 |---|---|---|
 | `openspec/config.yaml` | OpenSpec | default schema, `context`, `rules`; the harness respects them and passes them into the instructions |
 | `openspec/sdlc.yaml` | harness | gates, roles, verification commands, review policy, release commands, enforcement, `cli`, `tools` |
+| `openspec/explorations/<slug>.md` | agent + people | optional research and pressure test before intent; a change cites it with `--source-type exploration --source-ref openspec/explorations/<slug>.md` |
+| `openspec/deferred-work.md` | team | registry of deferred decisions and findings (`D<n>`) |
+| `openspec/changes/<id>/sources/bmad/` | importer | retained BMAD source artifacts for an imported change |
 | `openspec/schemas/sdlc/**` | harness → OpenSpec | schema and artifact templates |
 | `openspec/changes/<id>/{intent,proposal,design,plan,tasks}.md`, `specs/**` | agent + people | artifacts (OpenSpec format) |
-| `openspec/changes/<id>/.sdlc.yaml` | **CLI only** | kind, risk, track, source (link to Jira/incident), approvals with digests, verify result, event history |
+| `openspec/changes/<id>/.sdlc.yaml` | **CLI only** | kind, risk, track, `track_suggestion`, source, approvals with digests, verify result, event history |
 | `…/verification.md` | CLI + verifier | automatic evidence block (generated) + behavioral table by scenario |
-| `…/review.md` | reviewer | findings `### F<n> [severity][pass] …` with statuses |
+| `…/review.md` | reviewer | findings `### F<n> [severity][pass] …` with statuses and `## Coverage` for passes and lenses |
 | `…/release.md` | agent | changelog, rollout per environment, control bands, rollback |
 | `openspec/.sdlc/manifest.json` | harness | sha256 of the generated files (edits by people are not overwritten), the scdl version and the license they were created under |
 | `openspec/.sdlc/log.jsonl` | **CLI only** | project log: setup, gate decisions, verify runs, archives, license changes, hook denials; each line has `scdl` (the version) and `license` |
@@ -56,16 +59,18 @@ The stage **is not stored anywhere**: it is computed each time from the artifact
 | `spec` | Design | `proposal.md`, `specs/**`, `design.md` | product-owner (+ tech-lead with `risk: high`) | any of them changed |
 | `plan` | Build | `plan.md`, `tasks.md` (ignoring checkboxes) | engineer (+ tech-lead with `risk: high`) | the plan or the task list changed |
 | `verify` | Test | automatic: all required checks passed, all tasks closed | — (`waive` with a reason is allowed) | the worktree content changed |
-| `review` | Deploy | `review.md` + code | code-owner; blocked by open `important` findings | the code or review.md changed |
+| `review` | Deploy | `review.md` + code; pass/lens coverage and deferred links | code-owner; blocked by open `important` findings, missing required coverage or unlinked deferrals | the code or review.md changed |
 | `release` | Deploy | `release.md` + code | release-manager (optional by default) | the code changed |
 
 Mechanics:
 - **Approval is bound to content.** `.sdlc.yaml` records the role, who (git identity), when, and the **sha256 digest** of the covered files. Any edit → status `stale` → a new approval is needed. Checkboxes in `tasks.md` are normalized: progress does not make the plan stale.
 - **The worktree fingerprint for verify, review and release** is the git tree id of all files (tracked + untracked, excluding ignored files and `openspec/`). It is computed in a temporary index and does not depend on commits: committing verified code does not make the verification stale, while any change to the content does.
-- **Separation of duties.** `approve`, `reject`, `waive`, `tests unlock`, `archive --force` and `license set` refuse to run in an agent session (`CLAUDECODE=1`, `OPENCODE=1`/`AGENT=1`, `SDLC_AGENT`). Hooks also stop the agent from calling `approve`, `reject`, `waive` and `tests unlock`, and from editing `.sdlc.yaml` and the project log `openspec/.sdlc/log.jsonl`.
+- **Separation of duties.** `approve`, `reject`, `waive`, `track set`, `tests unlock`, `archive --force` and `license set` refuse to run in an agent session (`CLAUDECODE=1`, `OPENCODE=1`/`AGENT=1`, `SDLC_AGENT`). Hooks also stop the agent from calling `approve`, `reject`, `waive`, `track set` and `tests unlock`, and from editing `.sdlc.yaml` and the project log `openspec/.sdlc/log.jsonl`.
 - **Roles:** `roles.<role>: [emails]` in sdlc.yaml limits the set of approvers. Without a list, any person with a git identity can approve (convenient for small teams).
 - **Tracks:** `full` (all gates) and `lite` (intent and spec are optional, the change starts with the plan) for bug fixes, refactorings and minor work.
 - **Base drift:** on spec approval, the digests of the main specs that the change modifies are recorded. If another change has modified them in the meantime, `status` warns.
+
+`sdlc new` records a `track_suggestion`; a person confirms or changes it with `sdlc track set <full|lite> --change <id>` before plan approval. Agents are refused by the CLI and hook. `review.passes` and `review.lenses` define required perspectives. `sdlc review check` checks `## Coverage` counts and evidence for zero findings; new projects require coverage, while existing projects warn until `review.require_lens_coverage: true` is set. A `deferred (D<n>)` finding must link to an open item in `openspec/deferred-work.md`.
 
 ## 4.5. Deterministic enforcement (hooks and plugin)
 
@@ -109,6 +114,8 @@ Templates are written once (`assets/workflows/*.md`) and rendered for each surfa
 ## 4.7. CLI commands
 
 `init`, `update`, `uninstall`, `new`, `status [--markdown]`, `next`, `instructions`, `approve|reject|waive`, `tests lock|unlock`, `verify [--list|--check]`, `review context|check`, `validate`, `archive`, `audit`, `log`, `license [set]`, `doctor`, `hook`, `plugin build`, `openspec …` (pass-through call to the bundled OpenSpec). Every command has `--json` with `{severity, code, message, fix}` diagnostics, as in OpenSpec.
+
+Planning commands include `sdlc explore <slug> | list`, `sdlc track set <full|lite> --change <id>`, `sdlc defer add | list | close`, and `sdlc import bmad <path> --change <id> [--dry-run]`. BMAD PRD, SPEC and architecture spine map to intent, proposal, specs, design and deferred work; imported artifacts start without approvals and require `sdlc validate`.
 
 ## 4.8. Key decisions and trade-offs
 

@@ -62,6 +62,9 @@ export interface SdlcConfig {
     policy: string;
     base?: string;
     blockOn: string[];
+    passes: string[];
+    lenses: string[];
+    requireLensCoverage: boolean;
   };
   release: {
     /** Regular expressions; a matching agent shell command needs release authorization. */
@@ -141,7 +144,7 @@ export function defaultConfig(): SdlcConfig {
     },
     roles: {},
     verify: { commands: [], timeoutSeconds: 900, outputLines: 40 },
-    review: { policy: 'REVIEW.md', blockOn: ['important'] },
+    review: { policy: 'REVIEW.md', blockOn: ['important'], passes: ['bugs', 'security', 'compliance'], lenses: ['adversarial', 'edge-cases', 'verification-gaps'], requireLensCoverage: true },
     release: { commands: [...DEFAULT_RELEASE_COMMANDS] },
     enforcement: {
       mode: 'warn',
@@ -286,11 +289,20 @@ export function parseConfig(raw: Raw, file = 'openspec/sdlc.yaml'): SdlcConfig {
   }
 
   const review = asObject(raw.review, where('review'));
+  config.review.requireLensCoverage = false;
   if (review) {
     config.review.policy = asString(review.policy, where('review.policy')) ?? config.review.policy;
     config.review.base = asString(review.base, where('review.base')) ?? config.review.base;
     config.review.blockOn = (asStringArray(review.block_on, where('review.block_on')) ?? config.review.blockOn)
       .map((s) => s.toLowerCase());
+    for (const key of ['passes', 'lenses'] as const) {
+      const names = asStringArray(review[key], where(`review.${key}`));
+      if (names) {
+        if (names.some((name) => !/^[a-z]+(?:-[a-z]+)*$/.test(name))) throw new SdlcError('invalid_config', `${where(`review.${key}`)} must contain kebab-case names.`);
+        config.review[key] = names;
+      }
+    }
+    config.review.requireLensCoverage = asBool(review.require_lens_coverage, where('review.require_lens_coverage')) ?? false;
   }
 
   const release = asObject(raw.release, where('release'));
@@ -409,6 +421,9 @@ export function serializeConfig(config: SdlcConfig): Record<string, unknown> {
       policy: config.review.policy,
       ...(config.review.base ? { base: config.review.base } : {}),
       block_on: config.review.blockOn,
+      passes: config.review.passes,
+      lenses: config.review.lenses,
+      require_lens_coverage: config.review.requireLensCoverage,
     },
     release: { commands: config.release.commands },
     enforcement: {

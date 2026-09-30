@@ -21,6 +21,8 @@ export interface Finding {
   pass: string;
   title: string;
   status: FindingStatus;
+  deferredTo?: string;
+  deferredUnlinked?: boolean;
   where?: string;
   line: number;
 }
@@ -34,7 +36,7 @@ export interface FindingSummary {
 }
 
 const HEADING = /^###\s+(?:([A-Za-z]+-?\d+)\s+)?\[([A-Za-z][\w-]*)\]\s*(?:\[([A-Za-z][\w-]*)\]\s*)?(.+?)\s*$/;
-const STATUS = /^\s*[-*]\s*\*\*Status\*\*\s*:\s*([A-Za-z-]+)/i;
+const STATUS = /^\s*[-*]\s*\*\*Status\*\*\s*:\s*([A-Za-z-]+)(?:\s*\((D\d+)\))?/i;
 const WHERE = /^\s*[-*]\s*\*\*Where\*\*\s*:\s*(.+)$/i;
 
 function normalizeStatus(raw: string | undefined): FindingStatus {
@@ -73,7 +75,13 @@ export function parseFindings(content: string): Finding[] {
     }
     if (!current) continue;
     const status = line.match(STATUS);
-    if (status) current.status = normalizeStatus(status[1]);
+    if (status) {
+      current.status = normalizeStatus(status[1]);
+      if (status[1].toLowerCase() === 'deferred') {
+        if (status[2]) current.deferredTo = status[2];
+        else current.deferredUnlinked = true;
+      }
+    }
     const where = line.match(WHERE);
     if (where) current.where = where[1].trim();
   }
@@ -99,4 +107,69 @@ export function summarizeFindings(findings: Finding[], blockOn: string[]): Findi
     byPass,
     blocking,
   };
+}
+
+/**
+ * Coverage of the review passes and lenses, recorded in review.md so a pass
+ * that ran and found nothing is distinguishable from a pass that never ran:
+ *
+ *   ## Coverage
+ *   - bugs: 2 findings
+ *   - adversarial: none found — checked: token replay, empty names
+ *
+ * Only lines under a `## Coverage` heading count.
+ */
+export interface CoverageEntry {
+  name: string;
+  /** Declared number of findings (`N finding(s)`). */
+  findings?: number;
+  /** For `none found`: the text after `checked:` (empty when no evidence was given). */
+  none?: string;
+  line: number;
+}
+
+export interface CoverageResult {
+  /** Required passes/lenses with no coverage line. */
+  missing: string[];
+  /** `none found` without a non-empty `checked:` part. */
+  unchecked: string[];
+  /** Declared counts that differ from the findings tagged with that pass/lens. */
+  mismatched: Array<{ name: string; declared: number; actual: number }>;
+}
+
+export function parseCoverage(content: string): CoverageEntry[] {
+  const entries: CoverageEntry[] = [];
+  let inCoverage = false;
+  for (const [index, line] of content.split(/\r?\n/).entries()) {
+    if (/^##\s+/.test(line)) { inCoverage = /^##\s+Coverage\s*$/i.test(line); continue; }
+    if (/^#\s+/.test(line)) { inCoverage = false; continue; }
+    if (!inCoverage) continue;
+    const match = /^\s*[-*]\s+([a-z]+(?:-[a-z]+)*)\s*[:\-—]\s*(.*)$/i.exec(line);
+    if (!match) continue;
+    const name = match[1].toLowerCase();
+    const value = match[2].trim();
+    const count = /^(\d+)\s+findings?\b/i.exec(value);
+    if (count) entries.push({ name, findings: Number(count[1]), line: index + 1 });
+    else if (/^none found\b/i.test(value)) {
+      const checked = /(?:^|[:\-—])\s*checked\s*:\s*(.*)$/i.exec(value);
+      entries.push({ name, none: checked?.[1].trim() ?? '', line: index + 1 });
+    }
+  }
+  return entries;
+}
+
+export function checkCoverage(findings: Finding[], coverage: CoverageEntry[], required: string[]): CoverageResult {
+  const missing: string[] = [];
+  const unchecked: string[] = [];
+  const mismatched: CoverageResult['mismatched'] = [];
+  for (const name of required) {
+    const entry = coverage.find((item) => item.name === name);
+    if (!entry) { missing.push(name); continue; }
+    if (entry.none !== undefined && !entry.none.trim()) unchecked.push(name);
+    if (entry.findings !== undefined) {
+      const actual = findings.filter((finding) => finding.pass === name).length;
+      if (entry.findings !== actual) mismatched.push({ name, declared: entry.findings, actual });
+    }
+  }
+  return { missing, unchecked, mismatched };
 }

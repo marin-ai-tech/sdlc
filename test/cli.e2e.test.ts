@@ -158,7 +158,9 @@ describe('sdlc CLI end to end (with the bundled OpenSpec)', () => {
   it('blocks the review gate on open important findings, then approves after the fix', () => {
     const ctx = cli(['review', 'context', '--change', 'add-farewell', '--json']).json();
     expect(ctx.planDrift.unplanned).toEqual([]);
-    write(path.join(changeDir(), 'review.md'), '# Review\n\n## Findings\n\n### F1 [important][bugs] empty names\n- **Where**: src/greet.js:5\n- **Status**: open\n');
+    // A project created by `sdlc init` requires coverage of every pass and lens (0.3.0).
+    const coverage = '## Coverage\n- bugs: 1 finding\n- security: none found — checked: no input reaches a shell or a log\n- compliance: none found — checked: the farewell scenario has a test\n- adversarial: none found — checked: empty and very long names\n- edge-cases: none found — checked: undefined name\n- verification-gaps: none found — checked: test covers the new function\n';
+    write(path.join(changeDir(), 'review.md'), `# Review\n\n## Findings\n\n### F1 [important][bugs] empty names\n- **Where**: src/greet.js:5\n- **Status**: open\n\n${coverage}`);
     expect(cli(['review', 'check', '--change', 'add-farewell']).code).toBe(1);
     expect(cli(['approve', 'review', '--change', 'add-farewell', '--json']).json().status[0].code).toBe('gate_blocked');
     write(path.join(changeDir(), 'review.md'), read(path.join(changeDir(), 'review.md')).replace('Status**: open', 'Status**: fixed (default name)'));

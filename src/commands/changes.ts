@@ -16,7 +16,7 @@ import {
 import { assertValidChangeId, listActiveChanges, listArchivedChanges, resolveChange } from '../core/changes.js';
 import { changedBases, findOverlaps, readChangeDeltas, type Overlap } from '../core/deltas.js';
 import { SdlcError } from '../core/errors.js';
-import { isFile } from '../core/fs-utils.js';
+import { isFile, isWithin } from '../core/fs-utils.js';
 import { formatIdentity, gitIdentity } from '../core/git.js';
 import { evaluateChange, sharedFingerprint, type LifecycleView } from '../core/lifecycle.js';
 import { openspecFailure, runOpenSpec, runOpenSpecJson } from '../core/openspec.js';
@@ -24,6 +24,8 @@ import { loadSchemaInfo } from '../core/openspec-schema.js';
 import { PROJECT_URL } from '../core/license.js';
 import { readYamlObject, writeYaml } from '../core/yaml-io.js';
 import { readAsset } from '../integrations/assets.js';
+import { agentEnvironment } from '../core/agent-env.js';
+import { suggestTrack } from '../core/track.js';
 
 function oneOf<T extends string>(value: string | undefined, allowed: readonly T[], flag: string): T | undefined {
   if (value === undefined) return undefined;
@@ -31,6 +33,15 @@ function oneOf<T extends string>(value: string | undefined, allowed: readonly T[
     throw new SdlcError('invalid_option', `${flag} must be one of: ${allowed.join(', ')} (got ${value}).`);
   }
   return value as T;
+}
+
+function validateExplorationSource(root: string, type: SourceType | undefined, ref: string | undefined): void {
+  if (type !== 'exploration') return;
+  const directory = path.join(root, 'openspec', 'explorations');
+  const target = ref ? path.resolve(root, ref) : '';
+  if (!ref || !isWithin(directory, target) || !isFile(target)) {
+    throw new SdlcError('unknown_exploration', 'Exploration source must reference an existing file in openspec/explorations/.');
+  }
 }
 
 export interface NewOptions {
@@ -46,6 +57,25 @@ export interface NewOptions {
   json?: boolean;
 }
 
+export function createChange(name: string, opts: NewOptions): { ctx: ProjectContext; dir: string } {
+  assertValidChangeId(name);
+  const ctx = loadProject();
+  const { root, config } = ctx;
+  const kind = oneOf<ChangeKind>(opts.kind, CHANGE_KINDS, '--kind') ?? 'feature';
+  const risk = oneOf<RiskLevel>(opts.risk, RISK_LEVELS, '--risk') ?? 'medium';
+  const suggested = suggestTrack(kind, risk);
+  const sourceType = oneOf<SourceType>(opts.sourceType, SOURCE_TYPES, '--source-type');
+  const schema = opts.schema ?? config.schema;
+  loadSchemaInfo(schema, root);
+  const result = runOpenSpecJson<{ change?: { id: string; path: string } }>(['new', 'change', name, '--schema', schema], root);
+  if (!result.ok || !result.data?.change) throw new SdlcError('openspec_new_failed', `openspec new change failed: ${openspecFailure(result.data, result.raw)}`);
+  const dir = result.data.change.path;
+  const state = newChangeState({ kind, risk, track: 'full', ...(sourceType ? { source: { type: sourceType, ...(opts.sourceRef ? { ref: opts.sourceRef } : {}) } } : {}) });
+  if (suggested.track === 'lite') state.track_suggestion = suggested;
+  recordChangeEvent(ctx, { id: name, dir }, state, 'change.created', formatIdentity(gitIdentity(root)), `schema ${schema}, full track`);
+  return { ctx, dir };
+}
+
 export async function newCommand(name: string, opts: NewOptions): Promise<void> {
   try {
     assertValidChangeId(name);
@@ -53,8 +83,15 @@ export async function newCommand(name: string, opts: NewOptions): Promise<void> 
     const { root, paths, config } = ctx;
     const kind = oneOf<ChangeKind>(opts.kind, CHANGE_KINDS, '--kind') ?? 'feature';
     const risk = oneOf<RiskLevel>(opts.risk, RISK_LEVELS, '--risk') ?? 'medium';
-    const track = oneOf<Track>(opts.track, TRACKS, '--track') ?? 'full';
+    const requestedTrack = oneOf<Track>(opts.track, TRACKS, '--track');
+    const suggested = suggestTrack(kind, risk);
+    const agentRequestedLite = requestedTrack === 'lite' && !!agentEnvironment();
+    const track = requestedTrack === 'lite' && !agentRequestedLite ? 'lite' : 'full';
+    const trackSuggestion = agentRequestedLite
+      ? { track: 'lite' as const, reasons: ['An agent requested the lite track.', ...suggested.reasons] }
+      : !requestedTrack && suggested.track === 'lite' ? suggested : undefined;
     const sourceType = oneOf<SourceType>(opts.sourceType, SOURCE_TYPES, '--source-type');
+    validateExplorationSource(root, sourceType, opts.sourceRef);
     const schema = opts.schema ?? config.schema;
     loadSchemaInfo(schema, root); // fail early with a clear message
 
@@ -80,15 +117,17 @@ export async function newCommand(name: string, opts: NewOptions): Promise<void> 
         ? { source: { type: sourceType ?? 'other', ...(opts.sourceRef ? { ref: opts.sourceRef } : {}), ...(opts.sourceUrl ? { url: opts.sourceUrl } : {}) } }
         : {}),
     });
+    if (trackSuggestion) state.track_suggestion = trackSuggestion;
     recordChangeEvent(ctx, { id: name, dir: changeDir }, state, 'change.created', formatIdentity(gitIdentity(root)),
       `schema ${schema}, ${track} track`);
 
     const view = evaluateChange(root, { id: name, dir: changeDir, archived: false }, config, { skipFingerprint: true });
     if (opts.json) {
-      printJson({ change: { id: name, path: changeDir, schema, kind, risk, track, ...(state.source ? { source: state.source } : {}) }, next: view.next, root: { path: paths.root } });
+      printJson({ change: { id: name, path: changeDir, schema, kind, risk, track, ...(trackSuggestion ? { trackSuggestion } : {}), ...(state.source ? { source: state.source } : {}) }, next: view.next, root: { path: paths.root } });
       return;
     }
     line(c.bold(`Created change ${name}`) + c.dim(` (${schema} schema, ${kind}, risk ${risk}, ${track} track)`));
+    if (agentRequestedLite) warn(`An agent cannot select lite; ask a person to run ${config.cli} track set lite --change ${name}.`);
     line(`  ${path.relative(process.cwd(), changeDir) || changeDir}`);
     line(`  next: ${view.next.message}`);
     if (view.next.cli) line(`        ${c.cyan(view.next.cli)}`);

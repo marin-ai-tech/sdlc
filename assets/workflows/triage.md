@@ -19,7 +19,7 @@ Close the loop - Stage 6 (Maintain). What production or a scan reveals re-enters
    ```bash
    sdlc new <name> --kind <incident|bugfix|security> --risk <low|medium|high> --source-type <incident|alert|scan|ticket> --source-ref <id> [--track lite]
    ```
-   Use `--track lite` only for a bounded fix with no behavior change to specify.
+   An agent may request `--track lite` for a bounded fix with no behavior change to specify; the change remains full until a person confirms it with `sdlc track set lite --change <name>`.
 4. **Write `intent.md`** (`sdlc instructions intent --change <name> --json`): the anomaly and its evidence in Problem, the desired end state, affected systems, and open questions.
 5. **Recommend, do not act**: whether a rollback or runbook should run now (a person triggers it unless it is pre-approved), and which regression eval/test should be added once fixed.
 6. **Stop at the gate.** Route to the service or product owner: `sdlc approve intent --change <name>` to fix now, or `sdlc reject intent --change <name> --note "<reason>"` to dismiss (dismissals tune the alert bands).

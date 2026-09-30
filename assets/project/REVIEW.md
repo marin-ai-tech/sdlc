@@ -9,6 +9,14 @@ Run three passes and tag each finding with its pass:
 - **security**: injection risks, authentication and authorization gaps, secrets, PII in logs or error messages
 - **compliance**: the change matches its spec (openspec/changes/<id>/specs), its plan (plan.md) and our design principles below
 
+## Lenses
+Run each lens in fresh context and tag its findings with the lens name:
+- **adversarial**: how would an attacker or hostile input break this?
+- **edge-cases**: boundaries, empty, huge, concurrent and Unicode inputs, and failure paths.
+- **verification-gaps**: behaviour the tests and evidence do not actually prove.
+
+Every pass and lens must appear under `## Coverage` in review.md, with a finding count or `none found — checked: <what was checked>`.
+
 ## What Important means here
 Reserve **important** for findings that would break behavior, leak data or
 breach a policy. Style and naming are **nit**. Problems the change did not

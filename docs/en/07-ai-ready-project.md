@@ -102,4 +102,4 @@ Conversion never moves pinned `README.md`, `README`, `README.txt`, `README.rst`,
 
 ## 7.9. Limits and next steps
 
-The layout describes a small set of exact paths and aliases; it does not infer a role from arbitrary files. Review generated templates and mappings before relying on them. Importing conventions from other SDD frameworks such as Spec Kit, Kiro, and BMAD is a later step.
+The layout describes a small set of exact paths and aliases; it does not infer a role from arbitrary files. Review generated templates and mappings before relying on them. `sdlc import bmad` imports BMAD planning artifacts; broader convention imports from frameworks such as Spec Kit and Kiro remain a later step.

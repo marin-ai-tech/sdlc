@@ -31,12 +31,18 @@ function changes(model: ReportModel): string[] {
 }
 
 function leadTimes(model: ReportModel): string[] {
+  
   const m = model.metrics.medianLeadTimeHours;
   return [
     '## Median lead times (hours)', '',
     `Intent to spec: ${cell(m.intentToSpecApproval)} · Spec to plan: ${cell(m.specToPlanApproval)} · Plan to verified: ${cell(m.planToVerified)} · Verified to review: ${cell(m.verifiedToReviewApproval)} · Created to archived: ${cell(m.createdToArchived)}`,
     '',
   ];
+}
+
+function deferred(model: ReportModel): string[] {
+  return ['## Deferred work', '', '| ID | Title | Change | Revisit when |', '| --- | --- | --- | --- |',
+    ...model.deferred.items.map((item) => `| ${cell(item.id)} | ${cell(item.title)} | ${cell(item.change)} | ${cell(item.revisit)} |`), ''];
 }
 
 function events(model: ReportModel): string[] {
@@ -71,6 +77,7 @@ export function renderReportMarkdown(model: ReportModel): string {
     '',
     ...stages(model),
     ...changes(model),
+    ...deferred(model),
     ...leadTimes(model),
     ...events(model),
     ...layout(model),

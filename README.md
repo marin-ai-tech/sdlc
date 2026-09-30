@@ -3,7 +3,7 @@
 `sdlc` runs the lifecycle from Anthropic's [AI-Native SDLC playbook](https://claude.com/blog/the-ai-native-sdlc-playbook) inside your coding agent:
 
 ```
-intent ──► spec ──► plan ──► build ──► verify ──► review ──► (release) ──► archive
+explore (optional) ──► intent ──► spec ──► plan ──► build ──► verify ──► review ──► (release) ──► archive
  Plan      Design    Build              Test       Deploy                  living specs
    ▲                                                                           │
    └──────────────────────── triage (alerts, incidents, scans) ◄───────────────┘
@@ -20,6 +20,11 @@ On top of OpenSpec, `sdlc` adds the process parts the playbook asks for:
 - **Deterministic guardrails.** Claude Code hooks and an OpenCode plugin enforce the gates: no code before an approved plan, locked tests during bug fixes, protected paths, and no production release without authorization.
 - **Checks OpenSpec lacks.** Before a merge, delta targets are checked. Overlapping edits across open changes are flagged. So are base-spec drift and spec scenarios with no verification evidence.
 - **Right-sized process.** A `lite` track skips intent and spec for small, bounded work.
+- **Exploration before intent.** `/sdlc:explore` pressure-tests an idea in `openspec/explorations/`; a later change can cite the note.
+- **Review coverage.** Configured passes and lenses need recorded coverage in `review.md`; `sdlc review check` checks it.
+- **Human track confirmation.** `sdlc new` suggests a track; a person can confirm or change it with `sdlc track set` before plan approval.
+- **Deferred-work registry.** `sdlc defer` tracks postponed findings in `openspec/deferred-work.md` and exposes them in reports.
+- **BMAD import.** `sdlc import bmad` maps planning artifacts into an unapproved OpenSpec change.
 - **Audit and metrics.** `sdlc audit` builds a timeline of who approved what and when, plus the playbook's lead-time and first-pass metrics.
 
 ## Install
@@ -54,6 +59,7 @@ The plugin ships the same workflows (`/sdlc:<id>`), subagents and hooks. With th
 
 | Stage | Claude Code | OpenCode | Who decides |
 |---|---|---|---|
+| Explore before intent | `/sdlc:explore` | `/sdlc-explore` | — |
 | Plan: capture `intent.md` | `/sdlc:intent "<idea>"` | `/sdlc-intent "<idea>"` | product owner: `sdlc approve intent` |
 | Design: proposal, delta specs, design | `/sdlc:spec` | `/sdlc-spec` | product owner (+ tech lead if high risk): `sdlc approve spec` |
 | Build: `plan.md` + `tasks.md` | `/sdlc:plan` | `/sdlc-plan` | engineer: `sdlc approve plan` |
@@ -68,7 +74,7 @@ The plugin ships the same workflows (`/sdlc:<id>`), subagents and hooks. With th
 
 People run approvals **in their own terminal**. Inside an agent session `sdlc approve` refuses by design.
 
-Small bounded work: `sdlc new fix-null-name --kind bugfix --risk low --track lite [--skip-specs]`.
+Small bounded work: `sdlc new fix-null-name --kind bugfix --risk low`. Review its track suggestion, then confirm `sdlc track set lite --change fix-null-name` in your terminal before plan approval.
 
 ## What gets generated
 
@@ -100,6 +106,10 @@ Everything scdl writes records the scdl version and the license the project uses
 |---|---|
 | `sdlc init [path]` / `update` / `uninstall` | set up, regenerate, remove integrations (planning data is never touched) |
 | `sdlc new <id> [--kind --risk --track --source-type --source-ref --skip-specs]` | start a change (an OpenSpec change folder + `.sdlc.yaml`) |
+| `sdlc explore <slug> \| list` | create or list optional research notes before intent |
+| `sdlc track set <full\|lite> --change <id> [--note <text>]` | human confirmation of the suggested track before plan approval |
+| `sdlc defer add \| list \| close` | manage the deferred-work registry |
+| `sdlc import bmad <path> --change <id> [--dry-run]` | import BMAD planning into an unapproved change |
 | `sdlc status [--change] [--markdown] [--json]` / `sdlc next` | stages, gates, approvals, evidence, who acts next |
 | `sdlc layout check [--json]` / `scaffold [--dry-run] [--json]` / `adapt [--dry-run] [--json]` / `convert [--apply] [--json]` | check layout readiness, create missing documents, map existing paths, or plan and apply conversion |
 | `sdlc report [--format md\|json\|html] [--since] [--change] [--out]` / `sdlc dashboard [--since] [--change] [--out]` | progress report and self-contained HTML dashboard |
@@ -139,6 +149,10 @@ verify:
   commands:
     - { name: build, run: npm run build }
     - { name: test,  run: npm test }
+review:
+  passes: [bugs, security, compliance]
+  lenses: [adversarial, edge-cases, verification-gaps]
+  require_lens_coverage: true
 enforcement:
   mode: warn                               # off | warn | block
   require_approved_plan: true

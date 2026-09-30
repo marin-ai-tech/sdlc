@@ -21,6 +21,7 @@ import { aggregateMetrics, changeMetrics } from '../core/metrics.js';
 import { readLog } from '../core/log.js';
 import { detectLayout } from '../core/layout.js';
 import { readText } from '../core/fs-utils.js';
+import { readDeferred, type DeferredItem } from '../core/deferred.js';
 
 export interface ReportOptions {
   /** ISO date (YYYY-MM-DD) or timestamp: events and "moved in period" start here. Unset = everything. */
@@ -90,6 +91,12 @@ export interface ReportModel {
   /** Project log entries inside the period, oldest first, at most 200 (newest kept). */
   events: LogEntry[];
   layout: LayoutReport;
+  deferred: { open: number; items: DeferredItem[] };
+}
+
+function deferredWork(root: string): ReportModel['deferred'] {
+  const items = readDeferred(root).filter((item) => item.status === 'open').sort((a, b) => Number(a.id.slice(1)) - Number(b.id.slice(1)));
+  return { open: items.length, items };
 }
 
 function parseSince(value?: string): string | undefined {
@@ -190,5 +197,6 @@ export function buildReport(ctx: ProjectContext, opts: ReportOptions = {}): Repo
     changes,
     events: periodEvents(ctx.root, since, opts.change),
     layout: detectLayout(ctx.root, ctx.config.layout),
+    deferred: deferredWork(ctx.root),
   };
 }

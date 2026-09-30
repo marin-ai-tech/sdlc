@@ -14,9 +14,17 @@ import { LICENSE_TERMS, REQUIRED_NOTICE } from '../core/license.js';
 import { harnessVersion } from '../core/version.js';
 import { reportCommand } from '../commands/report.js';
 import { layoutCommand } from '../commands/layout.js';
+import { deferAdd, deferClose, deferList } from '../commands/defer.js';
+import { trackSetCommand } from '../commands/track.js';
+import { exploreCommand, exploreListCommand } from '../commands/explore.js';
+import { importBmadCommand } from '../commands/import.js';
 
 export function buildProgram(): Command {
   const program = new Command();
+  const defer = program.command('defer').description('Manage consciously deferred work');
+  defer.command('add <title>').option('--why <text>').option('--change <id>').option('--finding <F-id>').option('--revisit <text>').option('--json').action((title, opts) => deferAdd(title, opts));
+  defer.command('list').option('--open').option('--change <id>').option('--json').action((opts) => deferList(opts));
+  defer.command('close <D-id>').option('--status <status>').option('--note <text>').option('--json').action((id, opts) => deferClose(id, opts));
   const layout = program.command('layout').description('Check or create the AI-ready project layout');
   layout.command('check').option('--json', 'output JSON').action((opts) => layoutCommand('check', opts));
   layout.command('scaffold').option('--dry-run', 'show planned files').option('--json', 'output JSON').action((opts) => layoutCommand('scaffold', opts));
@@ -67,7 +75,7 @@ export function buildProgram(): Command {
     .option('--kind <kind>', 'feature | bugfix | refactor | chore | docs | incident | security')
     .option('--risk <risk>', 'low | medium | high (high adds tech-lead approvals)')
     .option('--track <track>', 'full (all gates) | lite (starts at plan; intent and spec optional)')
-    .option('--source-type <type>', 'idea | ticket | incident | alert | scan | review | other')
+    .option('--source-type <type>', 'idea | ticket | incident | alert | scan | review | exploration | other')
     .option('--source-ref <id>', 'external record id (Jira, incident, finding) for linkage')
     .option('--source-url <url>', 'link to the external record')
     .option('--skip-specs', 'no externally visible behavior changes (sets skip_specs in .openspec.yaml)')
@@ -75,6 +83,14 @@ export function buildProgram(): Command {
     .option('--description <text>', 'description for the change README')
     .option('--json', 'output JSON')
     .action((name, opts) => newCommand(name, opts));
+
+  const explore = program.command('explore').description('Create or list optional exploration notes before intent')
+    .argument('[slug]').option('--json', 'output JSON')
+    .action((slug, opts) => { if (slug) exploreCommand(slug, opts); });
+  explore.command('list').option('--json', 'output JSON').action((opts) => exploreListCommand(opts));
+  program.command('import').description('Import planning artifacts')
+    .command('bmad <path>').requiredOption('--change <id>').option('--kind <kind>').option('--risk <risk>')
+    .option('--dry-run').option('--json').action((input, opts) => importBmadCommand(input, opts));
 
   program
     .command('status')
@@ -84,6 +100,14 @@ export function buildProgram(): Command {
     .option('--markdown', 'markdown report (for pull requests and wikis)')
     .option('--json', 'output JSON')
     .action((opts) => statusCommand(opts));
+
+  program.command('track').description('Manage the change track')
+    .command('set <track>')
+    .description('Set full or lite track (human only)')
+    .requiredOption('--change <id>', 'change id')
+    .option('--note <text>', 'reason for the change')
+    .option('--json', 'output JSON')
+    .action((track, opts) => trackSetCommand(track, opts));
 
   program
     .command('next')

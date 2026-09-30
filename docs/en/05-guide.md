@@ -52,6 +52,14 @@ At any point, `/sdlc:next` (`/sdlc-next`) runs the next step or tells you who mu
 
 **A human runs approvals in their own terminal.** Inside an agent session, `sdlc approve` refuses to run. This is by design.
 
+### Explore before intent
+
+Use `/sdlc:explore` (`/sdlc-explore`) to research and pressure-test an idea. `sdlc explore <slug>` creates `openspec/explorations/<slug>.md`; `sdlc explore list` lists notes. Start a linked change with `sdlc new <id> --source-type exploration --source-ref openspec/explorations/<slug>.md`. Exploration is optional and does not approve intent.
+
+### Track suggestion and confirmation
+
+`sdlc new` suggests `lite` for eligible small changes from their kind and risk and records `track_suggestion` in `.sdlc.yaml`. Read the reason, then run `sdlc track set <full|lite> --change <id>` yourself. The CLI refuses agent sessions and changes after the plan is approved; the hook also denies agents.
+
 ### Lite track (small edits)
 ```bash
 sdlc new fix-null-name --kind bugfix --risk low --track lite [--skip-specs]
@@ -62,6 +70,32 @@ The intent and the spec are optional: the change starts with plan.md and tasks.m
 1. The first task is a test that reproduces the bug. Make sure it fails for the right reason, and commit it.
 2. `sdlc tests lock --change <id>` — from then on, hooks do not let the agent change the tests.
 3. Fix the code. Only a human can remove the lock: `sdlc tests unlock`.
+
+### Review with lenses and coverage
+
+`review.passes` and `review.lenses` in `openspec/sdlc.yaml` define the perspectives to check. In `review.md`, record each under `## Coverage`, including work checked when no finding was made:
+
+```md
+## Findings
+
+### F1 [important][adversarial] Replayed token is accepted
+- **Where**: src/auth/session.ts:88
+- **Status**: open
+
+## Coverage
+- bugs: none found — checked: changed error paths
+- adversarial: 1 finding
+```
+
+`sdlc review check --change <id>` checks missing entries, mismatched finding counts, empty `checked:` evidence, and deferred links. The review gate uses that result. New projects require lens coverage; older projects warn until `review.require_lens_coverage: true` opts in.
+
+### Defer a finding
+
+Record postponed work with `sdlc defer add <title> --why <text> [--change <id>] [--finding <F-id>] [--revisit <text>]`, inspect it with `sdlc defer list [--open] [--change <id>]`, and close it with `sdlc defer close <D-id> --status done|dropped --note <text>`. The registry is `openspec/deferred-work.md`; each `### D<n> [open] Title` entry has `**Change**`, optional `**Finding**`, `**Why**`, `**Revisit when**`, and `**Created**` fields. Mark the review finding `deferred (D<n>)`; the review check requires a link to an open item. Reports and dashboards show the registry.
+
+### Import BMAD planning
+
+Run `sdlc import bmad <path> --change <id> [--dry-run]` on BMAD PRD, SPEC and architecture spine artifacts. The importer keeps source copies under `sources/bmad/` and maps PRD vision to `intent.md`, SPEC purpose to `proposal.md`, capabilities or PRD requirements to `specs/`, architecture decisions to `design.md`, and deferred bullets to `openspec/deferred-work.md`. Nothing is approved by the import. Review the output and run `sdlc validate --change <id>`.
 
 ## 5.3. Configuring `openspec/sdlc.yaml`
 
@@ -89,6 +123,9 @@ verify:
   output_lines: 40
 review:
   policy: REVIEW.md
+  passes: [bugs, security, compliance]
+  lenses: [adversarial, edge-cases, verification-gaps]
+  require_lens_coverage: true
   base: main                  # base for the diff (default: origin/HEAD)
   block_on: [important]
 release:

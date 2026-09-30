@@ -4,11 +4,12 @@ import { c, line, printJson, reportFailure } from '../cli/output.js';
 import { readChangeState } from '../core/change-state.js';
 import { resolveChange } from '../core/changes.js';
 import { readChangeDeltas } from '../core/deltas.js';
+import { readDeferred } from '../core/deferred.js';
 import { SdlcError } from '../core/errors.js';
 import { isFile, readText } from '../core/fs-utils.js';
 import { defaultBaseRef, formatIdentity, gitIdentity, headCommit } from '../core/git.js';
 import { computePlanDrift } from '../core/plan-drift.js';
-import { parseFindings, summarizeFindings } from '../core/review.js';
+import { checkCoverage, parseCoverage, parseFindings, summarizeFindings } from '../core/review.js';
 import { applyVerifyToState, runVerification, writeEvidence } from '../core/verify.js';
 import { readAsset } from '../integrations/assets.js';
 import { readManifest } from '../integrations/manifest.js';
@@ -102,14 +103,27 @@ export async function reviewCommand(action: string, opts: { change?: string; bas
     if (action === 'check') {
       const file = path.join(ref.dir, 'review.md');
       if (!isFile(file)) throw new SdlcError('no_review', `No review.md in ${ref.id} yet.`, 'Run the review workflow first.');
-      const summary = summarizeFindings(parseFindings(readText(file) ?? ''), ctx.config.review.blockOn);
+      const content = readText(file) ?? '';
+      const findings = parseFindings(content);
+      const summary = summarizeFindings(findings, ctx.config.review.blockOn);
+      const required = [...ctx.config.review.passes, ...ctx.config.review.lenses];
+      const coverage = { required, enforced: ctx.config.review.requireLensCoverage, ...checkCoverage(findings, parseCoverage(content), required) };
+      const known = new Set(readDeferred(ctx.root).map((item) => item.id));
+      const deferred = { missing: findings.filter((f) => f.deferredTo && !known.has(f.deferredTo)).map((f) => ({ finding: f, id: f.deferredTo })), unlinked: findings.filter((f) => f.deferredUnlinked) };
       if (opts.json) {
-        printJson({ change: ref.id, ...summary, blocking: summary.blocking });
+        printJson({ change: ref.id, ...summary, blocking: summary.blocking, coverage, deferred });
       } else {
         line(`${summary.total} finding(s), ${summary.open} open; blocking open: ${summary.blocking.length}`);
         for (const f of summary.blocking) line(`  ${c.red('✗')} ${f.id ?? ''} [${f.severity}][${f.pass}] ${f.title}${f.where ? c.dim(` (${f.where})`) : ''}`);
       }
-      if (summary.blocking.length > 0) process.exitCode = 1;
+      if (!opts.json) {
+        if (coverage.missing.length) line(`Missing review coverage: ${coverage.missing.join(', ')}`);
+        if (coverage.unchecked.length) line(`Coverage lacks checked evidence: ${coverage.unchecked.join(', ')}`);
+        if (coverage.mismatched.length) line(`Coverage counts differ from findings: ${coverage.mismatched.map((m) => m.name).join(', ')}`);
+        if (deferred.missing.length) line(`Missing deferred registry ids: ${deferred.missing.map((m) => m.id).join(', ')}`);
+        if (deferred.unlinked.length) line(`Unlinked deferred findings: ${deferred.unlinked.map((f) => f.id ?? f.title).join(', ')}; use sdlc defer add … --finding <F-id>`);
+      }
+      if (summary.blocking.length > 0 || deferred.missing.length > 0 || (coverage.enforced && (coverage.missing.length > 0 || coverage.unchecked.length > 0))) process.exitCode = 1;
       return;
     }
     const base = opts.base ?? ctx.config.review.base ?? defaultBaseRef(ctx.root);
@@ -125,6 +139,9 @@ export async function reviewCommand(action: string, opts: { change?: string; bas
       planDrift: { unplanned: drift.unplanned, untouched: drift.untouched, plannedPaths: drift.plannedPaths },
       policy: { file: isFile(policyFile) ? ctx.config.review.policy : null, content: policy },
       blockOn: ctx.config.review.blockOn,
+      passes: ctx.config.review.passes,
+      lenses: ctx.config.review.lenses,
+      requireLensCoverage: ctx.config.review.requireLensCoverage,
       artifacts: {
         intent: rel('intent.md'),
         proposal: rel('proposal.md'),
