@@ -39,7 +39,7 @@ Sources: OpenSpec GitHub issues/discussions, the CHANGELOG, comparative reviews 
 | Harness | Phase model | Artifacts | Claude Code | OpenCode | Gates |
 |---|---|---|---|---|---|
 | **GitHub Spec Kit** | constitution → specify → (clarify) → plan → tasks → (analyze) → implement ⇄ converge | `specs/NNN-x/{spec,plan,tasks,research,...}.md`, `constitution.md` | `.claude/skills/speckit-*`, hooks in settings.json | `.opencode/commands/speckit.*.md` + a generated `speckit-events.ts` plugin | precondition scripts, prompts |
-| **BMAD-METHOD** | analysis → planning → solutioning → sprint/build/review | PRD, architecture spine, `SPEC.md` (CAP-id), `sprint-status.yaml` | skills via marketplace | `.agents/skills` + pointer commands | readiness PASS/CONCERNS/FAIL, multi-layer review |
+| **BMAD-METHOD** (v6.12, Sept 2026) | clarify → plan → build & verify → learn & adjust; the depth is chosen by `bmad-build` after investigating the change | product brief / PRFAQ, PRD, `SPEC.md`, architecture, tickets, `plan-<slug>.md`, `deferred-work.md`, `AGENTS.md` as project context | skills (Skills CLI) or a plugin marketplace | skills in `.agents/skills` | human plan approval in the session; independent multi-lens review with a logged verdict per finding; prompt-driven, no hooks or CLI checks |
 | **Kiro** (AWS) | requirements (EARS) → design → tasks | `.kiro/specs/*` + steering | its own IDE | — | approvals in the UI |
 | **cc-sdd** | Kiro style, 17 skills | `.kiro/specs/*/spec.json` with approvals | skills | skills/agents | approvals in JSON (trust-based) |
 | **Agent OS v3** | standards + shape-spec in plan mode | `agent-os/{standards,product,specs}` | commands | — | plan mode |
@@ -54,7 +54,8 @@ What was taken from them (and what to avoid):
 - **A manifest of installed files with hashes**, so that only untouched files are removed or updated (Spec Kit).
 - **A single hook dispatcher** for Claude Code (settings.json) and OpenCode (a generated JS plugin: `tool.execute.before/after`, `experimental.chat.system.transform`) — Spec Kit, ospec-workflow.
 - **Approvals in a state file, not in the chat** (cc-sdd `spec.json`, ospec-workflow `state.yaml`). But without hooks this remains "trust-based", which is why the harness has deterministic checks.
-- **Routing by change size** (ospec-workflow: hotfix/lite/standard) — hence the lite track.
+- **Routing by change size** (ospec-workflow: hotfix/lite/standard) — hence the lite track. BMAD goes further and lets the build step pick the depth after investigating the change; the harness keeps the choice with a person (`--track`).
+- **Upstream thinking tools** (BMAD: brainstorming, PRFAQ, multi-persona pressure tests, parallel research) have no counterpart in the harness, which starts at `intent.md`. BMAD in turn has no deterministic gates, content-bound approvals or recorded verification evidence, so the two combine rather than compete.
 - Spec Kit removed `context: fork` for large reports because of context bloat, so the harness subagents return short reports.
 
 ## 3.3. Harness requirements derived from the reviews
