@@ -1,5 +1,6 @@
 import { SdlcError } from './errors.js';
 import { isFile } from './fs-utils.js';
+import { LAYOUT_ROLE_IDS, type LayoutMapping, type LayoutRoleId } from './layout.js';
 import { readYamlObject, writeYaml } from './yaml-io.js';
 
 export const APPROVAL_GATES = ['intent', 'spec', 'plan', 'review', 'release'] as const;
@@ -90,6 +91,11 @@ export interface SdlcConfig {
     /** Also log hook decisions that deny or warn. */
     hookDecisions: boolean;
   };
+  /**
+   * AI-ready layout: role id -> the project's actual path for that role, when
+   * it differs from the canonical one (`sdlc layout adapt`). Empty = canonical.
+   */
+  layout: LayoutMapping;
 }
 
 export const DEFAULT_TEST_PATHS = [
@@ -149,6 +155,7 @@ export function defaultConfig(): SdlcConfig {
     },
     license: { type: 'community' },
     log: { enabled: true, hookDecisions: true },
+    layout: {},
   };
 }
 
@@ -350,6 +357,15 @@ export function parseConfig(raw: Raw, file = 'openspec/sdlc.yaml'): SdlcConfig {
     config.log.hookDecisions = asBool(log.hook_decisions, where('log.hook_decisions')) ?? config.log.hookDecisions;
   }
 
+  const layout = asObject(raw.layout, where('layout'));
+  if (layout) for (const [key, value] of Object.entries(layout)) {
+    if (!(LAYOUT_ROLE_IDS as readonly string[]).includes(key)) throw new SdlcError('invalid_config', `${where(`layout.${key}`)} is not a known layout role.`);
+    if (typeof value !== 'string' || !value.trim() || /^[\\/]/.test(value) || /^[a-zA-Z]:/.test(value))
+      throw new SdlcError('invalid_config', `${where(`layout.${key}`)} must be a relative project path.`);
+    const normalized = value.replace(/\\/g, '/');
+    if (normalized.split('/').includes('..')) throw new SdlcError('invalid_config', `${where(`layout.${key}`)} must stay inside the project.`);
+    config.layout[key as LayoutRoleId] = normalized;
+  }
   return config;
 }
 
@@ -411,6 +427,7 @@ export function serializeConfig(config: SdlcConfig): Record<string, unknown> {
       ...(config.license.licensee ? { licensee: config.license.licensee } : {}),
     },
     log: { enabled: config.log.enabled, hook_decisions: config.log.hookDecisions },
+    ...(Object.keys(config.layout).length ? { layout: config.layout } : {}),
   };
 }
 

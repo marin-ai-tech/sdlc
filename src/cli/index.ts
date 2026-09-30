@@ -12,9 +12,16 @@ import { findProjectRoot } from '../core/project.js';
 import { runHook } from '../hook.js';
 import { LICENSE_TERMS, REQUIRED_NOTICE } from '../core/license.js';
 import { harnessVersion } from '../core/version.js';
+import { reportCommand } from '../commands/report.js';
+import { layoutCommand } from '../commands/layout.js';
 
 export function buildProgram(): Command {
   const program = new Command();
+  const layout = program.command('layout').description('Check or create the AI-ready project layout');
+  layout.command('check').option('--json', 'output JSON').action((opts) => layoutCommand('check', opts));
+  layout.command('scaffold').option('--dry-run', 'show planned files').option('--json', 'output JSON').action((opts) => layoutCommand('scaffold', opts));
+  layout.command('adapt').option('--dry-run', 'show planned files').option('--json', 'output JSON').action((opts) => layoutCommand('adapt', opts));
+  layout.command('convert').option('--apply', 'apply conversion').option('--in-place', 'convert the current working copy').option('--worktree <path>', 'new worktree path').option('--branch <name>', 'new branch name').option('--json', 'output JSON').action((opts) => layoutCommand('convert', opts));
   program
     .name('sdlc')
     .description('AI-native SDLC harness (Anthropic playbook) for Claude Code and OpenCode, built on OpenSpec.')
@@ -158,6 +165,24 @@ export function buildProgram(): Command {
     .option('--change <id>', 'one change (active or archived)')
     .option('--json', 'output JSON')
     .action((opts) => auditCommand(opts));
+
+  program
+    .command('report')
+    .description('Project SDLC progress report')
+    .option('--format <format>', 'md | json | html', 'md')
+    .option('--json', 'output JSON')
+    .option('--since <date>', 'period start')
+    .option('--change <id>', 'one change')
+    .option('--out <file>', 'write report to file')
+    .action((opts) => reportCommand(opts));
+
+  program
+    .command('dashboard')
+    .description('Self-contained HTML progress dashboard')
+    .option('--since <date>', 'period start')
+    .option('--change <id>', 'one change')
+    .option('--out <file>', 'write dashboard to file')
+    .action((opts) => reportCommand({ ...opts, format: 'html' }));
 
   program
     .command('log')

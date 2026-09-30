@@ -16,6 +16,13 @@ describe('Claude Code plugin', () => {
     expect(fs.readFileSync(path.join(REPO_ROOT, '.claude-plugin', 'marketplace.json'), 'utf-8')).toBe(renderMarketplace());
   });
 
+  it('renders every file with LF line endings, whatever the checkout (core.autocrlf)', () => {
+    for (const f of files) {
+      expect(f.content.includes('\r'), f.path).toBe(false);
+    }
+    expect(renderMarketplace().includes('\r')).toBe(false);
+  });
+
   it('names skills by workflow so they are invoked as /sdlc:<id>', () => {
     for (const id of WORKFLOW_IDS) {
       const skill = files.find((f) => f.path === `skills/${id}/SKILL.md`)!;

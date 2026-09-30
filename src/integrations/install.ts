@@ -1,7 +1,7 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import type { SdlcConfig } from '../core/config.js';
-import { isDirectory, listFilesRecursive, readText } from '../core/fs-utils.js';
+import { isDirectory, listFilesRecursive, normalizeNewlines, readText } from '../core/fs-utils.js';
 import { generatedNotice, harnessStamp, type HarnessStamp } from '../core/license.js';
 import { harnessPackageDir } from '../core/openspec-schema.js';
 import { harnessVersion } from '../core/version.js';
@@ -45,7 +45,7 @@ export function schemaFiles(stamp: HarnessStamp): GeneratedFile[] {
   const dir = path.join(harnessPackageDir(), 'schemas', 'sdlc');
   if (!isDirectory(dir)) return [];
   return listFilesRecursive(dir).map((rel) => {
-    const content = readText(path.join(dir, rel)) ?? '';
+    const content = normalizeNewlines(readText(path.join(dir, rel)) ?? '');
     return {
       path: `openspec/schemas/sdlc/${rel}`,
       content: rel === 'schema.yaml' ? `${generatedNotice(stamp, 'yaml')}\n${content}` : content,

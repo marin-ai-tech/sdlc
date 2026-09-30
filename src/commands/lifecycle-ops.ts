@@ -15,6 +15,7 @@ import { isFile, readText, writeTextAtomic } from '../core/fs-utils.js';
 import { stampText } from '../core/license.js';
 import { appendLog, readLog } from '../core/log.js';
 import { changeMarkdown, tryStampArtifacts } from '../core/stamp.js';
+import { aggregateMetrics, changeMetrics } from '../core/metrics.js';
 
 interface ValidationIssue {
   source: 'openspec' | 'sdlc';
@@ -179,64 +180,6 @@ export async function archiveCommand(id: string | undefined, opts: ArchiveOption
   }
 }
 
-interface Milestones {
-  created?: string;
-  intent?: string;
-  spec?: string;
-  plan?: string;
-  verified?: string;
-  review?: string;
-  release?: string;
-  archived?: string;
-}
-
-/**
- * Milestones in lifecycle order. Each one is the last approval of its gate, and
- * "verified" is the first passing verification after the final plan approval,
- * so re-approvals and early verification runs do not skew lead times.
- */
-function milestones(history: HistoryEvent[], created: string): Milestones {
-  const last = (event: string) => [...history].reverse().find((h) => h.event === event)?.at;
-  const firstAfter = (event: string, after?: string) =>
-    history.find((h) => h.event === event && (!after || h.at >= after))?.at;
-  const plan = last('gate.plan.approved');
-  return {
-    created: created || firstAfter('change.created'),
-    intent: last('gate.intent.approved'),
-    spec: last('gate.spec.approved'),
-    plan,
-    verified: firstAfter('verify.passed', plan),
-    review: last('gate.review.approved'),
-    release: last('gate.release.approved'),
-    archived: last('change.archived') ?? last('change.archived.forced'),
-  };
-}
-
-function hours(from?: string, to?: string): number | undefined {
-  if (!from || !to) return undefined;
-  const ms = Date.parse(to) - Date.parse(from);
-  return Number.isFinite(ms) && ms >= 0 ? Math.round((ms / 36e5) * 10) / 10 : undefined;
-}
-
-function changeMetrics(state: ChangeState) {
-  const m = milestones(state.history, state.created);
-  const verifyRuns = state.history.filter((h) => h.event.startsWith('verify.'));
-  const firstRun = verifyRuns[0]?.event;
-  return {
-    milestones: m,
-    leadTimeHours: {
-      intentToSpecApproval: hours(m.intent, m.spec),
-      specToPlanApproval: hours(m.spec, m.plan),
-      planToVerified: hours(m.plan, m.verified),
-      verifiedToReviewApproval: hours(m.verified, m.review),
-      createdToArchived: hours(m.created, m.archived),
-    },
-    verifyRuns: verifyRuns.length,
-    verifyFirstPass: firstRun === undefined ? undefined : firstRun === 'verify.passed',
-    rejections: state.history.filter((h) => /^gate\.\w+\.rejected$/.test(h.event)).length,
-    waivers: state.history.filter((h) => /^gate\.\w+\.waived$/.test(h.event)).length,
-  };
-}
 
 /** ` [scdl 0.1.0 · community]` for events that recorded the harness version and license. */
 function stampSuffix(event: HistoryEvent): string {
@@ -245,12 +188,6 @@ function stampSuffix(event: HistoryEvent): string {
   return c.dim(` [scdl ${event.scdl}${type ? ` · ${type}` : ''}]`);
 }
 
-function median(values: number[]): number | undefined {
-  if (values.length === 0) return undefined;
-  const sorted = [...values].sort((a, b) => a - b);
-  const mid = Math.floor(sorted.length / 2);
-  return sorted.length % 2 ? sorted[mid] : Math.round(((sorted[mid - 1] + sorted[mid]) / 2) * 10) / 10;
-}
 
 export async function auditCommand(opts: { change?: string; json?: boolean }): Promise<void> {
   try {
@@ -290,22 +227,10 @@ export async function auditCommand(opts: { change?: string; json?: boolean }): P
       }
       return { change: ref.id, archived: ref.archived, kind: state.kind, track: state.track, ...changeMetrics(state) };
     });
-    const pick = (key: keyof ReturnType<typeof changeMetrics>['leadTimeHours']) =>
-      median(rows.map((r) => r.leadTimeHours[key]).filter((v): v is number => v !== undefined));
-    const firstPass = rows.filter((r) => r.verifyFirstPass !== undefined);
     const aggregate = {
       changes: rows.length,
       archived: rows.filter((r) => r.archived).length,
-      medianLeadTimeHours: {
-        intentToSpecApproval: pick('intentToSpecApproval'),
-        specToPlanApproval: pick('specToPlanApproval'),
-        planToVerified: pick('planToVerified'),
-        verifiedToReviewApproval: pick('verifiedToReviewApproval'),
-        createdToArchived: pick('createdToArchived'),
-      },
-      verifyFirstPassRate: firstPass.length > 0 ? Math.round((firstPass.filter((r) => r.verifyFirstPass).length / firstPass.length) * 100) / 100 : undefined,
-      rejections: rows.reduce((n, r) => n + r.rejections, 0),
-      waivers: rows.reduce((n, r) => n + r.waivers, 0),
+      ...aggregateMetrics(rows),
       /** scdl versions and licenses recorded in the change histories. */
       recordedWith: { versions: [...versions].sort(), licenses: [...licenses].sort() },
     };

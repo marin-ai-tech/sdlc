@@ -101,6 +101,8 @@ Everything scdl writes records the scdl version and the license the project uses
 | `sdlc init [path]` / `update` / `uninstall` | set up, regenerate, remove integrations (planning data is never touched) |
 | `sdlc new <id> [--kind --risk --track --source-type --source-ref --skip-specs]` | start a change (an OpenSpec change folder + `.sdlc.yaml`) |
 | `sdlc status [--change] [--markdown] [--json]` / `sdlc next` | stages, gates, approvals, evidence, who acts next |
+| `sdlc layout check [--json]` / `scaffold [--dry-run] [--json]` / `adapt [--dry-run] [--json]` / `convert [--apply] [--json]` | check layout readiness, create missing documents, map existing paths, or plan and apply conversion |
+| `sdlc report [--format md\|json\|html] [--since] [--change] [--out]` / `sdlc dashboard [--since] [--change] [--out]` | progress report and self-contained HTML dashboard |
 | `sdlc instructions <artifact> --change <id> --json` | artifact instructions (from OpenSpec for planning artifacts; from the harness for verification, review, release) |
 | `sdlc approve \| reject \| waive <gate> --change <id> [--as <role>] [--note]` | human gate decisions |
 | `sdlc verify [--list] [--check] [--only]` | run checks, record evidence, check scenario coverage |
@@ -163,7 +165,7 @@ Project context and per-artifact rules stay where OpenSpec keeps them (`openspec
 
 ```bash
 npm install            # uses --legacy-peer-deps via .npmrc
-npm run compile        # dist/ is committed so `npm install -g github:…` needs no build step
+npm run compile        # dist/ is build output (not in git); `npm install` and `npm install -g github:…` build it via the prepare script
 npm test               # compiles, then runs unit + end-to-end tests (real OpenSpec CLI)
 node bin/sdlc.js --help
 node bin/sdlc.js plugin build plugin --marketplace   # regenerate the committed plugin
@@ -172,6 +174,7 @@ node bin/sdlc.js plugin build plugin --marketplace   # regenerate the committed 
 ## Documentation
 
 Research and design are in [`docs/en/`](docs/en/README.md):
+- [The AI-ready project layout and progress reports](docs/en/07-ai-ready-project.md)
 - OpenSpec analysis
 - the playbook mapping
 - community reviews and other harnesses (Spec Kit, BMAD, Kiro, cc-sdd, superpowers…)

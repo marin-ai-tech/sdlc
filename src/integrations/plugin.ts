@@ -1,5 +1,5 @@
 import * as path from 'node:path';
-import { readText } from '../core/fs-utils.js';
+import { normalizeNewlines, readText } from '../core/fs-utils.js';
 import {
   generatedNotice,
   harnessStamp,
@@ -128,7 +128,7 @@ export function renderClaudePlugin(cli = 'sdlc'): PluginFile[] {
   // Every copy of the plugin carries the license terms and the Required Notice.
   for (const rel of LEGAL_FILES) {
     const content = readText(path.join(harnessPackageDir(), rel));
-    if (content !== undefined) files.push({ path: rel, content });
+    if (content !== undefined) files.push({ path: rel, content: normalizeNewlines(content) });
   }
   return files;
 }
