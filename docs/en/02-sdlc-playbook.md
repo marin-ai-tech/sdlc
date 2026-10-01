@@ -57,6 +57,7 @@ The adoption order of the plays is set by their prerequisites. No dependencies: 
 | diff + tests, feedback loop (Stage 4) | `/opsx:apply`, `/opsx:verify` (a prompt; runs nothing) | `sdlc verify`: real check runs, literal output as evidence, bound to the worktree contents; verifier subagent in a clean context; scenario coverage |
 | PR review per REVIEW.md (Stage 5) | none | `review.md` with classified findings, reviewer subagent, gate blocked while important findings are open, code owner approval |
 | Hooks as approval gates (Stage 5) | none | `sdlc hook` for Claude Code and the OpenCode plugin: plan gate, locked tests, protected paths, self-approval, production release |
+| Separation of duties between people | none | optional `openspec/roles.yaml` in git: people and roles, the author does not approve their own review or release, paired gates need different people; `sdlc approvals verify` checks signed approval commits |
 | Maintain → new intent (Stage 6) | none | `/sdlc:triage`: alert/incident/finding → diagnosed intent |
 | Audit trail | archive history | `.sdlc.yaml` (who approved what and when, with the digest), `sdlc audit` (timeline + playbook metrics) |
 | **Living specs** | **yes: deltas are merged into `openspec/specs/`** | used as is; the playbook has nothing like this, and it is OpenSpec's main contribution to the combination |

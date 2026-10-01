@@ -304,7 +304,16 @@ function layoutFlow(pres, def, lang) {
   header(slide, def, lang);
   const centres = stepper(slide, { x: ML + 0.2, y: 2.35, w: CW - 0.4, d: 0.72, pt: 13 }, def.highlight, lang, true);
   for (const group of def.groups ?? []) flowGroup(slide, group, centres, lang);
+  if (def.layer) layerNote(slide, def.layer[lang]);
   slide.addNotes(notesFor(def, lang));
+}
+
+/** A tinted band at the bottom of the flow slide: what lies underneath the process. */
+function layerNote(slide, value) {
+  box(slide, SHAPE.round, ML, 6.05, CW, 0.75, C.tint, { rectRadius: 0.1 });
+  text(slide, wrap(value, fits(CW - 0.5, 14, 0.5), 2).join('\n'), {
+    x: ML + 0.25, y: 6.05, w: CW - 0.5, h: 0.75, fontSize: 14, color: C.ink, valign: 'middle',
+  });
 }
 
 function moreRow(slide, def, lang, steps) {

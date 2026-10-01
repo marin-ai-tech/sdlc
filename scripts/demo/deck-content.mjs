@@ -6,7 +6,7 @@
  *   title    — dark cover: title, subtitle, the three people
  *   people   — roles.yaml as people cards (from transcript.people + ROLES below)
  *   flow     — the lifecycle stepper; `highlight` = the stages this part of the story covers;
- *              `groups` = captions under runs of stages (from, to, label, text)
+ *              `groups` = captions under runs of stages (from, to, label, text); `layer` = a note at the bottom
  *   steps    — 1–3 terminal cards (actor chip, command, output excerpt, note)
  *   refusals — a grid of refused commands (exit ≠ 0): who tried, what, why
  *   coverage — stat callouts (steps, commands, refusals, people) + every command used
@@ -74,6 +74,10 @@ export const SLIDES = [
   },
   {
     id: 'map', layout: 'flow', highlight: STAGES,
+    layer: {
+      en: 'Spec layer: OpenSpec (changes, delta specs, validation, living specs). scdl adds the people, gates, evidence and guardrails around it.',
+      ru: 'Слой спецификаций — OpenSpec (изменения, дельты, валидация, живые спецификации). scdl добавляет вокруг него людей, гейты, доказательства и защитные правила.',
+    },
     groups: [
       {
         from: 'explore', to: 'backlog', label: { en: 'Idea', ru: 'Идея' },
@@ -154,7 +158,33 @@ export const SLIDES = [
       ru: 'Агент утверждать не может. Боб не владелец продукта. Алиса утверждает замысел и спецификацию, инженер Боб — план.',
     },
     steps: ['approve-intent-agent', 'approve-intent-bob', 'approve-intent'],
-    more: ['validate', 'approve-spec', 'approve-plan'],
+    more: ['approve-spec', 'approve-plan'],
+  },
+  {
+    id: 'openspec-change', layout: 'steps',
+    title: { en: 'OpenSpec underneath: the change is an OpenSpec change', ru: 'Под капотом OpenSpec: обычное изменение OpenSpec' },
+    lead: {
+      en: 'scdl does not fork OpenSpec. The change lives in openspec/changes and OpenSpec reads it as its own: list, status, deltas.',
+      ru: 'scdl не форкает OpenSpec. Изменение лежит в openspec/changes, и OpenSpec читает его как своё: список, статус, дельты.',
+    },
+    steps: ['os-list', 'os-status', 'os-show'],
+    notes: {
+      en: 'OpenSpec does the spec work through its JSON CLI: changes, artifact instructions, validation and the delta merge on archive. /opsx:* commands keep working on the same folder.',
+      ru: 'Всю работу со спецификациями OpenSpec делает через свой JSON CLI: изменения, инструкции к артефактам, валидация и слияние дельт при архивации. Команды /opsx:* работают с той же папкой.',
+    },
+  },
+  {
+    id: 'openspec-validate', layout: 'steps',
+    title: { en: 'Delta specs and strict validation', ru: 'Дельты спецификаций и строгая валидация' },
+    lead: {
+      en: 'Requirements change as deltas (ADDED, MODIFIED, REMOVED). A requirement without a scenario is refused before anyone approves the spec.',
+      ru: 'Требования меняются дельтами (ADDED, MODIFIED, REMOVED). Требование без сценария отклоняется ещё до утверждения спецификации.',
+    },
+    steps: ['validate-bad', 'validate', 'os-schema'],
+    notes: {
+      en: 'sdlc validate runs openspec validate --strict and adds checks OpenSpec lacks: delta targets exist, ADDED does not collide, overlaps between open changes.',
+      ru: 'sdlc validate запускает openspec validate --strict и добавляет проверки, которых нет в OpenSpec: цели дельт существуют, ADDED не конфликтует, пересечения между открытыми изменениями.',
+    },
   },
   {
     id: 'build', layout: 'steps', highlight: ['build', 'verify'],
@@ -177,17 +207,26 @@ export const SLIDES = [
   },
   {
     id: 'release', layout: 'steps',
-    title: { en: 'Release, signatures, archive', ru: 'Релиз, подписи, архив' },
+    title: { en: 'Release and signed approvals', ru: 'Релиз и подписанные утверждения' },
     lead: {
-      en: 'Alice authorises the release. Approvals are checked against signed commits; the delta merges into the living spec and B1 closes.',
-      ru: 'Алиса разрешает релиз. Утверждения сверяются с подписанными коммитами; дельта вливается в живую спецификацию, B1 закрывается.',
+      en: 'Alice authorises the release. Every approval is checked against the commit that brought it: signed by the person who approved.',
+      ru: 'Алиса разрешает релиз. Каждое утверждение сверяется с коммитом, который его принёс: подписан ли он тем, кто утвердил.',
     },
-    steps: ['approve-release', 'approvals-verify', 'archive'],
-    more: ['openspec', 'list-after'],
+    steps: ['approve-release', 'approvals-verify'],
     notes: {
       en: 'Signing modes: off (no signatures), warn (report), required (CI fails). A commit signed by Bob with Alice\'s email is reported as wrong-signer.',
       ru: 'Режимы подписи: off (без подписей), warn (предупреждать), required (CI падает). Коммит, подписанный Бобом с почтой Алисы, помечается как wrong-signer.',
     },
+  },
+  {
+    id: 'openspec-living', layout: 'steps',
+    title: { en: 'Archive: the delta becomes the living spec', ru: 'Архив: дельта становится живой спецификацией' },
+    lead: {
+      en: 'sdlc archive re-checks the gates, then OpenSpec merges the delta into openspec/specs. The requirement now lives in the spec; B1 closes.',
+      ru: 'sdlc archive перепроверяет гейты, затем OpenSpec вливает дельту в openspec/specs. Требование теперь живёт в спецификации; B1 закрывается.',
+    },
+    steps: ['archive', 'openspec', 'os-spec-show'],
+    more: ['list-after'],
   },
   {
     id: 'safety', layout: 'refusals',
@@ -293,7 +332,7 @@ export const STEP_NOTE_RU = {
   'approve-intent-agent': 'Агент не может утверждать.',
   'approve-intent-bob': 'Боб не владелец продукта.',
   'approve-intent': 'Алиса утверждает замысел.',
-  validate: 'Строгая проверка OpenSpec.',
+  validate: 'Со сценариями строгая валидация OpenSpec и проверки целей дельт проходят.',
   'approve-spec': 'Алиса утверждает спецификацию.',
   'approve-plan': 'Боб, инженер, утверждает план.',
   verify: 'Настоящие проверки, записанные доказательства.',
@@ -308,7 +347,13 @@ export const STEP_NOTE_RU = {
   'approve-release': 'Алиса разрешает релиз.',
   'approvals-verify': 'Проверка подписей (режим warn): Алиса и Кэрол подписывают; утверждение плана Бобом без подписи — предупреждение, не блокировка.',
   archive: 'Дельта вливается в живую спецификацию; B1 закрывается.',
-  openspec: 'Живая спецификация в OpenSpec.',
+  'validate-bad': 'В первом черновике требование без сценария: строгая валидация его отклоняет.',
+  'os-schema': 'Схема sdlc — стандартная схема OpenSpec.',
+  'os-list': 'OpenSpec показывает изменение, как любое своё.',
+  'os-status': 'Готовность артефактов по схеме sdlc считает OpenSpec.',
+  'os-show': 'Изменение глазами OpenSpec: добавленное требование и его сценарии.',
+  'os-spec-show': 'В живой спецификации теперь есть требование, которое добавило изменение.',
+  openspec: 'Возможность calculator стала живой спецификацией.',
   'list-after': 'Теперь готовы B3 и B2.',
   'new-fix': 'Исправление бага: CLI предлагает облегчённый трек, решает человек.',
   track: 'Боб подтверждает облегчённый трек.',

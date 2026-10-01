@@ -101,7 +101,7 @@ Use `/sdlc:explore` (`/sdlc-explore`) to research and pressure-test an idea. `sd
 ```bash
 sdlc new fix-null-name --kind bugfix --risk low --track lite [--skip-specs]
 ```
-The intent and the spec are optional: the change starts with plan.md and tasks.md, followed by the same verify and review steps. `--skip-specs` sets `skip_specs: true` for a change that does not alter external behavior.
+The intent and the spec are optional: the change starts with plan.md and tasks.md, followed by the same verify and review steps. Run by a person, `--track lite` applies the track; from an agent session it is only recorded as a suggestion until a person runs `sdlc track set lite`. `--skip-specs` sets `skip_specs: true` for a change that does not alter external behavior.
 
 ### Bug-fix protocol
 1. The first task is a test that reproduces the bug. Make sure it fails for the right reason, and commit it.
@@ -156,7 +156,7 @@ gates:
   review:  { required: true,  approvers: [code-owner] }
   release: { required: false, approvers: [release-manager] }
   verify:  { required: true }
-roles:                        # optional: who may approve for a role
+roles:                        # optional: who may approve for a role (openspec/roles.yaml replaces this)
   product-owner: [anna@example.com]
   code-owner: [lead@example.com, dev2@example.com]
 verify:

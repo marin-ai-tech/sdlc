@@ -18,14 +18,21 @@ import { BIN, git, humanEnv, initGitRepo, read, REPO_ROOT, runCli, tempDir, writ
 type Actor = 'alice' | 'bob' | 'carol' | 'agent';
 interface Step { id: string; section: string; actor: Actor; command: string; exit: number | null; output: string; note: string }
 
+/** The team, named for the deck's language: SDLC_DEMO_PEOPLE=en (default) or ru. */
+const SURNAMES = {
+  en: { alice: 'Walker', bob: 'Turner', carol: 'Hughes' },
+  ru: { alice: 'Ivanova', bob: 'Petrov', carol: 'Smirnova' },
+};
+const surnames = process.env.SDLC_DEMO_PEOPLE === 'ru' ? SURNAMES.ru : SURNAMES.en;
 const PEOPLE: Record<Exclude<Actor, 'agent'>, { name: string; email: string }> = {
-  alice: { name: 'Alice Ivanova', email: 'alice@calc.example' },
-  bob: { name: 'Bob Petrov', email: 'bob@calc.example' },
-  carol: { name: 'Carol Smirnova', email: 'carol@calc.example' },
+  alice: { name: `Alice ${surnames.alice}`, email: 'alice@calc.example' },
+  bob: { name: `Bob ${surnames.bob}`, email: 'bob@calc.example' },
+  carol: { name: `Carol ${surnames.carol}`, email: 'carol@calc.example' },
 };
 
 const INTENT = '# Intent: basic arithmetic\n\nAuthor: Alice (product). Status: draft. Source: backlog B1\n\n## Problem\nPeople need quick sums at the counter; today they use a phone.\n\n## Proposed outcome\nA calculator library with add, subtract, multiply and divide.\n\n## Affected users and systems\nCashiers; the till app.\n\n## Constraints\nPlain JavaScript, no dependencies.\n\n## Success measures\nAll four operations pass their scenarios.\n\n## Out of scope\nPercent and memory (later backlog items).\n\n## Open questions\nNone\n';
 const PROPOSAL = '# Proposal\n\n## Why\n\nCashiers need exact results for the four basic operations; the till app has no calculator module today.\n\n## What Changes\n\n- Add src/calc.js with add, sub, mul, div.\n\n## Capabilities\n\n### New Capabilities\n- `calculator`: basic arithmetic\n\n## Impact\n\nsrc/calc.js, test/calc.test.js\n';
+const SPEC_WITHOUT_SCENARIO = '# Spec Delta\n\n## Purpose\n\nExact results for the four basic arithmetic operations.\n\n## ADDED Requirements\n\n### Requirement: Basic operations\nThe calculator SHALL add, subtract, multiply and divide two numbers.\n';
 const SPEC = '# Spec Delta\n\n## Purpose\n\nExact results for the four basic arithmetic operations.\n\n## ADDED Requirements\n\n### Requirement: Basic operations\nThe calculator SHALL add, subtract, multiply and divide two numbers.\n\n#### Scenario: Add\n- **WHEN** the cashier adds 2 and 3\n- **THEN** the result is 5\n\n#### Scenario: Divide\n- **WHEN** the cashier divides 10 by 4\n- **THEN** the result is 2.5\n';
 const DESIGN = '# Design\n\n## Context\nsrc/calc.js is new.\n\n## Decisions\nPure functions, one per operation.\n\n## Policy compliance\nNone apply.\n\n## Areas of concern\nDivision by zero (see review).\n';
 const PLAN = '# Plan\n\n## Files that change\n- `src/calc.js` (new)\n- `test/calc.test.js` (new)\n\n## Order of work\n1. Tests. 2. Implementation.\n\n## Proof\n`npm test`\n\n## Rollback\nRevert the commit.\n';
@@ -186,14 +193,27 @@ describe('demo: a team builds a calculator with scdl (every command)', () => {
     step('approve-intent-agent', 'gates', 'agent', ['approve', 'intent', '--change', 'basic-arithmetic'], 'The agent cannot approve.', { expect: 1 });
     step('approve-intent-bob', 'gates', 'bob', ['approve', 'intent', '--change', 'basic-arithmetic'], 'Bob is not the product owner.', { expect: 1 });
     step('approve-intent', 'gates', 'alice', ['approve', 'intent', '--change', 'basic-arithmetic'], 'Alice approves the intent.');
-    for (const [f, text] of [['proposal.md', PROPOSAL], ['specs/calculator/spec.md', SPEC], ['design.md', DESIGN]]) write(path.join(change('basic-arithmetic'), f), text);
-    step('validate', 'gates', 'agent', ['validate', '--change', 'basic-arithmetic'], 'OpenSpec strict validation.');
+    for (const [f, text] of [['proposal.md', PROPOSAL], ['specs/calculator/spec.md', SPEC_WITHOUT_SCENARIO], ['design.md', DESIGN]]) write(path.join(change('basic-arithmetic'), f), text);
+    const bad = step('validate-bad', 'openspec', 'agent', ['validate', '--change', 'basic-arithmetic'], 'The first draft has a requirement without a scenario: strict validation refuses it.', { expect: 1 });
+    expect(bad.stdout + bad.stderr).toMatch(/scenario/i);
+    write(path.join(change('basic-arithmetic'), 'specs/calculator/spec.md'), SPEC);
+    step('validate', 'openspec', 'agent', ['validate', '--change', 'basic-arithmetic'], 'With the scenarios added, OpenSpec strict validation and the delta target checks pass.');
+    step('os-schema', 'openspec', 'bob', ['openspec', 'schema', 'validate', 'sdlc'], 'The sdlc schema is a standard OpenSpec schema.');
     step('approve-spec', 'gates', 'alice', ['approve', 'spec', '--change', 'basic-arithmetic'], 'Alice approves the spec.');
     commit('alice', 'Intent and spec for basic arithmetic');
     write(path.join(change('basic-arithmetic'), 'plan.md'), PLAN);
     write(path.join(change('basic-arithmetic'), 'tasks.md'), TASKS);
     step('approve-plan', 'gates', 'bob', ['approve', 'plan', '--change', 'basic-arithmetic'], 'Bob, the engineer, approves the plan.');
     commit('bob', 'Plan for basic arithmetic'); // each approver commits their own approval
+  });
+
+  it('6b. OpenSpec underneath: the scdl change is a plain OpenSpec change', () => {
+    const list = step('os-list', 'openspec', 'bob', ['openspec', 'list'], 'OpenSpec lists the change like any of its own.');
+    expect(list.stdout).toContain('basic-arithmetic');
+    step('os-status', 'openspec', 'agent', ['openspec', 'status', '--change', 'basic-arithmetic'], 'Artifact completion by the sdlc schema, computed by OpenSpec.');
+    const show = step('os-show', 'openspec', 'bob', ['openspec', 'show', 'basic-arithmetic', '--json', '--deltas-only'], 'The change as OpenSpec sees it: the ADDED requirement and its scenarios.');
+    expect(show.stdout).toMatch(/"operation": "ADDED"/);
+    expect(show.stdout).toMatch(/SHALL add, subtract, multiply and divide/);
   });
 
   it('7. build and verify with evidence (Bob writes the code on a branch)', () => {
@@ -229,7 +249,9 @@ describe('demo: a team builds a calculator with scdl (every command)', () => {
     commit('alice', 'Archive basic arithmetic');
     git(root, ['checkout', '-q', 'main']);
     git(root, ['merge', '-q', '--no-ff', '--no-edit', 'basic-arithmetic']);
-    step('openspec', 'release', 'bob', ['openspec', 'list', '--specs'], 'The living spec in OpenSpec.');
+    step('openspec', 'openspec', 'bob', ['openspec', 'list', '--specs'], 'The calculator capability is now a living spec.');
+    const spec = step('os-spec-show', 'openspec', 'bob', ['openspec', 'show', 'calculator', '--type', 'spec'], 'The living spec holds the requirement the change added.');
+    expect(spec.stdout).toMatch(/Basic operations/);
     step('list-after', 'release', 'bob', ['backlog', 'list'], 'B3 and B2 are ready now.');
   });
 

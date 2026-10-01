@@ -2,6 +2,16 @@
 
 All notable changes to scdl. Versions follow [Semantic Versioning](https://semver.org/); while the major version is 0, a minor version may change behavior.
 
+## 0.6.1 — 2026-10-01
+
+### Fixed
+- `sdlc help` examples are runnable: 13 of them used the word `example` as a gate, id or path (`sdlc roles who example --change example`), three added `--json` to commands that do not have it (`statusline`, `dashboard`, `hook`), and some lacked options the CLI checks at run time (`import bmad`, `defer add`/`close`, `archive`).
+
+### Changed
+- The calculator demo shows working with OpenSpec: the change is a plain OpenSpec change (`openspec list`, `status`, `show`), strict validation refuses a delta requirement without a scenario, the `sdlc` schema validates as an OpenSpec schema, and the archived requirement lives in the spec. The deck has three more slides (20).
+- The demo team's surnames follow the deck's language (`SDLC_DEMO_PEOPLE`); `npm run demo:deck` runs the scenario once per language, and each deck has its own transcript (`docs/demo/calculator-transcript.en.json`).
+- Documentation brought up to date: architecture (roles and signing in the gate model and data model, the full CLI list, which commands have `--json`), README features (AI-ready layout, reports and dashboard, people and roles), the playbook mapping, a CODEOWNERS line for `openspec/roles.yaml`.
+
 ## 0.6.0 — 2026-09-30
 
 ### Added

@@ -13,20 +13,21 @@ The scenario covers every step of the product:
 - **Setup**: `init` for both tools, `doctor`, `license`, `help`, the `layout` commands, `update`.
 - **Roles**: `roles.yaml` with signing in `warn` mode.
 - **Planning**: exploration; a backlog with an epic, dependencies and priorities.
+- **OpenSpec underneath**: the change is a plain OpenSpec change (`openspec list`, `status`, `show`); a delta requirement without a scenario is refused by strict validation, then fixed; the `sdlc` schema validates as an OpenSpec schema; after the archive the requirement lives in the spec (`openspec list --specs`, `openspec show calculator`).
 - **The change**: a change started from a backlog item, then the gates with the right people. Bob is refused as product owner and as the author of the code he would review. Next come verification with evidence, a review with lenses and a deferred finding, the release, `approvals verify` and the archive.
 - **Other flows**: a bug fix with locked tests, a rejected idea, a waiver, closing deferred work and a backlog item, and a BMAD import.
 - **Visibility**: `status`, `report`, `dashboard`, `audit`, `log`, `statusline`, the session hook, the plugin and `uninstall`.
 
 The test fails if any CLI command is missing from the story.
 
-Each step is recorded with who ran it, the command, the exit code, an excerpt of the output and a note. The deck is built from that transcript:
+Each step is recorded with who ran it, the command, the exit code, an excerpt of the output and a note. The deck is built from that transcript. The team's surnames follow the deck's language (`SDLC_DEMO_PEOPLE=en` gives Alice Walker, Bob Turner and Carol Hughes; `ru` gives Alice Ivanova, Bob Petrov and Carol Smirnova), so `npm run demo:deck` runs the scenario once per language and every output on the slides stays real:
 
 ```bash
-npm run demo:deck                  # runs the scenario, then builds the English and Russian decks
-node scripts/demo/build-deck.mjs --transcript docs/demo/calculator-transcript.json --lang en --out deck.pptx
+npm run demo:deck                  # per language: runs the scenario, then builds the deck
+node scripts/demo/build-deck.mjs --transcript docs/demo/calculator-transcript.en.json --lang en --out deck.pptx
 ```
 
-The story (which steps each slide shows, the words in English and Russian) is in `scripts/demo/deck-content.mjs`; `scripts/demo/build-deck.mjs` renders it with pptxgenjs. The English deck is `docs/demo/scdl-calculator-demo.en.pptx`.
+The story (which steps each slide shows, the words in English and Russian) is in `scripts/demo/deck-content.mjs`; `scripts/demo/build-deck.mjs` renders it with pptxgenjs. The English deck is `docs/demo/scdl-calculator-demo.en.pptx` (20 slides), built from `docs/demo/calculator-transcript.en.json`.
 
 ## 9.2. A background process that keeps the dashboard current
 

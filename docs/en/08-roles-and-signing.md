@@ -10,9 +10,9 @@ Without `openspec/roles.yaml`, nothing changes: the `roles:` allow-lists in `ope
 version: 1
 signing: warn                 # off | warn | required
 people:
-  alice: { name: Alice Ivanova, emails: [alice@corp.example], signing_key: "ssh-ed25519 AAAA… alice@corp" }
-  bob:   { name: Bob Petrov,    emails: [bob@corp.example],   signing_key: "ssh-ed25519 AAAA… bob@corp" }
-  carol: { name: Carol Smirnova, emails: [carol@corp.example] }
+  alice: { name: Alice Walker, emails: [alice@corp.example], signing_key: "ssh-ed25519 AAAA… alice@corp" }
+  bob:   { name: Bob Turner,   emails: [bob@corp.example],   signing_key: "ssh-ed25519 AAAA… bob@corp" }
+  carol: { name: Carol Hughes, emails: [carol@corp.example] }
 roles:
   product-owner: [alice]
   release-manager: [alice]
@@ -80,6 +80,13 @@ git config commit.gpgsign true
 Then put the public key into `signing_key` in `roles.yaml` (a maintainer commits that change).
 
 The approver commits their own approval: `sdlc approve …`, then `git commit -S`.
+
+Protect the file in code review too. With GitHub or GitLab code owners, one line makes every change to it need a maintainer's review (use your maintainers' handles or a team):
+
+```text
+# .github/CODEOWNERS (or CODEOWNERS / docs/CODEOWNERS)
+/openspec/roles.yaml @your-org/maintainers
+```
 
 ## 8.4. What this protects against, and what it does not
 

@@ -48,6 +48,12 @@ describe('demo deck (scripts/demo)', () => {
     expect([...ids].filter((id) => !STEP_NOTE_RU[id])).toEqual([]);
   });
 
+  it('slide titles fit on one line (57 characters is the longest seen to fit at 30 pt on the wide layout)', async () => {
+    const { SLIDES } = await load();
+    const long = SLIDES.flatMap((s) => ['en', 'ru'].map((lang) => s.title[lang])).filter((title) => title.length > 57);
+    expect(long).toEqual([]);
+  });
+
   it('builds an English and a Russian deck: one slide per story slide, titles and speaker notes in the language', async () => {
     const { SLIDES } = await load();
     const dir = tempDir('sdlc-deck-');

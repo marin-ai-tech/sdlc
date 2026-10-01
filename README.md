@@ -14,7 +14,7 @@ backlog ──► explore (optional) ──► intent ──► spec ──► p
 On top of OpenSpec, `sdlc` adds the process parts the playbook asks for:
 
 - **Stages and gates** with human approvals bound to content digests. If an artifact changes after it was approved, the approval goes stale and the gate needs a new approval.
-- **Separation of duties.** An agent cannot approve its own work: the CLI refuses inside agent sessions, and hooks block attempts.
+- **Separation of duties.** An agent cannot approve its own work: the CLI refuses inside agent sessions, and hooks block attempts. Between people, optional `openspec/roles.yaml` (in git) names who holds which role: the author of a change's code cannot approve its review or release, paired gates need different people, and `sdlc approvals verify` checks that each approval arrived in a commit signed by the approver.
 - **Verification evidence.** `sdlc verify` runs your real checks, stores their literal output, and ties the result to a content-addressed fingerprint of the worktree. Committing the code keeps the result valid; changing the code makes it stale.
 - **Review** follows `REVIEW.md` passes (bugs, security, compliance). Findings are graded by severity. A human code owner approves once no important finding is open, and **plan drift** is computed against `plan.md`.
 - **Deterministic guardrails.** Claude Code hooks and an OpenCode plugin enforce the gates: no code before an approved plan, locked tests during bug fixes, protected paths, and no production release without authorization.
@@ -26,6 +26,8 @@ On top of OpenSpec, `sdlc` adds the process parts the playbook asks for:
 - **Human track confirmation.** `sdlc new` suggests a track; a person can confirm or change it with `sdlc track set` before plan approval.
 - **Deferred-work registry.** `sdlc defer` tracks postponed findings in `openspec/deferred-work.md` and exposes them in reports.
 - **BMAD import.** `sdlc import bmad` maps planning artifacts into an unapproved OpenSpec change, or into the backlog with `--to-backlog` (epics and tickets, or a PRD/SPEC).
+- **AI-ready project layout.** `sdlc layout check | scaffold | adapt | convert` checks and builds the documents agents rely on (`AGENTS.md`, `CLAUDE.md`, architecture, conventions, runbook…), maps existing paths, or plans a conversion.
+- **Reports and dashboard.** `sdlc report` (Markdown with Mermaid, JSON or HTML) and `sdlc dashboard` (one offline HTML page) show stages, gates, backlog, deferred work and metrics; an example background process keeps the page current.
 - **Audit and metrics.** `sdlc audit` builds a timeline of who approved what and when, plus the playbook's lead-time and first-pass metrics.
 - **Native agent UX.** Workflows ask with each tool's question tool (Claude Code AskUserQuestion, OpenCode `question`), mirror `tasks.md` into the tool todo list during `/sdlc:build`, and inject live CLI output into `/sdlc:status`, `/sdlc:next` and `/sdlc:help`. An answer in chat is never an approval — people run human decisions in their own terminal.
 - **Help and Next hints.** `sdlc help [topic]` and `/sdlc:help` catalog workflows and CLI commands with who runs them (agent or person). State-changing commands print a `Next:` hint (who acts next and how; the exact command when a person must act) and add `next` to JSON.
@@ -141,7 +143,7 @@ Everything scdl writes records the scdl version and the license the project uses
 | `sdlc plugin build [dir] --marketplace` | render the Claude Code plugin |
 | `sdlc openspec <args>` | run the bundled OpenSpec CLI |
 
-Every command supports `--json` and returns OpenSpec-style diagnostics (`{severity, code, message, fix}`) on failure.
+Every command except `statusline`, `dashboard`, `hook` and the `openspec` pass-through supports `--json` and returns OpenSpec-style diagnostics (`{severity, code, message, fix}`) on failure.
 
 ## Configuration (`openspec/sdlc.yaml`)
 

@@ -16,7 +16,32 @@ const EXAMPLES: Record<string, string> = {
   'backlog drop': 'sdlc backlog drop B2 --note "No longer needed"',
   'license set': 'sdlc license set community',
   'roles migrate': 'sdlc roles migrate',
+  'backlog epic add': 'sdlc backlog epic add "Checkout" --goal "Customers pay without calling support" --json',
+  'defer add': 'sdlc defer add "Retry failed payments" --why "Out of scope for this change" --json',
+  'defer close': 'sdlc defer close D1 --status done --note "Fixed in add-retries" --json',
+  'import bmad': 'sdlc import bmad _bmad-output/epic-1 --to-backlog --dry-run --json',
+  explore: 'sdlc explore checkout-flow --json',
+  archive: 'sdlc archive add-export --yes --json',
+  openspec: 'sdlc openspec list --specs',
 };
+
+/** A real value per argument name, so a generated example can be run as it is. */
+const ARGUMENT_EXAMPLES: Record<string, string> = {
+  gate: 'review', id: 'add-export', change: 'add-export', name: 'add-export', title: '"Show order status"',
+  'B-id': 'B1', 'D-id': 'D1', path: '_bmad-output/epic-1', slug: 'checkout-flow', topic: 'backlog',
+  track: 'lite', artifact: 'plan', type: 'bmad', dir: 'plugin', event: 'session-start', args: 'list',
+};
+/** Commands whose `<action>` argument takes one of several words. */
+const ACTION_EXAMPLES: Record<string, string> = { tests: 'lock', review: 'context' };
+
+function generatedExample(command: Command, name: string): string {
+  const value = (arg: string) => (arg === 'action' && ACTION_EXAMPLES[name]) || ARGUMENT_EXAMPLES[arg];
+  const args = command.registeredArguments.filter((arg) => arg.required).map((arg) => value(arg.name()));
+  const options = command.options.filter((option) => option.mandatory)
+    .map((option) => `${option.long} ${ARGUMENT_EXAMPLES[option.attributeName()] ?? ARGUMENT_EXAMPLES.id}`);
+  const json = command.options.some((option) => option.long === '--json') ? ['--json'] : [];
+  return ['sdlc', name, ...args, ...options, ...json].join(' ');
+}
 
 export interface CatalogCommand {
   name: string;
@@ -35,7 +60,7 @@ function describe(command: Command, name: string): CatalogCommand {
     usage,
     description: command.description(),
     actor: (HUMAN_COMMANDS as readonly string[]).includes(name) ? 'human' : 'any',
-    example: EXAMPLES[name] ?? `${usage.replace(/<[^>]+>/g, 'example').replace(/\[[^\]]+\]/g, '')} --json`.trim(),
+    example: EXAMPLES[name] ?? generatedExample(command, name),
   };
 }
 
