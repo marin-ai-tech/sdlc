@@ -41,6 +41,7 @@ export function provenance(stamp: HarnessStamp | undefined): Provenance {
 export interface ApprovalRecord extends Provenance {
   role: string;
   by: string;
+  person?: string;
   at: string;
   digest: string;
   note?: string;

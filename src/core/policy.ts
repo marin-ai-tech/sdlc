@@ -89,8 +89,8 @@ const APPROVAL_COMMAND = new RegExp(
   `\\b(?:sdlc|scdl)(?:\\.js)?\\s+(?:${HUMAN_COMMANDS.map((name) => name.replace(/ /g, '\\s+')).join('|')})\\b`
 );
 /** Harness records only the CLI writes: per-change `.sdlc.yaml` and the project log. */
-const STATE_FILE_WRITE = /\.sdlc\.yaml|\.sdlc\/log\.jsonl/;
-const STATE_FILE = /(^|\/)\.sdlc\.yaml$|^openspec\/\.sdlc\/log\.jsonl$/;
+const STATE_FILE_WRITE = /\.sdlc\.yaml|\.sdlc\/log\.jsonl|openspec\/roles\.yaml/;
+const STATE_FILE = /(^|\/)\.sdlc\.yaml$|^openspec\/\.sdlc\/log\.jsonl$|^openspec\/roles\.yaml$/;
 const WRITE_OPS = /(>>?|\btee\b|\bsed\s+-i|\bperl\s+-i|\bmv\b|\bcp\b|\brm\b|\btruncate\b|\bpython[0-9.]*\b|\bnode\b\s+-e|\bdd\b)/;
 
 export interface PolicyContext {

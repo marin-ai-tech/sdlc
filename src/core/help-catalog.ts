@@ -3,7 +3,7 @@ import { WORKFLOW_IDS, loadWorkflow } from '../integrations/assets.js';
 
 export const HUMAN_COMMANDS = [
   'approve', 'reject', 'waive', 'tests unlock', 'track set',
-  'backlog move', 'backlog drop', 'license set',
+  'backlog move', 'backlog drop', 'license set', 'roles migrate',
 ] as const;
 
 const EXAMPLES: Record<string, string> = {
@@ -15,6 +15,7 @@ const EXAMPLES: Record<string, string> = {
   'backlog move': 'sdlc backlog move B2 --top',
   'backlog drop': 'sdlc backlog drop B2 --note "No longer needed"',
   'license set': 'sdlc license set community',
+  'roles migrate': 'sdlc roles migrate',
 };
 
 export interface CatalogCommand {

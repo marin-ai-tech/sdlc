@@ -5,6 +5,7 @@ import { archiveCommand, auditCommand, logCommand, validateCommand } from '../co
 import { licenseCommand } from '../commands/license.js';
 import { instructionsCommand, newCommand, nextCommand, statusCommand } from '../commands/changes.js';
 import { doctorCommand } from '../commands/doctor.js';
+import { approvalsVerify } from '../commands/approvals.js';
 import { pluginBuildCommand } from '../commands/plugin.js';
 import { approveCommand, rejectCommand, testsCommand, waiveCommand } from '../commands/gates.js';
 import { initCommand, uninstallCommand, updateCommand } from '../commands/setup.js';
@@ -21,9 +22,19 @@ import { trackSetCommand } from '../commands/track.js';
 import { exploreCommand, exploreListCommand } from '../commands/explore.js';
 import { importBmadCommand } from '../commands/import.js';
 import { backlogAdd, backlogClose, backlogEpicAdd, backlogList, backlogMove, backlogNext, backlogStart } from '../commands/backlog.js';
+import { rolesCheck, rolesMigrate, rolesWho } from '../commands/roles.js';
 
 export function buildProgram(): Command {
   const program = new Command();
+  const roles = program.command('roles').description('Inspect people and approval roles');
+  roles.command('check').description('Check who can approve each gate')
+    .option('--change <id>', 'change id').option('--base <ref>', 'base ref').option('--json', 'output JSON')
+    .action((opts) => rolesCheck(opts));
+  roles.command('who <gate>').description('Show eligible people for a gate')
+    .requiredOption('--change <id>', 'change id').option('--base <ref>', 'base ref').option('--json', 'output JSON')
+    .action((gate, opts) => rolesWho(gate, opts));
+  roles.command('migrate').description('Move configured roles into roles.yaml (human only)')
+    .option('--json', 'output JSON').action((opts) => rolesMigrate(opts));
   const backlog = program.command('backlog').description('Manage planned changes in priority order');
   backlog.command('epic').description('Manage backlog epics')
     .command('add <title>').description('Add an epic')
@@ -232,6 +243,12 @@ export function buildProgram(): Command {
       .option('--json', 'output JSON')
       .action((gate, opts) => fn(gate, opts));
   }
+
+  program.command('approvals').description('Inspect signed approvals')
+    .command('verify').description('Verify approval and roles commit signatures')
+    .option('--mode <mode>', 'off | warn | required')
+    .option('--json', 'output JSON')
+    .action((opts) => approvalsVerify(opts));
 
   program
     .command('tests <action>')

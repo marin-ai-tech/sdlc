@@ -7,7 +7,8 @@ import { resolveChange } from '../core/changes.js';
 import { ALL_GATES, APPROVAL_GATES, type ApprovalGateId, type GateId, type SdlcConfig } from '../core/config.js';
 import { baseDigests, readChangeDeltas } from '../core/deltas.js';
 import { SdlcError } from '../core/errors.js';
-import { formatIdentity, gitIdentity } from '../core/git.js';
+import { defaultBaseRef, formatIdentity, gitIdentity } from '../core/git.js';
+import { approvalEmails, changeAuthors, checkApproval, readRolesFile, type RolesFile } from '../core/roles.js';
 import { evaluateChange, type LifecycleView } from '../core/lifecycle.js';
 import { changeMarkdown, tryStampArtifacts } from '../core/stamp.js';
 
@@ -47,6 +48,44 @@ function assertRoleMember(config: SdlcConfig, role: string, identity: string): v
   }
 }
 
+function roleDecision(root: string, config: SdlcConfig, roles: RolesFile, gate: ApprovalGateId,
+  state: ReturnType<typeof readChangeState>, requested: string | undefined, separation: boolean) {
+  const email = gitIdentity(root).email ?? '';
+  const accepted = [...config.gates[gate].approvers, ...config.gates[gate].highRiskApprovers];
+  const held = accepted.filter((role) => roles.roles[role]?.some((id) => roles.people.some((p) => p.id === id
+    && p.emails.includes(email.toLowerCase()))));
+  const role = requested ?? held[0] ?? accepted[0] ?? 'approver';
+  const approvals = separation ? approvalEmails(state) : {};
+  const authors = separation ? changeAuthors(root, config.review.base ?? defaultBaseRef(root)) : [];
+  const check = checkApproval(roles, { gate, roles: requested ? [requested] : accepted, email, authors,
+    approvals });
+  if (requested && !accepted.includes(requested)) {
+    throw new SdlcError('missing_role', `Role ${requested} cannot approve ${gate}.`);
+  }
+  if (!check.allowed) {
+    const eligible = roles.people.filter((person) => checkApproval(roles, { gate, roles: accepted,
+      email: person.emails[0], authors, approvals }).allowed).map((person) => person.name);
+    throw new SdlcError(check.refusals[0].rule, check.refusals.map((r) => r.message).join(' '),
+      `Ask one of: ${eligible.join(', ') || 'no eligible people'}.`);
+  }
+  return { role, person: check.person!.id };
+}
+
+function approvalIdentity(root: string, roles: RolesFile | undefined, by: string | undefined): string {
+  if (!roles) return resolveIdentity(root, by);
+  const email = gitIdentity(root).email;
+  if (!email) throw new SdlcError('no_identity', 'Git user.email is required with roles.yaml.');
+  if (by) {
+    const claimed = /<([^>]+)>/.exec(by)?.[1] ?? by;
+    if (claimed.toLowerCase() !== email.toLowerCase()) {
+      throw new SdlcError('by_mismatch', '--by email must match git user.email.');
+    }
+  }
+  const person = roles.people.find((candidate) => candidate.emails.includes(email.toLowerCase()));
+  if (!person) throw new SdlcError('unknown_person', `${email} is not in roles.yaml.`);
+  return `${person.name} <${email}>`;
+}
+
 function parseGate(value: string, allowed: readonly string[]): GateId {
   if (!allowed.includes(value)) {
     throw new SdlcError('invalid_gate', `Unknown gate '${value}'. Gates: ${allowed.join(', ')}.`);
@@ -71,6 +110,23 @@ export interface DecisionOptions {
   json?: boolean;
 }
 
+function approvalRole(
+  config: SdlcConfig, roles: RolesFile | undefined, root: string,
+  gate: ApprovalGateId, state: ReturnType<typeof readChangeState>,
+  requested: string | undefined, missing: string[],
+): { role: string; person?: string } {
+  const gateConfig = config.gates[gate];
+  const allowed = [...gateConfig.approvers, ...gateConfig.highRiskApprovers];
+  const decided = roles ? roleDecision(root, config, roles, gate, state, requested, true) : undefined;
+  const suggested = missing.map((value) => value.split(' | ')[0]).find((value) => allowed.includes(value));
+  const role = decided?.role ?? requested ?? suggested ?? gateConfig.approvers[0] ?? 'approver';
+  if (allowed.length && !allowed.includes(role)) {
+    throw new SdlcError('invalid_role',
+      `Role '${role}' does not approve the ${gate} gate (roles: ${allowed.join(', ')}).`);
+  }
+  return { role, person: decided?.person };
+}
+
 export async function approveCommand(gateArg: string, opts: DecisionOptions): Promise<void> {
   try {
     const ctx = loadProject();
@@ -85,21 +141,20 @@ export async function approveCommand(gateArg: string, opts: DecisionOptions): Pr
     if (!evaluation.digest) {
       throw new SdlcError('gate_not_ready', `Nothing to approve for the ${gate} gate yet.`);
     }
-    const gateConfig = ctx.config.gates[gate];
-    const allowedRoles = [...gateConfig.approvers, ...gateConfig.highRiskApprovers];
-    const role = opts.as ?? evaluation.missingRoles.map((r) => r.split(' | ')[0]).find((r) => allowedRoles.includes(r)) ?? gateConfig.approvers[0] ?? 'approver';
-    if (allowedRoles.length > 0 && !allowedRoles.includes(role)) {
-      throw new SdlcError('invalid_role', `Role '${role}' does not approve the ${gate} gate (roles: ${allowedRoles.join(', ')}).`);
-    }
-    const identity = resolveIdentity(ctx.root, opts.by);
-    assertRoleMember(ctx.config, role, identity);
-
+    const roles = readRolesFile(ctx.root);
     const state = readChangeState(ref.dir);
+    const { role, person } = approvalRole(
+      ctx.config, roles, ctx.root, gate, state, opts.as, evaluation.missingRoles,
+    );
+    const identity = approvalIdentity(ctx.root, roles, opts.by);
+    if (!roles) assertRoleMember(ctx.config, role, identity);
+
     const current: GateState = state.gates[gate] ?? {};
     const approvals = (current.approvals ?? []).filter((a) => a.role !== role);
     approvals.push({
       role,
       by: identity,
+      ...(person ? { person } : {}),
       at: new Date().toISOString(),
       digest: evaluation.digest,
       ...(opts.note ? { note: opts.note } : {}),
@@ -107,19 +162,27 @@ export async function approveCommand(gateArg: string, opts: DecisionOptions): Pr
       ...provenance(ctx.stamp),
     });
     state.gates[gate] = { ...current, approvals };
-    recordChangeEvent(ctx, ref, state, `gate.${gate}.approved`, identity, `role ${role}${opts.note ? `: ${opts.note}` : ''}`);
+    recordChangeEvent(
+      ctx, ref, state, `gate.${gate}.approved`, identity, `role ${role}${opts.note ? `: ${opts.note}` : ''}`,
+    );
     // The approved artifacts record which scdl version and license approved them.
     const stamping = tryStampArtifacts(ref.dir, approvedFiles(view, gate, ref.dir), ctx.stamp);
-    if (stamping.error && !opts.json) warn(`approval recorded, but the provenance line was not written: ${stamping.error}`);
+    if (stamping.error && !opts.json) {
+      warn(`approval recorded, but the provenance line was not written: ${stamping.error}`);
+    }
 
     const after = evaluateChange(ctx.root, ref, ctx.config);
     const status = after.gates.find((g) => g.id === gate)!;
     const next = resolveNext(ctx, ref.id);
     if (opts.json) {
-      printJson({ change: ref.id, gate, role, by: identity, status: status.status, missingRoles: status.missingRoles, ...(next ? { next } : {}) });
+      printJson({
+        change: ref.id, gate, role, by: identity, status: status.status,
+        missingRoles: status.missingRoles, ...(next ? { next } : {}),
+      });
       return;
     }
-    line(`${c.green('✓')} ${gate} gate: ${identity} approved as ${role} ${c.dim(`(${evaluation.digest.slice(7, 19)})`)}`);
+    line(`${c.green('✓')} ${gate} gate: ${identity} approved as ${role} `
+      + c.dim(`(${evaluation.digest.slice(7, 19)})`));
     if (status.status !== 'approved') line(`  still needed: ${status.missingRoles.join(', ')}`);
     emitNextHint(ctx, ref.id);
   } catch (error) {
@@ -132,10 +195,14 @@ export async function rejectCommand(gateArg: string, opts: DecisionOptions): Pro
     const ctx = loadProject();
     const gate = parseGate(gateArg, APPROVAL_GATES) as ApprovalGateId;
     assertHuman(ctx.config, 'reject');
-    if (!opts.note) throw new SdlcError('note_required', 'A rejection needs --note "<why>" so the author knows what to change.');
+    if (!opts.note) {
+      throw new SdlcError('note_required', 'A rejection needs --note "<why>" so the author knows what to change.');
+    }
     const ref = resolveChange(ctx.paths, opts.change);
-    const identity = resolveIdentity(ctx.root, opts.by);
     const state = readChangeState(ref.dir);
+    const roles = readRolesFile(ctx.root);
+    const identity = approvalIdentity(ctx.root, roles, opts.by);
+    if (roles) roleDecision(ctx.root, ctx.config, roles, gate, state, opts.as, false);
     state.gates[gate] = {
       ...(state.gates[gate] ?? {}),
       rejection: {
@@ -164,10 +231,16 @@ export async function waiveCommand(gateArg: string, opts: DecisionOptions): Prom
     const ctx = loadProject();
     const gate = parseGate(gateArg, ALL_GATES);
     assertHuman(ctx.config, 'waive');
-    if (!opts.note) throw new SdlcError('note_required', 'A waiver needs --note "<why>"; it is part of the audit trail.');
+    if (!opts.note) {
+      throw new SdlcError('note_required', 'A waiver needs --note "<why>"; it is part of the audit trail.');
+    }
     const ref = resolveChange(ctx.paths, opts.change);
-    const identity = resolveIdentity(ctx.root, opts.by);
     const state = readChangeState(ref.dir);
+    const roles = readRolesFile(ctx.root);
+    const identity = approvalIdentity(ctx.root, roles, opts.by);
+    if (roles && gate !== 'verify') {
+      roleDecision(ctx.root, ctx.config, roles, gate as ApprovalGateId, state, opts.as, false);
+    }
     const key = gate as keyof typeof state.gates;
     state.gates[key] = {
       ...(state.gates[key] ?? {}),
@@ -191,7 +264,9 @@ export async function waiveCommand(gateArg: string, opts: DecisionOptions): Prom
  * the fix has to change the code. Locking only restricts the agent, so the
  * agent may do it; unlocking is a human decision.
  */
-export async function testsCommand(action: string, opts: { change?: string; json?: boolean; by?: string }): Promise<void> {
+export async function testsCommand(
+  action: string, opts: { change?: string; json?: boolean; by?: string },
+): Promise<void> {
   try {
     if (action !== 'lock' && action !== 'unlock') {
       throw new SdlcError('invalid_action', 'Use `sdlc tests lock` or `sdlc tests unlock`.');
@@ -205,7 +280,8 @@ export async function testsCommand(action: string, opts: { change?: string; json
     recordChangeEvent(ctx, ref, state, `tests.${action}ed`, identity);
     if (opts.json) return printJson({ change: ref.id, testsLocked: state.tests_locked });
     line(action === 'lock'
-      ? `${c.green('✓')} tests locked for ${ref.id}: edits to test files (enforcement.test_paths) are blocked until a person runs \`sdlc tests unlock --change ${ref.id}\`.`
+      ? `${c.green('✓')} tests locked for ${ref.id}: edits to test files (enforcement.test_paths) `
+        + `are blocked until a person runs \`sdlc tests unlock --change ${ref.id}\`.`
       : `${c.green('✓')} tests unlocked for ${ref.id}.`);
   } catch (error) {
     reportFailure(error, opts.json);

@@ -125,7 +125,9 @@ Everything scdl writes records the scdl version and the license the project uses
 | `sdlc layout check [--json]` / `scaffold [--dry-run] [--json]` / `adapt [--dry-run] [--json]` / `convert [--apply] [--json]` | check layout readiness, create missing documents, map existing paths, or plan and apply conversion |
 | `sdlc report [--format md\|json\|html] [--since] [--change] [--out]` / `sdlc dashboard [--since] [--change] [--out]` | progress report and self-contained HTML dashboard |
 | `sdlc instructions <artifact> --change <id> --json` | artifact instructions (from OpenSpec for planning artifacts; from the harness for verification, review, release) |
-| `sdlc approve \| reject \| waive <gate> --change <id> [--as <role>] [--note]` | human gate decisions |
+| `sdlc approve \| reject \| waive <gate> --change <id> [--as <role>] [--note]` | human gate decisions (with `openspec/roles.yaml`: the person, the role and separation of duties are checked) |
+| `sdlc roles check [--change] \| who <gate> --change <id> \| migrate` | who holds which role and who may approve a gate; `migrate` (human-only) moves `roles:` from `sdlc.yaml` into `roles.yaml` |
+| `sdlc approvals verify [--mode off\|warn\|required]` | check that every approval arrived in a commit signed by the approver, and `roles.yaml` changes by a maintainer |
 | `sdlc verify [--list] [--check] [--only]` | run checks, record evidence, check scenario coverage |
 | `sdlc review context \| check` | diff, policy and plan drift; open blocking findings |
 | `sdlc tests lock \| unlock` | bug-fix protocol (unlocking is human-only) |
@@ -155,7 +157,7 @@ gates:
   review:  { required: true,  approvers: [code-owner] }
   release: { required: false, approvers: [release-manager] }
   verify:  { required: true }
-roles: { code-owner: [lead@example.com] } # optional allow-lists per role
+roles: { code-owner: [lead@example.com] } # optional allow-lists per role (replaced by openspec/roles.yaml)
 verify:
   commands:
     - { name: build, run: npm run build }
@@ -177,6 +179,15 @@ log:
 ```
 
 Project context and per-artifact rules stay where OpenSpec keeps them (`openspec/config.yaml` → `context`, `rules`).
+
+### People and roles (`openspec/roles.yaml`, optional)
+
+People, their emails and signing keys, the roles they hold and the separation rules, versioned in git. With it, the author of a change's code cannot approve its review or release, paired gates need different people, and `signing: warn | required` makes `sdlc approvals verify` check signed approval commits. See [docs/en/08-roles-and-signing.md](docs/en/08-roles-and-signing.md).
+
+### Examples
+
+- **The calculator demo**: `test/e2e-calculator.test.ts` runs every command on a small project and records a transcript; `npm run demo:deck` turns it into a deck (English and Russian). See [docs/en/09-demo-and-automation.md](docs/en/09-demo-and-automation.md).
+- **A background process that keeps the dashboard current**: [`scripts/examples/`](scripts/examples/README.md).
 
 ## Compatibility with OpenSpec
 
@@ -200,6 +211,8 @@ node bin/sdlc.js plugin build plugin --marketplace   # regenerate the committed 
 
 Research and design are in [`docs/en/`](docs/en/README.md):
 - [The AI-ready project layout and progress reports](docs/en/07-ai-ready-project.md)
+- [Roles, separation of duties and signed approvals](docs/en/08-roles-and-signing.md)
+- [The calculator demo and keeping the dashboard current](docs/en/09-demo-and-automation.md)
 - OpenSpec analysis
 - the playbook mapping
 - community reviews and other harnesses (Spec Kit, BMAD, Kiro, cc-sdd, superpowers…)

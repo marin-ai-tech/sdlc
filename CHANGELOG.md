@@ -2,6 +2,24 @@
 
 All notable changes to scdl. Versions follow [Semantic Versioning](https://semver.org/); while the major version is 0, a minor version may change behavior.
 
+## 0.6.0 — 2026-09-30
+
+### Added
+- **People and roles in git: `openspec/roles.yaml`** (optional). The file holds:
+  - people with their emails and optional SSH signing keys;
+  - the roles each person holds;
+  - separation rules: the authors of a change's code cannot approve its review or release; listed gate pairs need different people; a per-person gate limit.
+
+  With the file, `sdlc approve` identifies the person by the git email, requires a role the gate accepts, and applies the separation rules. `--by` can no longer record someone else. The approval record gains `person: <id>`. Without the file, behavior is unchanged.
+- `sdlc roles who <gate> --change <id>` (who may approve and why others may not), `sdlc roles check`, `sdlc roles migrate` (moves `roles:` from `sdlc.yaml`; human-only). Agents cannot edit `roles.yaml`: the hook and the plugin deny it.
+- **Signed approvals: `sdlc approvals verify [--mode off|warn|required]`**:
+  - every approval must arrive in a commit signed (SSH) by the key of the person who approved;
+  - every change to `roles.yaml` must be signed by a maintainer of the version before it.
+
+  `warn` reports problems; `required` fails, for CI.
+- **The calculator demo**: `test/e2e-calculator.test.ts` runs every CLI command on a small project with three people and agents and records a transcript. `npm run demo:deck` turns the transcript into a PowerPoint deck in English and Russian (`scripts/demo/`).
+- **Example background process** `scripts/examples/dashboard-watch.mjs`: rebuilds the dashboard page when `openspec/` changes and can serve it on localhost with an auto-refresh. Examples run it as a Windows task, a systemd or launchd service, or a CI step.
+
 ## 0.5.0 — 2026-09-30
 
 ### Added

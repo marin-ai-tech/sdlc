@@ -13,6 +13,7 @@ import { harnessStamp, REQUIRED_NOTICE } from '../core/license.js';
 import { LOG_PATH, readLog } from '../core/log.js';
 import { assessLicense, detectProjectLicense } from '../core/project-license.js';
 import { harnessVersion } from '../core/version.js';
+import { readRolesFile } from '../core/roles.js';
 import { readManifest, sha256 } from '../integrations/manifest.js';
 import { SETTINGS_PATH } from '../integrations/settings.js';
 
@@ -60,6 +61,8 @@ export async function doctorCommand(opts: { json?: boolean }): Promise<void> {
     } else {
       const paths = projectPaths(root);
       add('project', 'ok', `root ${root}`);
+      const roles = readRolesFile(root);
+      if (roles) add('approval signing', 'ok', `mode ${roles.signing}`);
       let config;
       try {
         config = loadConfig(paths.sdlcConfig);

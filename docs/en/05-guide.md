@@ -130,6 +130,10 @@ The intent and the spec are optional: the change starts with plan.md and tasks.m
 
 Record postponed work with `sdlc defer add <title> --why <text> [--change <id>] [--finding <F-id>] [--revisit <text>]`, inspect it with `sdlc defer list [--open] [--change <id>]`, and close it with `sdlc defer close <D-id> --status done|dropped --note <text>`. The registry is `openspec/deferred-work.md`; each `### D<n> [open] Title` entry has `**Change**`, optional `**Finding**`, `**Why**`, `**Revisit when**`, and `**Created**` fields. Mark the review finding `deferred (D<n>)`; the review check requires a link to an open item. Reports and dashboards show the registry.
 
+### Roles and separation of duties
+
+With `openspec/roles.yaml`, approvals are tied to people in git: the approver's email must belong to a person holding a role the gate accepts, the authors of the code do not approve its review or release, listed gate pairs need different people, and a per-person limit applies. `sdlc roles who <gate> --change <id>` shows who may approve and why others may not. With `signing: warn | required`, `sdlc approvals verify` checks that each approval arrived in a commit signed by the approver. See [Roles, separation of duties and signed approvals](08-roles-and-signing.md).
+
 ### Import BMAD planning
 
 Run `sdlc import bmad <path> --change <id> [--dry-run]` on BMAD PRD, SPEC and architecture spine artifacts. The importer keeps source copies under `sources/bmad/` and maps PRD vision to `intent.md`, SPEC purpose to `proposal.md`, capabilities or PRD requirements to `specs/`, architecture decisions to `design.md`, and deferred bullets to `openspec/deferred-work.md`. Nothing is approved by the import. Review the output and run `sdlc validate --change <id>`.
@@ -199,11 +203,16 @@ sdlc status --json                    # stages and gates of all changes
 sdlc review check --change <id>       # exit 1 if important findings are open
 sdlc audit --json                     # playbook metrics (lead times, first-pass)
 sdlc log --json                       # project log with the scdl version and license of each entry
+sdlc approvals verify --mode required # every approval in a commit signed by the approver (roles.yaml)
 ```
 
 For `claude -p`, allow the required tools in advance: `--allowedTools "Bash(sdlc *),Read,Write,Edit"`. In CI, it is convenient to add `sdlc status --markdown` to the PR description.
 
-## 5.5. Updating and uninstalling
+## 5.5. Keeping the dashboard current
+
+`scripts/examples/dashboard-watch.mjs` rebuilds `reports/dashboard.html` whenever `openspec/` changes and can serve it on localhost with an auto-refresh; examples run it as a Windows task, a systemd or launchd service, or a CI step. See [the demo and automation](09-demo-and-automation.md).
+
+## 5.6. Updating and uninstalling
 
 ```bash
 npm install -g github:marin-ai-tech/scdl   # new version

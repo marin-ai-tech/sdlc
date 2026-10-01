@@ -119,7 +119,9 @@ Templates are written once (`assets/workflows/*.md`) and rendered for each surfa
 
 An answer in chat is never an approval: gate approvals, `track set`, `backlog move`/`drop`, `license set` and other human decisions are commands the person runs in their own terminal. Offer the choice, explain the consequences, and give the exact command.
 
-`HUMAN_COMMANDS` in `src/core/help-catalog.ts` is the one list that drives both `sdlc help` (actor: human) and the hook denials. It includes `approve`, `reject`, `waive`, `tests unlock`, `track set`, `backlog move`, `backlog drop`, and `license set`.
+`HUMAN_COMMANDS` in `src/core/help-catalog.ts` is the one list that drives both `sdlc help` (actor: human) and the hook denials. It includes `approve`, `reject`, `waive`, `tests unlock`, `track set`, `backlog move`, `backlog drop`, `license set` and `roles migrate`.
+
+Who the person is comes from `openspec/roles.yaml` when it exists (`src/core/roles.ts`): the git email names a person, the gate needs one of that person's roles, and `checkApproval` applies the separation rules against the change's recorded approvals and its code authors (`changeAuthors`: commit authors and `Co-authored-by` since the review base, files outside `openspec/`). `sdlc approvals verify` (`src/commands/approvals.ts`) finds the commit that introduced each approval record (`git log -S<timestamp>`) and checks its SSH signature against an `allowed_signers` file built from the people's keys; `roles.yaml` commits are checked against the maintainers of the previous version. The hook denies agent writes to `roles.yaml`. See [8. Roles, separation of duties and signed approvals](08-roles-and-signing.md).
 
 ## 4.7. CLI commands
 

@@ -1,6 +1,6 @@
 {
   "name": "scdl",
-  "version": "0.5.0",
+  "version": "0.6.0",
   "description": "AI-native SDLC harness for Claude Code and OpenCode, built on OpenSpec",
   "keywords": [
     "sdlc",
@@ -40,6 +40,7 @@
     "pretest": "tsc -p tsconfig.json",
     "test": "vitest run",
     "test:watch": "vitest",
+    "demo:deck": "tsc -p tsconfig.json && node scripts/demo/build-all.mjs",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "prepublishOnly": "tsc -p tsconfig.json"
   },
@@ -55,6 +56,7 @@
   "devDependencies": {
     "@types/node": "^20.19.43",
     "@types/picomatch": "^4.0.0",
+    "pptxgenjs": "^3.12.0",
     "typescript": "^6.0.3",
     "vitest": "^4.1.11"
   }
