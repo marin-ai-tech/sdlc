@@ -1,4 +1,5 @@
 import * as fs from 'node:fs';
+import { t } from '../core/i18n.js';
 import * as path from 'node:path';
 import { c, line, printJson, reportFailure } from '../cli/output.js';
 import { SdlcError } from '../core/errors.js';
@@ -16,7 +17,11 @@ export async function pluginBuildCommand(target: string | undefined, opts: { cli
       } catch {
         ours = false;
       }
-      if (!ours) throw new SdlcError('plugin_dir_not_empty', `${dir} is not empty and is not an sdlc plugin.`, 'Choose another directory or pass --force.');
+      if (!ours) throw new SdlcError(
+      'plugin_dir_not_empty',
+      { key: 'error.x_is_not_empty_and_is_not_an_sdlc_plugin', params: { dir: dir } },
+      { key: 'fix.choose_another_directory_or_pass_force' }
+    );
     }
     const files = renderClaudePlugin(opts.cli ?? 'sdlc');
     const wanted = new Set(files.map((f) => f.path));
@@ -32,8 +37,8 @@ export async function pluginBuildCommand(target: string | undefined, opts: { cli
       writeTextAtomic(marketplace, renderMarketplace());
     }
     if (opts.json) return printJson({ dir, files: files.map((f) => f.path), ...(marketplace ? { marketplace } : {}) });
-    line(`${c.green('✓')} Claude Code plugin '${PLUGIN_NAME}' written to ${dir} (${files.length} files)`);
-    if (marketplace) line(`  marketplace: ${marketplace}`);
+    line(`${c.green('✓')} ${t('plugin.written', { name: PLUGIN_NAME, dir, count: files.length })}`);
+    if (marketplace) line(t('plugin.marketplace', { path: marketplace }));
   } catch (error) {
     reportFailure(error, opts.json);
   }

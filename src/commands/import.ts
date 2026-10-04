@@ -14,11 +14,12 @@ import { createChange } from './changes.js';
 import { addBacklogItem, addEpic } from '../core/backlog.js';
 import { planBmadBacklog } from '../core/bmad-tickets.js';
 import { appendLog } from '../core/log.js';
+import { t } from '../core/i18n.js';
 
 export function importBmadCommand(input: string, opts: { change?: string; toBacklog?: boolean; kind?: string; risk?: string; dryRun?: boolean; json?: boolean }): void {
   try {
     if (!!opts.change === !!opts.toBacklog) {
-      throw new SdlcError('invalid_option', 'Supply exactly one of --change or --to-backlog.');
+      throw new SdlcError('invalid_option', { key: 'error.supply_exactly_one_of_change_or_to_backlog' });
     }
     if (opts.toBacklog) {
       const ctx = loadProject();
@@ -39,7 +40,10 @@ export function importBmadCommand(input: string, opts: { change?: string; toBack
         const { key, epicKey, dependsOnKeys, ...fields } = item;
         const dependsOn = dependsOnKeys.map(dep => {
           const resolved = itemIds.get(dep);
-          if (!resolved) throw new SdlcError('invalid_tickets', `Dependency ${dep} is not earlier in build order.`);
+          if (!resolved) throw new SdlcError(
+            'invalid_tickets',
+            { key: 'error.dependency_x_is_not_earlier_in_build_order', params: { dep: dep } }
+          );
           return resolved;
         });
         const created = addBacklogItem(ctx.root, { ...fields, epic: epicKey ? epicIds.get(epicKey) : undefined,
@@ -50,20 +54,23 @@ export function importBmadCommand(input: string, opts: { change?: string; toBack
       appendLog(ctx.root, ctx.config, { event: 'backlog.imported',
         by: formatIdentity(gitIdentity(ctx.root)), detail: `${epics.length} epics, ${items.length} items` }, ctx.stamp);
       if (opts.json) printJson({ epics, items, unmapped: plan.unmapped, warnings: plan.warnings });
-      else line(`Imported ${epics.length} epics and ${items.length} backlog items.`);
+      else line(t('import.backlogDone', { epics: epics.length, items: items.length }));
       return;
     }
     const changeId = opts.change!;
     assertValidChangeId(changeId);
     const ctx = loadProject();
     const target = path.join(ctx.paths.changesDir, changeId);
-    if (fs.existsSync(target)) throw new SdlcError('change_exists', `Change ${opts.change} already exists.`);
+    if (fs.existsSync(target)) throw new SdlcError(
+      'change_exists',
+      { key: 'error.change_x_already_exists', params: { opts_change: opts.change ?? '' } }
+    );
     const plan = planBmadImport(ctx.root, input, changeId);
     if (opts.dryRun) { if (opts.json) printJson(plan); else line(JSON.stringify(plan, null, 2)); return; }
     const { dir } = createChange(changeId, { kind: opts.kind, risk: opts.risk, sourceType: 'bmad', sourceRef: input });
     for (const file of plan.files) {
       const dest = path.resolve(dir, file.path);
-      if (!isWithin(dir, dest)) throw new SdlcError('invalid_path', 'Import path escapes change folder.');
+      if (!isWithin(dir, dest)) throw new SdlcError('invalid_path', { key: 'error.import_path_escapes_change_folder' });
       fs.mkdirSync(path.dirname(dest), { recursive: true });
       fs.writeFileSync(dest, file.content, 'utf8');
     }
@@ -72,7 +79,10 @@ export function importBmadCommand(input: string, opts: { change?: string; toBack
     for (const doc of plan.docs) {
       const source = path.resolve(ctx.root, doc.path);
       const dest = path.resolve(sourceDir, path.basename(doc.path));
-      if (!isWithin(sourceDir, dest) || fs.lstatSync(source).isSymbolicLink()) throw new SdlcError('invalid_path', 'Invalid BMAD source.');
+      if (!isWithin(sourceDir, dest) || fs.lstatSync(source).isSymbolicLink()) throw new SdlcError(
+        'invalid_path',
+        { key: 'error.invalid_bmad_source' }
+      );
       fs.copyFileSync(source, dest);
     }
     const by = formatIdentity(gitIdentity(ctx.root));
@@ -81,7 +91,7 @@ export function importBmadCommand(input: string, opts: { change?: string; toBack
     const next = resolveNext(ctx, changeId);
     if (opts.json) printJson({ ...plan, ...(next ? { next } : {}) });
     else {
-      line(`Imported BMAD artifacts into ${changeId}.`);
+      line(t('import.changeDone', { change: changeId }));
       emitNextHint(ctx, changeId);
     }
   } catch (error) { reportFailure(error, opts.json); }

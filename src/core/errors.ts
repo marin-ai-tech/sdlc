@@ -5,16 +5,50 @@
  * actionable sentence or command. The shape mirrors OpenSpec's diagnostic
  * envelope (severity/code/message/fix) so agents that already parse OpenSpec
  * JSON can read ours the same way.
+ *
+ * Message and fix may be plain strings or { key, params } locale refs. English
+ * (via t(..., 'en')) is always stored on message/fix for JSON and
+ * toDiagnostic; text output uses localizedMessage()/localizedFix().
  */
+import { t, type MessageParams } from './i18n.js';
+
+export type LocParams = MessageParams;
+export type LocText = string | { key: string; params?: LocParams };
+
+function englishText(text: LocText): string {
+  if (typeof text === 'string') return text;
+  return t(text.key, text.params, 'en');
+}
+
+function localizedText(text: LocText | undefined): string | undefined {
+  if (text === undefined) return undefined;
+  if (typeof text === 'string') return text;
+  return t(text.key, text.params);
+}
+
 export class SdlcError extends Error {
   readonly code: string;
   readonly fix?: string;
+  private readonly messageLoc: LocText;
+  private readonly fixLoc?: LocText;
 
-  constructor(code: string, message: string, fix?: string) {
-    super(message);
+  constructor(code: string, message: LocText, fix?: LocText) {
+    super(englishText(message));
     this.name = 'SdlcError';
     this.code = code;
-    this.fix = fix;
+    this.messageLoc = message;
+    if (fix !== undefined) {
+      this.fixLoc = fix;
+      this.fix = englishText(fix);
+    }
+  }
+
+  localizedMessage(): string {
+    return localizedText(this.messageLoc) ?? this.message;
+  }
+
+  localizedFix(): string | undefined {
+    return localizedText(this.fixLoc) ?? this.fix;
   }
 }
 

@@ -70,7 +70,7 @@ function resolveInside(root: string, input: string): string {
   const rootResolved = path.resolve(root);
   const rel = path.relative(rootResolved, start);
   if (rel.startsWith('..') || path.isAbsolute(rel)) {
-    throw new SdlcError('no_bmad_artifacts', 'No BMAD artifacts found.');
+    throw new SdlcError('no_bmad_artifacts', { key: 'error.no_bmad_artifacts_found' });
   }
   return start;
 }
@@ -176,7 +176,7 @@ function expandAfter(
 function planFromTickets(root: string, start: string): BacklogImportPlan {
   const rootTicketsPath = fs.statSync(start).isFile() ? start : path.join(start, 'tickets.toml');
   if (!fs.existsSync(rootTicketsPath) || isSymlink(rootTicketsPath)) {
-    throw new SdlcError('no_bmad_artifacts', 'No BMAD artifacts found.');
+    throw new SdlcError('no_bmad_artifacts', { key: 'error.no_bmad_artifacts_found' });
   }
   const baseDir = fs.statSync(start).isFile() ? path.dirname(start) : start;
   const relativeTickets = (abs: string) => toPosix(path.relative(root, abs));
@@ -234,7 +234,7 @@ function planFromTickets(root: string, start: string): BacklogImportPlan {
       entries: entriesToml,
     });
   } else {
-    throw new SdlcError('no_bmad_artifacts', 'No BMAD artifacts found.');
+    throw new SdlcError('no_bmad_artifacts', { key: 'error.no_bmad_artifacts_found' });
   }
 
   const epicEntries = new Map<string, string[]>();
@@ -287,7 +287,7 @@ function planFromDocs(root: string, input: string): BacklogImportPlan {
   const spec = docs.find((d) => d.kind === 'spec');
   const prd = docs.find((d) => d.kind === 'prd');
   const origin: BmadDoc | undefined = spec ?? prd;
-  if (!origin) throw new SdlcError('no_bmad_artifacts', 'No BMAD artifacts found.');
+  if (!origin) throw new SdlcError('no_bmad_artifacts', { key: 'error.no_bmad_artifacts_found' });
   const body = readUtf8(path.resolve(root, origin.path));
   const requirements = spec
     ? requirementsFromSpec(sections(body))

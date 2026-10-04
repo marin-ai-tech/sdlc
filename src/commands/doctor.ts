@@ -5,6 +5,7 @@ import { loadConfig } from '../core/config.js';
 import { listActiveChanges } from '../core/changes.js';
 import { isFile, readText } from '../core/fs-utils.js';
 import { gitIdentity, isGitRepo } from '../core/git.js';
+import { currentLocale, t, type Locale } from '../core/i18n.js';
 import { evaluateChange } from '../core/lifecycle.js';
 import { openspecVersion, resolveOpenSpec, runOpenSpec } from '../core/openspec.js';
 import { findProjectRoot, projectPaths } from '../core/project.js';
@@ -44,66 +45,113 @@ function onPath(bin: string): boolean {
 
 export async function doctorCommand(opts: { json?: boolean }): Promise<void> {
   try {
+    // JSON payloads stay English in every locale; text uses the active locale.
+    const loc: Locale = opts.json ? 'en' : currentLocale();
+    const tt = (key: string, params?: Record<string, string | number>) => t(key, params, loc);
     const checks: Check[] = [];
     const add = (check: string, status: Check['status'], message: string, fix?: string) =>
       checks.push({ check, status, message, ...(fix ? { fix } : {}) });
 
-    add('node', versionAtLeast(process.versions.node, [20, 19, 0]) ? 'ok' : 'error', `Node.js ${process.versions.node}`, 'Install Node.js 20.19 or newer.');
-    add('harness', 'ok', `sdlc ${harnessVersion()}`);
+    add(
+      'node',
+      versionAtLeast(process.versions.node, [20, 19, 0]) ? 'ok' : 'error',
+      tt('doctor.node', { version: process.versions.node }),
+      tt('doctor.fix.node'),
+    );
+    add('harness', 'ok', tt('doctor.harness', { version: harnessVersion() }));
 
     const root = findProjectRoot();
     const bin = resolveOpenSpec();
     const osVersion = openspecVersion(root ?? process.cwd());
-    if (!osVersion) add('openspec', 'error', `OpenSpec CLI not runnable (${bin.source}: ${bin.command})`, 'Reinstall the harness or `npm install -g @fission-ai/openspec`.');
-    else add('openspec', versionAtLeast(osVersion, [1, 13, 2]) ? 'ok' : 'warn', `OpenSpec ${osVersion} (${bin.source})`, 'The harness is tested with OpenSpec >= 1.13.2.');
+    if (!osVersion) {
+      add(
+        'openspec',
+        'error',
+        tt('doctor.openspecMissing', { source: bin.source, command: bin.command }),
+        tt('doctor.fix.openspec'),
+      );
+    } else {
+      add(
+        'openspec',
+        versionAtLeast(osVersion, [1, 13, 2]) ? 'ok' : 'warn',
+        tt('doctor.openspecVersion', { version: osVersion, source: bin.source }),
+        tt('doctor.openspecOld'),
+      );
+    }
 
     const depRoot = root ?? process.cwd();
     const optional = detectDependencies(depRoot);
     const openspecCli = optional.find((d) => d.id === 'openspec')!;
     if (openspecCli.found) {
-      add('openspec cli', 'ok', openspecCli.version ?? 'installed');
+      add('openspec cli', 'ok', openspecCli.version ?? tt('doctor.installed'));
     } else {
       add(
         'openspec cli',
         'warn',
-        'not on PATH (optional: sdlc runs its bundled OpenSpec)',
+        tt('doctor.openspecCliOptional'),
         openspecCli.install.join(' '),
       );
     }
     const codegraph = optional.find((d) => d.id === 'codegraph')!;
     if (codegraph.found) {
       const indexed = codegraph.indexed
-        ? 'project indexed'
-        : 'not indexed (codegraph init)';
-      add('codegraph', 'ok', `${codegraph.version ?? 'installed'} — ${indexed}`);
+        ? tt('doctor.codegraphIndexed')
+        : tt('doctor.codegraphNotIndexed');
+      add(
+        'codegraph',
+        'ok',
+        tt('doctor.codegraphOk', { version: codegraph.version ?? tt('doctor.installed'), indexed }),
+      );
     } else {
-      add('codegraph', 'warn', 'not on PATH', codegraph.install.join(' '));
+      add('codegraph', 'warn', tt('doctor.notOnPath'), codegraph.install.join(' '));
     }
 
     if (!root) {
-      add('project', 'error', 'No openspec/ directory in this directory or its parents.', 'Run `sdlc init`.');
+      add('project', 'error', tt('doctor.noProject'), tt('doctor.fix.init'));
     } else {
       const paths = projectPaths(root);
-      add('project', 'ok', `root ${root}`);
+      add('project', 'ok', tt('doctor.root', { root }));
       const roles = readRolesFile(root);
-      if (roles) add('approval signing', 'ok', `mode ${roles.signing}`);
+      if (roles) add('approval signing', 'ok', tt('doctor.signingMode', { mode: roles.signing }));
       let config;
       try {
         config = loadConfig(paths.sdlcConfig);
-        add('sdlc.yaml', isFile(paths.sdlcConfig) ? 'ok' : 'error',
-          isFile(paths.sdlcConfig) ? `enforcement ${config.enforcement.mode}, tools ${config.tools.join(', ') || 'none'}` : 'openspec/sdlc.yaml missing',
-          'Run `sdlc init`.');
+        add(
+          'sdlc.yaml',
+          isFile(paths.sdlcConfig) ? 'ok' : 'error',
+          isFile(paths.sdlcConfig)
+            ? tt('doctor.enforcementTools', {
+              mode: config.enforcement.mode,
+              tools: config.tools.join(', ') || tt('init.none'),
+            })
+            : tt('doctor.sdlcMissing'),
+          tt('doctor.fix.init'),
+        );
       } catch (error) {
         add('sdlc.yaml', 'error', error instanceof Error ? error.message : String(error));
       }
-      const osConfig = (() => { try { return readYamlObject(paths.openspecConfig); } catch { return undefined; } })();
-      add('openspec config', osConfig ? 'ok' : 'warn', osConfig ? `default schema ${String(osConfig.schema ?? 'spec-driven')}` : 'openspec/config.yaml missing or invalid');
+      const osConfig = (() => {
+        try { return readYamlObject(paths.openspecConfig); } catch { return undefined; }
+      })();
+      add(
+        'openspec config',
+        osConfig ? 'ok' : 'warn',
+        osConfig
+          ? tt('doctor.schemaDefault', { schema: String(osConfig.schema ?? 'spec-driven') })
+          : tt('doctor.openspecConfigMissing'),
+      );
 
       if (isFile(path.join(paths.schemasDir, 'sdlc', 'schema.yaml'))) {
         const r = runOpenSpec(['schema', 'validate', 'sdlc'], { cwd: root });
-        add('sdlc schema', r.ok ? 'ok' : 'error', r.ok ? 'openspec/schemas/sdlc is valid' : (r.stderr || r.stdout).trim().split('\n').slice(-2).join(' '));
+        add(
+          'sdlc schema',
+          r.ok ? 'ok' : 'error',
+          r.ok
+            ? tt('doctor.schemaValid')
+            : (r.stderr || r.stdout).trim().split('\n').slice(-2).join(' '),
+        );
       } else {
-        add('sdlc schema', 'error', 'openspec/schemas/sdlc is not installed', 'Run `sdlc update`.');
+        add('sdlc schema', 'error', tt('doctor.schemaMissing'), tt('doctor.fix.update'));
       }
 
       const manifest = readManifest(root);
@@ -114,43 +162,106 @@ export async function doctorCommand(opts: { json?: boolean }): Promise<void> {
         return text !== undefined && sha256(text) !== e.sha256;
       }).map(([rel]) => rel);
       const outdated = manifest.harness !== harnessVersion() ||
-        (config !== undefined && manifest.license !== undefined && manifest.license !== harnessStamp(config).license);
-      add('generated files', missing.length > 0 ? 'error' : edited.length > 0 || (outdated && entries.length > 0) ? 'warn' : entries.length > 0 ? 'ok' : 'warn',
-        `${entries.length} tracked, ${missing.length} missing, ${edited.length} edited locally${outdated ? ` (generated by sdlc ${manifest.harness}${manifest.license ? `, license ${manifest.license}` : ''})` : ''}`,
-        missing.length > 0 || outdated ? 'Run `sdlc update`.' : edited.length > 0 ? 'Edited files are kept by `sdlc update`; use --force to restore them.' : undefined);
+        (config !== undefined && manifest.license !== undefined &&
+          manifest.license !== harnessStamp(config).license);
+      const licensePart = manifest.license
+        ? tt('doctor.licensePart', { license: manifest.license })
+        : '';
+      const by = outdated
+        ? tt('doctor.generatedBy', { harness: manifest.harness, license: licensePart })
+        : '';
+      add(
+        'generated files',
+        missing.length > 0
+          ? 'error'
+          : edited.length > 0 || (outdated && entries.length > 0)
+            ? 'warn'
+            : entries.length > 0 ? 'ok' : 'warn',
+        tt('doctor.generatedSummary', {
+          tracked: entries.length,
+          missing: missing.length,
+          edited: edited.length,
+        }) + by,
+        missing.length > 0 || outdated
+          ? tt('doctor.fix.update')
+          : edited.length > 0 ? tt('doctor.fix.edited') : undefined,
+      );
 
       if (config) {
-        const license = assessLicense(config.license, detectProjectLicense(root));
+        const license = assessLicense(config.license, detectProjectLicense(root), loc);
         add('license', license.status, license.message, license.fix);
-        add('project log', 'ok', config.log.enabled ? `${readLog(root).length} entries in ${LOG_PATH}` : 'off (log.enabled in openspec/sdlc.yaml)');
+        add(
+          'project log',
+          'ok',
+          config.log.enabled
+            ? tt('doctor.logEntries', { count: readLog(root).length, path: LOG_PATH })
+            : tt('doctor.logOff'),
+        );
         if (config.tools.includes('claude')) {
           const settings = readText(path.join(root, SETTINGS_PATH)) ?? '';
-          add('claude hooks', /hook pre-tool/.test(settings) ? 'ok' : 'warn',
-            /hook pre-tool/.test(settings) ? `installed in ${SETTINGS_PATH}` : `not found in ${SETTINGS_PATH} (gates are advisory only)`, 'Run `sdlc update`.');
+          const hasHooks = /hook pre-tool/.test(settings);
+          add(
+            'claude hooks',
+            hasHooks ? 'ok' : 'warn',
+            hasHooks
+              ? tt('doctor.hooksInstalled', { path: SETTINGS_PATH })
+              : tt('doctor.hooksMissing', { path: SETTINGS_PATH }),
+            tt('doctor.fix.update'),
+          );
         }
         if (config.tools.includes('opencode')) {
-          add('opencode plugin', isFile(path.join(root, '.opencode', 'plugins', 'sdlc.js')) ? 'ok' : 'warn', '.opencode/plugins/sdlc.js', 'Run `sdlc update`.');
+          add(
+            'opencode plugin',
+            isFile(path.join(root, '.opencode', 'plugins', 'sdlc.js')) ? 'ok' : 'warn',
+            '.opencode/plugins/sdlc.js',
+            tt('doctor.fix.update'),
+          );
         }
         const cliBin = config.cli.split(/\s+/)[0];
-        add('cli on PATH', onPath(cliBin) ? 'ok' : 'warn', `\`${cliBin}\` ${onPath(cliBin) ? 'is' : 'is not'} on PATH (hooks, plugin and skills call \`${config.cli}\`)`,
-          `Install globally (\`${INSTALL_COMMAND}\`) or, for a project-local install, set \`cli: npx --no-install sdlc\` in openspec/sdlc.yaml and run \`sdlc update\`.`);
-        add('verify commands', config.verify.commands.length > 0 ? 'ok' : 'warn',
-          config.verify.commands.length > 0 ? config.verify.commands.map((v) => v.name).join(', ') : 'none configured - the verify gate cannot pass',
-          'Add build/test/lint commands under verify.commands in openspec/sdlc.yaml.');
-        add('review policy', isFile(path.join(root, config.review.policy)) ? 'ok' : 'warn', config.review.policy, 'Run `sdlc init` to create a starter REVIEW.md.');
+        const on = onPath(cliBin);
+        add(
+          'cli on PATH',
+          on ? 'ok' : 'warn',
+          tt(on ? 'doctor.cliOnPath' : 'doctor.cliNotOnPath', { bin: cliBin, cli: config.cli }),
+          tt('doctor.fix.cli', { install: INSTALL_COMMAND }),
+        );
+        add(
+          'verify commands',
+          config.verify.commands.length > 0 ? 'ok' : 'warn',
+          config.verify.commands.length > 0
+            ? tt('doctor.verifyNames', {
+              names: config.verify.commands.map((v) => v.name).join(', '),
+            })
+            : tt('doctor.verifyNone'),
+          tt('doctor.fix.verify'),
+        );
+        add(
+          'review policy',
+          isFile(path.join(root, config.review.policy)) ? 'ok' : 'warn',
+          tt('doctor.reviewPolicyFile', { path: config.review.policy }),
+          tt('doctor.fix.review'),
+        );
         for (const ref of listActiveChanges(paths)) {
           try {
             const view = evaluateChange(root, ref, config, { skipFingerprint: true });
-            add(`change ${ref.id}`, 'ok', `stage ${view.stage}`);
+            add(`change ${ref.id}`, 'ok', tt('doctor.changeStage', { stage: view.stage }));
           } catch (error) {
             add(`change ${ref.id}`, 'error', error instanceof Error ? error.message : String(error));
           }
         }
       }
-      if (!isGitRepo(root)) add('git', 'warn', 'not a git repository: approvals and evidence cannot be tied to commits', 'Run `git init`.');
-      else {
+      if (!isGitRepo(root)) {
+        add('git', 'warn', tt('doctor.gitNotRepo'), tt('doctor.fix.gitInit'));
+      } else {
         const id = gitIdentity(root);
-        add('git', id.email ? 'ok' : 'warn', id.email ? `identity ${id.name ?? ''} <${id.email}>` : 'git user.email not set (needed to record approvals)', 'git config user.email you@example.com');
+        add(
+          'git',
+          id.email ? 'ok' : 'warn',
+          id.email
+            ? tt('doctor.gitIdentity', { name: id.name ?? '', email: id.email })
+            : tt('doctor.gitNoEmail'),
+          tt('doctor.fix.gitEmail'),
+        );
       }
     }
 
@@ -162,7 +273,9 @@ export async function doctorCommand(opts: { json?: boolean }): Promise<void> {
       for (const ch of checks) {
         const icon = ch.status === 'ok' ? c.green('✓') : ch.status === 'warn' ? c.yellow('!') : c.red('✗');
         line(`${icon} ${ch.check.padEnd(16)} ${ch.message}`);
-        if (ch.fix && ch.status !== 'ok') line(`  ${''.padEnd(16)} ${c.dim(`fix: ${ch.fix}`)}`);
+        if (ch.fix && ch.status !== 'ok') {
+          line(`  ${''.padEnd(16)} ${c.dim(tt('doctor.fixLabel', { fix: ch.fix }))}`);
+        }
       }
     }
     if (errors > 0) process.exitCode = 1;

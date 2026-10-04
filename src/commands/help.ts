@@ -62,7 +62,10 @@ export function helpCommand(topic: string | undefined, opts: { json?: boolean })
     const command = catalog.commands.find((item) => item.name === topic);
     if (topic && !workflow && !command) {
       const topics = [...catalog.workflows.map((item) => item.id), ...catalog.commands.map((item) => item.name)];
-      throw new SdlcError('unknown_topic', `Unknown topic: ${topic}. Topics: ${topics.join(', ')}`);
+      throw new SdlcError(
+        'unknown_topic',
+        { key: 'error.unknown_topic_x_topics_x', params: { topic: topic, p2: topics.join(', ') } }
+      );
     }
     if (opts.json) {
       printJson(topic ? workflow ?? command : catalog);

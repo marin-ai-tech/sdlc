@@ -2,6 +2,19 @@
 
 All notable changes to sdlc. Versions follow [Semantic Versioning](https://semver.org/); while the major version is 0, a minor version may change behavior.
 
+## 0.6.3 — 2026-10-04
+
+### Added
+- **Every command speaks the locale.** Besides help, status, hints, the wizard, hook reasons and reports, the text output of every command, all error messages with their fixes and all warnings now follow `--locale`, `SDLC_LOCALE`, `locale:` in `sdlc.yaml` or the system locale (English and Russian). JSON output and error codes stay English and identical in every locale.
+- The demo scenario runs in the deck's language, so the Russian deck shows Russian CLI output.
+
+### Fixed
+- `/sdlc:explore`, `/sdlc:intent` and `/sdlc:triage` started without a subject now ask for it instead of inventing one.
+- Indexing with codegraph from the init wizard no longer writes `.claude/` into an OpenCode-only project: a bare `codegraph init` asked its own questions and defaulted to Claude Code. The wizard now runs `codegraph install --target <the chosen tools> --location local --yes --init` (index only, `codegraph init --yes`, when no tool is chosen).
+- An exploration that pauses for answers or research leaves the note saying where it stopped: open questions go under the new **Open questions** section, unfinished sections are marked `_pending: …_`, and the next run continues from there; without answers the agent continues on recorded assumptions.
+- Every workflow talks to the person, and writes notes and artifacts, in their language (or the project's `locale:`), keeping command names, ids and template headings as they are.
+- `sdlc doctor` no longer prints Node's DEP0190 deprecation warning on Windows.
+
 ## 0.6.2 — 2026-10-04
 
 ### Changed

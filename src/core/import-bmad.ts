@@ -62,10 +62,10 @@ export function detectBmadDocs(root: string, input: string): BmadDoc[] {
     walkMarkdown(start, files);
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
-    throw new SdlcError('no_bmad_artifacts', 'No BMAD artifacts found.');
+    throw new SdlcError('no_bmad_artifacts', { key: 'error.no_bmad_artifacts_found' });
   }
   const docs = files.flatMap((file) => identifyDoc(root, file));
-  if (!docs.length) throw new SdlcError('no_bmad_artifacts', 'No BMAD artifacts found.');
+  if (!docs.length) throw new SdlcError('no_bmad_artifacts', { key: 'error.no_bmad_artifacts_found' });
   return docs;
 }
 

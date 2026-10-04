@@ -3,7 +3,7 @@ import * as path from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { askInitChoices, type Prompter } from '../src/commands/init-wizard.js';
 import { initCommand } from '../src/commands/setup.js';
-import { CODEGRAPH_INDEX, detectDependencies, installCommand, type CommandResult, type DependencyStatus } from '../src/core/dependencies.js';
+import { codegraphIndexCommand, detectDependencies, installCommand, type CommandResult, type DependencyStatus } from '../src/core/dependencies.js';
 import { openspecPackageDir } from '../src/core/openspec-schema.js';
 import { git, humanEnv, initGitRepo, runCli, tempDir } from './helpers.js';
 
@@ -32,13 +32,13 @@ function installer(root: string, ok = true) {
   return { fn, calls };
 }
 
-function scripted(answers: { installOpenSpec?: boolean; installCodegraph?: boolean; index?: boolean; confirm?: boolean } = {}) {
+function scripted(answers: { tools?: string[]; installOpenSpec?: boolean; installCodegraph?: boolean; index?: boolean; confirm?: boolean } = {}) {
   const asked: string[] = [];
   const said: string[] = [];
   const prompter: Prompter = {
     async checkbox(message, choices) {
       asked.push(`checkbox:${message}`);
-      return choices.filter((c) => c.checked).map((c) => c.value) as never;
+      return (answers.tools ?? choices.filter((c) => c.checked).map((c) => c.value)) as never;
     },
     async select(message, _choices, initial) {
       asked.push(`select:${message}`);
@@ -82,10 +82,15 @@ const defaults = (dependencies?: DependencyStatus[]) =>
 afterEach(() => vi.restoreAllMocks());
 
 describe('optional tools: detection and install commands', () => {
-  it('OpenSpec is pinned to the bundled version; codegraph comes from npm; the index command is codegraph init', () => {
+  it('OpenSpec is pinned to the bundled version; codegraph comes from npm', () => {
     expect(installCommand('openspec')).toEqual(OPENSPEC_INSTALL);
     expect(installCommand('codegraph')).toEqual(CODEGRAPH_INSTALL);
-    expect(CODEGRAPH_INDEX).toEqual(['codegraph', 'init']);
+  });
+
+  it('indexing connects codegraph only to the chosen tools, without its own prompts (a bare codegraph init picked Claude Code)', () => {
+    expect(codegraphIndexCommand(['opencode'])).toEqual(['codegraph', 'install', '--target', 'opencode', '--location', 'local', '--yes', '--init']);
+    expect(codegraphIndexCommand(['claude', 'opencode'])).toEqual(['codegraph', 'install', '--target', 'claude,opencode', '--location', 'local', '--yes', '--init']);
+    expect(codegraphIndexCommand([])).toEqual(['codegraph', 'init', '--yes']);
   });
 
   it('missing tools are reported with their install command; only the PATH commands are probed', () => {
@@ -153,9 +158,21 @@ describe('interactive init installs only what the person chose', () => {
       prompter: scripted({ installOpenSpec: true, installCodegraph: true, index: true }).prompter,
       io: TTY, probe: probe({}).fn, installer: inst.fn,
     });
-    expect(inst.calls.map((c) => c.command)).toEqual([OPENSPEC_INSTALL, CODEGRAPH_INSTALL, CODEGRAPH_INDEX]);
+    expect(inst.calls.map((c) => c.command)).toEqual([OPENSPEC_INSTALL, CODEGRAPH_INSTALL, codegraphIndexCommand(['claude', 'opencode'])]);
     expect(inst.calls.every((c) => c.settingsWritten)).toBe(true);
     expect(path.resolve(inst.calls[2].cwd)).toBe(path.resolve(root));
+  }, 120000);
+
+  it('an OpenCode-only project indexes with codegraph for OpenCode only (no .claude)', async () => {
+    const root = repo();
+    const inst = installer(root);
+    quiet();
+    await initCommand(root, { hooks: true }, {
+      prompter: scripted({ tools: ['opencode'], installOpenSpec: false, installCodegraph: false, index: true }).prompter,
+      io: TTY, probe: probe({ codegraph: '1.6.1' }).fn, installer: inst.fn,
+    });
+    expect(inst.calls.map((c) => c.command)).toEqual([codegraphIndexCommand(['opencode'])]);
+    expect(fs.existsSync(path.join(root, '.claude'))).toBe(false);
   }, 120000);
 
   it('negative: no to everything runs nothing', async () => {

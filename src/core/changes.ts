@@ -22,8 +22,8 @@ export function assertValidChangeId(id: string): void {
   if (!isValidChangeId(id)) {
     throw new SdlcError(
       'invalid_change_name',
-      `Change name '${id}' must be lowercase kebab-case (letters, digits, single hyphens).`,
-      'Example: add-claims-status-panel'
+      { key: 'error.change_name_x_must_be_lowercase_kebab_case_lette', params: { id: id } },
+      { key: 'fix.example_add_claims_status_panel' }
     );
   }
 }
@@ -65,11 +65,15 @@ export function resolveChange(paths: ProjectPaths, id?: string, options: { allow
   if (!id) {
     if (active.length === 1) return active[0];
     if (active.length === 0) {
-      throw new SdlcError('no_active_changes', 'There are no active changes.', 'Start one with `sdlc new <name>`.');
+      throw new SdlcError(
+        'no_active_changes',
+        { key: 'error.there_are_no_active_changes' },
+        { key: 'fix.start_one_with_sdlc_new_name' }
+      );
     }
     throw new SdlcError(
       'change_required',
-      `Several active changes exist (${active.map((c) => c.id).join(', ')}); name one with --change <id>.`
+      { key: 'error.several_active_changes_exist_x_name_one_with_cha', params: { p1: active.map((c) => c.id).join(', ') } }
     );
   }
   const found = active.find((c) => c.id === id);
@@ -79,8 +83,10 @@ export function resolveChange(paths: ProjectPaths, id?: string, options: { allow
     if (archived.length > 0) return archived[archived.length - 1];
   }
   throw new SdlcError(
-    'change_not_found',
-    `Change '${id}' not found.`,
-    active.length > 0 ? `Active changes: ${active.map((c) => c.id).join(', ')}` : 'Start one with `sdlc new <name>`.'
-  );
+      'change_not_found',
+      { key: 'error.change_x_not_found', params: { id: id } },
+      active.length > 0
+      ? { key: 'fix.active_changes_x', params: { p1: active.map((c) => c.id).join(', ') } }
+      : { key: 'fix.start_one_with_sdlc_new_name' }
+    );
 }

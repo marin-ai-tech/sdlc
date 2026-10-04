@@ -8,13 +8,19 @@ import { CONVERT_EXCLUDES, detectLayout, layoutRole, PINNED_PATHS, type ConvertM
 
 function run(root: string, args: string[]): string {
   const result = spawnSync('git', args, { cwd: root, encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 });
-  if (result.status !== 0) throw new SdlcError('git_error', (result.stderr ?? '').trim() || `git ${args[0]} failed`);
+  if (result.status !== 0) throw new SdlcError(
+    'git_error',
+    { key: 'error.git_x_failed', params: { detail: (result.stderr ?? '').trim() || `git ${args[0]} failed` } }
+  );
   return result.stdout ?? '';
 }
 
 function safe(root: string, rel: string): string {
   const absolute = path.resolve(root, rel);
-  if (!isWithin(root, absolute)) throw new SdlcError('invalid_path', `Path outside project: ${rel}`);
+  if (!isWithin(root, absolute)) throw new SdlcError(
+    'invalid_path',
+    { key: 'error.path_outside_project_x', params: { rel: rel } }
+  );
   return absolute;
 }
 
@@ -117,14 +123,14 @@ export function planConversion(root: string, config: SdlcConfig): ConvertPlan {
 }
 
 export function applyConversion(root: string, config: SdlcConfig, plan: ConvertPlan): void {
-  if (plan.conflicts.length) throw new SdlcError('conversion_conflict', 'Conversion plan has conflicts.');
+  if (plan.conflicts.length) throw new SdlcError('conversion_conflict', { key: 'error.conversion_plan_has_conflicts' });
   for (const move of plan.moves) {
     safe(root, move.from);
     safe(root, move.to);
   }
   for (const entry of plan.linkRewrites) safe(root, entry.file);
   if (run(root, ['status', '--porcelain', '--untracked-files=all']).trim())
-    throw new SdlcError('dirty_worktree', 'The worktree must be clean before conversion.');
+    throw new SdlcError('dirty_worktree', { key: 'error.the_worktree_must_be_clean_before_conversion' });
   for (const move of plan.moves) {
     fs.mkdirSync(path.dirname(safe(root, move.to)), { recursive: true });
     run(root, ['mv', '--', move.from.replace(/\/$/, ''), move.to.replace(/\/$/, '')]);

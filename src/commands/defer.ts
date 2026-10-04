@@ -5,12 +5,19 @@ import { addDeferred, closeDeferred, readDeferred } from '../core/deferred.js';
 import { SdlcError } from '../core/errors.js';
 import { formatIdentity, gitIdentity } from '../core/git.js';
 import { appendLog } from '../core/log.js';
+import { t } from '../core/i18n.js';
+
+function deferStatus(status: string): string {
+  const key = `defer.status.${status}`;
+  const text = t(key);
+  return text === key ? status : text;
+}
 
 function formatDeferredTable(items: Array<{ id: string; status: string; title: string; change?: string }>): string {
-  const headers = ['ID', 'Status', 'Title', 'Change'];
+  const headers = [t('defer.colId'), t('defer.colStatus'), t('defer.colTitle'), t('defer.colChange')];
   const rows = items.map((item) => {
     const change = item.change ?? '-';
-    return [item.id, item.status, item.title, change];
+    return [item.id, deferStatus(item.status), item.title, change];
   });
   const widths = headers.map((header, index) => {
     let width = header.length;
@@ -32,7 +39,7 @@ function formatDeferredTable(items: Array<{ id: string; status: string; title: s
 export function deferAdd(title: string, opts: { why?: string; change?: string; finding?: string; revisit?: string; json?: boolean }): void {
   try {
     const ctx = loadProject();
-    if (!opts.why) throw new SdlcError('invalid_option', '--why is required.');
+    if (!opts.why) throw new SdlcError('invalid_option', { key: 'error.why_is_required' });
     const by = formatIdentity(gitIdentity(ctx.root));
     const item = addDeferred(ctx.root, { title, why: opts.why, change: opts.change, finding: opts.finding, revisit: opts.revisit, by });
     appendLog(ctx.root, ctx.config, { event: 'deferred.added', change: item.change, by, detail: `${item.id} ${item.title}` }, ctx.stamp);
@@ -62,7 +69,7 @@ export function deferList(opts: { open?: boolean; change?: string; json?: boolea
       return;
     }
     if (items.length === 0) {
-      line('No deferred work.');
+      line(t('defer.none'));
       return;
     }
     line(formatDeferredTable(items));
@@ -72,11 +79,14 @@ export function deferList(opts: { open?: boolean; change?: string; json?: boolea
 export function deferClose(id: string, opts: { status?: string; note?: string; json?: boolean }): void {
   try {
     const ctx = loadProject();
-    if (opts.status !== 'done' && opts.status !== 'dropped') throw new SdlcError('invalid_option', '--status must be done or dropped.');
-    if (!opts.note) throw new SdlcError('invalid_option', '--note is required.');
+    if (opts.status !== 'done' && opts.status !== 'dropped') throw new SdlcError(
+      'invalid_option',
+      { key: 'error.status_must_be_done_or_dropped' }
+    );
+    if (!opts.note) throw new SdlcError('invalid_option', { key: 'error.note_is_required' });
     const item = closeDeferred(ctx.root, id, opts.status, opts.note);
     appendLog(ctx.root, ctx.config, { event: 'deferred.closed', change: item.change, detail: `${item.id} ${item.title}` }, ctx.stamp);
     if (opts.json) printJson({ item, harness: ctx.stamp });
-    else line(`${item.id} ${item.status} ${item.title}`);
+    else line(`${item.id} ${deferStatus(item.status)} ${item.title}`);
   } catch (error) { reportFailure(error, opts.json); }
 }

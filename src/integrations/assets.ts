@@ -52,7 +52,11 @@ export function readAsset(...segments: string[]): string {
   const file = path.join(assetsDir(), ...segments);
   const text = readText(file);
   if (text === undefined) {
-    throw new SdlcError('missing_asset', `Harness asset not found: ${file}`, 'Reinstall the harness package.');
+    throw new SdlcError(
+      'missing_asset',
+      { key: 'error.harness_asset_not_found_x', params: { file: file } },
+      { key: 'fix.reinstall_the_harness_package' }
+    );
   }
   return text.replace(/\r\n?/g, '\n');
 }
@@ -68,7 +72,10 @@ export function loadWorkflow(id: WorkflowId): WorkflowTemplate {
   const { data, body } = splitFrontmatter(readAsset('workflows', `${id}.md`));
   const str = (key: string) => (typeof data[key] === 'string' ? (data[key] as string) : undefined);
   const description = str('description');
-  if (!description) throw new SdlcError('invalid_asset', `Workflow ${id} has no description.`);
+  if (!description) throw new SdlcError(
+    'invalid_asset',
+    { key: 'error.workflow_x_has_no_description', params: { id: id } }
+  );
   return {
     id,
     title: str('title') ?? `SDLC: ${id}`,

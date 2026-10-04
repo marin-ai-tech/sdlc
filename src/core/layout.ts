@@ -154,7 +154,7 @@ export const CONVERT_EXCLUDES: readonly string[] = ['openspec/', 'node_modules/'
 
 export function layoutRole(id: LayoutRoleId): LayoutRole {
   const role = LAYOUT_ROLES.find((r) => r.id === id);
-  if (!role) throw new SdlcError('unknown_layout_role', `Unknown layout role: ${id}`);
+  if (!role) throw new SdlcError('unknown_layout_role', { key: 'error.unknown_layout_role_x', params: { id: id } });
   return role;
 }
 
@@ -228,7 +228,7 @@ export interface TemplateContext {
 }
 
 function notImplemented(what: string): never {
-  throw new SdlcError('not_implemented', `${what} is not implemented yet.`);
+  throw new SdlcError('not_implemented', { key: 'error.x_is_not_implemented_yet', params: { what: what } });
 }
 
 /** Finds each role in `root`, honouring the `layout:` mapping. Read-only. */
@@ -285,12 +285,15 @@ export function renderLayoutTemplate(text: string, targetPath: string, ctx: Temp
       : 'Add verification commands to openspec/sdlc.yaml.';
     if (token.startsWith('path:')) {
       const id = token.slice(5) as LayoutRoleId;
-      if (!LAYOUT_ROLE_IDS.includes(id)) throw new SdlcError('unknown_layout_token', `Unknown layout token: ${token}`);
+      if (!LAYOUT_ROLE_IDS.includes(id)) throw new SdlcError(
+        'unknown_layout_token',
+        { key: 'error.unknown_layout_token_x', params: { token: token } }
+      );
       const destination = ctx.paths[id];
       const relative = path.posix.relative(path.posix.dirname(toPosix(targetPath)), destination.replace(/\/$/, ''));
       return relative + (destination.endsWith('/') ? '/' : '');
     }
-    throw new SdlcError('unknown_layout_token', `Unknown layout token: ${token}`);
+    throw new SdlcError('unknown_layout_token', { key: 'error.unknown_layout_token_x', params: { token: token } });
   });
 }
 
@@ -305,7 +308,10 @@ function writeMissing(root: string, config: SdlcConfig, opts: { dryRun?: boolean
   for (const role of LAYOUT_ROLES) {
     const rel = role.kind === 'dir' ? role.path + path.posix.basename(role.template) : role.path;
     const target = path.resolve(root, rel);
-    if (!isWithin(root, target)) throw new SdlcError('invalid_config', `Layout target outside project: ${rel}`);
+    if (!isWithin(root, target)) throw new SdlcError(
+      'invalid_config',
+      { key: 'error.layout_target_outside_project_x', params: { rel: rel } }
+    );
     const found = report.roles.find((r) => r.role === role.id)!;
     if (found.status !== 'missing') {
       if (found.status === 'canonical') kept.push(rel);

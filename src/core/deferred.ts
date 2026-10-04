@@ -49,7 +49,10 @@ export interface DeferredInput {
 }
 
 function oneLine(value: string, name: string): void {
-  if (!value.trim() || /[\r\n]/.test(value)) throw new SdlcError('invalid_option', `${name} must be one non-empty line.`);
+  if (!value.trim() || /[\r\n]/.test(value)) throw new SdlcError(
+    'invalid_option',
+    { key: 'error.x_must_be_one_non_empty_line', params: { name: name } }
+  );
 }
 
 /** Parses the registry text. Unknown statuses read as `open`; malformed headings are skipped. */
@@ -103,12 +106,18 @@ export function addDeferred(root: string, input: DeferredInput, now: Date = new 
  */
 export function closeDeferred(root: string, id: string, status: Exclude<DeferredStatus, 'open'>, note: string, now: Date = new Date()): DeferredItem {
   oneLine(note, 'note');
-  if (status !== 'done' && status !== 'dropped') throw new SdlcError('invalid_option', `Invalid deferred status: ${status}`);
+  if (status !== 'done' && status !== 'dropped') throw new SdlcError(
+    'invalid_option',
+    { key: 'error.invalid_deferred_status_x', params: { status: status } }
+  );
   const file = path.join(root, DEFERRED_PATH);
   const lines = (readText(file) ?? '').split(/\r?\n/);
   const item = parseDeferred(lines.join('\n')).find((entry) => entry.id === id);
-  if (!item) throw new SdlcError('unknown_deferred', `Unknown deferred item: ${id}`);
-  if (item.status !== 'open') throw new SdlcError('deferred_not_open', `${id} is not open.`);
+  if (!item) throw new SdlcError('unknown_deferred', { key: 'error.unknown_deferred_item_x', params: { id: id } });
+  if (item.status !== 'open') throw new SdlcError(
+    'deferred_not_open',
+    { key: 'error.x_is_not_open', params: { id: id } }
+  );
   lines[item.line - 1] = `### ${id} [${status}] ${item.title}`;
   let end = item.line;
   while (end < lines.length && !/^### /.test(lines[end])) end++;

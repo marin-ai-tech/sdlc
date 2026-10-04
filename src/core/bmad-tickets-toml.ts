@@ -9,7 +9,7 @@ export type TomlValue = string | number | boolean | TomlValue[] | { [key: string
 export type TomlTable = Record<string, TomlValue>;
 
 function err(file: string, line: number, detail: string): never {
-  throw new SdlcError('invalid_tickets', `${file}:${line}: ${detail}`);
+  throw new SdlcError('invalid_tickets', { key: 'error.x_x_x', params: { file: file, line: line, detail: detail } });
 }
 
 class Parser {

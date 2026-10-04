@@ -15,5 +15,8 @@
 ## Pressure test
 <!-- User, technical, cost, and risk assumptions; how each could fail. -->
 
+## Open questions
+<!-- Questions for the person, and assumptions made while they are unanswered. -->
+
 ## Recommendation
-<!-- Proceed, reshape, or stop; list open questions. -->
+<!-- Proceed, reshape, or stop, with reasons. -->

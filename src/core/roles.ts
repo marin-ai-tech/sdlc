@@ -26,6 +26,7 @@ import type { ChangeState } from './change-state.js';
 import { APPROVAL_GATES, type ApprovalGateId } from './config.js';
 import { SdlcError } from './errors.js';
 import { git, defaultBaseRef } from './git.js';
+import { t, type MessageParams, type MessageRef } from './i18n.js';
 
 export const ROLES_PATH = 'openspec/roles.yaml';
 export const SIGNING_MODES = ['off', 'warn', 'required'] as const;
@@ -67,8 +68,20 @@ export const DEFAULT_SEPARATION: SeparationRules = {
 export interface ApprovalCheck {
   allowed: boolean;
   person?: Person;
-  /** Rule ids that refuse approval; see the refusal messages for details. */
-  refusals: Array<{ rule: string; message: string }>;
+  /** Rule ids that refuse approval; `message` is English (JSON), `ref` renders it in the current locale. */
+  refusals: Refusal[];
+}
+
+export interface Refusal {
+  rule: string;
+  message: string;
+  ref: MessageRef;
+}
+
+/** A refusal whose English message comes from the same catalog key as its localized text. */
+function refusal(rule: string, params: MessageParams): Refusal {
+  const ref = { key: `roles.refusal.${rule}`, params };
+  return { rule, message: t(ref.key, params, 'en'), ref };
 }
 
 export interface ApprovalContext {
@@ -84,7 +97,7 @@ export interface ApprovalContext {
 }
 
 function invalid(file: string, field: string, detail: string): never {
-  throw new SdlcError('invalid_roles', `${file}: ${field}: ${detail}`);
+  throw new SdlcError('invalid_roles', { key: 'error.x_x_x_2', params: { file: file, field: field, detail: detail } });
 }
 
 function mapping(value: unknown, file: string, field: string): Record<string, unknown> {
@@ -197,27 +210,24 @@ export function personByEmail(roles: RolesFile, email: string): Person | undefin
 /** Applies the role and separation rules to one approval attempt. Pure. */
 export function checkApproval(roles: RolesFile, ctx: ApprovalContext): ApprovalCheck {
   const person = personByEmail(roles, ctx.email);
-  const refusals: ApprovalCheck['refusals'] = [];
+  const refusals: Refusal[] = [];
   if (!person) {
-    return { allowed: false, refusals: [{ rule: 'unknown_person', message: `${ctx.email} is not in roles.yaml.` }] };
+    return { allowed: false, refusals: [refusal('unknown_person', { email: ctx.email })] };
   }
   const holders = ctx.roles.flatMap((role) => roles.roles[role] ?? []);
   if (!holders.includes(person.id)) refusals.push(missingRole(roles, ctx, person, holders));
   if (roles.separation.authorCannotApprove.includes(ctx.gate) && owns(person, ctx.authors)) {
-    refusals.push({ rule: 'author_cannot_approve', message: `${person.name} authored code in this change.` });
+    refusals.push(refusal('author_cannot_approve', { name: person.name }));
   }
   for (const pair of roles.separation.distinctApprovers) {
     if (pair.includes(ctx.gate) && pair.some((gate) => gate !== ctx.gate && owns(person, ctx.approvals[gate] ?? []))) {
-      refusals.push({
-        rule: 'distinct_approvers',
-        message: `${person.name} already approved the paired gate ${pair.join('/')}.`,
-      });
+      refusals.push(refusal('distinct_approvers', { name: person.name, pair: pair.join('/') }));
     }
   }
   const count = Object.entries(ctx.approvals)
     .filter(([gate, emails]) => gate !== ctx.gate && owns(person, emails ?? [])).length;
   if (roles.separation.maxGatesPerPerson > 0 && count >= roles.separation.maxGatesPerPerson) {
-    refusals.push({ rule: 'max_gates_per_person', message: `${person.name} reached the gate approval limit.` });
+    refusals.push(refusal('max_gates_per_person', { name: person.name }));
   }
   return { allowed: refusals.length === 0, person, refusals };
 }
@@ -228,10 +238,10 @@ function owns(person: Person, emails: string[]): boolean {
 
 function missingRole(roles: RolesFile, ctx: ApprovalContext, person: Person, holders: string[]) {
   const names = [...new Set(holders)].map((id) => roles.people.find((candidate) => candidate.id === id)?.name ?? id);
-  return {
-    rule: 'missing_role',
-    message: `${person.name} does not hold ${ctx.roles.join(' or ')}; ask ${names.join(', ')}.`,
-  };
+  // `roles` reads "a or b" in English; other languages use `roleList` with their own wording.
+  return refusal('missing_role', {
+    name: person.name, roles: ctx.roles.join(' or '), roleList: ctx.roles.join(', '), holders: names.join(', '),
+  });
 }
 
 /**

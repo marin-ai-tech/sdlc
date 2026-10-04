@@ -1,3 +1,4 @@
+import { t, type Locale } from './i18n.js';
 import * as path from 'node:path';
 import type { SdlcConfig } from './config.js';
 import { readText } from './fs-utils.js';
@@ -129,28 +130,50 @@ export interface LicenseAssessment {
   fix?: string;
 }
 
-/** Whether the declared sdlc license plausibly fits the project, for `sdlc license` and `sdlc doctor`. */
-export function assessLicense(license: SdlcConfig['license'], detected: ProjectLicense | undefined): LicenseAssessment {
+/**
+ * Whether the declared sdlc license plausibly fits the project.
+ * Defaults to English so JSON payloads stay locale-stable; pass the UI locale
+ * when printing text.
+ */
+export function assessLicense(
+  license: SdlcConfig['license'],
+  detected: ProjectLicense | undefined,
+  locale: Locale = 'en',
+): LicenseAssessment {
   if (license.type === 'commercial') {
     return license.agreement
-      ? { status: 'ok', message: `commercial license, agreement ${license.agreement}${license.licensee ? ` (${license.licensee})` : ''}` }
+      ? {
+          status: 'ok',
+          message: t('license.assess.commercialOk', {
+            agreement: license.agreement,
+            licensee: license.licensee
+              ? t('license.assess.licenseePart', { licensee: license.licensee }, locale)
+              : '',
+          }, locale),
+        }
       : {
           status: 'warn',
-          message: 'commercial license declared without an agreement id',
-          fix: 'sdlc license set commercial --agreement <id> --licensee "<company>"',
+          message: t('license.assess.commercialNoAgreement', undefined, locale),
+          fix: t('license.assess.commercialFix', undefined, locale),
         };
   }
   if (detected?.osi) {
     return {
       status: 'ok',
-      message: `community license; the project declares ${detected.id} (${detected.source}), an OSI-approved license, so the open source permission applies while its complete source is public`,
+      message: t('license.assess.communityOsi', {
+        id: detected.id,
+        source: detected.source,
+      }, locale),
     };
   }
   return {
     status: 'warn',
     message: detected
-      ? `community license, but the project's license ${detected.id} (${detected.source}) is not OSI-approved`
-      : 'community license, but the project declares no OSI-approved license',
-    fix: 'The Community License covers noncommercial use, public open source projects and a 30-day evaluation; other commercial use needs a commercial license (COMMERCIAL-LICENSE.md). Record one with `sdlc license set commercial --agreement <id>`.',
+      ? t('license.assess.communityNotOsi', {
+        id: detected.id,
+        source: detected.source,
+      }, locale)
+      : t('license.assess.communityNoOsi', undefined, locale),
+    fix: t('license.assess.communityFix', undefined, locale),
   };
 }

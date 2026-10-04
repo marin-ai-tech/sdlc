@@ -24,7 +24,7 @@
  *   (confirm, default no). The summary lists the install commands and the index choice. With no dependencies in
  *   the defaults (or all found and indexed) nothing extra is asked.
  *   In setup.ts the installs run after the settings are written, through `deps.installer` (default
- *   defaultInstaller): each chosen install, then CODEGRAPH_INDEX in the root when `index` is chosen. A failed
+ *   defaultInstaller): each chosen install, then codegraphIndexCommand(tools) in the root when `index` is chosen. A failed
  *   command prints a warning with the command to run by hand; init still succeeds. Non-interactive runs never
  *   probe or install. `InitDeps` gains `probe?: Probe` and `installer?: Installer`.
  * - `initCommand(target, opts, deps)` in setup.ts asks before any file is written; a declined summary prints

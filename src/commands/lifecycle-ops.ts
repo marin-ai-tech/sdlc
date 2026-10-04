@@ -1,3 +1,4 @@
+import { t } from '../core/i18n.js';
 import * as path from 'node:path';
 import { createInterface } from 'node:readline/promises';
 import { loadProject, type ProjectContext } from '../cli/context.js';
@@ -13,7 +14,7 @@ import { evaluateChange } from '../core/lifecycle.js';
 import { openspecFailure, runOpenSpecJson } from '../core/openspec.js';
 import { readOpenSpecMetadata } from '../core/openspec-schema.js';
 import { isFile, readText, writeTextAtomic } from '../core/fs-utils.js';
-import { stampText } from '../core/license.js';
+import { stampText, stampTextLocalized } from '../core/license.js';
 import { appendLog, readLog } from '../core/log.js';
 import { changeMarkdown, tryStampArtifacts } from '../core/stamp.js';
 import { aggregateMetrics, changeMetrics } from '../core/metrics.js';
@@ -26,6 +27,7 @@ interface ValidationIssue {
   path?: string;
   line?: number;
   message: string;
+  textKey?: string;
 }
 
 interface OpenSpecValidateItem {
@@ -39,7 +41,11 @@ function validateOne(ctx: ProjectContext, ref: ChangeRef): { change: string; val
   const deltas = readChangeDeltas(ref.dir);
   const skipSpecs = readOpenSpecMetadata(ref.dir).skip_specs === true;
   if (deltas.length === 0 && !skipSpecs) {
-    issues.push({ source: 'sdlc', level: 'info', message: 'No delta specs yet; OpenSpec validation runs once specs/ exists (or set skip_specs for no-behavior changes).' });
+    issues.push({
+      source: 'sdlc', level: 'info',
+      message: t('validate.noDeltaSpecs', undefined, 'en'),
+      textKey: 'validate.noDeltaSpecs',
+    });
   } else {
     const result = runOpenSpecJson<{ items?: OpenSpecValidateItem[] }>(['validate', ref.id, '--type', 'change', '--strict', '--no-interactive'], ctx.root);
     const item = result.data?.items?.[0];
@@ -51,7 +57,11 @@ function validateOne(ctx: ProjectContext, ref: ChangeRef): { change: string; val
         issues.push({ source: 'openspec', level, ...(i.path ? { path: i.path } : {}), ...(i.line ? { line: i.line } : {}), message: i.message });
       }
       if (!item.valid && !item.issues.some((i) => i.level.toLowerCase() === 'error')) {
-        issues.push({ source: 'openspec', level: 'error', message: 'OpenSpec reports the change as invalid.' });
+        issues.push({
+          source: 'openspec', level: 'error',
+          message: t('validate.openspecInvalid', undefined, 'en'),
+          textKey: 'validate.openspecInvalid',
+        });
       }
     }
     issues.push(...checkDeltaTargets(ctx.paths, deltas).map((i: DeltaIssue) => ({ source: 'sdlc' as const, level: i.level, path: i.file, line: i.line, message: i.message })));
@@ -70,19 +80,36 @@ export async function validateCommand(opts: { change?: string; all?: boolean; js
       .filter((o) => o.changes.some((ch) => refs.some((r) => r.id === ch.change)));
     const failed = items.filter((i) => !i.valid).length;
     if (opts.json) {
-      printJson({ items, overlaps, summary: { total: items.length, valid: items.length - failed, invalid: failed } });
+      printJson({
+        items: items.map((item) => ({
+          change: item.change,
+          valid: item.valid,
+          issues: item.issues.map(({ source, level, path: p, line: ln, message }) => ({
+            source, level, ...(p ? { path: p } : {}), ...(ln ? { line: ln } : {}), message,
+          })),
+        })),
+        overlaps,
+        summary: { total: items.length, valid: items.length - failed, invalid: failed },
+      });
     } else {
       for (const item of items) {
         line(`${item.valid ? c.green('✓') : c.red('✗')} ${item.change}`);
         for (const i of item.issues) {
-          const tag = i.level === 'error' ? c.red('error') : i.level === 'warning' ? c.yellow('warning') : c.dim('info');
-          line(`    ${tag} ${c.dim(`[${i.source}]`)} ${i.path ? `${i.path}${i.line ? `:${i.line}` : ''}: ` : ''}${i.message}`);
+          const tag = i.level === 'error' ? c.red(t('label.error'))
+            : i.level === 'warning' ? c.yellow(t('label.warning'))
+              : c.dim(t('label.info'));
+          const msg = i.textKey ? t(i.textKey) : i.message;
+          const loc = i.path ? `${i.path}${i.line ? `:${i.line}` : ''}: ` : '';
+          line(`    ${tag} ${c.dim(`[${i.source}]`)} ${loc}${msg}`);
         }
       }
       for (const o of overlaps) {
-        warn(`"${o.requirement}" (${o.capability}) is changed by ${o.changes.map((x) => `${x.change}:${x.op}`).join(', ')} - reconcile before archiving the second one.`);
+        warn(t('warn.archiveOverlap', {
+          requirement: o.requirement, capability: o.capability,
+          changes: o.changes.map((x) => `${x.change}:${x.op}`).join(', '),
+        }));
       }
-      if (items.length === 0) line('No active changes to validate.');
+      if (items.length === 0) line(t('validate.none'));
     }
     if (failed > 0) process.exitCode = 1;
   } catch (error) {
@@ -116,26 +143,35 @@ export async function archiveCommand(id: string | undefined, opts: ArchiveOption
     const open = view.gates.filter((g) => g.required && !g.satisfied);
     if (open.length > 0 && !opts.force) {
       throw new SdlcError(
-        'gates_not_satisfied',
-        `Cannot archive ${ref.id}: ${open.map((g) => `${g.id} (${g.status}${g.reason ? `: ${g.reason}` : ''})`).join('; ')}.`,
-        view.next.cli ? `Next: ${view.next.cli}` : `Next: ${view.next.message}`
-      );
+      'gates_not_satisfied',
+      { key: 'error.cannot_archive_x_x', params: { ref_id: ref.id, p2: open.map((g) => `${g.id} (${g.status}${g.reason ? `: ${g.reason}` : ''})`).join('; ') } },
+      { key: 'fix.next_x', params: { detail: view.next.cli ?? view.next.message } }
+    );
     }
     if (opts.force) {
       const agent = agentEnvironment();
       if (agent && ctx.config.enforcement.forbidAgentApprovals) {
-        throw new SdlcError('agent_cannot_force', 'Archiving past unsatisfied gates is a human decision and cannot run in an agent session.');
+        throw new SdlcError('agent_cannot_force', { key: 'error.archiving_past_unsatisfied_gates_is_a_human_deci' });
       }
-      if (open.length > 0 && !opts.note) throw new SdlcError('note_required', '--force past open gates needs --note "<why>" for the audit trail.');
+      if (open.length > 0 && !opts.note) throw new SdlcError(
+        'note_required',
+        { key: 'error.force_past_open_gates_needs_note_why_for_the_aud' }
+      );
     }
     const deltaErrors = checkDeltaTargets(ctx.paths, readChangeDeltas(ref.dir)).filter((i) => i.level === 'error');
     if (deltaErrors.length > 0 && !opts.skipSpecs) {
-      throw new SdlcError('delta_check_failed',
-        `Delta specs of ${ref.id} do not match the living specs: ${deltaErrors.map((e) => `${e.file}:${e.line} ${e.message}`).join(' | ')}`,
-        'Fix the delta headers (run `sdlc validate --change ' + ref.id + '`), then archive again.');
+      throw new SdlcError(
+      'delta_check_failed',
+      { key: 'error.delta_specs_of_x_do_not_match_the_living_specs_x', params: { ref_id: ref.id, p2: deltaErrors.map((e) => `${e.file}:${e.line} ${e.message}`).join(' | ') } },
+      { key: 'fix.fix_the_delta_headers_run_sdlc_validate_change_x', params: { ref_id: ref.id } }
+    );
     }
     if (!opts.yes && !(await confirm(`Archive ${ref.id} and merge its delta specs into openspec/specs?`))) {
-      throw new SdlcError('archive_confirmation_required', 'Archive needs confirmation.', `Re-run with --yes: sdlc archive ${ref.id} --yes`);
+      throw new SdlcError(
+      'archive_confirmation_required',
+      { key: 'error.archive_needs_confirmation' },
+      { key: 'fix.re_run_with_yes_sdlc_archive_x_yes', params: { ref_id: ref.id } }
+    );
     }
 
     const before = readChangeState(ref.dir);
@@ -146,7 +182,7 @@ export async function archiveCommand(id: string | undefined, opts: ArchiveOption
     // Every artifact that goes into the archive records the sdlc version and license that archived it.
     const originals = new Map(changeMarkdown(ref.dir).map((f) => [f, readText(path.join(ref.dir, f)) ?? '']));
     const stamping = tryStampArtifacts(ref.dir, [...originals.keys()], ctx.stamp);
-    if (stamping.error && !opts.json) warn(`provenance lines were not written: ${stamping.error}`);
+    if (stamping.error && !opts.json) warn(t('warn.provenanceNotWritten', { error: stamping.error }));
     appendHistory(state, event, by, detail, ctx.stamp);
     writeChangeState(ref.dir, state, ctx.stamp);
 
@@ -159,7 +195,10 @@ export async function archiveCommand(id: string | undefined, opts: ArchiveOption
         const target = path.join(ref.dir, file);
         if (isFile(target) && readText(target) !== content) writeTextAtomic(target, content);
       }
-      throw new SdlcError('openspec_archive_failed', `openspec archive failed: ${openspecFailure(result.data, result.raw)}`);
+      throw new SdlcError(
+      'openspec_archive_failed',
+      { key: 'error.openspec_archive_failed_x', params: { p1: openspecFailure(result.data, result.raw) } }
+    );
     }
     const archive = result.data.archive;
     appendLog(ctx.root, ctx.config, {
@@ -186,10 +225,15 @@ export async function archiveCommand(id: string | undefined, opts: ArchiveOption
       printJson({ archive: { change: ref.id, ...archive, forced: open.length > 0 }, root: { path: ctx.root }, harness: ctx.stamp, ...(next ? { next } : {}) });
       return;
     }
-    line(`${c.green('✓')} archived ${ref.id} → ${path.relative(ctx.root, archive.path)}`);
+    line(c.green(t('archive.done', {
+      change: ref.id, path: path.relative(ctx.root, archive.path),
+    })));
     if (archive.totals) {
-      const t = archive.totals;
-      line(`  specs: +${t.added ?? 0} added, ~${t.modified ?? 0} modified, -${t.removed ?? 0} removed, ${t.renamed ?? 0} renamed`);
+      const totals = archive.totals;
+      line(`  ${t('archive.specs', {
+        added: totals.added ?? 0, modified: totals.modified ?? 0,
+        removed: totals.removed ?? 0, renamed: totals.renamed ?? 0,
+      })}`);
     }
     for (const w of archive.warnings ?? []) warn(w);
     emitNextHint(ctx);
@@ -220,18 +264,27 @@ export async function auditCommand(opts: { change?: string; json?: boolean }): P
           ...(state.harness ? { recordedWith: state.harness } : {}), history: state.history, commits, metrics, harness: ctx.stamp });
         return;
       }
-      line(c.bold(`Audit trail: ${ref.id}`) + c.dim(` [${state.kind} · risk ${state.risk} · ${state.track}]`));
+      line(c.bold(t('audit.trail', { change: ref.id }))
+        + c.dim(t('audit.meta', { kind: state.kind, risk: state.risk, track: state.track })));
       for (const h of state.history) {
         line(`  ${h.at}  ${h.event.padEnd(26)} ${h.by ?? ''}${h.detail ? c.dim(` - ${h.detail}`) : ''}${stampSuffix(h)}`);
       }
       if (commits.length > 0) {
-        line(c.bold('  commits touching the change folder'));
+        line(c.bold(`  ${t('audit.commits')}`));
         for (const cm of commits) line(`  ${cm.date}  ${cm.sha.slice(0, 10)}  ${cm.author}  ${cm.subject}`);
       }
       const lt = metrics.leadTimeHours;
-      line(c.bold('  lead times (hours)'));
-      line(`  intent→spec ${lt.intentToSpecApproval ?? '-'} · spec→plan ${lt.specToPlanApproval ?? '-'} · plan→verified ${lt.planToVerified ?? '-'} · verified→review ${lt.verifiedToReviewApproval ?? '-'} · total ${lt.createdToArchived ?? '-'}`);
-      line(`  verify runs ${metrics.verifyRuns}${metrics.verifyFirstPass === undefined ? '' : `, first run ${metrics.verifyFirstPass ? 'passed' : 'failed'}`}; rejections ${metrics.rejections}; waivers ${metrics.waivers}`);
+      line(c.bold(`  ${t('audit.leadTimes')}`));
+      line(`  ${t('audit.leadLine', {
+        a: lt.intentToSpecApproval ?? '-', b: lt.specToPlanApproval ?? '-',
+        c: lt.planToVerified ?? '-', d: lt.verifiedToReviewApproval ?? '-',
+        e: lt.createdToArchived ?? '-',
+      })}`);
+      const first = metrics.verifyFirstPass === undefined ? ''
+        : metrics.verifyFirstPass ? t('audit.firstPassed') : t('audit.firstFailed');
+      line(`  ${t('audit.verifyRuns', {
+        runs: metrics.verifyRuns, first, rejections: metrics.rejections, waivers: metrics.waivers,
+      })}`);
       return;
     }
     const refs = [...listActiveChanges(ctx.paths), ...listArchivedChanges(ctx.paths)];
@@ -253,12 +306,24 @@ export async function auditCommand(opts: { change?: string; json?: boolean }): P
       recordedWith: { versions: [...versions].sort(), licenses: [...licenses].sort() },
     };
     if (opts.json) return printJson({ aggregate, changes: rows, harness: ctx.stamp });
-    line(c.bold(`SDLC metrics across ${aggregate.changes} change(s) (${aggregate.archived} archived)`) + c.dim(` · ${stampText(ctx.stamp)}`));
+    line(c.bold(t('audit.metrics', {
+      changes: aggregate.changes, archived: aggregate.archived,
+    })) + c.dim(` · ${stampTextLocalized(ctx.stamp)}`));
     const m = aggregate.medianLeadTimeHours;
-    line(`  median hours: intent→spec ${m.intentToSpecApproval ?? '-'} · spec→plan ${m.specToPlanApproval ?? '-'} · plan→verified ${m.planToVerified ?? '-'} · verified→review ${m.verifiedToReviewApproval ?? '-'} · total ${m.createdToArchived ?? '-'}`);
-    line(`  verification first-pass rate: ${aggregate.verifyFirstPassRate ?? '-'}; rejections ${aggregate.rejections}; waivers ${aggregate.waivers}`);
+    line(`  ${t('audit.medianHours', {
+      a: m.intentToSpecApproval ?? '-', b: m.specToPlanApproval ?? '-',
+      c: m.planToVerified ?? '-', d: m.verifiedToReviewApproval ?? '-',
+      e: m.createdToArchived ?? '-',
+    })}`);
+    line(`  ${t('audit.firstPassRate', {
+      rate: aggregate.verifyFirstPassRate ?? '-',
+      rejections: aggregate.rejections, waivers: aggregate.waivers,
+    })}`);
     if (versions.size > 0) {
-      line(`  recorded with sdlc ${[...versions].sort().join(', ')}; licenses: ${[...licenses].sort().join('; ')}`);
+      line(`  ${t('audit.recordedWith', {
+        versions: [...versions].sort().join(', '),
+        licenses: [...licenses].sort().join('; '),
+      })}`);
     }
   } catch (error) {
     reportFailure(error, opts.json);
@@ -270,17 +335,20 @@ export async function logCommand(opts: { change?: string; limit?: string; json?:
   try {
     const ctx = loadProject();
     const limit = opts.limit === undefined ? 50 : Number(opts.limit);
-    if (!Number.isInteger(limit) || limit <= 0) throw new SdlcError('invalid_option', '--limit must be a positive whole number.');
+    if (!Number.isInteger(limit) || limit <= 0) throw new SdlcError(
+      'invalid_option',
+      { key: 'error.limit_must_be_a_positive_whole_number' }
+    );
     const entries = readLog(ctx.root).filter((e) => !opts.change || e.change === opts.change);
     const shown = entries.slice(-limit);
     if (opts.json) return printJson({ entries: shown, total: entries.length, harness: ctx.stamp });
     if (entries.length === 0) {
-      line(ctx.config.log.enabled
-        ? 'The project log is empty.'
-        : 'The project log is off (log.enabled in openspec/sdlc.yaml).');
+      line(ctx.config.log.enabled ? t('log.empty') : t('log.off'));
       return;
     }
-    if (shown.length < entries.length) line(c.dim(`(last ${shown.length} of ${entries.length} entries; --limit to see more)`));
+    if (shown.length < entries.length) {
+      line(c.dim(t('log.truncated', { shown: shown.length, total: entries.length })));
+    }
     for (const e of shown) {
       const who = e.by ?? (e.agent ? `agent:${e.agent}` : '');
       line(`${e.ts}  ${e.event.padEnd(26)} ${e.change ? `${e.change} ` : ''}${who}${e.detail ? c.dim(` - ${e.detail}`) : ''}` +

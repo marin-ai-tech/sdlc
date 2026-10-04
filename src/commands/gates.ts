@@ -1,3 +1,4 @@
+import { t } from '../core/i18n.js';
 import { loadProject, recordChangeEvent } from '../cli/context.js';
 import { c, line, printJson, reportFailure, warn } from '../cli/output.js';
 import { emitNextHint, resolveNext } from '../cli/next-hint.js';
@@ -22,8 +23,8 @@ export function assertHuman(config: SdlcConfig, action: string): void {
   if (agent && config.enforcement.forbidAgentApprovals) {
     throw new SdlcError(
       'agent_cannot_approve',
-      `\`sdlc ${action}\` records a human decision and cannot run inside an agent session (${agent}).`,
-      'Run it yourself in a terminal outside the agent.'
+      { key: 'error.sdlc_x_records_a_human_decision_and_cannot_run_i', params: { action: action, agent: agent } },
+      { key: 'fix.run_it_yourself_in_a_terminal_outside_the_agent' }
     );
   }
 }
@@ -31,8 +32,11 @@ export function assertHuman(config: SdlcConfig, action: string): void {
 function resolveIdentity(root: string, by: string | undefined): string {
   const identity = by ?? formatIdentity(gitIdentity(root));
   if (!identity) {
-    throw new SdlcError('no_identity', 'Cannot tell who is deciding: git user.name/user.email are not set.',
-      'Set them with `git config user.email you@example.com`, or pass --by "<name <email>>".');
+    throw new SdlcError(
+      'no_identity',
+      { key: 'error.cannot_tell_who_is_deciding_git_user_name_user_e' },
+      { key: 'fix.set_them_with_git_config_user_email_you_example_' }
+    );
   }
   return identity;
 }
@@ -43,8 +47,11 @@ function assertRoleMember(config: SdlcConfig, role: string, identity: string): v
   const lower = identity.toLowerCase();
   const ok = members.some((m) => lower.includes(m.toLowerCase()));
   if (!ok) {
-    throw new SdlcError('not_in_role', `${identity} is not listed under roles.${role} in openspec/sdlc.yaml.`,
-      `Ask one of: ${members.join(', ')}.`);
+    throw new SdlcError(
+      'not_in_role',
+      { key: 'error.x_is_not_listed_under_roles_x_in_openspec_sdlc_y', params: { identity: identity, role: role } },
+      { key: 'fix.ask_one_of_x', params: { p1: members.join(', ') } }
+    );
   }
 }
 
@@ -60,13 +67,19 @@ function roleDecision(root: string, config: SdlcConfig, roles: RolesFile, gate: 
   const check = checkApproval(roles, { gate, roles: requested ? [requested] : accepted, email, authors,
     approvals });
   if (requested && !accepted.includes(requested)) {
-    throw new SdlcError('missing_role', `Role ${requested} cannot approve ${gate}.`);
+    throw new SdlcError(
+      'missing_role',
+      { key: 'error.role_x_cannot_approve_x', params: { requested: requested, gate: gate } }
+    );
   }
   if (!check.allowed) {
     const eligible = roles.people.filter((person) => checkApproval(roles, { gate, roles: accepted,
       email: person.emails[0], authors, approvals }).allowed).map((person) => person.name);
-    throw new SdlcError(check.refusals[0].rule, check.refusals.map((r) => r.message).join(' '),
-      `Ask one of: ${eligible.join(', ') || 'no eligible people'}.`);
+    throw new SdlcError(
+      check.refusals[0].rule,
+      { key: 'error.refusal_detail', params: { detail: check.refusals.map((r) => r.ref) } },
+      { key: 'fix.ask_one_of_x', params: { p1: eligible.length ? eligible.join(', ') : { key: 'roles.noEligible' } } }
+    );
   }
   return { role, person: check.person!.id };
 }
@@ -74,21 +87,24 @@ function roleDecision(root: string, config: SdlcConfig, roles: RolesFile, gate: 
 function approvalIdentity(root: string, roles: RolesFile | undefined, by: string | undefined): string {
   if (!roles) return resolveIdentity(root, by);
   const email = gitIdentity(root).email;
-  if (!email) throw new SdlcError('no_identity', 'Git user.email is required with roles.yaml.');
+  if (!email) throw new SdlcError('no_identity', { key: 'error.git_user_email_is_required_with_roles_yaml' });
   if (by) {
     const claimed = /<([^>]+)>/.exec(by)?.[1] ?? by;
     if (claimed.toLowerCase() !== email.toLowerCase()) {
-      throw new SdlcError('by_mismatch', '--by email must match git user.email.');
+      throw new SdlcError('by_mismatch', { key: 'error.by_email_must_match_git_user_email' });
     }
   }
   const person = roles.people.find((candidate) => candidate.emails.includes(email.toLowerCase()));
-  if (!person) throw new SdlcError('unknown_person', `${email} is not in roles.yaml.`);
+  if (!person) throw new SdlcError('unknown_person', { key: 'error.x_is_not_in_roles_yaml', params: { email: email } });
   return `${person.name} <${email}>`;
 }
 
 function parseGate(value: string, allowed: readonly string[]): GateId {
   if (!allowed.includes(value)) {
-    throw new SdlcError('invalid_gate', `Unknown gate '${value}'. Gates: ${allowed.join(', ')}.`);
+    throw new SdlcError(
+      'invalid_gate',
+      { key: 'error.unknown_gate_x_gates_x', params: { value: value, p2: allowed.join(', ') } }
+    );
   }
   return value as GateId;
 }
@@ -121,8 +137,10 @@ function approvalRole(
   const suggested = missing.map((value) => value.split(' | ')[0]).find((value) => allowed.includes(value));
   const role = decided?.role ?? requested ?? suggested ?? gateConfig.approvers[0] ?? 'approver';
   if (allowed.length && !allowed.includes(role)) {
-    throw new SdlcError('invalid_role',
-      `Role '${role}' does not approve the ${gate} gate (roles: ${allowed.join(', ')}).`);
+    throw new SdlcError(
+      'invalid_role',
+      { key: 'error.role_x_does_not_approve_the_x_gate_roles_x', params: { role: role, gate: gate, p3: allowed.join(', ') } }
+    );
   }
   return { role, person: decided?.person };
 }
@@ -136,10 +154,16 @@ export async function approveCommand(gateArg: string, opts: DecisionOptions): Pr
     const view = evaluateChange(ctx.root, ref, ctx.config);
     const evaluation = view.gates.find((g) => g.id === gate)!;
     if (evaluation.status === 'blocked') {
-      throw new SdlcError('gate_blocked', `The ${gate} gate cannot be approved yet: ${evaluation.reason}.`);
+      throw new SdlcError(
+      'gate_blocked',
+      { key: 'error.the_x_gate_cannot_be_approved_yet_x', params: { gate: gate, evaluation_reason: evaluation.reason ?? '' } }
+    );
     }
     if (!evaluation.digest) {
-      throw new SdlcError('gate_not_ready', `Nothing to approve for the ${gate} gate yet.`);
+      throw new SdlcError(
+        'gate_not_ready',
+        { key: 'error.nothing_to_approve_for_the_x_gate_yet', params: { gate: gate } }
+      );
     }
     const roles = readRolesFile(ctx.root);
     const state = readChangeState(ref.dir);
@@ -168,7 +192,7 @@ export async function approveCommand(gateArg: string, opts: DecisionOptions): Pr
     // The approved artifacts record which sdlc version and license approved them.
     const stamping = tryStampArtifacts(ref.dir, approvedFiles(view, gate, ref.dir), ctx.stamp);
     if (stamping.error && !opts.json) {
-      warn(`approval recorded, but the provenance line was not written: ${stamping.error}`);
+      warn(t('warn.approvalProvenance', { error: stamping.error }));
     }
 
     const after = evaluateChange(ctx.root, ref, ctx.config);
@@ -181,9 +205,11 @@ export async function approveCommand(gateArg: string, opts: DecisionOptions): Pr
       });
       return;
     }
-    line(`${c.green('✓')} ${gate} gate: ${identity} approved as ${role} `
+    line(`${c.green(t('gate.approvedLine', { gate, identity, role }))} `
       + c.dim(`(${evaluation.digest.slice(7, 19)})`));
-    if (status.status !== 'approved') line(`  still needed: ${status.missingRoles.join(', ')}`);
+    if (status.status !== 'approved') {
+      line(`  ${t('gate.stillNeeded', { roles: status.missingRoles.join(', ') })}`);
+    }
     emitNextHint(ctx, ref.id);
   } catch (error) {
     reportFailure(error, opts.json);
@@ -196,7 +222,7 @@ export async function rejectCommand(gateArg: string, opts: DecisionOptions): Pro
     const gate = parseGate(gateArg, APPROVAL_GATES) as ApprovalGateId;
     assertHuman(ctx.config, 'reject');
     if (!opts.note) {
-      throw new SdlcError('note_required', 'A rejection needs --note "<why>" so the author knows what to change.');
+      throw new SdlcError('note_required', { key: 'error.a_rejection_needs_note_why_so_the_author_knows_w' });
     }
     const ref = resolveChange(ctx.paths, opts.change);
     const state = readChangeState(ref.dir);
@@ -219,7 +245,7 @@ export async function rejectCommand(gateArg: string, opts: DecisionOptions): Pro
       printJson({ change: ref.id, gate, status: 'rejected', by: identity, note: opts.note, ...(next ? { next } : {}) });
       return;
     }
-    line(`${c.red('✗')} ${gate} gate rejected by ${identity}: ${opts.note}`);
+    line(c.red(t('gate.rejectedLine', { gate, identity, note: opts.note })));
     emitNextHint(ctx, ref.id);
   } catch (error) {
     reportFailure(error, opts.json);
@@ -232,7 +258,7 @@ export async function waiveCommand(gateArg: string, opts: DecisionOptions): Prom
     const gate = parseGate(gateArg, ALL_GATES);
     assertHuman(ctx.config, 'waive');
     if (!opts.note) {
-      throw new SdlcError('note_required', 'A waiver needs --note "<why>"; it is part of the audit trail.');
+      throw new SdlcError('note_required', { key: 'error.a_waiver_needs_note_why_it_is_part_of_the_audit_' });
     }
     const ref = resolveChange(ctx.paths, opts.change);
     const state = readChangeState(ref.dir);
@@ -252,7 +278,7 @@ export async function waiveCommand(gateArg: string, opts: DecisionOptions): Prom
       printJson({ change: ref.id, gate, status: 'waived', by: identity, note: opts.note, ...(next ? { next } : {}) });
       return;
     }
-    line(`${c.yellow('~')} ${gate} gate waived by ${identity}: ${opts.note}`);
+    line(c.yellow(t('gate.waivedLine', { gate, identity, note: opts.note })));
     emitNextHint(ctx, ref.id);
   } catch (error) {
     reportFailure(error, opts.json);
@@ -269,7 +295,7 @@ export async function testsCommand(
 ): Promise<void> {
   try {
     if (action !== 'lock' && action !== 'unlock') {
-      throw new SdlcError('invalid_action', 'Use `sdlc tests lock` or `sdlc tests unlock`.');
+      throw new SdlcError('invalid_action', { key: 'error.use_sdlc_tests_lock_or_sdlc_tests_unlock' });
     }
     const ctx = loadProject();
     if (action === 'unlock') assertHuman(ctx.config, 'tests unlock');
@@ -280,9 +306,8 @@ export async function testsCommand(
     recordChangeEvent(ctx, ref, state, `tests.${action}ed`, identity);
     if (opts.json) return printJson({ change: ref.id, testsLocked: state.tests_locked });
     line(action === 'lock'
-      ? `${c.green('✓')} tests locked for ${ref.id}: edits to test files (enforcement.test_paths) `
-        + `are blocked until a person runs \`sdlc tests unlock --change ${ref.id}\`.`
-      : `${c.green('✓')} tests unlocked for ${ref.id}.`);
+      ? c.green(t('tests.locked', { change: ref.id }))
+      : c.green(t('tests.unlocked', { change: ref.id })));
   } catch (error) {
     reportFailure(error, opts.json);
   }

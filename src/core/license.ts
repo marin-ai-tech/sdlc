@@ -1,3 +1,4 @@
+import { t } from './i18n.js';
 import type { LicenseType, SdlcConfig } from './config.js';
 import { harnessVersion } from './version.js';
 
@@ -90,6 +91,11 @@ export function harnessStamp(config: Pick<SdlcConfig, 'license'>, version = harn
 
 export function stampText(stamp: HarnessStamp): string {
   return `sdlc ${stamp.version}, license: ${stamp.license}`;
+}
+
+/** People-facing stamp line; records and JSON keep stampText (English). */
+export function stampTextLocalized(stamp: HarnessStamp): string {
+  return t('stamp.line', { version: stamp.version, license: stamp.license });
 }
 
 // --- Provenance in change artifacts -----------------------------------------

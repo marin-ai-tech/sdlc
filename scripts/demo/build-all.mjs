@@ -34,7 +34,7 @@ function run(cmd, args, env = {}, shell = false) {
 
 function scenario(deck) {
   fs.mkdirSync(path.dirname(deck.transcript), { recursive: true });
-  const env = { SDLC_DEMO_TRANSCRIPT: deck.transcript, SDLC_DEMO_PEOPLE: deck.lang };
+  const env = { SDLC_DEMO_TRANSCRIPT: deck.transcript, SDLC_DEMO_PEOPLE: deck.lang, SDLC_DEMO_LOCALE: deck.lang };
   // A deck from a red run would show failures as the product's behaviour: stop instead.
   const code = run('npx', ['vitest', 'run', 'test/e2e-calculator.test.ts'], env, true);
   if (code !== 0) process.exit(code);

@@ -164,7 +164,10 @@ export function readChangeState(changeDir: string): ChangeState {
   if (!isFile(file)) return { ...newChangeState(), created: '' };
   const raw = renameLegacyKeys(readYamlObject(file) ?? {}) as Record<string, unknown>;
   if (raw.version !== undefined && raw.version !== 1) {
-    throw new SdlcError('unsupported_state_version', `${file} has unsupported version ${String(raw.version)}.`);
+    throw new SdlcError(
+      'unsupported_state_version',
+      { key: 'error.x_has_unsupported_version_x', params: { file: file, p2: String(raw.version) } }
+    );
   }
   const gates = (raw.gates && typeof raw.gates === 'object' ? raw.gates : {}) as ChangeState['gates'];
   const source = raw.source && typeof raw.source === 'object' ? (raw.source as Record<string, unknown>) : undefined;

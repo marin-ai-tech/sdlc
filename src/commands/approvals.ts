@@ -11,6 +11,7 @@ import {
   allowedSigners, parseRolesFile, personByEmail, readRolesFile, ROLES_PATH,
   SIGNING_MODES, type RolesFile, type SigningMode,
 } from '../core/roles.js';
+import { t } from '../core/i18n.js';
 
 type Status = 'valid' | 'unsigned' | 'wrong-signer' | 'bad-signature' | 'not-committed' | 'not-maintainer';
 interface Result { status: Status; commit?: string; signer?: string }
@@ -86,15 +87,14 @@ function printResults(results: ReturnType<typeof verify>, mode: string): void {
   for (const result of results) {
     const subject = result.file ?? `${result.change}/${result.gate}`;
     const mark = result.status === 'valid' ? '✓' : '✗';
-    line(`${mark} ${subject} ${result.person ?? result.by} ${result.status} ${result.commit?.slice(0, 8) ?? '-'}`);
+    const status = t(`approvals.status.${result.status}`);
+    line(`${mark} ${subject} ${result.person ?? result.by} ${status} ${result.commit?.slice(0, 8) ?? '-'}`);
   }
   const approvals = results.filter((result) => result.change).length;
   const failures = results.filter((result) => result.status !== 'valid');
-  const blocking = mode === 'warn' ? ' (warn: not blocking)' : '';
-  line(`${approvals} approvals checked, ${failures.length} invalid${blocking}`);
-  if (failures.length) {
-    line('Sign commits: git config gpg.format ssh; git config user.signingkey <key>; git commit -S');
-  }
+  const blocking = mode === 'warn' ? t('approvals.warnNotBlocking') : '';
+  line(t('approvals.summary', { approvals, invalid: failures.length, blocking }));
+  if (failures.length) line(t('approvals.signHint'));
 }
 
 export function approvalsVerify(opts: { mode?: string; json?: boolean }): void {
@@ -103,11 +103,11 @@ export function approvalsVerify(opts: { mode?: string; json?: boolean }): void {
     const roles = readRolesFile(ctx.root);
     const mode = opts.mode ?? roles?.signing ?? 'off';
     if (!SIGNING_MODES.includes(mode as SigningMode)) {
-      throw new SdlcError('invalid_mode', `Unknown signing mode ${mode}.`);
+      throw new SdlcError('invalid_mode', { key: 'error.unknown_signing_mode_x', params: { mode: mode } });
     }
     if (mode === 'off' || !roles) {
       if (opts.json) printJson({ mode, ok: true, results: [] });
-      else line('Approval signing is off.');
+      else line(t('approvals.off'));
       return;
     }
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'sdlc-signers-'));

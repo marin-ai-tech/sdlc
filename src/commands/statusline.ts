@@ -1,4 +1,5 @@
 import { listActiveChanges } from '../core/changes.js';
+import { t } from '../core/i18n.js';
 import { readBacklog, nextBacklogItem } from '../core/backlog.js';
 import { loadConfig } from '../core/config.js';
 import { evaluateChange } from '../core/lifecycle.js';
@@ -23,13 +24,13 @@ export async function statuslineCommand(): Promise<void> {
       evaluateChange(root, ref, config, { skipFingerprint: true }));
     if (views.length) {
       const view = views.find((item) => item.next.actor === 'human') ?? views[0];
-      const prefix = views.length > 1 ? `${views.length} changes · ` : '';
-      const actor = view.next.actor === 'human' ? 'person' : 'agent';
-      process.stdout.write(`${prefix}${view.change} · ${view.stageTitle} · next: ${actor}\n`);
+      const prefix = views.length > 1 ? t('statusline.changesPrefix', { count: views.length }) : '';
+      const actor = t(view.next.actor === 'human' ? 'statusline.actor.person' : 'statusline.actor.agent');
+      process.stdout.write(t('statusline.line', { prefix, change: view.change, stage: view.stageTitle, actor }) + '\n');
       return;
     }
     const next = nextBacklogItem(readBacklog(root));
-    if (next) process.stdout.write(`backlog: ${next.id} ${next.title}\n`);
+    if (next) process.stdout.write(t('statusline.backlog', { id: next.id, title: next.title }) + '\n');
   } catch {
     // Status lines fail quietly, including malformed input and project state.
   }

@@ -11,6 +11,8 @@ Close the loop - Stage 6 (Maintain). What production or a scan reveals re-enters
 
 **Input**: {{input}}
 
+If the input is empty, stop and ask the user to paste the alert, incident, error report or finding to triage. Do not invent one and do not create anything until they answer.
+
 **Steps**
 
 1. **Diagnose read-only.** Gather evidence: the alert or finding payload, logs, metrics, recent deploys and commits (`git log --since`), failing CI runs, related specs (`sdlc openspec list --specs`). Reproduce when possible. No fixes, no deploys, no config changes.

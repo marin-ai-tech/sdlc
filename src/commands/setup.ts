@@ -1,3 +1,4 @@
+import { currentLocale, t } from '../core/i18n.js';
 import * as path from 'node:path';
 import { c, line, printJson, reportFailure, warn } from '../cli/output.js';
 import {
@@ -11,7 +12,7 @@ import {
 import { SdlcError } from '../core/errors.js';
 import { ensureDir, exists, isDirectory, isFile, readText, writeTextAtomic } from '../core/fs-utils.js';
 import { formatIdentity, gitIdentity } from '../core/git.js';
-import { harnessStamp, stampText } from '../core/license.js';
+import { harnessStamp, stampTextLocalized } from '../core/license.js';
 import { appendLog } from '../core/log.js';
 import { assessLicense, detectProjectLicense } from '../core/project-license.js';
 import { runOpenSpec } from '../core/openspec.js';
@@ -30,7 +31,7 @@ import {
 import type { ToolId } from '../integrations/types.js';
 import { agentEnvironment } from '../core/agent-env.js';
 import {
-  CODEGRAPH_INDEX,
+  codegraphIndexCommand,
   defaultInstaller,
   defaultProbe,
   installCommand,
@@ -65,7 +66,10 @@ export interface InitOptions {
 function assertDelivery(value: string | undefined): Delivery | undefined {
   if (value === undefined) return undefined;
   if (value !== 'both' && value !== 'skills' && value !== 'commands') {
-    throw new SdlcError('invalid_option', `--delivery must be both, skills, or commands (got ${value}).`);
+    throw new SdlcError(
+      'invalid_option',
+      { key: 'error.delivery_must_be_both_skills_or_commands_got_x', params: { value: value } }
+    );
   }
   return value;
 }
@@ -73,7 +77,10 @@ function assertDelivery(value: string | undefined): Delivery | undefined {
 function assertMode(value: string | undefined): EnforcementMode | undefined {
   if (value === undefined) return undefined;
   if (value !== 'off' && value !== 'warn' && value !== 'block') {
-    throw new SdlcError('invalid_option', `--mode must be off, warn, or block (got ${value}).`);
+    throw new SdlcError(
+      'invalid_option',
+      { key: 'error.mode_must_be_off_warn_or_block_got_x', params: { value: value } }
+    );
   }
   return value;
 }
@@ -97,8 +104,8 @@ function ensureOpenSpec(paths: ProjectPaths, language?: string): { created: bool
   if (!result.ok || !isDirectory(paths.openspecDir)) {
     throw new SdlcError(
       'openspec_init_failed',
-      `openspec init failed: ${(result.stderr || result.stdout).trim().split('\n').slice(-3).join(' ')}`,
-      'Run `sdlc openspec init --tools none` to see the full error.'
+      { key: 'error.openspec_init_failed_x', params: { p1: (result.stderr || result.stdout).trim().split('\n').slice(-3).join(' ') } },
+      { key: 'fix.run_sdlc_openspec_init_tools_none_to_see_the_ful' }
     );
   }
   ensureDir(paths.changesDir);
@@ -130,6 +137,14 @@ function ensureReviewPolicy(root: string, config: SdlcConfig): boolean {
   return true;
 }
 
+
+/** Localized label for hook/status-line result words in text output (JSON keeps English). */
+function stateLabel(state: string): string {
+  const key = `state.${state}`;
+  const text = t(key);
+  return text === key ? state : text;
+}
+
 function summarize(result: InstallResult): Record<string, number> {
   return {
     created: result.files.created.length,
@@ -142,20 +157,20 @@ function summarize(result: InstallResult): Record<string, number> {
 
 function printInstall(result: InstallResult, config: SdlcConfig): void {
   const s = summarize(result);
-  line(`  files: ${s.created} created, ${s.updated} updated, ${s.unchanged} unchanged, ${s.removed} removed`);
+  line(t('init.filesSummary', { created: s.created, updated: s.updated, unchanged: s.unchanged, removed: s.removed }));
   for (const kept of result.files.kept) {
-    warn(`kept ${kept} (edited locally; run with --force to overwrite)`);
+    warn(t('init.keptEditedForce', { path: kept }));
   }
     if (result.claudeHooks !== 'absent' && result.claudeHooks !== 'unchanged') {
-    line(`  Claude Code hooks: ${result.claudeHooks} in .claude/settings.json`);
+    line(t('init.claudeHooks', { state: stateLabel(result.claudeHooks) }));
   }
   if (result.tools.length > 0) {
     line();
-    line(c.bold('Start a change:'));
+    line(c.bold(t('init.startChange')));
     for (const tool of result.tools) {
       const adapter = ADAPTERS[tool];
       const ctx = renderContext(config, result.tools);
-      line(`  ${adapter.name.padEnd(12)} ${adapter.invocation('intent', ctx)} "<your idea>"   then ${adapter.invocation('next', ctx)}`);
+      line(t('init.startChangeLine', { name: adapter.name.padEnd(12), intent: adapter.invocation('intent', ctx), next: adapter.invocation('next', ctx) }));
     }
   }
 }
@@ -186,7 +201,7 @@ async function resolveWizard(
   const defaults = initDefaults(root, detectTools(root), probe);
   const choices = await askInitChoices(deps.prompter ?? terminalPrompter(), defaults);
   if (!choices) {
-    line('Nothing written.');
+    line(t('init.nothingWritten'));
     return undefined;
   }
   return {
@@ -201,20 +216,21 @@ async function resolveWizard(
 async function runChosenInstalls(
   root: string,
   install: DependencyId[],
-  index: boolean,
+  index: { wanted: boolean; tools: string[] },
   installer: Installer,
 ): Promise<void> {
   for (const id of install) {
     const command = installCommand(id);
     const result = await installer(command, root);
     if (!result.ok) {
-      warn(`optional install failed; run by hand: ${command.join(' ')}`);
+      warn(t('init.optionalInstallFailed', { command: command.join(' ') }));
     }
   }
-  if (!index) return;
-  const result = await installer(CODEGRAPH_INDEX, root);
+  if (!index.wanted) return;
+  const command = codegraphIndexCommand(index.tools);
+  const result = await installer(command, root);
   if (!result.ok) {
-    warn(`optional index failed; run by hand: ${CODEGRAPH_INDEX.join(' ')}`);
+    warn(t('init.optionalIndexFailed', { command: command.join(' ') }));
   }
 }
 
@@ -247,10 +263,13 @@ export interface InitDeps {
 export async function initCommand(target: string | undefined, opts: InitOptions, deps?: InitDeps): Promise<void> {
   try {
     const root = path.resolve(target ?? process.cwd());
-    if (!isDirectory(root)) throw new SdlcError('invalid_path', `${root} is not a directory.`);
+    if (!isDirectory(root)) throw new SdlcError(
+      'invalid_path',
+      { key: 'error.x_is_not_a_directory', params: { root: root } }
+    );
     const nested = findProjectRoot(root);
     if (nested && nested !== root && !isDirectory(path.join(root, 'openspec'))) {
-      warn(`an OpenSpec root already exists at ${nested}; initializing a separate one in ${root}.`);
+      warn(t('init.nestedOpenSpec', { nested, root }));
     }
     const resolved = await resolveWizard(root, opts, deps);
     if (!resolved) return;
@@ -296,13 +315,17 @@ export async function initCommand(target: string | undefined, opts: InitOptions,
     }
     const stamp = harnessStamp(config);
     logSetup(root, config, hadConfig ? 'harness.reinitialized' : 'harness.initialized', tools);
-    const license = assessLicense(config.license, detectProjectLicense(root));
+    const license = assessLicense(
+      config.license,
+      detectProjectLicense(root),
+      opts.json ? 'en' : currentLocale(),
+    );
 
     if (resolved.install.length > 0 || resolved.index) {
       await runChosenInstalls(
         root,
         resolved.install,
-        resolved.index,
+        { wanted: resolved.index, tools },
         deps?.installer ?? defaultInstaller,
       );
     }
@@ -324,22 +347,22 @@ export async function initCommand(target: string | undefined, opts: InitOptions,
       });
       return;
     }
-    line(c.bold(`SDLC harness initialized in ${root}`));
-    line(`  OpenSpec: ${openspec.created ? 'created openspec/ (via openspec init)' : 'using existing openspec/'}${schemaDefaulted ? `, default schema: ${config.schema}` : ''}`);
-    line(`  config: ${hadConfig ? 'kept' : 'created'} openspec/sdlc.yaml (enforcement: ${config.enforcement.mode})`);
+    line(c.bold(t('init.done', { root })));
+    line((openspec.created ? t('init.openspecCreated') : t('init.openspecExisting')) + (schemaDefaulted ? t('init.defaultSchema', { schema: config.schema }) : ''));
+    line(t(hadConfig ? 'init.configKept' : 'init.configCreated', { mode: config.enforcement.mode }));
     if (!hadConfig) {
       line(detectedCommands.length > 0
-        ? `  verify.commands detected: ${detectedCommands.join('; ')}`
-        : `  ${c.yellow('verify.commands is empty')} - add your build/test/lint commands to openspec/sdlc.yaml`);
+        ? t('init.verifyDetected', { commands: detectedCommands.join('; ') })
+        : c.yellow(t('init.verifyEmpty')));
     }
-    if (reviewCreated) line(`  review policy: created ${config.review.policy}`);
-    line(`  tools: ${tools.length > 0 ? tools.map((t) => ADAPTERS[t].name).join(', ') : 'none'}`);
+    if (reviewCreated) line(t('init.reviewPolicy', { policy: config.review.policy }));
+    line(t('init.toolsLine', { tools: tools.length > 0 ? tools.map((id) => ADAPTERS[id].name).join(', ') : t('init.none') }));
     if (rolesNote) line(`  ${rolesNote}`);
-    if (opsx) line(`  OpenSpec /opsx workflows: ${opsx}`);
-    line(`  ${stampText(stamp)}`);
+    if (opsx) line(t('init.opsxLine', { opsx: stateLabel(opsx) }));
+    line(`  ${stampTextLocalized(stamp)}`);
     if (license.status !== 'ok') warn(`${license.message}. ${license.fix ?? ''}`.trim());
     printInstall(result, config);
-    if (result.statusLine === 'kept (user-defined)') warn('kept user-defined Claude Code status line');
+    if (result.statusLine === 'kept (user-defined)') warn(t('init.keptStatusline'));
   } catch (error) {
     reportFailure(error, opts.json);
   }
@@ -361,10 +384,18 @@ export interface UpdateOptions {
 export async function updateCommand(target: string | undefined, opts: UpdateOptions): Promise<void> {
   try {
     const root = findProjectRoot(path.resolve(target ?? process.cwd()));
-    if (!root) throw new SdlcError('no_project_root', 'No openspec/ directory found.', 'Run `sdlc init` first.');
+    if (!root) throw new SdlcError(
+      'no_project_root',
+      { key: 'error.no_openspec_directory_found' },
+      { key: 'fix.run_sdlc_init_first' }
+    );
     const paths = projectPaths(root);
     if (!isFile(paths.sdlcConfig)) {
-      throw new SdlcError('not_initialized', 'This OpenSpec project has no openspec/sdlc.yaml.', 'Run `sdlc init` to add the SDLC harness.');
+      throw new SdlcError(
+      'not_initialized',
+      { key: 'error.this_openspec_project_has_no_openspec_sdlc_yaml' },
+      { key: 'fix.run_sdlc_init_to_add_the_sdlc_harness' }
+    );
     }
     const config = loadConfig(paths.sdlcConfig);
     const tools = parseTools(opts.tools, config.tools.filter((t) => t in ADAPTERS) as ToolId[]);
@@ -379,7 +410,7 @@ export async function updateCommand(target: string | undefined, opts: UpdateOpti
       printJson({ root, tools, dryRun: !!opts.dryRun, files: result.files, claudeHooks: result.claudeHooks, harness: stamp });
       return;
     }
-    line(c.bold(`${opts.dryRun ? 'Would update' : 'Updated'} SDLC harness files in ${root}`) + c.dim(` (${stampText(stamp)})`));
+    line(c.bold(t(opts.dryRun ? 'update.would' : 'update.done', { root })) + c.dim(` (${stampTextLocalized(stamp)})`));
     printInstall(result, config);
   } catch (error) {
     reportFailure(error, opts.json);
@@ -389,7 +420,7 @@ export async function updateCommand(target: string | undefined, opts: UpdateOpti
 export async function uninstallCommand(target: string | undefined, opts: { force?: boolean; dryRun?: boolean; json?: boolean }): Promise<void> {
   try {
     const root = findProjectRoot(path.resolve(target ?? process.cwd()));
-    if (!root) throw new SdlcError('no_project_root', 'No openspec/ directory found.');
+    if (!root) throw new SdlcError('no_project_root', { key: 'error.no_openspec_directory_found' });
     const result = uninstallIntegrations(root, { force: opts.force, dryRun: opts.dryRun });
     const paths = projectPaths(root);
     if (!opts.dryRun && isFile(paths.sdlcConfig)) {
@@ -403,10 +434,10 @@ export async function uninstallCommand(target: string | undefined, opts: { force
       printJson({ root, dryRun: !!opts.dryRun, files: result.files, claudeHooks: result.claudeHooks });
       return;
     }
-    line(c.bold(`${opts.dryRun ? 'Would remove' : 'Removed'} SDLC harness integration files from ${root}`));
-    line(`  files removed: ${result.files.removed.length}; Claude hooks: ${result.claudeHooks}`);
-    for (const kept of result.files.kept) warn(`kept ${kept} (edited locally)`);
-    line(c.dim('  openspec/ (specs, changes, sdlc.yaml, the sdlc schema) was left untouched.'));
+    line(c.bold(t(opts.dryRun ? 'uninstall.would' : 'uninstall.done', { root })));
+    line(t('uninstall.filesRemoved', { removed: result.files.removed.length, hooks: stateLabel(result.claudeHooks) }));
+    for (const kept of result.files.kept) warn(t('uninstall.keptEdited', { path: kept }));
+    line(c.dim(t('uninstall.leftUntouched')));
   } catch (error) {
     reportFailure(error, opts.json);
   }

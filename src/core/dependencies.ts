@@ -8,7 +8,7 @@
  *   `version` = the first x.y.z in its output. codegraph also reports `indexed` = `<root>/.codegraph` exists.
  * - `installCommand('openspec')` = npm install -g @fission-ai/openspec@<bundled version> (the version of the
  *   OpenSpec sdlc ships, from its package.json); `installCommand('codegraph')` = npm install -g
- *   @colbymchenry/codegraph. `CODEGRAPH_INDEX` = codegraph init (run in the project root).
+ *   @colbymchenry/codegraph. `codegraphIndexCommand(tools)` indexes and wires codegraph to the chosen tools only.
  * - `defaultProbe` / `defaultInstaller` spawn the command (with a shell on Windows, where npm is npm.cmd);
  *   the installer shows the command's output to the person and resolves to ok + output, never throws.
  * Nothing here runs unless a person chose it in the interactive init; agents and scripts never install.
@@ -44,7 +44,19 @@ export type Probe = (command: string, args: string[], cwd: string) => CommandRes
 /** Runs an install or index command for a person who asked for it. */
 export type Installer = (command: string[], cwd: string) => Promise<CommandResult>;
 
-export const CODEGRAPH_INDEX = ['codegraph', 'init'];
+/** codegraph's agent ids for the tools sdlc supports. */
+const CODEGRAPH_TARGETS: Record<string, string> = { claude: 'claude', opencode: 'opencode' };
+
+/**
+ * Indexes the project and connects codegraph to exactly the chosen tools, without codegraph's own prompts.
+ * A bare `codegraph init` in a terminal asks which agents to wire and defaults to Claude Code, which wrote
+ * `.claude/` into an OpenCode-only project. Without tools: index only.
+ */
+export function codegraphIndexCommand(tools: readonly string[]): string[] {
+  const targets = tools.map((tool) => CODEGRAPH_TARGETS[tool]).filter(Boolean);
+  if (targets.length === 0) return ['codegraph', 'init', '--yes'];
+  return ['codegraph', 'install', '--target', targets.join(','), '--location', 'local', '--yes', '--init'];
+}
 
 const NAMES: Record<DependencyId, string> = {
   openspec: 'OpenSpec CLI',
@@ -97,12 +109,19 @@ export function detectDependencies(root: string, probe: Probe = defaultProbe): D
 
 export function defaultProbe(command: string, args: string[], cwd: string): CommandResult {
   try {
-    const result = spawnSync(command, args, {
-      cwd,
-      encoding: 'utf-8',
-      timeout: PROBE_TIMEOUT_MS,
-      shell: process.platform === 'win32',
-    });
+    const useShell = process.platform === 'win32';
+    const result = useShell
+      ? spawnSync([command, ...args].join(' '), {
+          cwd,
+          encoding: 'utf-8',
+          timeout: PROBE_TIMEOUT_MS,
+          shell: true,
+        })
+      : spawnSync(command, args, {
+          cwd,
+          encoding: 'utf-8',
+          timeout: PROBE_TIMEOUT_MS,
+        });
     const output = `${result.stdout ?? ''}${result.stderr ?? ''}`;
     if (result.error) return { ok: false, output: result.error.message };
     if (result.status !== 0) return { ok: false, output };
@@ -116,12 +135,19 @@ export async function defaultInstaller(command: string[], cwd: string): Promise<
   const shown = command.join(' ');
   process.stdout.write(`${shown}\n`);
   try {
-    const result = spawnSync(command[0], command.slice(1), {
-      cwd,
-      encoding: 'utf-8',
-      shell: process.platform === 'win32',
-      stdio: 'inherit',
-    });
+    const useShell = process.platform === 'win32';
+    const result = useShell
+      ? spawnSync(command.join(' '), {
+          cwd,
+          encoding: 'utf-8',
+          shell: true,
+          stdio: 'inherit',
+        })
+      : spawnSync(command[0], command.slice(1), {
+          cwd,
+          encoding: 'utf-8',
+          stdio: 'inherit',
+        });
     if (result.error) return { ok: false, output: result.error.message };
     if (result.status !== 0) return { ok: false, output: `exit ${result.status ?? 'unknown'}` };
     return { ok: true, output: '' };

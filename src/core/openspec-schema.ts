@@ -91,8 +91,8 @@ export function loadSchemaInfo(name: string, projectRoot: string): SchemaInfo {
   if (!resolved) {
     throw new SdlcError(
       'schema_not_found',
-      `OpenSpec schema '${name}' was not found in the project, user data dir, or installed packages.`,
-      name === 'sdlc' ? 'Run `sdlc init` (or `sdlc update`) to install the sdlc schema.' : undefined
+      { key: 'error.openspec_schema_x_was_not_found_in_the_project_u', params: { name: name } },
+      name === 'sdlc' ? { key: 'fix.run_sdlc_init_or_update_to_install_sdlc_schema' } : undefined
     );
   }
   return parseSchemaFile(path.join(resolved.dir, 'schema.yaml'), resolved.source, resolved.dir);
@@ -104,7 +104,10 @@ export function parseSchemaFile(file: string, source: SchemaInfo['source'], dir:
   const artifacts: SchemaArtifact[] = artifactsRaw.map((entry, index) => {
     const a = (entry ?? {}) as Record<string, unknown>;
     if (typeof a.id !== 'string' || typeof a.generates !== 'string') {
-      throw new SdlcError('invalid_schema', `${file}: artifacts[${index}] needs string id and generates.`);
+      throw new SdlcError(
+        'invalid_schema',
+        { key: 'error.x_artifacts_x_needs_string_id_and_generates', params: { file: file, index: index } }
+      );
     }
     return {
       id: a.id,

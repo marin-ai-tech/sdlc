@@ -75,8 +75,8 @@ function readSettings(root: string): Record<string, unknown> {
   } catch (error) {
     throw new SdlcError(
       'invalid_claude_settings',
-      `${SETTINGS_PATH} is not valid JSON (${error instanceof Error ? error.message : String(error)}); hooks were not installed.`,
-      `Fix ${SETTINGS_PATH}, then run \`sdlc update\`.`
+      { key: 'error.x_is_not_valid_json_x_hooks_were_not_installed', params: { SETTINGS_PATH: SETTINGS_PATH, p2: error instanceof Error ? error.message : String(error) } },
+      { key: 'fix.fix_x_then_run_sdlc_update', params: { SETTINGS_PATH: SETTINGS_PATH } }
     );
   }
 }

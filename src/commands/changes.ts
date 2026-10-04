@@ -34,7 +34,10 @@ import { nextBacklogItem, readBacklog } from '../core/backlog.js';
 function oneOf<T extends string>(value: string | undefined, allowed: readonly T[], flag: string): T | undefined {
   if (value === undefined) return undefined;
   if (!(allowed as readonly string[]).includes(value)) {
-    throw new SdlcError('invalid_option', `${flag} must be one of: ${allowed.join(', ')} (got ${value}).`);
+    throw new SdlcError(
+      'invalid_option',
+      { key: 'error.x_must_be_one_of_x_got_x', params: { flag: flag, p2: allowed.join(', '), value: value } }
+    );
   }
   return value as T;
 }
@@ -44,7 +47,7 @@ function validateExplorationSource(root: string, type: SourceType | undefined, r
   const directory = path.join(root, 'openspec', 'explorations');
   const target = ref ? path.resolve(root, ref) : '';
   if (!ref || !isWithin(directory, target) || !isFile(target)) {
-    throw new SdlcError('unknown_exploration', 'Exploration source must reference an existing file in openspec/explorations/.');
+    throw new SdlcError('unknown_exploration', { key: 'error.exploration_source_must_reference_an_existing_fi' });
   }
 }
 
@@ -78,7 +81,10 @@ export function createChange(name: string, opts: NewOptions): { ctx: ProjectCont
   const args = ['new', 'change', name, '--schema', schema];
   if (opts.description) args.push('--description', opts.description);
   const result = runOpenSpecJson<{ change?: { id: string; path: string } }>(args, root);
-  if (!result.ok || !result.data?.change) throw new SdlcError('openspec_new_failed', `openspec new change failed: ${openspecFailure(result.data, result.raw)}`);
+  if (!result.ok || !result.data?.change) throw new SdlcError(
+      'openspec_new_failed',
+      { key: 'error.openspec_new_change_failed_x', params: { p1: openspecFailure(result.data, result.raw) } }
+    );
   const dir = result.data.change.path;
   if (opts.skipSpecs) {
     const metaFile = path.join(dir, '.openspec.yaml');
@@ -124,8 +130,8 @@ export async function newCommand(name: string, opts: NewOptions): Promise<void> 
       printJson({ change: { id: name, path: changeDir, schema, kind, risk, track, ...(trackSuggestion ? { trackSuggestion } : {}), ...(state.source ? { source: state.source } : {}) }, ...(next ? { next } : {}), root: { path: paths.root } });
       return;
     }
-    line(c.bold(`Created change ${name}`) + c.dim(` (${schema} schema, ${kind}, risk ${risk}, ${track} track)`));
-    if (agentRequestedLite) warn(`An agent cannot select lite; ask a person to run ${config.cli} track set lite --change ${name}.`);
+    line(c.bold(t('change.created', { name })) + c.dim(t('change.createdMeta', { schema, kind, risk, track })));
+    if (agentRequestedLite) warn(t('warn.agentCannotLite', { cmd: `${config.cli} track set lite --change ${name}` }));
     line(`  ${path.relative(process.cwd(), changeDir) || changeDir}`);
     emitNextHint(ctx, name);
   } catch (error) {
@@ -169,7 +175,8 @@ function stageTitleText(view: LifecycleView): string {
 }
 
 function printDetailed(view: LifecycleView, warnings: string[], invocationHint: (wf: string) => string): void {
-  line(`${c.bold(view.change)}  ${c.dim(`[${view.kind} · risk ${view.risk} · ${view.track} track · schema ${view.schema}]`)}`);
+  const header = t('status.header', { kind: view.kind, risk: view.risk, track: view.track, schema: view.schema });
+  line(`${c.bold(view.change)}  ${c.dim(`[${header}]`)}`);
   line(`  ${t('status.stage').padEnd(10)}${c.bold(stageTitleText(view))}`);
   if (view.source) {
     line(`  ${t('status.source').padEnd(10)}${view.source.type}${view.source.ref ? ` ${view.source.ref}` : ''}${view.source.url ? ` ${view.source.url}` : ''}`);
@@ -283,7 +290,7 @@ export async function statusCommand(opts: StatusOptions): Promise<void> {
       line(`${v.change.padEnd(width)}  ${v.stage.padEnd(9)} ${next}`);
     }
     for (const o of overlaps) {
-      warn(`requirement "${o.requirement}" (${o.capability}) is changed by ${o.changes.map((x) => `${x.change}:${x.op}`).join(', ')}`);
+      warn(t('warn.requirementChanged', { requirement: o.requirement, capability: o.capability, changes: o.changes.map((x) => `${x.change}:${x.op}`).join(', ') }));
     }
   } catch (error) {
     reportFailure(error, opts.json, { changes: [] });
@@ -379,7 +386,10 @@ export async function instructionsCommand(artifact: string, opts: { change?: str
       return;
     }
     const result = runOpenSpecJson<Record<string, unknown>>(['instructions', artifact, '--change', ref.id], ctx.root);
-    if (!result.data) throw new SdlcError('openspec_instructions_failed', openspecFailure(result.data, result.raw));
+    if (!result.data) throw new SdlcError(
+      'openspec_instructions_failed',
+      { key: 'error.openspec_failure_detail', params: { detail: openspecFailure(result.data, result.raw) } }
+    );
     const view = evaluateChange(ctx.root, ref, ctx.config, { skipFingerprint: true });
     const gate = view.gates.find((g) => g.artifacts.includes(artifact));
     printJson({

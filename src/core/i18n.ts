@@ -50,10 +50,24 @@ function loadCatalog(locale: Locale): Record<string, string> {
   return data;
 }
 
-function substitute(text: string, params?: Record<string, string | number>): string {
+/** A catalog message used as a parameter of another message (rendered in the same locale). */
+export interface MessageRef {
+  key: string;
+  params?: MessageParams;
+}
+/** Params: plain values, or messages (a list renders joined with spaces), so one text can hold several. */
+export type MessageParams = Record<string, string | number | MessageRef | MessageRef[]>;
+
+function renderParam(value: MessageParams[string], locale: Locale): string {
+  if (Array.isArray(value)) return value.map((ref) => t(ref.key, ref.params, locale)).join(' ');
+  if (typeof value === 'object') return t(value.key, value.params, locale);
+  return String(value);
+}
+
+function substitute(text: string, params: MessageParams | undefined, locale: Locale): string {
   if (!params) return text;
   return text.replace(/\{(\w+)\}/g, (match, name: string) => {
-    if (Object.prototype.hasOwnProperty.call(params, name)) return String(params[name]);
+    if (Object.prototype.hasOwnProperty.call(params, name)) return renderParam(params[name], locale);
     return match;
   });
 }
@@ -110,15 +124,15 @@ export function currentLocale(): Locale {
 
 export function t(
   key: string,
-  params?: Record<string, string | number>,
+  params?: MessageParams,
   locale?: Locale,
 ): string {
   const want = locale ?? current;
   const primary = loadCatalog(want)[key];
-  if (primary !== undefined) return substitute(primary, params);
+  if (primary !== undefined) return substitute(primary, params, want);
   if (want !== 'en') {
     const english = loadCatalog('en')[key];
-    if (english !== undefined) return substitute(english, params);
+    if (english !== undefined) return substitute(english, params, want);
   }
   return key;
 }

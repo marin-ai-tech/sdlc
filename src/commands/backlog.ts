@@ -29,6 +29,7 @@ import { assertValidChangeId } from '../core/changes.js';
 import { readChangeState } from '../core/change-state.js';
 import { writeTextAtomic } from '../core/fs-utils.js';
 import { createChange } from './changes.js';
+import { t } from '../core/i18n.js';
 
 type Options = Record<string, unknown> & { json?: boolean };
 
@@ -67,7 +68,7 @@ function run(
     } else {
       const message = result
         ? `${(result as { id: string }).id} ${(result as { title: string }).title}`
-        : 'No ready backlog item.';
+        : t('backlog.noReady');
       line(message);
     }
   } catch (error) {
@@ -92,19 +93,19 @@ export function backlogAdd(title: string, opts: Options): void {
       const sourceType = text(opts.sourceType);
       const sourceRef = text(opts.sourceRef);
       if (kind && !CHANGE_KINDS.includes(kind as ChangeKind)) {
-        throw new SdlcError('invalid_option', `Invalid kind: ${kind}`);
+        throw new SdlcError('invalid_option', { key: 'error.invalid_kind_x', params: { kind: kind } });
       }
       if (risk && !RISK_LEVELS.includes(risk as RiskLevel)) {
-        throw new SdlcError('invalid_option', `Invalid risk: ${risk}`);
+        throw new SdlcError('invalid_option', { key: 'error.invalid_risk_x', params: { risk: risk } });
       }
       const sourcePairOk = !!sourceType === !!sourceRef;
       const sourceTypeOk =
         !sourceType || SOURCE_TYPES.includes(sourceType as (typeof SOURCE_TYPES)[number]);
       if (!sourcePairOk || !sourceTypeOk) {
         throw new SdlcError(
-          'invalid_option',
-          'Source type and reference must be valid and supplied together.'
-        );
+      'invalid_option',
+      { key: 'error.source_type_and_reference_must_be_valid_and_supp' }
+    );
       }
       return addBacklogItem(ctx.root, {
         title,
@@ -121,12 +122,18 @@ export function backlogAdd(title: string, opts: Options): void {
   );
 }
 
+function statusLabel(status: string): string {
+  const key = `backlog.status.${status}`;
+  const text = t(key);
+  return text === key ? status : text;
+}
+
 function printListTable(items: ReturnType<typeof readBacklog>['items']): void {
   const rows = [
-    ['ID', 'Status', 'Ready', 'Title', 'Change'],
+    [t('backlog.colId'), t('backlog.colStatus'), t('backlog.colReady'), t('backlog.colTitle'), t('backlog.colChange')],
     ...items.map((item) => [
       item.id,
-      item.status,
+      statusLabel(item.status),
       item.ready ? '✓' : '-',
       item.title,
       item.change ?? '-',
@@ -150,7 +157,7 @@ export function backlogList(opts: Options): void {
     const backlog = readBacklog(ctx.root);
     const status = text(opts.status);
     if (status && !BACKLOG_STATUSES.includes(status as (typeof BACKLOG_STATUSES)[number])) {
-      throw new SdlcError('invalid_option', `Invalid status: ${status}`);
+      throw new SdlcError('invalid_option', { key: 'error.invalid_status_x', params: { status: status } });
     }
     const items = backlog.items.filter(
       (item) =>
@@ -181,7 +188,8 @@ export function backlogList(opts: Options): void {
         const total = epic.open + epic.inProgress + done;
         epicBar = `  ${bar(done, total)}  ${done}/${total}`;
       }
-      line(`${epic.id} ${epic.title}${epicBar}`.trim());
+      const heading = epic.id === 'Unassigned' ? t('backlog.unassigned') : `${epic.id} ${epic.title}`;
+      line(`${heading}${epicBar}`.trim());
       if (section.length) {
         printListTable(section);
       }
@@ -199,7 +207,7 @@ function human(): void {
   if (agentEnvironment()) {
     throw new SdlcError(
       'agent_cannot_prioritize',
-      'Backlog priority is a product decision. Ask a person to run this command.'
+      { key: 'error.backlog_priority_is_a_product_decision_ask_a_per' }
     );
   }
 }
@@ -216,7 +224,7 @@ export function backlogMove(id: string, opts: Options): void {
         opts.epic && { epic: text(opts.epic)! },
       ].filter(Boolean);
       if (targets.length !== 1) {
-        throw new SdlcError('invalid_option', 'Exactly one move target is required.');
+        throw new SdlcError('invalid_option', { key: 'error.exactly_one_move_target_is_required' });
       }
       return moveBacklogItem(ctx.root, id, targets[0] as BacklogMove);
     },
@@ -233,7 +241,7 @@ export function backlogClose(id: string, status: 'done' | 'dropped', opts: Optio
       }
       const note = text(opts.note);
       if (!note) {
-        throw new SdlcError('invalid_option', '--note is required.');
+        throw new SdlcError('invalid_option', { key: 'error.note_is_required' });
       }
       return setBacklogStatus(ctx.root, id, status, { note });
     },
@@ -271,11 +279,17 @@ export function backlogStart(id: string, opts: Options): void {
   try {
     const ctx = loadProject();
     const item = readBacklog(ctx.root).items.find(entry => entry.id === id);
-    if (!item) throw new SdlcError('unknown_backlog_item', `Unknown backlog item: ${id}`);
-    if (item.status !== 'open') throw new SdlcError('invalid_transition', `${id} is ${item.status}.`);
+    if (!item) throw new SdlcError('unknown_backlog_item', { key: 'error.unknown_backlog_item_x', params: { id: id } });
+    if (item.status !== 'open') throw new SdlcError(
+      'invalid_transition',
+      { key: 'error.x_is_x', params: { id: id, item_status: item.status } }
+    );
     if (!item.ready) {
       const missing = [...item.missing, ...item.blockedBy];
-      throw new SdlcError('backlog_item_not_ready', `${id} is not ready: ${missing.join(', ')}.`);
+      throw new SdlcError(
+        'backlog_item_not_ready',
+        { key: 'error.x_is_not_ready_x', params: { id: id, p2: missing.join(', ') } }
+      );
     }
     const changeId = text(opts.change) ?? item.title.toLowerCase().normalize('NFKD')
       .replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
@@ -292,7 +306,7 @@ export function backlogStart(id: string, opts: Options): void {
     const next = resolveNext(ctx, changeId);
     if (opts.json) printJson({ item: started, change, harness: ctx.stamp, ...(next ? { next } : {}) });
     else {
-      line(`Started ${id} as ${changeId}.`);
+      line(t('backlog.started', { id, change: changeId }));
       emitNextHint(ctx, changeId);
     }
   } catch (error) {

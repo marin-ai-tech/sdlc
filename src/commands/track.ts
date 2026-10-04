@@ -6,22 +6,26 @@ import { readChangeState, TRACKS, type Track } from '../core/change-state.js';
 import { resolveChange } from '../core/changes.js';
 import { SdlcError } from '../core/errors.js';
 import { formatIdentity, gitIdentity } from '../core/git.js';
+import { t } from '../core/i18n.js';
 
 interface TrackOptions { change: string; note?: string; json?: boolean }
 
 export async function trackSetCommand(trackArg: string, opts: TrackOptions): Promise<void> {
   try {
     if (!(TRACKS as readonly string[]).includes(trackArg)) {
-      throw new SdlcError('invalid_track', `Track must be one of: ${TRACKS.join(', ')}.`);
+      throw new SdlcError('invalid_track', { key: 'error.track_must_be_one_of_x', params: { p1: TRACKS.join(', ') } });
     }
     const agent = agentEnvironment();
-    if (agent) throw new SdlcError('agent_cannot_set_track', `An agent session (${agent}) cannot set the track.`,
-      'Run this command yourself in a terminal outside the agent.');
+    if (agent) throw new SdlcError(
+      'agent_cannot_set_track',
+      { key: 'error.an_agent_session_x_cannot_set_the_track', params: { agent: agent } },
+      { key: 'fix.run_this_command_yourself_in_a_terminal_outside_' }
+    );
     const ctx = loadProject();
     const ref = resolveChange(ctx.paths, opts.change);
     const state = readChangeState(ref.dir);
     if (state.gates.plan?.approvals?.length) {
-      throw new SdlcError('plan_already_approved', 'The track cannot change after the plan gate is approved.');
+      throw new SdlcError('plan_already_approved', { key: 'error.the_track_cannot_change_after_the_plan_gate_is_a' });
     }
     const previous = state.track;
     const track = trackArg as Track;
@@ -32,7 +36,7 @@ export async function trackSetCommand(trackArg: string, opts: TrackOptions): Pro
     const next = resolveNext(ctx, ref.id);
     if (opts.json) printJson({ change: ref.id, track, previous, harness: ctx.stamp, ...(next ? { next } : {}) });
     else {
-      line(`Track for ${ref.id}: ${previous} → ${track}`);
+      line(t('track.set', { change: ref.id, previous, track }));
       emitNextHint(ctx, ref.id);
     }
   } catch (error) {

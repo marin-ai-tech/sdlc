@@ -61,8 +61,8 @@ export function runOpenSpec(
   if (result.error) {
     throw new SdlcError(
       'openspec_unavailable',
-      `Could not run OpenSpec (${bin.command}): ${result.error.message}`,
-      `Reinstall the harness (${INSTALL_COMMAND}) or install OpenSpec: npm install -g @fission-ai/openspec`
+      { key: 'error.could_not_run_openspec_x_x', params: { bin_command: bin.command, result_error_message: result.error.message } },
+      { key: 'fix.reinstall_the_harness_x_or_install_openspec_npm_', params: { INSTALL_COMMAND: INSTALL_COMMAND } }
     );
   }
   return {

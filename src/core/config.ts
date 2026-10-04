@@ -171,7 +171,7 @@ type Raw = Record<string, unknown>;
 function asObject(value: unknown, where: string): Raw | undefined {
   if (value === undefined || value === null) return undefined;
   if (typeof value !== 'object' || Array.isArray(value)) {
-    throw new SdlcError('invalid_config', `${where} must be a mapping.`);
+    throw new SdlcError('invalid_config', { key: 'error.x_must_be_a_mapping', params: { where: where } });
   }
   return value as Raw;
 }
@@ -179,21 +179,24 @@ function asObject(value: unknown, where: string): Raw | undefined {
 function asStringArray(value: unknown, where: string): string[] | undefined {
   if (value === undefined || value === null) return undefined;
   if (!Array.isArray(value) || value.some((v) => typeof v !== 'string')) {
-    throw new SdlcError('invalid_config', `${where} must be a list of strings.`);
+    throw new SdlcError('invalid_config', { key: 'error.x_must_be_a_list_of_strings', params: { where: where } });
   }
   return value as string[];
 }
 
 function asBool(value: unknown, where: string): boolean | undefined {
   if (value === undefined || value === null) return undefined;
-  if (typeof value !== 'boolean') throw new SdlcError('invalid_config', `${where} must be true or false.`);
+  if (typeof value !== 'boolean') throw new SdlcError(
+    'invalid_config',
+    { key: 'error.x_must_be_true_or_false', params: { where: where } }
+  );
   return value;
 }
 
 function asNumber(value: unknown, where: string): number | undefined {
   if (value === undefined || value === null) return undefined;
   if (typeof value !== 'number' || !Number.isFinite(value) || value <= 0) {
-    throw new SdlcError('invalid_config', `${where} must be a positive number.`);
+    throw new SdlcError('invalid_config', { key: 'error.x_must_be_a_positive_number', params: { where: where } });
   }
   return value;
 }
@@ -201,7 +204,7 @@ function asNumber(value: unknown, where: string): number | undefined {
 function asString(value: unknown, where: string): string | undefined {
   if (value === undefined || value === null) return undefined;
   if (typeof value !== 'string' || value.trim() === '') {
-    throw new SdlcError('invalid_config', `${where} must be a non-empty string.`);
+    throw new SdlcError('invalid_config', { key: 'error.x_must_be_a_non_empty_string', params: { where: where } });
   }
   return value;
 }
@@ -215,19 +218,25 @@ export function parseConfig(raw: Raw, file = 'openspec/sdlc.yaml'): SdlcConfig {
   const where = (key: string) => `${file}: ${key}`;
 
   if (raw.version !== undefined && raw.version !== 1) {
-    throw new SdlcError('unsupported_config_version', `${where('version')} must be 1.`);
+    throw new SdlcError('unsupported_config_version', { key: 'error.x_must_be_1', params: { p1: where('version') } });
   }
   config.schema = asString(raw.schema, where('schema')) ?? config.schema;
   config.cli = asString(raw.cli, where('cli')) ?? config.cli;
   config.statusline = asBool(raw.statusline, where('statusline')) ?? config.statusline;
   if (!/^[A-Za-z0-9@._/ -]+$/.test(config.cli)) {
-    throw new SdlcError('invalid_config', `${where('cli')} may only contain letters, digits, spaces and . _ / @ -`);
+    throw new SdlcError(
+      'invalid_config',
+      { key: 'error.x_may_only_contain_letters_digits_spaces_and', params: { p1: where('cli') } }
+    );
   }
   config.tools = asStringArray(raw.tools, where('tools')) ?? config.tools;
   const delivery = asString(raw.delivery, where('delivery'));
   if (delivery !== undefined) {
     if (delivery !== 'both' && delivery !== 'skills' && delivery !== 'commands') {
-      throw new SdlcError('invalid_config', `${where('delivery')} must be both, skills, or commands.`);
+      throw new SdlcError(
+        'invalid_config',
+        { key: 'error.x_must_be_both_skills_or_commands', params: { p1: where('delivery') } }
+      );
     }
     config.delivery = delivery;
   }
@@ -243,9 +252,9 @@ export function parseConfig(raw: Raw, file = 'openspec/sdlc.yaml'): SdlcConfig {
       }
       if (!(APPROVAL_GATES as readonly string[]).includes(id)) {
         throw new SdlcError(
-          'invalid_config',
-          `${where(`gates.${id}`)} is not a known gate (${ALL_GATES.join(', ')}).`
-        );
+      'invalid_config',
+      { key: 'error.x_is_not_a_known_gate_x', params: { p1: where(`gates.${id}`), p2: ALL_GATES.join(', ') } }
+    );
       }
       const target = config.gates[id as ApprovalGateId];
       target.required = asBool(gate.required, where(`gates.${id}.required`)) ?? target.required;
@@ -273,7 +282,10 @@ export function parseConfig(raw: Raw, file = 'openspec/sdlc.yaml'): SdlcConfig {
       asNumber(verify.output_lines, where('verify.output_lines')) ?? config.verify.outputLines;
     if (verify.commands !== undefined && verify.commands !== null) {
       if (!Array.isArray(verify.commands)) {
-        throw new SdlcError('invalid_config', `${where('verify.commands')} must be a list.`);
+        throw new SdlcError(
+          'invalid_config',
+          { key: 'error.x_must_be_a_list', params: { p1: where('verify.commands') } }
+        );
       }
       config.verify.commands = verify.commands.map((entry, index) => {
         const key = `verify.commands[${index}]`;
@@ -282,7 +294,10 @@ export function parseConfig(raw: Raw, file = 'openspec/sdlc.yaml'): SdlcConfig {
         }
         const item = asObject(entry, where(key));
         const run = asString(item?.run, where(`${key}.run`));
-        if (!run) throw new SdlcError('invalid_config', `${where(`${key}.run`)} is required.`);
+        if (!run) throw new SdlcError(
+          'invalid_config',
+          { key: 'error.x_is_required', params: { p1: where(`${key}.run`) } }
+        );
         return {
           name: asString(item?.name, where(`${key}.name`)) ?? `check-${index + 1}`,
           run,
@@ -303,7 +318,10 @@ export function parseConfig(raw: Raw, file = 'openspec/sdlc.yaml'): SdlcConfig {
     for (const key of ['passes', 'lenses'] as const) {
       const names = asStringArray(review[key], where(`review.${key}`));
       if (names) {
-        if (names.some((name) => !/^[a-z]+(?:-[a-z]+)*$/.test(name))) throw new SdlcError('invalid_config', `${where(`review.${key}`)} must contain kebab-case names.`);
+        if (names.some((name) => !/^[a-z]+(?:-[a-z]+)*$/.test(name))) throw new SdlcError(
+          'invalid_config',
+          { key: 'error.x_must_contain_kebab_case_names', params: { p1: where(`review.${key}`) } }
+        );
         config.review[key] = names;
       }
     }
@@ -318,7 +336,10 @@ export function parseConfig(raw: Raw, file = 'openspec/sdlc.yaml'): SdlcConfig {
         try {
           new RegExp(pattern, 'i');
         } catch {
-          throw new SdlcError('invalid_config', `${where('release.commands')} has an invalid regular expression: ${pattern}`);
+          throw new SdlcError(
+      'invalid_config',
+      { key: 'error.x_has_an_invalid_regular_expression_x', params: { p1: where('release.commands'), pattern: pattern } }
+    );
         }
       }
       config.release.commands = commands;
@@ -330,7 +351,10 @@ export function parseConfig(raw: Raw, file = 'openspec/sdlc.yaml'): SdlcConfig {
     const mode = asString(enforcement.mode, where('enforcement.mode'));
     if (mode !== undefined) {
       if (mode !== 'off' && mode !== 'warn' && mode !== 'block') {
-        throw new SdlcError('invalid_config', `${where('enforcement.mode')} must be off, warn, or block.`);
+        throw new SdlcError(
+          'invalid_config',
+          { key: 'error.x_must_be_off_warn_or_block', params: { p1: where('enforcement.mode') } }
+        );
       }
       config.enforcement.mode = mode;
     }
@@ -354,7 +378,10 @@ export function parseConfig(raw: Raw, file = 'openspec/sdlc.yaml'): SdlcConfig {
     const type = asString(license.type, where('license.type'));
     if (type !== undefined) {
       if (!(LICENSE_TYPES as readonly string[]).includes(type)) {
-        throw new SdlcError('invalid_config', `${where('license.type')} must be ${LICENSE_TYPES.join(' or ')}.`);
+        throw new SdlcError(
+          'invalid_config',
+          { key: 'error.x_must_be_x', params: { p1: where('license.type'), p2: LICENSE_TYPES.join(' or ') } }
+        );
       }
       config.license.type = type as LicenseType;
     }
@@ -362,7 +389,10 @@ export function parseConfig(raw: Raw, file = 'openspec/sdlc.yaml'): SdlcConfig {
       const value = asString(license[key], where(`license.${key}`));
       if (value === undefined) continue;
       if (!LICENSE_FIELD.test(value)) {
-        throw new SdlcError('invalid_config', `${where(`license.${key}`)} must be one line of at most 120 characters without | < >.`);
+        throw new SdlcError(
+      'invalid_config',
+      { key: 'error.x_must_be_one_line_of_at_most_120_characters_wit_2', params: { p1: where(`license.${key}`) } }
+    );
       }
       config.license[key] = value;
     }
@@ -379,11 +409,20 @@ export function parseConfig(raw: Raw, file = 'openspec/sdlc.yaml'): SdlcConfig {
 
   const layout = asObject(raw.layout, where('layout'));
   if (layout) for (const [key, value] of Object.entries(layout)) {
-    if (!(LAYOUT_ROLE_IDS as readonly string[]).includes(key)) throw new SdlcError('invalid_config', `${where(`layout.${key}`)} is not a known layout role.`);
+    if (!(LAYOUT_ROLE_IDS as readonly string[]).includes(key)) throw new SdlcError(
+      'invalid_config',
+      { key: 'error.x_is_not_a_known_layout_role', params: { p1: where(`layout.${key}`) } }
+    );
     if (typeof value !== 'string' || !value.trim() || /^[\\/]/.test(value) || /^[a-zA-Z]:/.test(value))
-      throw new SdlcError('invalid_config', `${where(`layout.${key}`)} must be a relative project path.`);
+      throw new SdlcError(
+        'invalid_config',
+        { key: 'error.x_must_be_a_relative_project_path', params: { p1: where(`layout.${key}`) } }
+      );
     const normalized = value.replace(/\\/g, '/');
-    if (normalized.split('/').includes('..')) throw new SdlcError('invalid_config', `${where(`layout.${key}`)} must stay inside the project.`);
+    if (normalized.split('/').includes('..')) throw new SdlcError(
+      'invalid_config',
+      { key: 'error.x_must_stay_inside_the_project', params: { p1: where(`layout.${key}`) } }
+    );
     config.layout[key as LayoutRoleId] = normalized;
   }
   return config;

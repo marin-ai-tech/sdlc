@@ -11,6 +11,8 @@ Capture an idea as `intent.md` - Stage 1 (Plan). The intent is the originator's 
 
 **Input**: {{input}}
 
+If the input is empty, stop and ask the user in plain text for the idea or problem to capture (and the change it belongs to, if any). Do not invent one and do not create a change until they answer.
+
 **Steps**
 
 1. **Choose the change.** If the input names an existing change, use it. Otherwise derive a short kebab-case name (e.g. "customers keep calling about claim status" -> `claims-status-self-service`) and create it:

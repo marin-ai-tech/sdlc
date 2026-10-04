@@ -135,7 +135,7 @@ function parseSince(value?: string): string | undefined {
   if (value === undefined) return undefined;
   const iso = /^\d{4}-\d{2}-\d{2}(?:T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2}))?$/;
   if (!iso.test(value) || !Number.isFinite(Date.parse(value))) {
-    throw new SdlcError('invalid_option', '--since must be a YYYY-MM-DD date or ISO timestamp.');
+    throw new SdlcError('invalid_option', { key: 'error.since_must_be_a_yyyy_mm_dd_date_or_iso_timestamp' });
   }
   return new Date(value).toISOString();
 }

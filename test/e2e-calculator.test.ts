@@ -105,7 +105,8 @@ describe('demo: a team builds a calculator with sdlc (every command)', () => {
 
   beforeAll(() => {
     root = tempDir('sdlc-demo-calculator-');
-    env = humanEnv(tempDir('sdlc-home-'));
+    // The CLI speaks the deck's language (SDLC_DEMO_LOCALE); the default run, the acceptance test, is English.
+    env = humanEnv(tempDir('sdlc-home-'), { SDLC_LOCALE: process.env.SDLC_DEMO_LOCALE ?? 'en' });
     const k = tempDir('sdlc-demo-keys-');
     keys = { alice: keypair(k, 'alice', PEOPLE.alice.email), carol: keypair(k, 'carol', PEOPLE.carol.email) };
     initGitRepo(root);

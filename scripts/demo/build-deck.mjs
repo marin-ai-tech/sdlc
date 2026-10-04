@@ -153,7 +153,7 @@ function hardWrap(line, max) {
 
 function outputLines(step, max, rows) {
   const lines = String(step.output ?? '').split('\n').filter((line) => line.trim());
-  const wrapped = lines.flatMap((line) => hardWrap(line.replace(/^error:\s*/i, ''), max));
+  const wrapped = lines.flatMap((line) => hardWrap(line.replace(/^(error|ошибка):\s*/i, ''), max));
   const kept = wrapped.slice(0, rows);
   if (wrapped.length > rows) kept[rows - 1] = '…';
   return kept.length ? kept : ['(no output)'];
@@ -345,7 +345,7 @@ function refusalRow(slide, step, frame, lang) {
     x: x + 1.75, y: y + 0.08, w: cw, h: 0.3, fontFace: MONO, fontSize: 11, valign: 'middle',
   });
   const reason = String(step.output ?? '').split('\n').find((line) => line.trim()) ?? '';
-  text(slide, cut(reason.replace(/^error:\s*/i, ''), fits(w - 0.6, 11, 0.5)), {
+  text(slide, cut(reason.replace(/^(error|ошибка):\s*/i, ''), fits(w - 0.6, 11, 0.5)), {
     x: x + 0.45, y: y + 0.42, w: w - 0.6, h: 0.26, fontSize: 11, color: C.refused, valign: 'middle',
   });
 }

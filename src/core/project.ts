@@ -58,8 +58,8 @@ export function requireProjectRoot(start: string = process.cwd()): string {
   if (!root) {
     throw new SdlcError(
       'no_project_root',
-      `No openspec/ directory found in ${path.resolve(start)} or any parent.`,
-      'Run `sdlc init` in the project root first.'
+      { key: 'error.no_openspec_directory_found_in_x_or_any_parent', params: { p1: path.resolve(start) } },
+      { key: 'fix.run_sdlc_init_in_the_project_root_first' }
     );
   }
   return root;

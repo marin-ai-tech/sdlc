@@ -6,28 +6,38 @@ import { SdlcError } from '../core/errors.js';
 import { isWithin, readText } from '../core/fs-utils.js';
 import { appendLog } from '../core/log.js';
 import { readAsset } from '../integrations/assets.js';
+import { t } from '../core/i18n.js';
 
 const slugPattern = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 
 export function exploreCommand(slug: string, opts: { json?: boolean }): void {
   try {
-    if (!slugPattern.test(slug)) throw new SdlcError('invalid_option', 'Exploration slug must be kebab-case.');
+    if (!slugPattern.test(slug)) throw new SdlcError(
+      'invalid_option',
+      { key: 'error.exploration_slug_must_be_kebab_case' }
+    );
     const ctx = loadProject();
     const directory = path.join(ctx.paths.openspecDir, 'explorations');
     const target = path.join(directory, `${slug}.md`);
-    if (!isWithin(directory, target)) throw new SdlcError('invalid_option', 'Exploration path is outside explorations.');
+    if (!isWithin(directory, target)) throw new SdlcError(
+      'invalid_option',
+      { key: 'error.exploration_path_is_outside_explorations' }
+    );
     const relativePath = `openspec/explorations/${slug}.md`;
     const template = readAsset('records', 'exploration.md').replaceAll('<slug>', slug);
     fs.mkdirSync(directory, { recursive: true });
     try {
       fs.writeFileSync(target, template, { encoding: 'utf8', flag: 'wx' });
     } catch (error) {
-      if ((error as NodeJS.ErrnoException).code === 'EEXIST') throw new SdlcError('exploration_exists', `Exploration already exists: ${relativePath}`);
+      if ((error as NodeJS.ErrnoException).code === 'EEXIST') throw new SdlcError(
+        'exploration_exists',
+        { key: 'error.exploration_already_exists_x', params: { relativePath: relativePath } }
+      );
       throw error;
     }
     appendLog(ctx.root, ctx.config, { event: 'exploration.created', detail: relativePath }, ctx.stamp);
     if (opts.json) printJson({ slug, path: relativePath });
-    else line(`Created exploration ${relativePath}`);
+    else line(t('explore.created', { path: relativePath }));
   } catch (error) {
     reportFailure(error, opts.json);
   }

@@ -1,4 +1,4 @@
-import { toDiagnostic } from '../core/errors.js';
+import { SdlcError, toDiagnostic } from '../core/errors.js';
 import { t } from '../core/i18n.js';
 
 const useColor = (): boolean =>
@@ -27,7 +27,7 @@ export function line(text = ''): void {
 }
 
 export function warn(text: string): void {
-  process.stderr.write(`${c.yellow('warning')}: ${text}\n`);
+  process.stderr.write(`${c.yellow(t('label.warning'))}: ${text}\n`);
 }
 
 /** Reports a failure in the requested mode and sets a non-zero exit code. */
@@ -36,8 +36,10 @@ export function reportFailure(error: unknown, json: boolean | undefined, nullSha
   if (json) {
     printJson({ ...nullShape, status: [diagnostic] });
   } else {
-    process.stderr.write(`${c.red('error')}: ${diagnostic.message}\n`);
-    if (diagnostic.fix) process.stderr.write(`${c.dim('fix')}: ${diagnostic.fix}\n`);
+    const message = error instanceof SdlcError ? error.localizedMessage() : diagnostic.message;
+    const fix = error instanceof SdlcError ? error.localizedFix() : diagnostic.fix;
+    process.stderr.write(`${c.red(t('label.error'))}: ${message}\n`);
+    if (fix) process.stderr.write(`${c.dim(t('label.fix'))}: ${fix}\n`);
   }
   process.exitCode = 1;
 }

@@ -110,7 +110,7 @@ const NEXT_ID_COMMENT_RE = (prefix: string): RegExp =>
 
 function oneLine(value: string, name: string): void {
   if (!value.trim() || /[\r\n]/.test(value)) {
-    throw new SdlcError('invalid_option', `${name} must be one non-empty line.`);
+    throw new SdlcError('invalid_option', { key: 'error.x_must_be_one_non_empty_line', params: { name: name } });
   }
 }
 
@@ -133,14 +133,14 @@ function save(root: string, backlog: Backlog): void {
 function itemOrThrow(backlog: Backlog, id: string): BacklogItem {
   const item = backlog.items.find((entry) => entry.id === id);
   if (!item) {
-    throw new SdlcError('unknown_backlog_item', `Unknown backlog item: ${id}`);
+    throw new SdlcError('unknown_backlog_item', { key: 'error.unknown_backlog_item_x', params: { id: id } });
   }
   return item;
 }
 
 function epicOrThrow(backlog: Backlog, id: string): void {
   if (!backlog.epics.some((entry) => entry.id === id)) {
-    throw new SdlcError('unknown_epic', `Unknown epic: ${id}`);
+    throw new SdlcError('unknown_epic', { key: 'error.unknown_epic_x', params: { id: id } });
   }
 }
 
@@ -166,10 +166,10 @@ function validateItemInput(input: BacklogItemInput): void {
     oneLine(criterion, 'acceptance');
   }
   if (input.kind && !CHANGE_KINDS.includes(input.kind)) {
-    throw new SdlcError('invalid_option', `Invalid kind: ${input.kind}`);
+    throw new SdlcError('invalid_option', { key: 'error.invalid_kind_x_2', params: { input_kind: input.kind } });
   }
   if (input.risk && !RISK_LEVELS.includes(input.risk)) {
-    throw new SdlcError('invalid_option', `Invalid risk: ${input.risk}`);
+    throw new SdlcError('invalid_option', { key: 'error.invalid_risk_x_2', params: { input_risk: input.risk } });
   }
 }
 
@@ -177,7 +177,7 @@ function assertNoDependencyCycle(backlog: Backlog, dependsOn: string[]): void {
   const seen = new Set<string>();
   const visit = (id: string): void => {
     if (seen.has(id)) {
-      throw new SdlcError('dependency_cycle', `Dependency cycle at ${id}`);
+      throw new SdlcError('dependency_cycle', { key: 'error.dependency_cycle_at_x', params: { id: id } });
     }
     seen.add(id);
     for (const dep of itemOrThrow(backlog, id).dependsOn) {
@@ -317,7 +317,7 @@ export function moveBacklogItem(root: string, id: string, to: BacklogMove): Back
   const backlog = readBacklog(root);
   const item = itemOrThrow(backlog, id);
   if (Object.keys(to).length !== 1) {
-    throw new SdlcError('invalid_option', 'Exactly one move target is required.');
+    throw new SdlcError('invalid_option', { key: 'error.exactly_one_move_target_is_required' });
   }
   if ('epic' in to) {
     epicOrThrow(backlog, to.epic);
@@ -326,7 +326,7 @@ export function moveBacklogItem(root: string, id: string, to: BacklogMove): Back
     const targetId = 'before' in to ? to.before : to.after;
     const target = itemOrThrow(backlog, targetId);
     if (target.id === id) {
-      throw new SdlcError('invalid_option', 'Cannot move relative to itself.');
+      throw new SdlcError('invalid_option', { key: 'error.cannot_move_relative_to_itself' });
     }
     item.epic = target.epic;
   }
@@ -341,7 +341,10 @@ function assertValidTransition(from: BacklogStatus, to: BacklogStatus): void {
   const openLeaving = from === 'open' && to !== 'open';
   const inProgressLeaving = from === 'in-progress' && to !== 'in-progress';
   if (!BACKLOG_STATUSES.includes(to) || !(openLeaving || inProgressLeaving)) {
-    throw new SdlcError('invalid_transition', `Invalid transition: ${from} to ${to}`);
+    throw new SdlcError(
+      'invalid_transition',
+      { key: 'error.invalid_transition_x_to_x', params: { from: from, to: to } }
+    );
   }
 }
 
@@ -363,14 +366,14 @@ export function setBacklogStatus(
   assertValidTransition(item.status, status);
   if (status === 'in-progress') {
     if (!extra.change) {
-      throw new SdlcError('invalid_option', 'change is required.');
+      throw new SdlcError('invalid_option', { key: 'error.change_is_required' });
     }
     oneLine(extra.change, 'change');
     item.change = extra.change;
   }
   if (status === 'done' || status === 'dropped') {
     if (!extra.note) {
-      throw new SdlcError('invalid_option', 'note is required.');
+      throw new SdlcError('invalid_option', { key: 'error.note_is_required_2' });
     }
     oneLine(extra.note, 'note');
     const date = now.toISOString().slice(0, 10);
