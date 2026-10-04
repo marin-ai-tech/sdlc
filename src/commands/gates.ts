@@ -165,7 +165,7 @@ export async function approveCommand(gateArg: string, opts: DecisionOptions): Pr
     recordChangeEvent(
       ctx, ref, state, `gate.${gate}.approved`, identity, `role ${role}${opts.note ? `: ${opts.note}` : ''}`,
     );
-    // The approved artifacts record which scdl version and license approved them.
+    // The approved artifacts record which sdlc version and license approved them.
     const stamping = tryStampArtifacts(ref.dir, approvedFiles(view, gate, ref.dir), ctx.stamp);
     if (stamping.error && !opts.json) {
       warn(`approval recorded, but the provenance line was not written: ${stamping.error}`);

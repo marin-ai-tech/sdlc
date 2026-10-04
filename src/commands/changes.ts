@@ -3,6 +3,7 @@ import { loadProject, recordChangeEvent, type ProjectContext } from '../cli/cont
 import { c, gateBadge, line, printJson, reportFailure, warn } from '../cli/output.js';
 import { bar, stepper } from '../cli/progress.js';
 import { emitNextHint, resolveNext } from '../cli/next-hint.js';
+import { t } from '../core/i18n.js';
 import {
   CHANGE_KINDS,
   newChangeState,
@@ -153,32 +154,48 @@ function changeWarnings(ctx: ProjectContext, view: LifecycleView, overlaps: Over
 }
 
 function actorLabel(view: LifecycleView): string {
-  if (view.next.actor === 'human') return c.yellow('person');
-  if (view.next.actor === 'agent') return c.cyan('agent');
-  return c.dim('none');
+  if (view.next.actor === 'human') return c.yellow(t('actor.person'));
+  if (view.next.actor === 'agent') return c.cyan(t('actor.agent'));
+  return c.dim(t('actor.none'));
+}
+
+function nextText(view: LifecycleView): string {
+  if (view.next.key) return t(view.next.key, view.next.params);
+  return view.next.message;
+}
+
+function stageTitleText(view: LifecycleView): string {
+  return t(`stage.${view.stage}`);
 }
 
 function printDetailed(view: LifecycleView, warnings: string[], invocationHint: (wf: string) => string): void {
   line(`${c.bold(view.change)}  ${c.dim(`[${view.kind} · risk ${view.risk} · ${view.track} track · schema ${view.schema}]`)}`);
-  line(`  stage      ${c.bold(view.stageTitle)}`);
-  if (view.source) line(`  source     ${view.source.type}${view.source.ref ? ` ${view.source.ref}` : ''}${view.source.url ? ` ${view.source.url}` : ''}`);
-  line(`  artifacts  ${view.artifacts.map((a) => `${a.id} ${a.status === 'done' ? c.green('✓') : a.status === 'skipped' ? c.dim('~') : a.status === 'ready' ? c.yellow('○') : c.dim('·')}`).join('  ')}`);
+  line(`  ${t('status.stage').padEnd(10)}${c.bold(stageTitleText(view))}`);
+  if (view.source) {
+    line(`  ${t('status.source').padEnd(10)}${view.source.type}${view.source.ref ? ` ${view.source.ref}` : ''}${view.source.url ? ` ${view.source.url}` : ''}`);
+  }
+  const arts = view.artifacts.map((a) => `${a.id} ${a.status === 'done' ? c.green('✓') : a.status === 'skipped' ? c.dim('~') : a.status === 'ready' ? c.yellow('○') : c.dim('·')}`).join('  ');
+  line(`  ${t('status.artifacts').padEnd(10)}${arts}`);
   line(`  ${stepper(view)}`);
   const taskBar = view.tasks.total === 0
-    ? c.dim('none yet')
+    ? c.dim(t('status.noneYet'))
     : `${bar(view.tasks.complete, view.tasks.total)}  ${view.tasks.complete}/${view.tasks.total}`;
-  line(`  tasks      ${taskBar}`);
-  line('  gates');
+  line(`  ${t('status.tasks').padEnd(10)}${taskBar}`);
+  line(`  ${t('status.gates')}`);
   for (const g of view.gates) {
     const who = g.approvals.map((a) => `${a.by} as ${a.role}`).join('; ');
-    const detail = g.status === 'approved' && who ? who : g.reason ?? '';
-    line(`    ${g.id.padEnd(8)} ${gateBadge(g.status).padEnd(20)} ${g.required ? '' : c.dim('(optional) ')}${c.dim(detail)}`);
+    const reasonText = g.reasonKey ? t(g.reasonKey, g.reasonParams) : g.reason ?? '';
+    const detail = g.status === 'approved' && who ? who : reasonText;
+    const optional = g.required ? '' : c.dim(t('status.optional'));
+    line(`    ${g.id.padEnd(8)} ${gateBadge(g.status).padEnd(20)} ${optional}${c.dim(detail)}`);
   }
   if (view.review) {
     const imp = view.review.bySeverity.important;
-    line(`  review     ${view.review.total} finding(s)${imp ? `, important ${imp.open} open / ${imp.total}` : ''}`);
+    const findings = t('status.findings', { total: view.review.total });
+    const important = imp ? t('status.importantOpen', { open: imp.open, total: imp.total }) : '';
+    line(`  ${t('status.review').padEnd(10)}${findings}${important}`);
   }
-  line(`  next       ${actorLabel(view)}: ${view.next.message}`);
+  line(`  ${t('status.next').padEnd(10)}${actorLabel(view)}: ${nextText(view)}`);
   if (view.next.cli) line(`             ${c.cyan(`$ ${view.next.cli}`)}`);
   else if (view.next.workflow && view.next.actor === 'agent') line(`             ${c.cyan(invocationHint(view.next.workflow))}`);
   for (const w of warnings) warn(`${view.change}: ${w}`);
@@ -187,7 +204,8 @@ function printDetailed(view: LifecycleView, warnings: string[], invocationHint: 
 function markdownReport(view: LifecycleView, warnings: string[]): string {
   const rows = view.gates.map((g) => {
     const who = g.approvals.map((a) => `${a.by} (${a.role}, ${a.at.slice(0, 10)})`).join('<br>');
-    return `| ${g.id} | ${g.status}${g.required ? '' : ' (optional)'} | ${who || (g.reason ?? '')} |`;
+    const reasonText = g.reasonKey ? t(g.reasonKey, g.reasonParams) : g.reason ?? '';
+    return `| ${g.id} | ${g.status}${g.required ? '' : ' (optional)'} | ${who || reasonText} |`;
   });
   const lines = [
     `### SDLC: \`${view.change}\``,
@@ -207,9 +225,9 @@ function markdownReport(view: LifecycleView, warnings: string[]): string {
   return lines.join('\n');
 }
 
-/** Markdown reports (pasted into pull requests and wikis) record the scdl version and license that produced them. */
+/** Markdown reports (pasted into pull requests and wikis) record the sdlc version and license that produced them. */
 function reportFooter(ctx: ProjectContext): string {
-  return `<sub>Generated by [scdl](${PROJECT_URL}) ${ctx.stamp.version} · license: ${ctx.stamp.license}</sub>`;
+  return `<sub>Generated by [sdlc](${PROJECT_URL}) ${ctx.stamp.version} · license: ${ctx.stamp.license}</sub>`;
 }
 
 export interface StatusOptions {
@@ -249,19 +267,19 @@ export async function statusCommand(opts: StatusOptions): Promise<void> {
       return line(`${reports.join('\n\n---\n\n')}\n\n${reportFooter(ctx)}`);
     }
     if (views.length === 0) {
-      line('No active changes. Start one with /sdlc:intent (Claude Code), /sdlc-intent (OpenCode), or `sdlc new <name>`.');
+      line(t('status.noChanges'));
       return;
     }
     const width = Math.max(8, ...views.map((v) => v.change.length));
-    line(c.bold(`${'CHANGE'.padEnd(width)}  ${'STAGE'.padEnd(9)} NEXT`));
+    line(c.bold(`${t('status.colChange').padEnd(width)}  ${t('status.colStage').padEnd(9)} ${t('status.colNext')}`));
     for (const v of views) {
       if ('error' in v) {
-        line(`${v.change.padEnd(width)}  ${c.red('error'.padEnd(9))} ${(v as { error: string }).error}`);
+        line(`${v.change.padEnd(width)}  ${c.red(t('status.error').padEnd(9))} ${(v as { error: string }).error}`);
         continue;
       }
       const next = v.next.actor === 'human' && v.next.cli
         ? `${actorLabel(v)}: ${v.next.cli}`
-        : `${actorLabel(v)}: ${v.next.workflow ? `${invocation(v.next.workflow)} - ` : ''}${v.next.message}`;
+        : `${actorLabel(v)}: ${v.next.workflow ? `${invocation(v.next.workflow)} - ` : ''}${nextText(v)}`;
       line(`${v.change.padEnd(width)}  ${v.stage.padEnd(9)} ${next}`);
     }
     for (const o of overlaps) {
@@ -292,7 +310,7 @@ export async function nextCommand(opts: { change?: string; json?: boolean }): Pr
       return;
     }
     line(`${c.bold(view.change)}: ${view.stageTitle}`);
-    line(`${actorLabel(view)}: ${view.next.message}`);
+    line(`${actorLabel(view)}: ${nextText(view)}`);
     if (view.next.cli) line(c.cyan(`$ ${view.next.cli}`));
   } catch (error) {
     reportFailure(error, opts.json, { next: null });

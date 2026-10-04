@@ -28,6 +28,26 @@ import {
   type InstallResult,
 } from '../integrations/install.js';
 import type { ToolId } from '../integrations/types.js';
+import { agentEnvironment } from '../core/agent-env.js';
+import {
+  CODEGRAPH_INDEX,
+  defaultInstaller,
+  defaultProbe,
+  installCommand,
+  type DependencyId,
+  type Installer,
+  type Probe,
+} from '../core/dependencies.js';
+import {
+  askInitChoices,
+  initDefaults,
+  shouldPrompt,
+  starterRoles,
+  terminalPrompter,
+  type InitChoices,
+  type Prompter,
+  type TerminalState,
+} from './init-wizard.js';
 
 export interface InitOptions {
   tools?: string;
@@ -140,7 +160,91 @@ function printInstall(result: InstallResult, config: SdlcConfig): void {
   }
 }
 
-export async function initCommand(target: string | undefined, opts: InitOptions): Promise<void> {
+interface WizardResult {
+  opts: InitOptions;
+  roles: boolean;
+  install: DependencyId[];
+  index: boolean;
+}
+
+/** Asks interactively when appropriate; returns undefined if the person declines. */
+async function resolveWizard(
+  root: string,
+  opts: InitOptions,
+  deps: InitDeps = {}
+): Promise<WizardResult | undefined> {
+  const terminal = {
+    stdinTTY: !!process.stdin.isTTY,
+    stdoutTTY: !!process.stdout.isTTY,
+    agent: agentEnvironment(),
+  };
+  const io = deps.io ?? terminal;
+  if (!shouldPrompt(opts, io)) {
+    return { opts, roles: false, install: [], index: false };
+  }
+  const probe = deps.probe ?? defaultProbe;
+  const defaults = initDefaults(root, detectTools(root), probe);
+  const choices = await askInitChoices(deps.prompter ?? terminalPrompter(), defaults);
+  if (!choices) {
+    line('Nothing written.');
+    return undefined;
+  }
+  return {
+    opts: optsFromChoices(opts, choices),
+    roles: choices.roles,
+    install: choices.install,
+    index: choices.index,
+  };
+}
+
+/** Runs chosen optional installs after settings are written; failures warn, never fail init. */
+async function runChosenInstalls(
+  root: string,
+  install: DependencyId[],
+  index: boolean,
+  installer: Installer,
+): Promise<void> {
+  for (const id of install) {
+    const command = installCommand(id);
+    const result = await installer(command, root);
+    if (!result.ok) {
+      warn(`optional install failed; run by hand: ${command.join(' ')}`);
+    }
+  }
+  if (!index) return;
+  const result = await installer(CODEGRAPH_INDEX, root);
+  if (!result.ok) {
+    warn(`optional index failed; run by hand: ${CODEGRAPH_INDEX.join(' ')}`);
+  }
+}
+
+function optsFromChoices(opts: InitOptions, choices: InitChoices): InitOptions {
+  return {
+    ...opts,
+    tools: choices.tools.length > 0 ? choices.tools.join(',') : 'none',
+    mode: choices.mode,
+    statusline: choices.statusline,
+    opsx: choices.opsx,
+    ...(choices.language ? { language: choices.language } : {}),
+  };
+}
+
+function writeStarterRoles(root: string): 'created' | 'kept' {
+  const file = path.join(root, 'openspec', 'roles.yaml');
+  if (exists(file)) return 'kept';
+  writeTextAtomic(file, starterRoles(gitIdentity(root)));
+  return 'created';
+}
+
+/** Test seams for the interactive mode; production uses the real terminal. */
+export interface InitDeps {
+  prompter?: Prompter;
+  io?: TerminalState;
+  probe?: Probe;
+  installer?: Installer;
+}
+
+export async function initCommand(target: string | undefined, opts: InitOptions, deps?: InitDeps): Promise<void> {
   try {
     const root = path.resolve(target ?? process.cwd());
     if (!isDirectory(root)) throw new SdlcError('invalid_path', `${root} is not a directory.`);
@@ -148,6 +252,9 @@ export async function initCommand(target: string | undefined, opts: InitOptions)
     if (nested && nested !== root && !isDirectory(path.join(root, 'openspec'))) {
       warn(`an OpenSpec root already exists at ${nested}; initializing a separate one in ${root}.`);
     }
+    const resolved = await resolveWizard(root, opts, deps);
+    if (!resolved) return;
+    opts = resolved.opts;
     const paths = projectPaths(root);
     const openspec = ensureOpenSpec(paths, opts.language);
     const hadConfig = isFile(paths.sdlcConfig);
@@ -170,6 +277,11 @@ export async function initCommand(target: string | undefined, opts: InitOptions)
       detectedCommands = found.map((f) => `${f.run} (${f.why})`);
     }
     saveConfig(paths.sdlcConfig, config);
+    let rolesNote: string | undefined;
+    if (resolved.roles) {
+      const rolesAction = writeStarterRoles(root);
+      rolesNote = `roles: ${rolesAction} openspec/roles.yaml`;
+    }
 
     // New OpenSpec roots default to the sdlc schema so OpenSpec's own /opsx
     // workflows produce SDLC changes too; existing roots keep their default.
@@ -186,6 +298,15 @@ export async function initCommand(target: string | undefined, opts: InitOptions)
     logSetup(root, config, hadConfig ? 'harness.reinitialized' : 'harness.initialized', tools);
     const license = assessLicense(config.license, detectProjectLicense(root));
 
+    if (resolved.install.length > 0 || resolved.index) {
+      await runChosenInstalls(
+        root,
+        resolved.install,
+        resolved.index,
+        deps?.installer ?? defaultInstaller,
+      );
+    }
+
     if (opts.json) {
       printJson({
         harness: stamp,
@@ -199,6 +320,7 @@ export async function initCommand(target: string | undefined, opts: InitOptions)
         statusLine: result.statusLine,
         reviewPolicy: reviewCreated ? config.review.policy : undefined,
         ...(opsx ? { opsx } : {}),
+        ...(rolesNote ? { roles: rolesNote } : {}),
       });
       return;
     }
@@ -212,6 +334,7 @@ export async function initCommand(target: string | undefined, opts: InitOptions)
     }
     if (reviewCreated) line(`  review policy: created ${config.review.policy}`);
     line(`  tools: ${tools.length > 0 ? tools.map((t) => ADAPTERS[t].name).join(', ') : 'none'}`);
+    if (rolesNote) line(`  ${rolesNote}`);
     if (opsx) line(`  OpenSpec /opsx workflows: ${opsx}`);
     line(`  ${stampText(stamp)}`);
     if (license.status !== 'ok') warn(`${license.message}. ${license.fix ?? ''}`.trim());

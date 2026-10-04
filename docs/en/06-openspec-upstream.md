@@ -17,7 +17,7 @@ The question: "Is it worth fixing all the shortcomings in the OpenSpec implement
 | No visibility for non-technical roles | no reporting | `status --markdown`, `audit`, playbook metrics |
 | Too much ceremony for small things | a trade-off of the model | the lite track, `--skip-specs` |
 | Heavy prompts (#749, #611) | their choice | short workflows (3–5 KB), the CLI provides the state; `/opsx` workflows are not installed by default |
-| The hard-coded `openspec` binary breaks local installs (#1624) | their choice | the `cli:` prefix (`npx sdlc`) in all generated files; OpenSpec is called from inside `sdlc` |
+| The hard-coded `openspec` binary breaks local installs (#1624) | their choice | the `cli:` prefix (`npx --no-install sdlc`) in all generated files; OpenSpec is called from inside `sdlc` |
 
 ### B. Real core bugs or gaps: send upstream (issue/PR); until they are fixed, the harness provides a safeguard
 

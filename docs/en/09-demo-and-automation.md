@@ -27,7 +27,7 @@ npm run demo:deck                  # per language: runs the scenario, then build
 node scripts/demo/build-deck.mjs --transcript docs/demo/calculator-transcript.en.json --lang en --out deck.pptx
 ```
 
-The story (which steps each slide shows, the words in English and Russian) is in `scripts/demo/deck-content.mjs`; `scripts/demo/build-deck.mjs` renders it with pptxgenjs. The English deck is `docs/demo/scdl-calculator-demo.en.pptx` (20 slides), built from `docs/demo/calculator-transcript.en.json`.
+The story (which steps each slide shows, the words in English and Russian) is in `scripts/demo/deck-content.mjs`; `scripts/demo/build-deck.mjs` renders it with pptxgenjs. The English deck is `docs/demo/sdlc-calculator-demo.en.pptx` (20 slides), built from `docs/demo/calculator-transcript.en.json`.
 
 ## 9.2. A background process that keeps the dashboard current
 
@@ -37,7 +37,7 @@ The story (which steps each slide shows, the words in English and Russian) is in
 node scripts/examples/dashboard-watch.mjs --once                     # build once
 node scripts/examples/dashboard-watch.mjs                            # watch and rebuild
 node scripts/examples/dashboard-watch.mjs --serve 127.0.0.1:8123     # and serve with auto-refresh
-node scripts/examples/dashboard-watch.mjs --cli "npx sdlc" --debounce 2000 --min-interval 10000
+node scripts/examples/dashboard-watch.mjs --cli "npx --no-install sdlc" --debounce 2000 --min-interval 10000
 ```
 
 [`scripts/examples/README.md`](../../scripts/examples/README.md) shows how to run it in the background:

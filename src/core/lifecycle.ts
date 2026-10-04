@@ -7,6 +7,7 @@ import {
   type ChangeState,
   type GateState,
 } from './change-state.js';
+import { t } from './i18n.js';
 import type { ChangeRef } from './changes.js';
 import { digestFiles, withoutCheckboxState } from './digest.js';
 import { readDeferred } from './deferred.js';
@@ -78,6 +79,10 @@ export interface GateEvaluation {
   staleApprovals: ApprovalRecord[];
   missingRoles: string[];
   reason?: string;
+  /** Catalog key for localized status text; reason stays English. */
+  reasonKey?: string;
+  /** Params for the catalog key (locale-independent). */
+  reasonParams?: Record<string, string | number>;
 }
 
 export interface NextAction {
@@ -103,6 +108,10 @@ export interface NextAction {
   /** Exact CLI invocation, when the action is a CLI call. */
   cli?: string;
   message: string;
+  /** Catalog key for localized Next text; message stays English. */
+  key?: string;
+  /** Params for the catalog key (locale-independent). */
+  params?: Record<string, string | number>;
 }
 
 export interface LifecycleView {
@@ -162,13 +171,32 @@ function latestTime(records: Array<{ at: string }>): string | undefined {
  * whose digest no longer matches are "stale": the approver signed off on
  * content that has since changed, so the gate needs a fresh approval.
  */
+
+interface LocalizedReason {
+  reason: string;
+  reasonKey: string;
+  reasonParams?: Record<string, string | number>;
+}
+
+function lr(key: string, params: Record<string, string | number> = {}): LocalizedReason {
+  return {
+    reason: t(key, params, 'en'),
+    reasonKey: key,
+    ...(Object.keys(params).length > 0 ? { reasonParams: params } : {}),
+  };
+}
+
+function withLocalizedReason<T extends object>(base: T, info: LocalizedReason): T & LocalizedReason {
+  return { ...base, ...info };
+}
+
 function evaluateApprovalGate(
   id: ApprovalGateId,
   config: SdlcConfig,
   state: ChangeState,
   gateState: GateState | undefined,
   digest: string | undefined,
-  blockedReason: string | undefined,
+  blocked: LocalizedReason | undefined,
   artifacts: string[],
   trustRecorded = false
 ): GateEvaluation {
@@ -191,29 +219,45 @@ function evaluateApprovalGate(
     ...roles.allOf.filter((r) => !validRoles.has(r)),
   ];
 
+  const open = { approvals: valid, staleApprovals: stale, missingRoles };
   if (gateState?.waived) {
-    return { ...base, status: 'waived', satisfied: true, approvals: valid, staleApprovals: stale, missingRoles: [],
-      reason: `waived by ${gateState.waived.by}: ${gateState.waived.note}` };
+    const info = lr('gate.waived', { by: gateState.waived.by, note: gateState.waived.note });
+    return withLocalizedReason(
+      { ...base, status: 'waived' as const, satisfied: true, ...open, missingRoles: [] },
+      info,
+    );
   }
-  if (blockedReason && !(trustRecorded && valid.length > 0)) {
-    return { ...base, status: 'blocked', satisfied: !required, approvals: valid, staleApprovals: stale,
-      missingRoles, reason: blockedReason };
+  if (blocked && !(trustRecorded && valid.length > 0)) {
+    return withLocalizedReason(
+      { ...base, status: 'blocked' as const, satisfied: !required, ...open },
+      blocked,
+    );
   }
   const rejection = gateState?.rejection;
   const lastApproval = latestTime(valid);
   if (rejection && (!lastApproval || rejection.at > lastApproval)) {
-    return { ...base, status: 'rejected', satisfied: !required, approvals: valid, staleApprovals: stale,
-      missingRoles, reason: `rejected by ${rejection.by}${rejection.note ? `: ${rejection.note}` : ''}` };
+    const info = rejection.note
+      ? lr('gate.rejectedNote', { by: rejection.by, note: rejection.note })
+      : lr('gate.rejected', { by: rejection.by });
+    return withLocalizedReason(
+      { ...base, status: 'rejected' as const, satisfied: !required, ...open },
+      info,
+    );
   }
   if (missingRoles.length === 0) {
-    return { ...base, status: 'approved', satisfied: true, approvals: valid, staleApprovals: stale, missingRoles };
+    return { ...base, status: 'approved', satisfied: true, ...open };
   }
   if (stale.length > 0 && valid.length === 0) {
-    return { ...base, status: 'stale', satisfied: !required, approvals: valid, staleApprovals: stale, missingRoles,
-      reason: 'content changed after approval; re-approval needed' };
+    return withLocalizedReason(
+      { ...base, status: 'stale' as const, satisfied: !required, ...open },
+      lr('gate.stale'),
+    );
   }
-  return { ...base, status: 'pending', satisfied: !required, approvals: valid, staleApprovals: stale, missingRoles,
-    reason: `awaiting approval (${missingRoles.join(', ')})` };
+  const awaiting = lr('gate.awaiting', { roles: missingRoles.join(', ') });
+  return withLocalizedReason(
+    { ...base, status: 'pending' as const, satisfied: !required, ...open },
+    awaiting,
+  );
 }
 
 export interface EvaluateOptions {
@@ -269,25 +313,27 @@ export function evaluateChange(
       : isGitRepo(root) ? worktreeFingerprint(root, FINGERPRINT_EXCLUDES) : undefined;
 
   // Planning gates: intent, spec, plan.
-  let upstreamOpen: string | undefined;
+  let upstreamOpen: LocalizedReason | undefined;
   for (const id of ['intent', 'spec', 'plan'] as const) {
     const covered = mapping[id];
     if (covered.length === 0) {
-      gates.push({ id, stage: GATE_STAGE[id], required: false, status: 'n/a', satisfied: true,
-        artifacts: [], approvals: [], staleApprovals: [], missingRoles: [],
-        reason: `schema '${schema.name}' has no artifacts for this gate` });
+      gates.push(withLocalizedReason(
+        { id, stage: GATE_STAGE[id], required: false, status: 'n/a' as const, satisfied: true,
+          artifacts: [], approvals: [], staleApprovals: [], missingRoles: [] },
+        lr('gate.noArtifacts', { schema: schema.name }),
+      ));
       continue;
     }
     const missing = missingOf(covered);
-    const blockedReason = missing.length > 0
-      ? `missing artifacts: ${missing.join(', ')}`
+    const blocked = missing.length > 0
+      ? lr('gate.missingArtifacts', { artifacts: missing.join(', ') })
       : upstreamOpen;
     const digest = missing.length === 0
       ? digestFiles(ref.dir, coveredFiles(covered), (rel, content) => (rel === tracks ? withoutCheckboxState(content) : content))
       : undefined;
-    const evaluation = evaluateApprovalGate(id, config, state, state.gates[id], digest, blockedReason, covered, ref.archived);
+    const evaluation = evaluateApprovalGate(id, config, state, state.gates[id], digest, blocked, covered, ref.archived);
     gates.push(evaluation);
-    if (!evaluation.satisfied && !upstreamOpen) upstreamOpen = `waiting on the ${id} gate`;
+    if (!evaluation.satisfied && !upstreamOpen) upstreamOpen = lr('gate.waitingOn', { gate: id });
   }
 
   // Verify gate: deterministic evidence from `sdlc verify`, bound to the worktree fingerprint.
@@ -305,44 +351,47 @@ export function evaluateChange(
   }
   {
     let status: GateStatus;
-    let reason: string | undefined;
+    let info: LocalizedReason | undefined;
     const waiver = state.gates.verify?.waived;
     if (waiver) {
       status = 'waived';
-      reason = `waived by ${waiver.by}: ${waiver.note}`;
+      info = lr('gate.waived', { by: waiver.by, note: waiver.note });
     } else if (upstreamOpen) {
       status = 'blocked';
-      reason = upstreamOpen;
+      info = upstreamOpen;
     } else if (!taskProgress && schema.apply) {
       status = 'blocked';
-      reason = `no ${tracks} to track implementation`;
+      info = lr('gate.noTasksFile', { file: tracks });
     } else if (tasks.remaining > 0) {
       status = 'blocked';
-      reason = `${tasks.remaining} task(s) still open in ${tracks}`;
+      info = lr('gate.tasksOpen', { remaining: tasks.remaining, file: tracks });
     } else if (verification.status === 'passed') {
       status = 'passed';
     } else if (verification.status === 'stale') {
       status = 'stale';
-      reason = 'code changed since the last passing `sdlc verify`';
+      info = lr('gate.verifyStale');
     } else if (verification.status === 'failed') {
       status = 'failed';
-      reason = 'last `sdlc verify` run failed';
+      info = lr('gate.verifyFailed');
     } else {
       status = 'pending';
-      reason = config.verify.commands.length === 0
-        ? 'no verification commands configured (verify.commands in openspec/sdlc.yaml)'
-        : 'run `sdlc verify`';
+      info = config.verify.commands.length === 0
+        ? lr('gate.verifyNoCommands')
+        : lr('gate.verifyRun');
     }
     const satisfied = status === 'passed' || status === 'waived' || !verifyRequired;
-    gates.push({ id: 'verify', stage: 'test', required: verifyRequired, status, satisfied, artifacts: [],
-      approvals: [], staleApprovals: [], missingRoles: [], ...(reason ? { reason } : {}) });
-    if (!satisfied && !upstreamOpen) upstreamOpen = 'waiting on the verify gate';
+    const verifyBase = {
+      id: 'verify' as const, stage: 'test' as const, required: verifyRequired, status, satisfied,
+      artifacts: [] as string[], approvals: [], staleApprovals: [], missingRoles: [] as string[],
+    };
+    gates.push(info ? withLocalizedReason(verifyBase, info) : verifyBase);
+    if (!satisfied && !upstreamOpen) upstreamOpen = lr('gate.waitingOn', { gate: 'verify' });
   }
 
   // Review gate: findings in review.md + human code-owner approval bound to code + review record.
   const reviewFile = path.join(ref.dir, 'review.md');
   let review: LifecycleView['review'];
-  let reviewBlocked: string | undefined = upstreamOpen;
+  let reviewBlocked: LocalizedReason | undefined = upstreamOpen;
   if (isFile(reviewFile)) {
     const content = readText(reviewFile) ?? '';
     const findings = parseFindings(content);
@@ -355,17 +404,24 @@ export function evaluateChange(
       blocking: summary.blocking.map((f) => ({ ...(f.id ? { id: f.id } : {}), title: f.title, severity: f.severity })),
     };
     if (!reviewBlocked && summary.blocking.length > 0) {
-      reviewBlocked = `${summary.blocking.length} open blocking finding(s) in review.md`;
+      reviewBlocked = lr('gate.reviewBlocking', { count: summary.blocking.length });
     }
     const coverage = checkCoverage(findings, parseCoverage(content), [...config.review.passes, ...config.review.lenses]);
     if (!reviewBlocked && config.review.requireLensCoverage && (coverage.missing.length || coverage.unchecked.length)) {
-      reviewBlocked = `review coverage missing: ${coverage.missing.join(', ')}; unchecked: ${coverage.unchecked.join(', ')}`;
+      reviewBlocked = lr('gate.reviewCoverage', {
+        missing: coverage.missing.join(', '),
+        unchecked: coverage.unchecked.join(', '),
+      });
     }
     const knownDeferred = new Set(readDeferred(root).map((item) => item.id));
-    const missingDeferred = findings.filter((finding) => finding.deferredTo && !knownDeferred.has(finding.deferredTo)).map((finding) => finding.deferredTo);
-    if (!reviewBlocked && missingDeferred.length) reviewBlocked = `missing deferred registry ids: ${missingDeferred.join(', ')}`;
+    const missingDeferred = findings
+      .filter((finding) => finding.deferredTo && !knownDeferred.has(finding.deferredTo))
+      .map((finding) => finding.deferredTo);
+    if (!reviewBlocked && missingDeferred.length) {
+      reviewBlocked = lr('gate.missingDeferred', { ids: missingDeferred.join(', ') });
+    }
   } else if (!reviewBlocked) {
-    reviewBlocked = 'no review.md yet (run the review workflow)';
+    reviewBlocked = lr('gate.noReview');
   }
   // Review and release approvals are bound to the code under review (worktree
   // fingerprint) plus the record files, so any later code change makes them stale.
@@ -378,11 +434,11 @@ export function evaluateChange(
       .update(digestFiles(ref.dir, files))
       .digest('hex')}`;
   };
-  const fastModeReason = options.skipFingerprint ? 'not evaluated in fast mode' : undefined;
+  const fastModeReason = options.skipFingerprint ? lr('gate.fastMode') : undefined;
   const reviewEval = evaluateApprovalGate('review', config, state, state.gates.review,
     codeDigest(['review.md']), fastModeReason ?? reviewBlocked, [], ref.archived);
   gates.push(reviewEval);
-  if (!reviewEval.satisfied && !upstreamOpen) upstreamOpen = 'waiting on the review gate';
+  if (!reviewEval.satisfied && !upstreamOpen) upstreamOpen = lr('gate.waitingOn', { gate: 'review' });
 
   const releaseEval = evaluateApprovalGate('release', config, state, state.gates.release,
     codeDigest(['review.md', 'release.md']), fastModeReason ?? upstreamOpen, [], ref.archived);
@@ -456,7 +512,18 @@ function nextAction(
   config: SdlcConfig,
   mapping: Record<'intent' | 'spec' | 'plan', string[]>
 ): NextAction {
-  if (view.archived) return { actor: 'none', action: 'none', message: 'Change is archived.' };
+  const withKey = (
+    action: Omit<NextAction, 'message' | 'key' | 'params'>,
+    key: string,
+    params: Record<string, string | number> = {},
+  ): NextAction => ({
+    ...action,
+    key,
+    params,
+    message: t(key, params, 'en'),
+  });
+
+  if (view.archived) return withKey({ actor: 'none', action: 'none' }, 'next.archived');
   const art = new Map(view.artifacts.map((a) => [a.id, a]));
   const firstMissing = (ids: string[]) =>
     ids.map((id) => art.get(id)).find((a) => a && a.status !== 'done' && a.status !== 'skipped');
@@ -467,70 +534,109 @@ function nextAction(
     const workflow = id;
     const missing = firstMissing(mapping[id]);
     if (missing) {
-      return {
-        actor: 'agent', action: 'write-artifact', workflow, artifact: missing.id,
-        cli: `sdlc instructions ${missing.id} --change ${view.change} --json`,
-        message: `Write ${missing.id} (${missing.generates}) for the ${id} gate.`,
-      };
+      return withKey(
+        {
+          actor: 'agent', action: 'write-artifact', workflow, artifact: missing.id,
+          cli: `sdlc instructions ${missing.id} --change ${view.change} --json`,
+        },
+        'next.writeArtifact',
+        { artifact: missing.id, file: missing.generates, gate: id },
+      );
     }
     if (g.status === 'rejected') {
-      return { actor: 'agent', action: 'revise-artifact', workflow, gate: id,
-        message: `The ${id} gate was ${g.reason}. Revise the ${mapping[id].join(', ')} artifact(s), then ask for approval again.` };
+      return withKey(
+        { actor: 'agent', action: 'revise-artifact', workflow, gate: id },
+        'next.reviseArtifact',
+        { gate: id, reason: g.reason ?? '', artifacts: mapping[id].join(', ') },
+      );
     }
     const role = g.missingRoles[0]?.split(' | ')[0];
-    return {
-      actor: 'human', action: 'approve-gate', gate: id, workflow,
-      cli: approveCli(view.change, id, role && role !== 'any approver' ? role : undefined),
-      message: g.status === 'stale'
-        ? `The ${id} artifacts changed after approval; ${withArticle(g.missingRoles)} must re-approve.`
-        : `${capitalize(withArticle(g.missingRoles))} must review and approve the ${id} gate (${mapping[id].join(', ')}).`,
-    };
+    const who = g.status === 'stale'
+      ? withArticle(g.missingRoles)
+      : capitalize(withArticle(g.missingRoles));
+    return withKey(
+      {
+        actor: 'human', action: 'approve-gate', gate: id, workflow,
+        cli: approveCli(view.change, id, role && role !== 'any approver' ? role : undefined),
+      },
+      g.status === 'stale' ? 'next.reapprove' : 'next.approve',
+      // `who` is English with an article; `roles` is the bare list other languages build their own sentence from.
+      { gate: id, who, roles: g.missingRoles.join(', '), artifacts: mapping[id].join(', ') },
+    );
   }
 
   const verify = gate(view, 'verify');
   if (!verify.satisfied) {
     if (view.tasks.remaining > 0 || view.tasks.total === 0) {
-      return { actor: 'agent', action: 'implement', workflow: 'build',
-        message: view.tasks.total === 0
-          ? 'Implement the approved plan (no tasks tracked yet).'
-          : `Implement the approved plan: ${view.tasks.remaining} of ${view.tasks.total} task(s) remain.` };
+      if (view.tasks.total === 0) {
+        return withKey(
+          { actor: 'agent', action: 'implement', workflow: 'build' },
+          'next.implementNone',
+        );
+      }
+      return withKey(
+        { actor: 'agent', action: 'implement', workflow: 'build' },
+        'next.implementRemain',
+        { remaining: view.tasks.remaining, total: view.tasks.total },
+      );
     }
-    return { actor: 'agent', action: 'verify', workflow: 'verify', cli: `sdlc verify --change ${view.change}`,
-      message: verify.status === 'failed'
-        ? 'Verification failed: fix the code (not the tests), then run `sdlc verify` again.'
-        : verify.status === 'stale'
-          ? 'Code changed since the last passing verification: run `sdlc verify` again.'
-          : 'Run the verification loop and record the evidence with `sdlc verify`.' };
+    const verifyKey = verify.status === 'failed'
+      ? 'next.verifyFailed'
+      : verify.status === 'stale'
+        ? 'next.verifyStale'
+        : 'next.verifyRun';
+    return withKey(
+      { actor: 'agent', action: 'verify', workflow: 'verify', cli: `sdlc verify --change ${view.change}` },
+      verifyKey,
+    );
   }
 
   const review = gate(view, 'review');
   if (!review.satisfied) {
     if (!view.review) {
-      return { actor: 'agent', action: 'review', workflow: 'review',
-        message: 'Run the multi-pass review (bugs, security, compliance with spec and plan) and record findings in review.md.' };
+      return withKey(
+        { actor: 'agent', action: 'review', workflow: 'review' },
+        'next.reviewRun',
+      );
     }
     if (view.review.blocking.length > 0) {
-      return { actor: 'agent', action: 'fix-findings', workflow: 'review',
-        message: `Address ${view.review.blocking.length} open blocking finding(s) in review.md, re-verify, and update their status.` };
+      return withKey(
+        { actor: 'agent', action: 'fix-findings', workflow: 'review' },
+        'next.fixFindings',
+        { count: view.review.blocking.length },
+      );
     }
-    return { actor: 'human', action: 'approve-gate', gate: 'review', workflow: 'review',
-      cli: approveCli(view.change, 'review'),
-      message: review.status === 'stale'
-        ? 'Code or review.md changed after review approval. A code owner must re-approve.'
-        : 'A code owner must read review.md and the diff, then approve the review gate.' };
+    return withKey(
+      {
+        actor: 'human', action: 'approve-gate', gate: 'review', workflow: 'review',
+        cli: approveCli(view.change, 'review'),
+      },
+      review.status === 'stale' ? 'next.reviewReapprove' : 'next.reviewApprove',
+    );
   }
 
   const release = gate(view, 'release');
   if (config.gates.release.required && !release.satisfied) {
     if (!isFile(path.join(view.dir, 'release.md'))) {
-      return { actor: 'agent', action: 'release', workflow: 'release',
-        message: 'Prepare release.md (rollout, rollback, monitoring) for release authorization.' };
+      return withKey(
+        { actor: 'agent', action: 'release', workflow: 'release' },
+        'next.releasePrepare',
+      );
     }
-    return { actor: 'human', action: 'approve-gate', gate: 'release', workflow: 'release',
-      cli: approveCli(view.change, 'release'),
-      message: 'A release manager must authorize the release.' };
+    return withKey(
+      {
+        actor: 'human', action: 'approve-gate', gate: 'release', workflow: 'release',
+        cli: approveCli(view.change, 'release'),
+      },
+      'next.releaseApprove',
+    );
   }
 
-  return { actor: 'agent', action: 'archive', workflow: 'archive', cli: `sdlc archive ${view.change} --yes`,
-    message: 'All gates are satisfied: archive the change to merge its delta specs into openspec/specs/.' };
+  return withKey(
+    {
+      actor: 'agent', action: 'archive', workflow: 'archive',
+      cli: `sdlc archive ${view.change} --yes`,
+    },
+    'next.archive',
+  );
 }

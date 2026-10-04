@@ -4,7 +4,7 @@ import { readText, writeTextAtomic } from './fs-utils.js';
 import { withProvenance, type HarnessStamp } from './license.js';
 
 /**
- * Keeps the provenance line (scdl version and license, see core/license.ts)
+ * Keeps the provenance line (sdlc version and license, see core/license.ts)
  * at the end of a change's own markdown artifacts: the files at the top level
  * of the change folder. Delta specs under `specs/` are never stamped, because
  * OpenSpec merges their text into the living specs at archive. The line is

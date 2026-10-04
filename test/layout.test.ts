@@ -225,7 +225,7 @@ describe('sdlc layout (CLI)', () => {
     const report = check.json();
     expect(report.ready).toBe(false);
     expect(report.roles.find((r: { role: string }) => r.role === 'architecture')).toMatchObject({ status: 'alias', path: 'ARCHITECTURE.md' });
-    expect(report.harness).toMatchObject({ tool: 'scdl' });
+    expect(report.harness).toMatchObject({ tool: 'sdlc' });
 
     const adapt = cli(['layout', 'adapt', '--json']);
     expect(adapt.code, adapt.stderr).toBe(0);

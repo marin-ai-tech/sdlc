@@ -2,6 +2,7 @@ import { line } from './output.js';
 import type { ProjectContext } from './context.js';
 import { listActiveChanges, resolveChange } from '../core/changes.js';
 import { nextBacklogItem, readBacklog } from '../core/backlog.js';
+import { t } from '../core/i18n.js';
 import { evaluateChange, type NextAction } from '../core/lifecycle.js';
 
 /** Next action shown after a state-changing CLI command (change or project-level). */
@@ -21,11 +22,14 @@ export function withCliPrefix(cli: string, prefix: string): string {
 function backlogHint(ctx: ProjectContext): NextHint | undefined {
   const item = nextBacklogItem(readBacklog(ctx.root));
   if (!item) return undefined;
+  const params = { id: item.id, title: item.title };
   return {
     actor: 'agent',
     action: 'start-backlog-item',
     item: item.id,
-    message: `Start backlog item ${item.id}: ${item.title}.`,
+    key: 'next.startBacklog',
+    params,
+    message: t('next.startBacklog', params, 'en'),
     cli: `${ctx.config.cli} backlog start ${item.id}`,
   };
 }
@@ -50,19 +54,25 @@ export function resolveNext(ctx: ProjectContext, changeId?: string): NextHint | 
   return backlogHint(ctx);
 }
 
+function nextMessage(next: NextHint): string {
+  if (next.key) return t(next.key, next.params);
+  return next.message;
+}
+
 /** Last-line text: `Next: agent — …` or `Next: person — …`. */
 export function formatNextLine(ctx: ProjectContext, next: NextHint): string | undefined {
   if (next.actor === 'none') return undefined;
+  const message = nextMessage(next);
   if (next.actor === 'human') {
     if (!next.cli) return undefined;
     const cmd = withCliPrefix(next.cli, ctx.config.cli);
-    return `Next: person — ${next.message.replace(/[.\s]+$/, '')}: ${cmd}`;
+    return t('next.personCmd', { message: message.replace(/[.\s]+$/, ''), cmd });
   }
   let how = '';
   if (next.workflow) how = workflowInvocation(ctx, next.workflow);
   else if (next.cli) how = withCliPrefix(next.cli, ctx.config.cli);
-  if (how) return `Next: agent — ${next.message} (${how})`;
-  return `Next: agent — ${next.message}`;
+  if (how) return t('next.agentHow', { message, how });
+  return t('next.agent', { message });
 }
 
 /** Print the Next: line (text mode). Returns the hint for JSON callers. */

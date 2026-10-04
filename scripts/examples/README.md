@@ -1,8 +1,8 @@
 # Dashboard watch examples
 
-Keep the scdl HTML dashboard (`sdlc dashboard --out …`) fresh while you edit
+Keep the sdlc HTML dashboard (`sdlc dashboard --out …`) fresh while you edit
 specs under `openspec/`. These files are **examples** — copy or adapt them; they
-are not part of the published `scdl` CLI package surface.
+are not part of the published `sdlc` CLI package surface.
 
 ## Files
 
@@ -18,13 +18,13 @@ From a project that already has `openspec/sdlc.yaml` (after `sdlc init`):
 
 ```bash
 # Build once
-node path/to/scdl/scripts/examples/dashboard-watch.mjs --once
+node path/to/sdlc/scripts/examples/dashboard-watch.mjs --once
 
 # Watch openspec/ and rebuild on changes
-node path/to/scdl/scripts/examples/dashboard-watch.mjs
+node path/to/sdlc/scripts/examples/dashboard-watch.mjs
 
 # Watch + serve with auto-refresh meta tag (response only; disk file unchanged)
-node path/to/scdl/scripts/examples/dashboard-watch.mjs --serve 127.0.0.1:0
+node path/to/sdlc/scripts/examples/dashboard-watch.mjs --serve 127.0.0.1:0
 ```
 
 ### Options
@@ -74,14 +74,14 @@ powershell -NoProfile -File scripts\examples\register-dashboard-task.ps1 `
   -ProjectRoot C:\path\to\your\project `
   -Out reports/dashboard.html `
   -Cli sdlc `
-  -TaskName scdl-dashboard-watch
+  -TaskName sdlc-dashboard-watch
 ```
 
 Unregister:
 
 ```powershell
 powershell -NoProfile -File scripts\examples\register-dashboard-task.ps1 `
-  -TaskName scdl-dashboard-watch `
+  -TaskName sdlc-dashboard-watch `
   -Unregister
 ```
 
@@ -89,16 +89,16 @@ Parameters: `-ProjectRoot`, `-Out`, `-Cli`, `-TaskName`, `-Unregister`.
 
 ## systemd --user (Linux example)
 
-Create `~/.config/systemd/user/scdl-dashboard-watch.service`:
+Create `~/.config/systemd/user/sdlc-dashboard-watch.service`:
 
 ```ini
 [Unit]
-Description=scdl dashboard HTML watcher
+Description=sdlc dashboard HTML watcher
 
 [Service]
 Type=simple
 WorkingDirectory=%h/projects/my-app
-ExecStart=/usr/bin/node /path/to/scdl/scripts/examples/dashboard-watch.mjs --out reports/dashboard.html --cli sdlc
+ExecStart=/usr/bin/node /path/to/sdlc/scripts/examples/dashboard-watch.mjs --out reports/dashboard.html --cli sdlc
 Restart=on-failure
 
 [Install]
@@ -109,12 +109,12 @@ Then:
 
 ```bash
 systemctl --user daemon-reload
-systemctl --user enable --now scdl-dashboard-watch.service
+systemctl --user enable --now sdlc-dashboard-watch.service
 ```
 
 ## launchd (macOS example)
 
-Create `~/Library/LaunchAgents/com.example.scdl-dashboard-watch.plist`:
+Create `~/Library/LaunchAgents/com.example.sdlc-dashboard-watch.plist`:
 
 ```xml
 <?xml version="1.0" encoding="UTF-8"?>
@@ -122,13 +122,13 @@ Create `~/Library/LaunchAgents/com.example.scdl-dashboard-watch.plist`:
 <plist version="1.0">
 <dict>
   <key>Label</key>
-  <string>com.example.scdl-dashboard-watch</string>
+  <string>com.example.sdlc-dashboard-watch</string>
   <key>WorkingDirectory</key>
   <string>/Users/you/projects/my-app</string>
   <key>ProgramArguments</key>
   <array>
     <string>/usr/local/bin/node</string>
-    <string>/path/to/scdl/scripts/examples/dashboard-watch.mjs</string>
+    <string>/path/to/sdlc/scripts/examples/dashboard-watch.mjs</string>
     <string>--out</string>
     <string>reports/dashboard.html</string>
     <string>--cli</string>
@@ -142,7 +142,7 @@ Create `~/Library/LaunchAgents/com.example.scdl-dashboard-watch.plist`:
 </plist>
 ```
 
-Load with `launchctl load ~/Library/LaunchAgents/com.example.scdl-dashboard-watch.plist`.
+Load with `launchctl load ~/Library/LaunchAgents/com.example.sdlc-dashboard-watch.plist`.
 
 ## CI: build dashboard as an artifact (example only)
 
@@ -162,7 +162,7 @@ jobs:
         # node scripts/examples/dashboard-watch.mjs --once --cli "node bin/sdlc.js"
       - uses: actions/upload-artifact@v4
         with:
-          name: scdl-dashboard
+          name: sdlc-dashboard
           path: reports/dashboard.html
 ```
 

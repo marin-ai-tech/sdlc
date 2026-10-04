@@ -182,6 +182,6 @@ describe('policy engine', () => {
     const { root, paths, config } = project();
     change(root, 'add-export', ['intent.md']);
     expect(sessionSummary({ paths, config })).toMatch(/add-export: stage plan/);
-    expect(sessionSummary({ paths, config })).toMatch(/^SDLC harness \(scdl \d+\.\d+\.\d+, license: community /);
+    expect(sessionSummary({ paths, config })).toMatch(/^SDLC harness \(sdlc \d+\.\d+\.\d+, license: community /);
   });
 });

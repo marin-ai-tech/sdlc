@@ -1,7 +1,7 @@
-# scdl Additional Permissions 1.0
+# sdlc Additional Permissions 1.0
 
-The licensor of scdl, marin-ai technologies, grants the following permissions in addition
-to the PolyForm Noncommercial License 1.0.0 (the "License") under which scdl is
+The licensor of sdlc, marin-ai technologies, grants the following permissions in addition
+to the PolyForm Noncommercial License 1.0.0 (the "License") under which sdlc is
 offered. Each permission adds a permitted purpose under the License. All other
 terms of the License continue to apply, including [Notices](PolyForm-Noncommercial-1.0.0.md#notices)
 (keeping the Required Notice), Patent Defense, Violations and No Liability.
@@ -50,4 +50,4 @@ the License applies.
 
 ## Required Notice
 
-Required Notice: Copyright (c) 2026 marin-ai technologies (https://github.com/marin-ai-tech/scdl)
+Required Notice: Copyright (c) 2026 marin-ai technologies (https://github.com/marin-ai-tech/sdlc)

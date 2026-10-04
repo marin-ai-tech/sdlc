@@ -1,7 +1,7 @@
 <#
 .SYNOPSIS
   Register (or unregister) a Windows Task Scheduler task that runs the
-  scdl dashboard HTML watcher at logon for the current user (hidden).
+  sdlc dashboard HTML watcher at logon for the current user (hidden).
 
 .DESCRIPTION
   Does not start the watcher immediately; it creates a logon trigger so
@@ -11,7 +11,7 @@
   DO NOT run this in CI blindly. Review -ProjectRoot / -Cli first.
 
 .PARAMETER ProjectRoot
-  Absolute path to the scdl project root (directory with openspec/sdlc.yaml).
+  Absolute path to the sdlc project root (directory with openspec/sdlc.yaml).
 
 .PARAMETER Out
   Dashboard output path relative to ProjectRoot (default: reports/dashboard.html).
@@ -20,7 +20,7 @@
   CLI command string passed to --cli (default: sdlc).
 
 .PARAMETER TaskName
-  Task Scheduler task name (default: scdl-dashboard-watch).
+  Task Scheduler task name (default: sdlc-dashboard-watch).
 
 .PARAMETER Unregister
   Remove the named task instead of registering it.
@@ -43,7 +43,7 @@ param(
   [string] $Cli = 'sdlc',
 
   [Parameter(Mandatory = $false)]
-  [string] $TaskName = 'scdl-dashboard-watch',
+  [string] $TaskName = 'sdlc-dashboard-watch',
 
   [Parameter(Mandatory = $false)]
   [switch] $Unregister
@@ -74,7 +74,7 @@ if ($Unregister) {
 $root = [System.IO.Path]::GetFullPath($ProjectRoot)
 $marker = Join-Path $root 'openspec\sdlc.yaml'
 if (-not (Test-Path -LiteralPath $marker)) {
-  throw "Not an scdl project root (missing openspec/sdlc.yaml): $root"
+  throw "Not an sdlc project root (missing openspec/sdlc.yaml): $root"
 }
 
 $scriptPath = Join-Path $PSScriptRoot 'dashboard-watch.mjs'

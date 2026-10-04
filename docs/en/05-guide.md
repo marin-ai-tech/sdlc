@@ -3,8 +3,8 @@
 ## 5.1. Installation
 
 ```bash
-# CLI (the required OpenSpec version is installed with it)
-npm install -g github:marin-ai-tech/scdl
+# CLI, the latest release (the required OpenSpec version is installed with it)
+npm install -g https://github.com/marin-ai-tech/sdlc/releases/latest/download/sdlc.tgz
 sdlc --version
 
 # in the project root (a git repository)
@@ -12,23 +12,27 @@ sdlc init --tools claude,opencode      # or --tools claude / --tools opencode
 sdlc doctor                            # check the installation
 ```
 
+From git, install the `release` branch, which carries the built code: `npm install -g github:marin-ai-tech/sdlc#release`. Never `npm install -g sdlc`: the registry package of that name is unrelated.
+
+With no flags in a terminal, `sdlc init` guides you through the setup (tools, enforcement mode, status line, /opsx, language, roles) and shows a summary before writing. The wizard also offers to install the OpenSpec CLI and codegraph when they are missing. Scripts, `--json`, non-terminals and agent sessions never prompt.
+
 `sdlc init`:
 - creates `openspec/` by running `openspec init` if it does not exist, and makes `sdlc` the default schema. In an existing OpenSpec project, the default schema does not change;
 - copies the schema to `openspec/schemas/sdlc/` and creates `openspec/sdlc.yaml`. Verification commands are detected automatically from `package.json`, `Makefile`, `pyproject`, `go.mod` or `Cargo.toml`;
 - generates skills, commands, subagents and hooks (Claude) or a plugin (OpenCode), plus `REVIEW.md` if it does not exist.
 
-Useful flags: `--mode block` — strict enforcement; `--cli "npx sdlc"` — if the CLI is installed locally in the project (`npm i -D github:marin-ai-tech/scdl`); `--opsx` — also install OpenSpec's own `/opsx:*` workflows alongside; `--delivery skills|commands|both`; `--no-hooks`; `--statusline` — install the Claude Code status line.
+Useful flags: `--mode block` — strict enforcement; `--cli "npx --no-install sdlc"` — if the CLI is installed locally in the project (`npm i -D https://github.com/marin-ai-tech/sdlc/releases/latest/download/sdlc.tgz`; `--no-install` keeps npx from fetching the unrelated registry package); `--opsx` — also install OpenSpec's own `/opsx:*` workflows alongside; `--delivery skills|commands|both`; `--no-hooks`; `--statusline` — install the Claude Code status line.
 
 **Claude Code plugin (organization-wide):**
 ```text
-/plugin marketplace add marin-ai-tech/scdl
-/plugin install sdlc@scdl
+/plugin marketplace add marin-ai-tech/sdlc
+/plugin install sdlc@sdlc
 ```
 After you install the plugin, it is enough to run `sdlc init --tools none` (or `--tools opencode`) in the project, so that skills are not duplicated. To make the plugin installation mandatory, use `extraKnownMarketplaces` and `enabledPlugins` in `.claude/settings.json` or in managed settings.
 
 After `init`, commit the generated files: they are shared by the team.
 
-**License.** By default, a project uses scdl under the free Community License. It covers noncommercial use, open source projects and a 30-day evaluation. `sdlc init` and `sdlc doctor` warn you if the project has no OSI-approved license. Commercial use requires a commercial license. After the agreement is signed, record the license with `sdlc license set commercial --agreement <id> --licensee "<company>"`.
+**License.** By default, a project uses sdlc under the free Community License. It covers noncommercial use, open source projects and a 30-day evaluation. `sdlc init` and `sdlc doctor` warn you if the project has no OSI-approved license. Commercial use requires a commercial license. After the agreement is signed, record the license with `sdlc license set commercial --agreement <id> --licensee "<company>"`.
 
 ## 5.2. Lifecycle of a change
 
@@ -56,6 +60,7 @@ At any point, `/sdlc:next` (`/sdlc-next`) runs the next step or tells you who mu
 
 ### Getting around
 
+- Language: help, hints, `status`, the init wizard, hook reasons and reports follow `--locale`, `SDLC_LOCALE`, `locale:` in `sdlc.yaml` or the system locale, in that order; English when there is no translation (English and Russian ship). JSON never changes with the locale.
 - `sdlc help [topic] [--json]` and `/sdlc:help` (`/sdlc-help`) list workflows and CLI commands and say who runs each one (agent or person).
 - After a state-changing command, the CLI prints a `Next:` hint (who acts next and how; the exact command when a person must act) and adds `next` to JSON. With no active change, session-start context names the next ready backlog item.
 - `sdlc status --change <id>` draws a stage stepper and a task bar; `sdlc backlog list` draws a bar per epic. Markdown reports include Mermaid diagrams with sanitized labels.
@@ -65,7 +70,7 @@ intent ● ─ spec ○ ─ plan ○ ─ build ○ ─ verify ○ ─ review ○
 tasks      █████░░░░░  2/4
 ```
 
-- Claude Code status line: `sdlc statusline` prints one line (`change · stage · who acts`). Opt in with `sdlc init --statusline`. A user-defined status line is never replaced; `sdlc uninstall` removes only the scdl one.
+- Claude Code status line: `sdlc statusline` prints one line (`change · stage · who acts`). Opt in with `sdlc init --statusline`. A user-defined status line is never replaced; `sdlc uninstall` removes only the sdlc one.
 
 ### Backlog and epics
 
@@ -147,7 +152,8 @@ Run `sdlc import bmad <path> --to-backlog [--dry-run]` to load BMAD into `opensp
 ```yaml
 version: 1
 schema: sdlc                  # schema for sdlc new
-cli: sdlc                     # or "npx sdlc"
+cli: sdlc                     # or "npx --no-install sdlc"
+locale: ru                    # optional: language for people (default: the system locale, else en)
 tools: [claude, opencode]
 gates:
   intent:  { required: true,  approvers: [product-owner] }
@@ -202,7 +208,7 @@ sdlc validate --all --json            # deltas + cross-change overlaps
 sdlc status --json                    # stages and gates of all changes
 sdlc review check --change <id>       # exit 1 if important findings are open
 sdlc audit --json                     # playbook metrics (lead times, first-pass)
-sdlc log --json                       # project log with the scdl version and license of each entry
+sdlc log --json                       # project log with the sdlc version and license of each entry
 sdlc approvals verify --mode required # every approval in a commit signed by the approver (roles.yaml)
 ```
 
@@ -215,7 +221,7 @@ For `claude -p`, allow the required tools in advance: `--allowedTools "Bash(sdlc
 ## 5.6. Updating and uninstalling
 
 ```bash
-npm install -g github:marin-ai-tech/scdl   # new version
+npm install -g https://github.com/marin-ai-tech/sdlc/releases/latest/download/sdlc.tgz   # the latest release
 sdlc update                             # regenerate files (manually edited ones are kept; --force overwrites them)
 sdlc update --tools claude              # change the set of agents
 sdlc uninstall                          # remove agent files and hooks; openspec/ remains

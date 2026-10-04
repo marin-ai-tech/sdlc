@@ -1,6 +1,6 @@
 {
-  "name": "scdl",
-  "version": "0.6.1",
+  "name": "sdlc",
+  "version": "0.6.2",
   "description": "AI-native SDLC harness for Claude Code and OpenCode, built on OpenSpec",
   "keywords": [
     "sdlc",
@@ -11,17 +11,17 @@
     "ai-native",
     "agents"
   ],
-  "homepage": "https://github.com/marin-ai-tech/scdl",
+  "homepage": "https://github.com/marin-ai-tech/sdlc",
   "repository": {
     "type": "git",
-    "url": "https://github.com/marin-ai-tech/scdl"
+    "url": "https://github.com/marin-ai-tech/sdlc"
   },
   "license": "SEE LICENSE IN LICENSE",
   "author": "marin-ai technologies (https://github.com/marin-ai-tech)",
   "type": "module",
   "bin": {
     "sdlc": "./bin/sdlc.js",
-    "scdl": "./bin/sdlc.js"
+    "scdl": "./bin/scdl.js"
   },
   "files": [
     "dist",
@@ -49,6 +49,7 @@
   },
   "dependencies": {
     "@fission-ai/openspec": "^1.13.2",
+    "@inquirer/prompts": "^8.7.2",
     "commander": "^14.0.0",
     "picomatch": "^4.0.2",
     "yaml": "^2.8.3"

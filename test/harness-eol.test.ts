@@ -23,7 +23,7 @@ const { schemaFiles } = await import('../src/integrations/install.js');
 const { renderClaudePlugin } = await import('../src/integrations/plugin.js');
 const { readAsset } = await import('../src/integrations/assets.js');
 
-const stamp = { tool: 'scdl' as const, version: '0.0.0-test', license: 'community' };
+const stamp = { tool: 'sdlc' as const, version: '0.0.0-test', license: 'community' };
 
 describe('files copied from the harness package are emitted with LF', () => {
   it('schema and templates installed into openspec/schemas/sdlc/', () => {

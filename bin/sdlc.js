@@ -8,8 +8,7 @@ for (const stream of [process.stdout, process.stderr]) {
 }
 
 // Hooks run on every agent tool call, so `sdlc hook` skips loading the full CLI.
-const argv = process.argv;
-const main = argv[2] === 'hook'
+const argv = process.argv;const main = argv[2] === 'hook'
   ? import('../dist/hook.js').then(({ runHook }) => {
       const agentIndex = argv.indexOf('--agent');
       return runHook(argv[3] ?? '', agentIndex > 0 ? argv[agentIndex + 1] : undefined);

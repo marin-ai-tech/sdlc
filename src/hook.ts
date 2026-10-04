@@ -3,6 +3,7 @@ import * as os from 'node:os';
 import * as path from 'node:path';
 import { loadConfig } from './core/config.js';
 import { isFile, isWithin, toPosix } from './core/fs-utils.js';
+import { resolveLocale, setLocale, systemLocale } from './core/i18n.js';
 import { appendLog } from './core/log.js';
 import { evaluateToolCall, normalizeToolCall, sessionSummary, stopCheck, type Decision, type ToolCall } from './core/policy.js';
 import { findProjectRoot, projectPaths } from './core/project.js';
@@ -97,6 +98,14 @@ function decisionDetail(root: string, call: ToolCall, decision: Decision): strin
   return `${decision.rule ?? 'policy'}: ${call.tool}${files.length > 0 ? ` ${files.slice(0, 5).join(', ')}` : ''}`;
 }
 
+function applyHookLocale(configLocale: string | undefined): void {
+  setLocale(resolveLocale({
+    env: process.env,
+    config: configLocale,
+    system: systemLocale(),
+  }));
+}
+
 export async function runHook(event: string, agentFlag: string | undefined): Promise<void> {
   const agent: Agent = agentFlag === 'opencode' ? 'opencode' : 'claude';
   let input: HookInput = {};
@@ -113,6 +122,7 @@ export async function runHook(event: string, agentFlag: string | undefined): Pro
     const paths = projectPaths(root);
     if (!isFile(paths.sdlcConfig)) return;
     const config = loadConfig(paths.sdlcConfig);
+    applyHookLocale(config.locale);
     const ctx = { paths, config };
 
     switch (event as HookEvent) {

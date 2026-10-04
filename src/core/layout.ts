@@ -223,7 +223,7 @@ export interface TemplateContext {
   paths: Record<LayoutRoleId, string>;
   /** `verify.commands` from sdlc.yaml, rendered for `{{verify.commands}}`. */
   verifyCommands: Array<{ name: string; run: string }>;
-  /** How agents call the CLI (`sdlc`, `npx sdlc`), for `{{cli}}`. */
+  /** How agents call the CLI (`sdlc`, `npx --no-install sdlc`), for `{{cli}}`. */
   cli: string;
 }
 

@@ -1,13 +1,13 @@
 {
   "name": "sdlc",
-  "version": "0.6.1",
-  "description": "AI-native SDLC workflows (intent, spec, plan, build, verify, review, release, archive, triage) with gates, built on OpenSpec. Requires the `sdlc` CLI (npm package scdl).",
+  "version": "0.6.2",
+  "description": "AI-native SDLC workflows (intent, spec, plan, build, verify, review, release, archive, triage) with gates, built on OpenSpec. Requires the `sdlc` CLI (npm package sdlc).",
   "author": {
     "name": "marin-ai technologies",
     "url": "https://github.com/marin-ai-tech"
   },
-  "homepage": "https://github.com/marin-ai-tech/scdl",
-  "repository": "https://github.com/marin-ai-tech/scdl",
+  "homepage": "https://github.com/marin-ai-tech/sdlc",
+  "repository": "https://github.com/marin-ai-tech/sdlc",
   "license": "SEE LICENSE IN LICENSE",
   "keywords": [
     "sdlc",

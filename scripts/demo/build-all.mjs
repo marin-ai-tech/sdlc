@@ -15,7 +15,7 @@ const DECKS = [
 ].map(({ lang, dir }) => ({
   lang,
   transcript: path.join(root, dir, `calculator-transcript.${lang}.json`),
-  out: path.join(root, dir, `scdl-calculator-demo.${lang}.pptx`),
+  out: path.join(root, dir, `sdlc-calculator-demo.${lang}.pptx`),
 }));
 const buildDeck = path.join(root, 'scripts/demo/build-deck.mjs');
 const skipTest = process.argv.includes('--skip-test');

@@ -20,7 +20,7 @@ export interface RenderContext {
   cli: string;
   version: string;
   config: SdlcConfig;
-  /** scdl version and the project's license, written into every generated file's notice. */
+  /** sdlc version and the project's license, written into every generated file's notice. */
   stamp: HarnessStamp;
 }
 

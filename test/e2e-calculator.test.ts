@@ -7,7 +7,7 @@ import { buildProgram } from '../src/cli/index.js';
 import { BIN, git, humanEnv, initGitRepo, read, REPO_ROOT, runCli, tempDir, write } from './helpers.js';
 
 /**
- * The demo: a small team builds a calculator with scdl, using every command.
+ * The demo: a small team builds a calculator with sdlc, using every command.
  * Each step is recorded (who, command, exit code, output excerpt, note) into a
  * transcript that the demo deck is generated from. Set SDLC_DEMO_TRANSCRIPT to
  * a path to keep it (e.g. docs/demo/calculator-transcript.json).
@@ -75,7 +75,7 @@ function keypair(dir: string, name: string, email: string): { pubPath: string; p
   return { pubPath: `${priv}.pub`, pub: fs.readFileSync(`${priv}.pub`, 'utf-8').trim() };
 }
 
-describe('demo: a team builds a calculator with scdl (every command)', () => {
+describe('demo: a team builds a calculator with sdlc (every command)', () => {
   let root: string;
   let env: NodeJS.ProcessEnv;
   let keys: Record<'alice' | 'carol', { pubPath: string; pub: string }>;
@@ -124,7 +124,7 @@ describe('demo: a team builds a calculator with scdl (every command)', () => {
     const tmp = fs.realpathSync(path.dirname(root));
     const clean = (s: string) => s
       .replace(pattern([root, fs.realpathSync(root)]), 'till-calculator')
-      .replace(pattern([REPO_ROOT]), '<scdl>')
+      .replace(pattern([REPO_ROOT]), '<sdlc>')
       .replace(pattern([tmp], '(?:\\\\{1,2}|/)[\\w.-]+'), '<tmp>')
       .replace(pattern([os.tmpdir()]), '<tmp>');
     const commands = cliCommands();
@@ -134,16 +134,16 @@ describe('demo: a team builds a calculator with scdl (every command)', () => {
   });
 
   it('1. setup: install for both tools, check health, get help, make the project AI-ready', () => {
-    step('init', 'setup', 'alice', ['init', '--tools', 'claude,opencode', '--statusline'], 'Alice installs scdl for Claude Code and OpenCode, with the status line.');
+    step('init', 'setup', 'alice', ['init', '--tools', 'claude,opencode', '--statusline'], 'Alice installs sdlc for Claude Code and OpenCode, with the status line.');
     step('doctor', 'setup', 'alice', ['doctor'], 'Installation health.');
-    step('license', 'setup', 'alice', ['license'], 'Which license the project uses scdl under.');
+    step('license', 'setup', 'alice', ['license'], 'Which license the project uses sdlc under.');
     step('help', 'setup', 'bob', ['help'], 'The catalog: workflows, commands, and the decisions only people take.');
     step('layout-check', 'setup', 'agent', ['layout', 'check'], 'Is the project AI-ready? Not yet.');
     step('layout-scaffold', 'setup', 'agent', ['layout', 'scaffold'], 'The agent creates AGENTS.md, CLAUDE.md and the docs skeleton.');
     step('layout-adapt', 'setup', 'agent', ['layout', 'adapt', '--dry-run'], 'Nothing to adapt: everything is at its canonical place.');
     step('layout-convert', 'setup', 'agent', ['layout', 'convert'], 'Nothing to convert (dry run).');
     step('update', 'setup', 'alice', ['update', '--dry-run'], 'Generated files are up to date.');
-    commit('alice', 'Install scdl and the AI-ready layout');
+    commit('alice', 'Install sdlc and the AI-ready layout');
   });
 
   it('2. roles: who may approve what, in a file versioned in git', () => {
@@ -207,7 +207,7 @@ describe('demo: a team builds a calculator with scdl (every command)', () => {
     commit('bob', 'Plan for basic arithmetic'); // each approver commits their own approval
   });
 
-  it('6b. OpenSpec underneath: the scdl change is a plain OpenSpec change', () => {
+  it('6b. OpenSpec underneath: the sdlc change is a plain OpenSpec change', () => {
     const list = step('os-list', 'openspec', 'bob', ['openspec', 'list'], 'OpenSpec lists the change like any of its own.');
     expect(list.stdout).toContain('basic-arithmetic');
     step('os-status', 'openspec', 'agent', ['openspec', 'status', '--change', 'basic-arithmetic'], 'Artifact completion by the sdlc schema, computed by OpenSpec.');
@@ -281,7 +281,7 @@ describe('demo: a team builds a calculator with scdl (every command)', () => {
     step('report', 'visibility', 'alice', ['report', '--format', 'md'], 'The progress report with Mermaid diagrams.');
     step('dashboard', 'visibility', 'alice', ['dashboard', '--out', 'reports/dashboard.html'], 'The dashboard, one offline HTML page.');
     step('audit', 'visibility', 'alice', ['audit'], 'Lead times and first-pass rate.');
-    step('log', 'visibility', 'alice', ['log', '--limit', '15'], 'Who did what, with the scdl version and license.');
+    step('log', 'visibility', 'alice', ['log', '--limit', '15'], 'Who did what, with the sdlc version and license.');
     step('statusline', 'visibility', 'bob', ['statusline'], 'Claude Code status line.', { input: JSON.stringify({ cwd: root }) });
     step('hook', 'visibility', 'agent', ['hook', 'session-start'], 'What the agent learns when a session starts.', { input: JSON.stringify({ cwd: root, source: 'startup' }) });
     step('plugin', 'visibility', 'bob', ['plugin', 'build', path.join(tempDir('sdlc-demo-plugin-'), 'plugin')], 'The same workflows as a Claude Code plugin.');

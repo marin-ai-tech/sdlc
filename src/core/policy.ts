@@ -9,6 +9,7 @@ import { evaluateChange, sharedFingerprint, type LifecycleView } from './lifecyc
 import type { ProjectPaths } from './project.js';
 import { HUMAN_COMMANDS } from './help-catalog.js';
 import { nextBacklogItem, readBacklog } from './backlog.js';
+import { t } from './i18n.js';
 
 /**
  * Deterministic guardrails behind the advisory skills - the playbook's
@@ -147,14 +148,14 @@ export function evaluateToolCall(call: ToolCall, ctx: PolicyContext): Decision {
       return {
         decision: 'deny',
         rule: 'separation-of-duties',
-        reason: 'Gate approvals, rejections, waivers, test unlocks, track selection and backlog priority are human decisions. Ask the responsible person to run the command in their own terminal.',
+        reason: t('hook.separationOfDuties'),
       };
     }
     if (STATE_FILE_WRITE.test(cmd) && WRITE_OPS.test(cmd)) {
       return {
         decision: 'deny',
         rule: 'state-integrity',
-        reason: '.sdlc.yaml and openspec/.sdlc/log.jsonl hold gate approvals, evidence and the audit log; only the sdlc CLI may change them. Use `sdlc` commands instead of editing them.',
+        reason: t('hook.stateIntegrityBash'),
       };
     }
     const release = config.release.commands.find((p) => new RegExp(p, 'i').test(cmd));
@@ -166,7 +167,7 @@ export function evaluateToolCall(call: ToolCall, ctx: PolicyContext): Decision {
         return {
           decision: 'deny',
           rule: 'release-gate',
-          reason: `This looks like a production release (matched /${release}/). Production releases need a named release authorization: a release manager runs \`sdlc approve release --change <id>\` after reviewing release.md (or sets SDLC_RELEASE_APPROVAL for this session). The agent prepares the release; it does not authorize it.`,
+          reason: t('hook.releaseGate', { pattern: release }),
         };
       }
     }
@@ -183,7 +184,7 @@ export function evaluateToolCall(call: ToolCall, ctx: PolicyContext): Decision {
     return {
       decision: 'deny',
       rule: 'state-integrity',
-      reason: '.sdlc.yaml and openspec/.sdlc/log.jsonl hold gate approvals, evidence and the audit log; only the sdlc CLI may change them.',
+      reason: t('hook.stateIntegrityEdit'),
     };
   }
 
@@ -193,7 +194,7 @@ export function evaluateToolCall(call: ToolCall, ctx: PolicyContext): Decision {
     return {
       decision: 'deny',
       rule: 'protected-path',
-      reason: `${protectedHit} is a protected path (enforcement.protected_paths in openspec/sdlc.yaml). Change it through its owning process, not in an agent session.`,
+      reason: t('hook.protectedPath', { path: protectedHit }),
     };
   }
 
@@ -210,7 +211,7 @@ export function evaluateToolCall(call: ToolCall, ctx: PolicyContext): Decision {
       return {
         decision: 'deny',
         rule: 'tests-locked',
-        reason: `Tests are locked for change '${locking.id}' (fix-first protocol): the failing test is the proof, so fix the code, not ${testHit}. A person can unlock with \`sdlc tests unlock --change ${locking.id}\`.`,
+        reason: t('hook.testsLocked', { change: locking.id, path: testHit }),
       };
     }
   }
@@ -224,8 +225,8 @@ export function evaluateToolCall(call: ToolCall, ctx: PolicyContext): Decision {
         return soft(
           'plan-gate',
           pending.length === 0
-            ? `No SDLC change covers this edit (${code[0]}). Nothing is implemented without an accepted plan: start with /sdlc:intent (or \`sdlc new <name>\`), or keep the edit out of scope.`
-            : `No active change has an approved plan yet (${pending.join(', ')}). Finish the plan and have an engineer run \`sdlc approve plan --change <id>\` before editing ${code[0]}.`
+            ? t('hook.planGateNone', { path: code[0] })
+            : t('hook.planGatePending', { changes: pending.join(', '), path: code[0] }),
         );
       }
     }
@@ -240,20 +241,25 @@ export function sessionSummary(ctx: PolicyContext): string | undefined {
     const item = nextBacklogItem(readBacklog(ctx.paths.root));
     if (!item) return undefined;
     const start = `${ctx.config.cli} backlog start ${item.id}`;
-    return `Next backlog item: ${item.id} ${item.title}. Start with \`${start}\`.`;
+    return t('session.backlogNext', { id: item.id, title: item.title, start });
   }
-  const lines = [`SDLC harness (${stampText(harnessStamp(ctx.config))}): active changes in openspec/changes (run \`sdlc status\` for details).`];
+  const stamp = stampText(harnessStamp(ctx.config));
+  const lines = [t('session.header', { stamp })];
   for (const ref of changes.slice(0, 8)) {
     try {
       const view = evaluateChange(ctx.paths.root, ref, ctx.config, { skipFingerprint: true });
-      const who = view.next.actor === 'human' ? 'waiting on a person' : view.next.actor === 'agent' ? 'agent' : '';
-      lines.push(`- ${view.change}: stage ${view.stage}; next (${who}): ${view.next.message}`);
+      const who = view.next.actor === 'human'
+        ? t('session.whoPerson')
+        : view.next.actor === 'agent' ? t('session.whoAgent') : '';
+      const message = view.next.key ? t(view.next.key, view.next.params) : view.next.message;
+      lines.push(t('session.changeLine', { change: view.change, stage: view.stage, who, message }));
     } catch (error) {
-      lines.push(`- ${ref.id}: cannot evaluate (${error instanceof Error ? error.message : String(error)})`);
+      const err = error instanceof Error ? error.message : String(error);
+      lines.push(t('session.evalError', { id: ref.id, error: err }));
     }
   }
-  if (changes.length > 8) lines.push(`- ...and ${changes.length - 8} more`);
-  lines.push(`Enforcement mode is ${ctx.config.enforcement.mode}. Gate approvals are made by people with \`sdlc approve\`, never by the agent.`);
+  if (changes.length > 8) lines.push(t('session.more', { count: changes.length - 8 }));
+  lines.push(t('session.enforcement', { mode: ctx.config.enforcement.mode }));
   return lines.join('\n');
 }
 
@@ -267,7 +273,10 @@ export function stopCheck(ctx: PolicyContext): string | undefined {
       const verify = view.gates.find((g) => g.id === 'verify');
       const planOk = gateOk(view, 'plan');
       if (planOk && view.tasks.total > 0 && view.tasks.remaining === 0 && verify && verify.status !== 'passed' && verify.required) {
-        return `Change '${view.change}' has all tasks checked but no passing verification for the current code (${verify.reason ?? verify.status}). Run \`sdlc verify --change ${view.change}\` and paste the evidence before finishing.`;
+        return t('hook.verifyBeforeStop', {
+          change: view.change,
+          detail: verify.reason ?? verify.status,
+        });
       }
     } catch {
       // Ignore changes that cannot be evaluated here.

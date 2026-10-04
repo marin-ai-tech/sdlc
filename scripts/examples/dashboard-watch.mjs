@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Example background process: keeps the scdl dashboard page up to date.
+ * Example background process: keeps the sdlc dashboard page up to date.
  * Watches openspec/ and runs `<cli> dashboard --out <file>` after changes.
  * Optionally serves the page on localhost with an auto-refresh.
  * Everything stays local. How to run it in the background: README.md next to this file.
@@ -13,7 +13,7 @@ import path from 'node:path';
 const USAGE = `Usage: node dashboard-watch.mjs [options]
 
   --out <file>          page to write, relative to the project root (default reports/dashboard.html)
-  --cli <command>       scdl command line (default sdlc), e.g. "npx sdlc"
+  --cli <command>       sdlc command line (default sdlc), e.g. "npx --no-install sdlc"
   --debounce <ms>       wait after the last change before rebuilding (default 1000)
   --min-interval <ms>   fewest ms between two rebuilds (default 5000)
   --once                build once and exit
@@ -149,7 +149,7 @@ async function main() {
   const opts = parseArgs(process.argv.slice(2));
   if (opts.help) return void process.stdout.write(USAGE);
   const root = findProjectRoot(process.cwd());
-  if (!root) fail('Not inside an scdl project: no openspec/sdlc.yaml here or above. Run `sdlc init` first.', 1);
+  if (!root) fail('Not inside an sdlc project: no openspec/sdlc.yaml here or above. Run `sdlc init` first.', 1);
   if (opts.once) process.exit((await build(root, opts)) ? 0 : 1);
   const rebuild = rebuilder(root, opts);
   const stops = [watch(path.join(root, 'openspec'), rebuild.schedule), rebuild.stop];

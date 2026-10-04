@@ -11,7 +11,7 @@ export type GateId = (typeof ALL_GATES)[number];
 export type EnforcementMode = 'off' | 'warn' | 'block';
 export type Delivery = 'both' | 'skills' | 'commands';
 
-/** scdl is dual-licensed; a project declares which license it uses scdl under (see LICENSE). */
+/** sdlc is dual-licensed; a project declares which license it uses sdlc under (see LICENSE). */
 export const LICENSE_TYPES = ['community', 'commercial'] as const;
 export type LicenseType = (typeof LICENSE_TYPES)[number];
 /**
@@ -46,7 +46,7 @@ export interface SdlcConfig {
   version: 1;
   /** OpenSpec schema used for new changes created by `sdlc new`. */
   schema: string;
-  /** How agents and hooks invoke the harness CLI: `sdlc`, or e.g. `npx sdlc` for a project-local install. */
+  /** How agents and hooks invoke the harness CLI: `sdlc`, or e.g. `npx --no-install sdlc` for a project-local install. */
   cli: string;
   statusline: boolean;
   tools: string[];
@@ -81,7 +81,7 @@ export interface SdlcConfig {
     sessionContext: boolean;
     verifyBeforeStop: boolean;
   };
-  /** The license this project uses scdl under; recorded in every log entry and lifecycle record. */
+  /** The license this project uses sdlc under; recorded in every log entry and lifecycle record. */
   license: {
     type: LicenseType;
     /** Commercial agreement id. */
@@ -100,6 +100,8 @@ export interface SdlcConfig {
    * it differs from the canonical one (`sdlc layout adapt`). Empty = canonical.
    */
   layout: LayoutMapping;
+  /** UI locale (en, ru). Optional; absent means resolve from flag/env/system. */
+  locale?: string;
 }
 
 export const DEFAULT_TEST_PATHS = [
@@ -372,6 +374,9 @@ export function parseConfig(raw: Raw, file = 'openspec/sdlc.yaml'): SdlcConfig {
     config.log.hookDecisions = asBool(log.hook_decisions, where('log.hook_decisions')) ?? config.log.hookDecisions;
   }
 
+  const locale = asString(raw.locale, where('locale'));
+  if (locale !== undefined) config.locale = locale;
+
   const layout = asObject(raw.layout, where('layout'));
   if (layout) for (const [key, value] of Object.entries(layout)) {
     if (!(LAYOUT_ROLE_IDS as readonly string[]).includes(key)) throw new SdlcError('invalid_config', `${where(`layout.${key}`)} is not a known layout role.`);
@@ -447,15 +452,16 @@ export function serializeConfig(config: SdlcConfig): Record<string, unknown> {
     },
     log: { enabled: config.log.enabled, hook_decisions: config.log.hookDecisions },
     ...(Object.keys(config.layout).length ? { layout: config.layout } : {}),
+    ...(config.locale ? { locale: config.locale } : {}),
   };
 }
 
-export const CONFIG_HEADER = `# SDLC harness configuration (https://github.com/marin-ai-tech/scdl)
+export const CONFIG_HEADER = `# SDLC harness configuration (https://github.com/marin-ai-tech/sdlc)
 # Lives next to OpenSpec's config.yaml; OpenSpec itself never reads this file.
 # Gates follow Anthropic's AI-native SDLC playbook: intent -> spec -> plan -> verify -> review -> release.
 # enforcement.mode: off | warn (remind, never block) | block (hooks deny actions that skip a gate).
 # license.type: community (free: noncommercial use and open source projects) | commercial (paid, royalties).
-# See LICENSE and COMMERCIAL-LICENSE.md in the scdl package; change it with \`sdlc license set\`.
+# See LICENSE and COMMERCIAL-LICENSE.md in the sdlc package; change it with \`sdlc license set\`.
 `;
 
 export function saveConfig(file: string, config: SdlcConfig): void {

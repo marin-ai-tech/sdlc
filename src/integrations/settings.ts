@@ -99,7 +99,7 @@ function oursStatusLine(value: unknown): boolean {
   if (!value || typeof value !== 'object') return false;
   const line = value as Record<string, unknown>;
   return line.type === 'command' && typeof line.command === 'string'
-    && /^(?:sdlc|scdl|npx sdlc) statusline$/.test(line.command);
+    && /^(?:npx (?:--no-install )?)?(?:sdlc|scdl) statusline$/.test(line.command);
 }
 
 export function mergeClaudeStatusLine(root: string, cli: string, install: boolean, dryRun = false): string {

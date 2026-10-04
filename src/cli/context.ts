@@ -9,7 +9,7 @@ export interface ProjectContext {
   root: string;
   paths: ProjectPaths;
   config: SdlcConfig;
-  /** scdl version and the project's license, recorded with everything the CLI writes. */
+  /** sdlc version and the project's license, recorded with everything the CLI writes. */
   stamp: HarnessStamp;
 }
 
@@ -23,7 +23,7 @@ export function loadProject(cwd: string = process.cwd()): ProjectContext {
 /**
  * Records a lifecycle event: appends it to the change's history, writes the
  * change record, then appends it to the project log. History, record and log
- * entry all carry the scdl version and license.
+ * entry all carry the sdlc version and license.
  */
 export function recordChangeEvent(
   ctx: ProjectContext,

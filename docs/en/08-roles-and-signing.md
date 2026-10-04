@@ -1,6 +1,6 @@
 # 8. Roles, separation of duties and signed approvals
 
-A gate approval is only worth something if the right person gave it. Since 0.6.0, scdl can tie approvals to people named in a file that lives in git, refuse approvals that break separation of duties, and check that each approval arrived in a commit signed by the person who gave it.
+A gate approval is only worth something if the right person gave it. Since 0.6.0, sdlc can tie approvals to people named in a file that lives in git, refuse approvals that break separation of duties, and check that each approval arrived in a commit signed by the person who gave it.
 
 Without `openspec/roles.yaml`, nothing changes: the `roles:` allow-lists in `openspec/sdlc.yaml` apply as before.
 

@@ -2,7 +2,7 @@
 id: help
 title: "SDLC: Help"
 description: Show available SDLC workflows and the current project state.
-when-to-use: The user asks for help, what can scdl do, or which command to run.
+when-to-use: The user asks for help, what can sdlc do, or which command to run.
 command-description: Show SDLC workflows, state, and human decision commands
 ---
 Show the available workflows and the current state.

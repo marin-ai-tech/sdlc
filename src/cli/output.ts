@@ -1,4 +1,5 @@
 import { toDiagnostic } from '../core/errors.js';
+import { t } from '../core/i18n.js';
 
 const useColor = (): boolean =>
   !!process.stdout.isTTY && !process.env.NO_COLOR && process.env.TERM !== 'dumb';
@@ -42,21 +43,22 @@ export function reportFailure(error: unknown, json: boolean | undefined, nullSha
 }
 
 export function gateBadge(status: string): string {
+  const word = t(`gateStatus.${status}`);
   switch (status) {
     case 'approved':
     case 'passed':
-      return c.green(`✓ ${status}`);
+      return c.green(`✓ ${word}`);
     case 'waived':
     case 'n/a':
-      return c.dim(`~ ${status}`);
+      return c.dim(`~ ${word}`);
     case 'rejected':
     case 'failed':
-      return c.red(`✗ ${status}`);
+      return c.red(`✗ ${word}`);
     case 'stale':
-      return c.yellow(`↻ ${status}`);
+      return c.yellow(`↻ ${word}`);
     case 'pending':
-      return c.yellow(`… ${status}`);
+      return c.yellow(`… ${word}`);
     default:
-      return c.dim(`· ${status}`);
+      return c.dim(`· ${word}`);
   }
 }

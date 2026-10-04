@@ -8,8 +8,8 @@ import { harnessStamp, type HarnessStamp } from './license.js';
  * Append-only project log: one JSON object per line in
  * `openspec/.sdlc/log.jsonl`. It records what the harness did and decided
  * across all changes (setup, gate decisions, verification runs, archives,
- * hook denials), and every entry carries the scdl version and the license
- * the project uses scdl under. The log is committed with the project; the
+ * hook denials), and every entry carries the sdlc version and the license
+ * the project uses sdlc under. The log is committed with the project; the
  * `merge=union` attribute written next to it lets branches append
  * concurrently without merge conflicts.
  */
@@ -23,11 +23,11 @@ export interface LogEntry {
   detail?: string;
   /** Agent integration that triggered the entry (hook decisions). */
   agent?: string;
-  scdl: string;
+  sdlc: string;
   license: string;
 }
 
-export type LogInput = Omit<LogEntry, 'ts' | 'scdl' | 'license'>;
+export type LogInput = Omit<LogEntry, 'ts' | 'sdlc' | 'license'>;
 
 const GITATTRIBUTES = 'log.jsonl merge=union\n';
 
@@ -50,7 +50,7 @@ export function appendLog(
       ...(input.by ? { by: input.by } : {}),
       ...(input.detail ? { detail: input.detail } : {}),
       ...(input.agent ? { agent: input.agent } : {}),
-      scdl: stamp.version,
+      sdlc: stamp.version,
       license: stamp.license,
     };
     fs.appendFileSync(file, `${JSON.stringify(entry)}\n`, 'utf-8');
@@ -67,8 +67,12 @@ export function readLog(root: string): LogEntry[] {
   for (const line of text.split(/\r?\n/)) {
     if (!line.trim()) continue;
     try {
-      const parsed = JSON.parse(line) as LogEntry;
-      if (parsed && typeof parsed.event === 'string') entries.push(parsed);
+      const parsed = JSON.parse(line) as LogEntry & { scdl?: string };
+      if (!parsed || typeof parsed.event !== 'string') continue;
+      // Entries written before the rename from scdl carry the version under `scdl`.
+      if (parsed.sdlc === undefined && typeof parsed.scdl === 'string') parsed.sdlc = parsed.scdl;
+      delete parsed.scdl;
+      entries.push(parsed);
     } catch {
       // skip
     }

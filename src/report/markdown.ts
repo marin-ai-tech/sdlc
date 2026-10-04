@@ -1,5 +1,6 @@
 import type { ReportChange, ReportModel } from './model.js';
 import { PROJECT_URL } from '../core/license.js';
+import { t } from '../core/i18n.js';
 import {
   isStepDone,
   progressSteps,
@@ -17,21 +18,36 @@ function cell(value: unknown): string {
 
 function stages(model: ReportModel): string[] {
   return [
-    '## Stages', '',
-    '| Stage | Active |',
+    `## ${t('report.stages')}`, '',
+    `| ${t('report.stageCol')} | ${t('report.activeCol')} |`,
     '| --- | ---: |',
-    ...model.summary.byStage.map((stage) => `| ${cell(stage.title)} | ${stage.count} |`),
+    ...model.summary.byStage.map((stage) =>
+      `| ${cell(t(`stage.${stage.stage}`))} | ${stage.count} |`),
     '',
   ];
 }
 
+function changeRow(change: ReportChange): string {
+  const stage = cell(t(`stage.${change.stage}`));
+  const tasks = `${change.tasks.complete}/${change.tasks.total}`;
+  const verify = cell(change.verification);
+  const next = cell(change.next.message);
+  return `| ${cell(change.id)} | ${stage} | ${tasks} | ${verify} | ${next} |`;
+}
+
 function changes(model: ReportModel): string[] {
+  const header = [
+    t('report.changeCol'),
+    t('report.stageCol'),
+    t('report.tasksCol'),
+    t('report.verificationCol'),
+    t('report.nextCol'),
+  ].join(' | ');
   return [
-    '## Changes', '',
-    '| Change | Stage | Tasks | Verification | Next |',
+    `## ${t('report.changes')}`, '',
+    `| ${header} |`,
     '| --- | --- | --- | --- | --- |',
-    ...model.changes.map((change) =>
-      `| ${cell(change.id)} | ${cell(change.stageTitle)} | ${change.tasks.complete}/${change.tasks.total} | ${cell(change.verification)} | ${cell(change.next.message)} |`),
+    ...model.changes.map(changeRow),
     '',
   ];
 }
@@ -93,13 +109,13 @@ function mermaidDiagrams(model: ReportModel): string[] {
   const active = model.changes.filter((change) => !change.archived);
   const lines: string[] = [];
   if (active.length) {
-    lines.push('## Lifecycle diagrams', '');
+    lines.push(`## ${t('report.lifecycleDiagrams')}`, '');
     for (const change of active) {
       lines.push(...changeFlowchart(change));
     }
   }
   if (model.backlog.epics.length) {
-    lines.push('## Epic progress', '');
+    lines.push(`## ${t('report.epicProgress')}`, '');
     lines.push(...epicFlowchart(model));
   }
   return lines;
@@ -108,8 +124,14 @@ function mermaidDiagrams(model: ReportModel): string[] {
 function leadTimes(model: ReportModel): string[] {
   const m = model.metrics.medianLeadTimeHours;
   return [
-    '## Median lead times (hours)', '',
-    `Intent to spec: ${cell(m.intentToSpecApproval)} · Spec to plan: ${cell(m.specToPlanApproval)} · Plan to verified: ${cell(m.planToVerified)} · Verified to review: ${cell(m.verifiedToReviewApproval)} · Created to archived: ${cell(m.createdToArchived)}`,
+    `## ${t('report.medianLeadTimes')}`, '',
+    t('report.leadLine', {
+      a: cell(m.intentToSpecApproval),
+      b: cell(m.specToPlanApproval),
+      c: cell(m.planToVerified),
+      d: cell(m.verifiedToReviewApproval),
+      e: cell(m.createdToArchived),
+    }),
     '',
   ];
 }
@@ -117,69 +139,98 @@ function leadTimes(model: ReportModel): string[] {
 function backlog(model: ReportModel): string[] {
   const { counts, epics, next, blocked } = model.backlog;
   const lines = [
-    '## Backlog', '',
-    `Open: ${counts.open} · In progress: ${counts['in-progress']} · Done: ${counts.done} · Dropped: ${counts.dropped}`,
+    `## ${t('report.backlog')}`, '',
+    t('report.backlogCounts', {
+      open: counts.open,
+      inProgress: counts['in-progress'],
+      done: counts.done,
+      dropped: counts.dropped,
+    }),
     '',
   ];
   if (epics.length) {
-    lines.push('| Epic | Done / total | In progress |', '| --- | ---: | ---: |');
+    lines.push(
+      `| ${t('report.epicCol')} | ${t('report.doneTotalCol')} | ${t('report.inProgressCol')} |`,
+      '| --- | ---: | ---: |',
+    );
     for (const epic of epics) {
       lines.push(`| ${cell(`${epic.id} ${epic.title}`)} | ${epic.done}/${epic.total} | ${epic.inProgress} |`);
     }
     lines.push('');
   }
-  lines.push('### Next', '');
+  lines.push(`### ${t('report.nextHeading')}`, '');
   if (next.length) {
     for (const item of next) lines.push(`- ${cell(item.id)} — ${cell(item.title)}`);
   } else {
-    lines.push('- (none)');
+    lines.push(`- ${t('report.none')}`);
   }
-  lines.push('', '### Blocked', '');
+  lines.push('', `### ${t('report.blockedHeading')}`, '');
   if (blocked.length) {
     for (const item of blocked) {
-      lines.push(`- ${cell(item.id)} — ${cell(item.title)} (blocked by ${cell(item.blockedBy.join(', '))})`);
+      const by = t('report.blockedBy', { ids: item.blockedBy.join(', ') });
+      lines.push(`- ${cell(item.id)} — ${cell(item.title)} (${by})`);
     }
   } else {
-    lines.push('- (none)');
+    lines.push(`- ${t('report.none')}`);
   }
   lines.push('');
   return lines;
 }
 
 function deferred(model: ReportModel): string[] {
-  return ['## Deferred work', '', '| ID | Title | Change | Revisit when |', '| --- | --- | --- | --- |',
-    ...model.deferred.items.map((item) => `| ${cell(item.id)} | ${cell(item.title)} | ${cell(item.change)} | ${cell(item.revisit)} |`), ''];
+  return [
+    `## ${t('report.deferred')}`, '',
+    `| ${t('report.idCol')} | ${t('report.titleCol')} | ${t('report.changeCol')} | ${t('report.revisitCol')} |`,
+    '| --- | --- | --- | --- |',
+    ...model.deferred.items.map((item) =>
+      `| ${cell(item.id)} | ${cell(item.title)} | ${cell(item.change)} | ${cell(item.revisit)} |`),
+    '',
+  ];
 }
 
 function events(model: ReportModel): string[] {
   return [
-    '## Recent events', '',
-    ...model.events.map((event) =>
-      `- ${event.ts} ${event.change ? `${cell(event.change)}: ` : ''}${cell(event.event)}${event.detail ? ` — ${cell(event.detail)}` : ''}`),
+    `## ${t('report.recentEvents')}`, '',
+    ...model.events.map((event) => {
+      const who = event.change ? `${cell(event.change)}: ` : '';
+      const detail = event.detail ? ` — ${cell(event.detail)}` : '';
+      return `- ${event.ts} ${who}${cell(event.event)}${detail}`;
+    }),
     '',
   ];
 }
 
 function layout(model: ReportModel): string[] {
   const missing = model.layout.missingRequired.length
-    ? ` Missing required: ${model.layout.missingRequired.join(', ')}.`
+    ? t('report.layoutMissing', { missing: model.layout.missingRequired.join(', ') })
     : '';
+  const state = model.layout.ready ? t('report.layoutReady') : t('report.layoutIncomplete');
   return [
-    '## Layout readiness', '',
-    `${model.layout.ready ? 'Ready' : 'Incomplete'} (${model.layout.score}%).${missing}`,
+    `## ${t('report.layout')}`, '',
+    t('report.layoutLine', { state, score: model.layout.score, missing }),
     '',
   ];
 }
 
 function footer(model: ReportModel): string {
-  return `<sub>Generated by [scdl](${PROJECT_URL}) ${model.harness.version} · license: ${model.harness.license}</sub>`;
+  return `<sub>${t('report.footer', {
+    url: PROJECT_URL,
+    version: model.harness.version,
+    license: model.harness.license,
+  })}</sub>`;
 }
 
 export function renderReportMarkdown(model: ReportModel): string {
+  const since = model.period.since ?? t('report.allTime');
   const lines = [
-    `# ${cell(model.project.name)} SDLC progress (${model.period.since ?? 'all time'} to ${model.period.until})`,
+    `# ${t('report.title', { name: cell(model.project.name), since, until: model.period.until })}`,
     '',
-    `${model.summary.active} active · ${model.summary.archived} archived · ${model.summary.blocked} blocked · ${model.summary.awaitingHuman} awaiting a person`,
+    t('report.summaryLine', {
+      active: model.summary.active,
+      archived: model.summary.archived,
+      blocked: model.summary.blocked,
+      awaiting: model.summary.awaitingHuman,
+    }),
     '',
     ...stages(model),
     ...changes(model),

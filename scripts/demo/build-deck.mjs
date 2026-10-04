@@ -237,7 +237,7 @@ function resolve(ids, steps) {
 
 function layoutTitle(pres, def, lang) {
   const slide = newSlide(pres, C.graphite);
-  text(slide, 'scdl', { x: ML, y: 0.5, w: 2, h: 0.4, fontSize: 18, bold: true, color: C.orange });
+  text(slide, 'sdlc', { x: ML, y: 0.5, w: 2, h: 0.4, fontSize: 18, bold: true, color: C.orange });
   text(slide, def.title[lang], {
     x: ML, y: 2.1, w: CW, h: 1.0, fontFace: SERIF, fontSize: 40, bold: true, color: C.paper,
   });
@@ -419,7 +419,7 @@ const LAYOUTS = {
 async function build(transcript, lang, out) {
   const pres = new pptxgen();
   pres.layout = 'LAYOUT_WIDE';
-  pres.title = lang === 'ru' ? 'scdl · демо «калькулятор»' : 'scdl · calculator demo';
+  pres.title = lang === 'ru' ? 'sdlc · демо «калькулятор»' : 'sdlc · calculator demo';
   const steps = transcript.steps ?? [];
   const data = { ...transcript, steps, byId: new Map(steps.map((step) => [step.id, step])) };
   for (const def of SLIDES) {

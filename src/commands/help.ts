@@ -2,36 +2,56 @@ import { buildProgram } from '../cli/index.js';
 import { line, printJson, reportFailure } from '../cli/output.js';
 import { helpCatalog, type CatalogCommand } from '../core/help-catalog.js';
 import { SdlcError } from '../core/errors.js';
+import { t } from '../core/i18n.js';
+
+function cmdKey(name: string): string {
+  return `cmd.${name.replace(/ /g, '.')}`;
+}
+
+function localizedDescription(item: CatalogCommand): string {
+  return t(cmdKey(item.name));
+}
 
 function printCommands(title: string, commands: CatalogCommand[]): void {
   line(`\n${title}`);
   const width = Math.max(...commands.map((item) => item.usage.length), 0);
-  for (const item of commands) line(`  ${item.usage.padEnd(width)}  ${item.description}`);
+  for (const item of commands) {
+    line(`  ${item.usage.padEnd(width)}  ${localizedDescription(item)}`);
+  }
 }
 
 function printWorkflows(workflows: ReturnType<typeof helpCatalog>['workflows']): void {
-  line('Workflows');
-  const width = Math.max(...workflows.map((item) => item.title.length), 0);
+  line(t('help.workflows'));
+  const titles = workflows.map((item) => t(`workflow.${item.id}.title`));
+  const width = Math.max(...titles.map((title) => title.length), 0);
   const invocations = workflows.map((item) => `${item.invocation.claude} · ${item.invocation.opencode}`);
   const invocationWidth = Math.max(...invocations.map((item) => item.length), 0);
   for (const [index, item] of workflows.entries()) {
-    line(`  ${item.title.padEnd(width)}  ${invocations[index].padEnd(invocationWidth)}  ${item.description}`);
+    const title = titles[index];
+    const description = t(`workflow.${item.id}.description`);
+    line(`  ${title.padEnd(width)}  ${invocations[index].padEnd(invocationWidth)}  ${description}`);
   }
 }
 
-function printTopic(workflow: ReturnType<typeof helpCatalog>['workflows'][number] | undefined,
-  command: CatalogCommand | undefined): boolean {
+function printTopic(
+  workflow: ReturnType<typeof helpCatalog>['workflows'][number] | undefined,
+  command: CatalogCommand | undefined,
+): boolean {
   if (workflow) {
-    line(`${workflow.title}\n${workflow.description}`);
-    line(`Claude Code: ${workflow.invocation.claude} | OpenCode: ${workflow.invocation.opencode}`);
-    line('Who runs it: agent');
-    line(`Example: ${workflow.invocation.claude}`);
+    line(`${t(`workflow.${workflow.id}.title`)}\n${t(`workflow.${workflow.id}.description`)}`);
+    line(t('help.claudeCode', {
+      claude: workflow.invocation.claude,
+      opencode: workflow.invocation.opencode,
+    }));
+    line(t('help.whoRunsAgent'));
+    line(t('help.example', { example: workflow.invocation.claude }));
     return true;
   }
   if (!command) return false;
-  line(`${command.usage}\n${command.description}`);
-  line(`Who runs it: ${command.actor === 'human' ? 'person' : 'agent or person'}`);
-  line(`Example: ${command.example}`);
+  line(`${command.usage}\n${localizedDescription(command)}`);
+  const who = command.actor === 'human' ? t('help.whoRunsPerson') : t('help.whoRunsAny');
+  line(who);
+  line(t('help.example', { example: command.example }));
   return true;
 }
 
@@ -50,10 +70,9 @@ export function helpCommand(topic: string | undefined, opts: { json?: boolean })
     }
     if (printTopic(workflow, command)) return;
     printWorkflows(catalog.workflows);
-    printCommands('Commands for everyone', catalog.commands.filter((entry) => entry.actor === 'any'));
-    printCommands('Decisions made by people (in their own terminal)',
-      catalog.commands.filter((entry) => entry.actor === 'human'));
-    line('\nDetails: sdlc help <command or workflow>');
+    printCommands(t('help.commandsEveryone'), catalog.commands.filter((entry) => entry.actor === 'any'));
+    printCommands(t('help.commandsPeople'), catalog.commands.filter((entry) => entry.actor === 'human'));
+    line(`\n${t('help.details')}`);
   } catch (error) {
     reportFailure(error, opts.json);
   }

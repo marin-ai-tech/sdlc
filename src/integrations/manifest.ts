@@ -19,9 +19,9 @@ export interface ManifestEntry {
 
 export interface Manifest {
   version: 1;
-  /** scdl version that last wrote the generated files. */
+  /** sdlc version that last wrote the generated files. */
   harness: string;
-  /** License the project used scdl under when the files were generated. */
+  /** License the project used sdlc under when the files were generated. */
   license?: string;
   files: Record<string, ManifestEntry>;
 }

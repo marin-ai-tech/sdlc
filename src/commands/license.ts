@@ -19,7 +19,7 @@ export interface LicenseOptions {
 }
 
 /**
- * `sdlc license` shows the scdl version, the license the project uses scdl
+ * `sdlc license` shows the sdlc version, the license the project uses sdlc
  * under, and whether that fits the project; `sdlc license set` records a
  * change of license (a human decision) and refreshes the generated files'
  * notices so logs, artifacts and agent files all name the license in force.

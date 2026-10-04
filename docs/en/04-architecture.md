@@ -1,4 +1,4 @@
-# 4. Architecture of the `sdlc` harness (scdl)
+# 4. Architecture of the `sdlc` harness (sdlc)
 
 ## 4.1. The idea in one paragraph
 
@@ -47,8 +47,8 @@
 | `…/verification.md` | CLI + verifier | automatic evidence block (generated) + behavioral table by scenario |
 | `…/review.md` | reviewer | findings `### F<n> [severity][pass] …` with statuses and `## Coverage` for passes and lenses |
 | `…/release.md` | agent | changelog, rollout per environment, control bands, rollback |
-| `openspec/.sdlc/manifest.json` | harness | sha256 of the generated files (edits by people are not overwritten), the scdl version and the license they were created under |
-| `openspec/.sdlc/log.jsonl` | **CLI only** | project log: setup, gate decisions, verify runs, archives, license changes, hook denials; each line has `scdl` (the version) and `license` |
+| `openspec/.sdlc/manifest.json` | harness | sha256 of the generated files (edits by people are not overwritten), the sdlc version and the license they were created under |
+| `openspec/.sdlc/log.jsonl` | **CLI only** | project log: setup, gate decisions, verify runs, archives, license changes, hook denials; each line has `sdlc` (the version) and `license` |
 | `REVIEW.md` | team | review policy (created once) |
 
 The stage **is not stored anywhere**: it is computed each time from the artifacts and the gate records. So a manual file edit or a `git revert` cannot put the "current stage" out of sync.
@@ -109,14 +109,14 @@ OpenCode has no Stop hook, so `verify_before_stop` does not apply there.
 | Skills | `.claude/skills/` | **the same files**: OpenCode reads `.claude/skills/`. `.opencode/skills/` is used only if Claude is not selected (otherwise: duplicate names and a random winner) |
 | Subagents | `.claude/agents/sdlc-{verifier,reviewer,researcher,simplifier}.md` (`tools: Read, Grep, Glob, Bash`) | `.opencode/agents/sdlc-*.md` (`mode: subagent`, a `permission` map; a Claude-style `tools:` line would break OpenCode startup) |
 | Rules | hooks in `.claude/settings.json` | plugin `.opencode/plugins/sdlc.js` |
-| Distribution | project-level install **or** the Claude Code plugin from this repository's marketplace (`/plugin install sdlc@scdl`) | project-level install |
+| Distribution | project-level install **or** the Claude Code plugin from this repository's marketplace (`/plugin install sdlc@sdlc`) | project-level install |
 | Question tool | AskUserQuestion (2–4 choices) | `question` (choices + free text) |
 | Todo list | TodoWrite mirrors `tasks.md` during `/sdlc:build` (`tasks.md` stays the source of truth) | `todowrite` mirrors `tasks.md` during `/sdlc-build` |
 | Live CLI injection | inline live output of `sdlc … --json` in `/sdlc:status`, `/sdlc:next`, `/sdlc:help` via the tool `!` injection (fallback: run the same command) | same `!` injection form |
 
 Thirteen workflows: `help`, `next`, `status`, `explore`, `intent`, `spec`, `plan`, `build`, `verify`, `review`, `release`, `archive`, `triage`. The bodies are intentionally short (3–5 KB versus 10–22 KB in OpenSpec). The agent gets state, templates and instructions from the CLI at run time (`sdlc status/next/instructions --json`).
 
-Templates are written once (`assets/workflows/*.md`) and rendered for each surface. `{{cmd:x}}` references become `/sdlc:x` or `/sdlc-x`, `{{input}}` becomes `$ARGUMENTS` or a description, and `sdlc` becomes the configured prefix (`npx sdlc` for a local install).
+Templates are written once (`assets/workflows/*.md`) and rendered for each surface. `{{cmd:x}}` references become `/sdlc:x` or `/sdlc-x`, `{{input}}` becomes `$ARGUMENTS` or a description, and `sdlc` becomes the configured prefix (`npx --no-install sdlc` for a local install).
 
 An answer in chat is never an approval: gate approvals, `track set`, `backlog move`/`drop`, `license set` and other human decisions are commands the person runs in their own terminal. Offer the choice, explain the consequences, and give the exact command.
 

@@ -6,5 +6,7 @@ export default defineConfig({
     testTimeout: 60000,
     hookTimeout: 60000,
     pool: 'forks',
+    // Output is English unless a test asks for a locale, whatever the machine's language.
+    env: { SDLC_LOCALE: 'en' },
   },
 });

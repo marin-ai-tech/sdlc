@@ -25,17 +25,17 @@ export const TRACKS = ['full', 'lite'] as const;
 export type Track = (typeof TRACKS)[number];
 
 /**
- * The scdl version and the license the project used scdl under when a record
+ * The sdlc version and the license the project used sdlc under when a record
  * was written. Every history event and gate, waiver and verification record
  * carries it.
  */
 export interface Provenance {
-  scdl?: string;
+  sdlc?: string;
   license?: string;
 }
 
 export function provenance(stamp: HarnessStamp | undefined): Provenance {
-  return stamp ? { scdl: stamp.version, license: stamp.license } : {};
+  return stamp ? { sdlc: stamp.version, license: stamp.license } : {};
 }
 
 export interface ApprovalRecord extends Provenance {
@@ -94,8 +94,8 @@ export interface HistoryEvent extends Provenance {
 
 export interface ChangeState {
   version: 1;
-  /** scdl version and license that last wrote this record. */
-  harness?: { scdl: string; license: string };
+  /** sdlc version and license that last wrote this record. */
+  harness?: { sdlc: string; license: string };
   kind: ChangeKind;
   risk: RiskLevel;
   track: Track;
@@ -144,10 +144,25 @@ function oneOf<T extends string>(value: unknown, allowed: readonly T[], fallback
  * Reads the record, tolerating a missing file (a plain OpenSpec change that
  * never went through `sdlc new` still gets a lifecycle view with defaults).
  */
+/**
+ * Records written before the rename from scdl carry the version under `scdl:`; they are read as `sdlc:`
+ * (and rewritten with the new key on the next write). No other key in a change record is called `scdl`.
+ */
+function renameLegacyKeys(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(renameLegacyKeys);
+  if (!value || typeof value !== 'object') return value;
+  const out: Record<string, unknown> = {};
+  for (const [key, inner] of Object.entries(value)) {
+    const name = key === 'scdl' && !('sdlc' in value) ? 'sdlc' : key;
+    out[name] = renameLegacyKeys(inner);
+  }
+  return out;
+}
+
 export function readChangeState(changeDir: string): ChangeState {
   const file = statePath(changeDir);
   if (!isFile(file)) return { ...newChangeState(), created: '' };
-  const raw = readYamlObject(file) ?? {};
+  const raw = renameLegacyKeys(readYamlObject(file) ?? {}) as Record<string, unknown>;
   if (raw.version !== undefined && raw.version !== 1) {
     throw new SdlcError('unsupported_state_version', `${file} has unsupported version ${String(raw.version)}.`);
   }
@@ -157,8 +172,8 @@ export function readChangeState(changeDir: string): ChangeState {
   const suggestion = raw.track_suggestion && typeof raw.track_suggestion === 'object' ? raw.track_suggestion as Record<string, unknown> : undefined;
   return {
     version: 1,
-    ...(harness && typeof harness.scdl === 'string' && typeof harness.license === 'string'
-      ? { harness: { scdl: harness.scdl, license: harness.license } }
+    ...(harness && typeof harness.sdlc === 'string' && typeof harness.license === 'string'
+      ? { harness: { sdlc: harness.sdlc, license: harness.license } }
       : {}),
     kind: oneOf(raw.kind, CHANGE_KINDS, 'feature'),
     risk: oneOf(raw.risk, RISK_LEVELS, 'medium'),
@@ -183,9 +198,9 @@ export function readChangeState(changeDir: string): ChangeState {
   };
 }
 
-/** Writes the record; with a stamp, `harness` records the scdl version and license writing it. */
+/** Writes the record; with a stamp, `harness` records the sdlc version and license writing it. */
 export function writeChangeState(changeDir: string, state: ChangeState, stamp?: HarnessStamp): void {
-  if (stamp) state.harness = { scdl: stamp.version, license: stamp.license };
+  if (stamp) state.harness = { sdlc: stamp.version, license: stamp.license };
   const ordered: Record<string, unknown> = {
     version: 1,
     ...(state.harness ? { harness: state.harness } : {}),

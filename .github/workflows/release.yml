@@ -1,0 +1,63 @@
+# Release: on a version tag (v0.6.2), test, attach the npm pack archive to a GitHub release and update the
+# `release` branch with the built code.
+#
+#   npm install -g https://github.com/marin-ai-tech/sdlc/releases/latest/download/sdlc.tgz
+#   npm install -g github:marin-ai-tech/sdlc#release
+name: release
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: The tag matches package.json
+        run: |
+          version="$(node -p "require('./package.json').version")"
+          if [ "${GITHUB_REF_NAME}" != "v${version}" ]; then
+            echo "tag ${GITHUB_REF_NAME} does not match package.json version ${version}"
+            exit 1
+          fi
+
+      - name: Install and test
+        run: |
+          npm ci
+          npm test
+
+      - name: Pack
+        run: |
+          file="$(npm pack --silent --ignore-scripts | tail -n 1)"
+          cp "${file}" sdlc.tgz
+          echo "PACKED=${file}" >> "${GITHUB_ENV}"
+
+      - name: GitHub release with the archive
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "${GITHUB_REF_NAME}" "${PACKED}" sdlc.tgz \
+            --title "sdlc ${GITHUB_REF_NAME#v}" --generate-notes
+
+      - name: Update the release branch (built code, no prepare)
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          rm -f "${PACKED}" sdlc.tgz
+          git checkout -B release
+          node scripts/release-branch.mjs --in-place
+          git add -A
+          git add -f dist
+          git commit -m "release ${GITHUB_REF_NAME}"
+          git push --force origin release

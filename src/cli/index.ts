@@ -23,25 +23,62 @@ import { exploreCommand, exploreListCommand } from '../commands/explore.js';
 import { importBmadCommand } from '../commands/import.js';
 import { backlogAdd, backlogClose, backlogEpicAdd, backlogList, backlogMove, backlogNext, backlogStart } from '../commands/backlog.js';
 import { rolesCheck, rolesMigrate, rolesWho } from '../commands/roles.js';
+import { catalog, resolveLocale, setLocale, systemLocale } from '../core/i18n.js';
+import { loadConfig } from '../core/config.js';
+import { projectPaths } from '../core/project.js';
+
+function cmdDesc(key: string): string {
+  return catalog('en')[key] ?? key;
+}
+
+function applyLocale(flag: string | undefined): void {
+  let configLocale: string | undefined;
+  const projectRoot = findProjectRoot();
+  if (projectRoot) {
+    try {
+      configLocale = loadConfig(projectPaths(projectRoot).sdlcConfig).locale;
+    } catch {
+      configLocale = undefined;
+    }
+  }
+  setLocale(resolveLocale({
+    flag,
+    env: process.env,
+    config: configLocale,
+    system: systemLocale(),
+  }));
+}
+
+function withLocaleOption(command: Command): void {
+  if (!command.options.some((option) => option.long === '--locale')) {
+    command.option('--locale <locale>', 'UI locale (en, ru)');
+  }
+  for (const child of command.commands) withLocaleOption(child);
+}
 
 export function buildProgram(): Command {
   const program = new Command();
-  const roles = program.command('roles').description('Inspect people and approval roles');
-  roles.command('check').description('Check who can approve each gate')
+  program.option('--locale <locale>', 'UI locale (en, ru)');
+  program.hook('preAction', (_thisCommand, actionCommand) => {
+    const opts = actionCommand.optsWithGlobals() as { locale?: string };
+    applyLocale(opts.locale);
+  });
+  const roles = program.command('roles').description(cmdDesc('cmd.roles'));
+  roles.command('check').description(cmdDesc('cmd.roles.check'))
     .option('--change <id>', 'change id').option('--base <ref>', 'base ref').option('--json', 'output JSON')
     .action((opts) => rolesCheck(opts));
-  roles.command('who <gate>').description('Show eligible people for a gate')
+  roles.command('who <gate>').description(cmdDesc('cmd.roles.who'))
     .requiredOption('--change <id>', 'change id').option('--base <ref>', 'base ref').option('--json', 'output JSON')
     .action((gate, opts) => rolesWho(gate, opts));
-  roles.command('migrate').description('Move configured roles into roles.yaml (human only)')
+  roles.command('migrate').description(cmdDesc('cmd.roles.migrate'))
     .option('--json', 'output JSON').action((opts) => rolesMigrate(opts));
-  const backlog = program.command('backlog').description('Manage planned changes in priority order');
-  backlog.command('epic').description('Manage backlog epics')
-    .command('add <title>').description('Add an epic')
+  const backlog = program.command('backlog').description(cmdDesc('cmd.backlog'));
+  backlog.command('epic').description(cmdDesc('cmd.backlog.epic'))
+    .command('add <title>').description(cmdDesc('cmd.backlog.epic.add'))
     .option('--goal <text>', 'goal of the epic')
     .option('--json', 'output JSON')
     .action((title, opts) => backlogEpicAdd(title, opts));
-  backlog.command('add <title>').description('Add a backlog item')
+  backlog.command('add <title>').description(cmdDesc('cmd.backlog.add'))
     .option('--epic <E-id>', 'parent epic id')
     .option('--kind <kind>', 'kind of change')
     .option('--risk <risk>', 'risk level')
@@ -54,65 +91,65 @@ export function buildProgram(): Command {
     .option('--source-ref <ref>', 'origin reference')
     .option('--json', 'output JSON')
     .action((title, opts) => backlogAdd(title, opts));
-  backlog.command('list').description('List backlog items')
+  backlog.command('list').description(cmdDesc('cmd.backlog.list'))
     .option('--epic <E-id>', 'filter by epic id')
     .option('--status <status>', 'filter by status')
     .option('--ready', 'show ready items')
     .option('--json', 'output JSON')
     .action(opts => backlogList(opts));
-  backlog.command('next').description('Show the next ready backlog item')
+  backlog.command('next').description(cmdDesc('cmd.backlog.next'))
     .option('--json', 'output JSON')
     .action(opts => backlogNext(opts));
-  backlog.command('start <B-id>').description('Start a backlog item as a change')
+  backlog.command('start <B-id>').description(cmdDesc('cmd.backlog.start'))
     .option('--change <id>', 'change id')
     .option('--json', 'output JSON')
     .action((id, opts) => backlogStart(id, opts));
-  backlog.command('move <B-id>').description('Reorder a backlog item')
+  backlog.command('move <B-id>').description(cmdDesc('cmd.backlog.move'))
     .option('--top', 'move to the top')
     .option('--before <B-id>', 'place before this item')
     .option('--after <B-id>', 'place after this item')
     .option('--epic <E-id>', 'move into this epic')
     .option('--json', 'output JSON')
     .action((id, opts) => backlogMove(id, opts));
-  backlog.command('drop <B-id>').description('Drop a backlog item')
+  backlog.command('drop <B-id>').description(cmdDesc('cmd.backlog.drop'))
     .option('--note <text>', 'reason for dropping')
     .option('--json', 'output JSON')
     .action((id, opts) => backlogClose(id, 'dropped', opts));
-  backlog.command('done <B-id>').description('Mark a backlog item done')
+  backlog.command('done <B-id>').description(cmdDesc('cmd.backlog.done'))
     .option('--note <text>', 'completion note')
     .option('--json', 'output JSON')
     .action((id, opts) => backlogClose(id, 'done', opts));
-  const defer = program.command('defer').description('Manage consciously deferred work');
-  defer.command('add <title>').description('Record deferred work')
+  const defer = program.command('defer').description(cmdDesc('cmd.defer'));
+  defer.command('add <title>').description(cmdDesc('cmd.defer.add'))
     .option('--why <text>', 'reason for deferring')
     .option('--change <id>', 'related change id')
     .option('--finding <F-id>', 'related finding id')
     .option('--revisit <text>', 'when to revisit')
     .option('--json', 'output JSON')
     .action((title, opts) => deferAdd(title, opts));
-  defer.command('list').description('List deferred work')
+  defer.command('list').description(cmdDesc('cmd.defer.list'))
     .option('--open', 'show open items')
     .option('--change <id>', 'filter by change id')
     .option('--json', 'output JSON')
     .action((opts) => deferList(opts));
-  defer.command('close <D-id>').description('Resolve deferred work')
+  defer.command('close <D-id>').description(cmdDesc('cmd.defer.close'))
     .option('--status <status>', 'resolution status')
     .option('--note <text>', 'resolution note')
     .option('--json', 'output JSON')
     .action((id, opts) => deferClose(id, opts));
-  const layout = program.command('layout').description('Check or create the AI-ready project layout');
-  layout.command('check').description('Check the project layout')
+  const layout = program.command('layout').description(cmdDesc('cmd.layout'));
+  layout.command('check').description(cmdDesc('cmd.layout.check'))
     .option('--json', 'output JSON')
     .action((opts) => layoutCommand('check', opts));
-  layout.command('scaffold').description('Create the recommended layout')
+  layout.command('scaffold').description(cmdDesc('cmd.layout.scaffold'))
     .option('--dry-run', 'show planned files')
     .option('--json', 'output JSON')
     .action((opts) => layoutCommand('scaffold', opts));
-  layout.command('adapt').description('Adapt an existing project layout')
+  layout.command('adapt').description(cmdDesc('cmd.layout.adapt'))
     .option('--dry-run', 'show planned files')
     .option('--json', 'output JSON')
     .action((opts) => layoutCommand('adapt', opts));
-  layout.command('convert').description('Convert the project layout')
+  layout.command('convert').description(cmdDesc('cmd.layout.convert'))
     .option('--apply', 'apply conversion')
     .option('--in-place', 'convert the current working copy')
     .option('--worktree <path>', 'new worktree path')
@@ -121,7 +158,7 @@ export function buildProgram(): Command {
     .action((opts) => layoutCommand('convert', opts));
   program
     .name('sdlc')
-    .description('AI-native SDLC harness (Anthropic playbook) for Claude Code and OpenCode, built on OpenSpec.')
+    .description(cmdDesc('cmd.program'))
     .version(harnessVersion())
     .addHelpText('after', `\n${REQUIRED_NOTICE}\nLicense: ${LICENSE_TERMS}`)
     .enablePositionalOptions()
@@ -129,10 +166,10 @@ export function buildProgram(): Command {
 
   program
     .command('init [path]')
-    .description('Set up the harness: OpenSpec root, sdlc schema, openspec/sdlc.yaml, agent integrations')
+    .description(cmdDesc('cmd.init'))
     .option('--tools <list>', 'claude,opencode | all | none (default: detected, else both)')
     .option('--delivery <mode>', 'both | skills | commands')
-    .option('--cli <command>', 'how agents invoke the CLI, e.g. "npx sdlc" for a project-local install')
+    .option('--cli <command>', 'how agents invoke the CLI, e.g. "npx --no-install sdlc" for a project-local install')
     .option('--mode <mode>', 'enforcement mode: off | warn | block')
     .option('--no-hooks', 'do not install Claude Code hooks')
     .option('--opsx', "also install OpenSpec's own /opsx workflows for the same tools")
@@ -144,7 +181,7 @@ export function buildProgram(): Command {
 
   program
     .command('update [path]')
-    .description('Regenerate schema, skills, commands, agents, hooks and plugin after upgrading')
+    .description(cmdDesc('cmd.update'))
     .option('--tools <list>', 'change the configured tools (claude,opencode | all | none)')
     .option('--force', 'overwrite generated files even if edited locally')
     .option('--dry-run', 'show what would change')
@@ -153,7 +190,7 @@ export function buildProgram(): Command {
 
   program
     .command('uninstall [path]')
-    .description('Remove generated agent files and hooks (keeps openspec/ and all planning data)')
+    .description(cmdDesc('cmd.uninstall'))
     .option('--force', 'also remove generated files that were edited locally')
     .option('--dry-run', 'show what would be removed')
     .option('--json', 'output JSON')
@@ -161,7 +198,7 @@ export function buildProgram(): Command {
 
   program
     .command('new <name>')
-    .description('Start a change (an OpenSpec change folder plus its SDLC record)')
+    .description(cmdDesc('cmd.new'))
     .option('--kind <kind>', 'feature | bugfix | refactor | chore | docs | incident | security')
     .option('--risk <risk>', 'low | medium | high (high adds tech-lead approvals)')
     .option('--track <track>', 'full (all gates) | lite (starts at plan; intent and spec optional)')
@@ -175,15 +212,15 @@ export function buildProgram(): Command {
     .action((name, opts) => newCommand(name, opts));
 
   const explore = program.command('explore')
-    .description('Create or list optional exploration notes before intent')
+    .description(cmdDesc('cmd.explore'))
     .argument('[slug]', 'exploration note slug')
     .option('--json', 'output JSON')
     .action((slug, opts) => { if (slug) exploreCommand(slug, opts); });
-  explore.command('list').description('List exploration notes')
+  explore.command('list').description(cmdDesc('cmd.explore.list'))
     .option('--json', 'output JSON')
     .action((opts) => exploreListCommand(opts));
-  program.command('import').description('Import planning artifacts')
-    .command('bmad <path>').description('Import a BMAD planning artifact')
+  program.command('import').description(cmdDesc('cmd.import'))
+    .command('bmad <path>').description(cmdDesc('cmd.import.bmad'))
     .option('--change <id>', 'target change id')
     .option('--to-backlog', 'import as backlog items')
     .option('--kind <kind>', 'kind of change')
@@ -194,21 +231,21 @@ export function buildProgram(): Command {
 
   program
     .command('status')
-    .description('Lifecycle dashboard: stage, gates, approvals, evidence, and who must act next')
+    .description(cmdDesc('cmd.status'))
     .option('--change <id>', 'one change in detail')
     .option('--archived', 'include archived changes')
     .option('--markdown', 'markdown report (for pull requests and wikis)')
     .option('--json', 'output JSON')
     .action((opts) => statusCommand(opts));
 
-  program.command('help [topic]').description('Show workflows and commands')
+  program.command('help [topic]').description(cmdDesc('cmd.help'))
     .option('--json', 'output JSON').action((topic, opts) => helpCommand(topic, opts));
-  program.command('statusline').description('Print the Claude Code status line')
+  program.command('statusline').description(cmdDesc('cmd.statusline'))
     .action(() => statuslineCommand());
 
-  program.command('track').description('Manage the change track')
+  program.command('track').description(cmdDesc('cmd.track'))
     .command('set <track>')
-    .description('Set full or lite track (human only)')
+    .description(cmdDesc('cmd.track.set'))
     .requiredOption('--change <id>', 'change id')
     .option('--note <text>', 'reason for the change')
     .option('--json', 'output JSON')
@@ -216,22 +253,22 @@ export function buildProgram(): Command {
 
   program
     .command('next')
-    .description('The next action for a change and who performs it')
+    .description(cmdDesc('cmd.next'))
     .option('--change <id>', 'change id (defaults to the only active change)')
     .option('--json', 'output JSON')
     .action((opts) => nextCommand(opts));
 
   program
     .command('instructions <artifact>')
-    .description('Instructions for an artifact: intent|proposal|specs|design|plan|tasks|apply (OpenSpec) or verification|review|release')
+    .description(cmdDesc('cmd.instructions'))
     .option('--change <id>', 'change id')
     .option('--json', 'output JSON')
     .action((artifact, opts) => instructionsCommand(artifact, opts));
 
   for (const [name, fn, desc] of [
-    ['approve', approveCommand, 'Approve a gate (intent|spec|plan|review|release) - human only, bound to the current content'],
-    ['reject', rejectCommand, 'Reject a gate with a note - human only'],
-    ['waive', waiveCommand, 'Waive a gate with a recorded reason - human only'],
+    ['approve', approveCommand, cmdDesc('cmd.approve')],
+    ['reject', rejectCommand, cmdDesc('cmd.reject')],
+    ['waive', waiveCommand, cmdDesc('cmd.waive')],
   ] as const) {
     program
       .command(`${name} <gate>`)
@@ -244,22 +281,22 @@ export function buildProgram(): Command {
       .action((gate, opts) => fn(gate, opts));
   }
 
-  program.command('approvals').description('Inspect signed approvals')
-    .command('verify').description('Verify approval and roles commit signatures')
+  program.command('approvals').description(cmdDesc('cmd.approvals'))
+    .command('verify').description(cmdDesc('cmd.approvals.verify'))
     .option('--mode <mode>', 'off | warn | required')
     .option('--json', 'output JSON')
     .action((opts) => approvalsVerify(opts));
 
   program
     .command('tests <action>')
-    .description('lock | unlock test files for a bug-fix change (unlock is human only)')
+    .description(cmdDesc('cmd.tests'))
     .option('--change <id>', 'change id')
     .option('--json', 'output JSON')
     .action((action, opts) => testsCommand(action, opts));
 
   program
     .command('verify')
-    .description('Run the configured checks and record literal evidence (the verify gate)')
+    .description(cmdDesc('cmd.verify'))
     .option('--change <id>', 'change id')
     .option('--only <names>', 'run only these checks (comma-separated; never passes the gate)')
     .option('--list', 'list the configured checks')
@@ -270,7 +307,7 @@ export function buildProgram(): Command {
 
   program
     .command('review <action>')
-    .description('context (diff, policy, plan drift) | check (open blocking findings in review.md)')
+    .description(cmdDesc('cmd.review'))
     .option('--change <id>', 'change id')
     .option('--base <ref>', 'base ref for the diff (default: review.base or origin/HEAD)')
     .option('--json', 'output JSON')
@@ -278,7 +315,7 @@ export function buildProgram(): Command {
 
   program
     .command('validate')
-    .description('openspec validate --strict plus harness delta checks and cross-change overlaps')
+    .description(cmdDesc('cmd.validate'))
     .option('--change <id>', 'change id')
     .option('--all', 'all active changes')
     .option('--json', 'output JSON')
@@ -286,7 +323,7 @@ export function buildProgram(): Command {
 
   program
     .command('archive [change]')
-    .description('Check every required gate, then merge delta specs via openspec archive')
+    .description(cmdDesc('cmd.archive'))
     .option('-y, --yes', 'do not ask for confirmation')
     .option('--skip-specs', 'archive without touching specs (tooling/docs changes)')
     .option('--force', 'archive past unsatisfied gates (human only, needs --note)')
@@ -296,14 +333,14 @@ export function buildProgram(): Command {
 
   program
     .command('audit')
-    .description('Audit trail and SDLC metrics (lead times, first-pass verification, rejections)')
+    .description(cmdDesc('cmd.audit'))
     .option('--change <id>', 'one change (active or archived)')
     .option('--json', 'output JSON')
     .action((opts) => auditCommand(opts));
 
   program
     .command('report')
-    .description('Project SDLC progress report')
+    .description(cmdDesc('cmd.report'))
     .option('--format <format>', 'md | json | html', 'md')
     .option('--json', 'output JSON')
     .option('--since <date>', 'period start')
@@ -313,7 +350,7 @@ export function buildProgram(): Command {
 
   program
     .command('dashboard')
-    .description('Self-contained HTML progress dashboard')
+    .description(cmdDesc('cmd.dashboard'))
     .option('--since <date>', 'period start')
     .option('--change <id>', 'one change')
     .option('--out <file>', 'write dashboard to file')
@@ -321,7 +358,7 @@ export function buildProgram(): Command {
 
   program
     .command('log')
-    .description('Project log (openspec/.sdlc/log.jsonl): harness events with the scdl version and license of each')
+    .description(cmdDesc('cmd.log'))
     .option('--change <id>', 'only entries for this change')
     .option('--limit <n>', 'show the last n entries (default 50)')
     .option('--json', 'output JSON')
@@ -329,7 +366,7 @@ export function buildProgram(): Command {
 
   program
     .command('license [action] [type]')
-    .description('Show the scdl version and the license this project uses scdl under; `set community|commercial` records a change (human only)')
+    .description(cmdDesc('cmd.license'))
     .option('--agreement <id>', 'commercial agreement id (with `set commercial`)')
     .option('--licensee <name>', 'licensee named in the commercial agreement')
     .option('--json', 'output JSON')
@@ -337,15 +374,15 @@ export function buildProgram(): Command {
 
   program
     .command('doctor')
-    .description('Check the installation: OpenSpec, schema, generated files, hooks, CLI on PATH, verify commands, license')
+    .description(cmdDesc('cmd.doctor'))
     .option('--json', 'output JSON')
     .action((opts) => doctorCommand(opts));
 
   program
     .command('plugin')
-    .description('Claude Code plugin packaging')
+    .description(cmdDesc('cmd.plugin'))
     .command('build [dir]')
-    .description('Render the workflows, subagents and hooks as a Claude Code plugin (default dir: ./plugin)')
+    .description(cmdDesc('cmd.plugin.build'))
     .option('--cli <command>', 'how the plugin invokes the CLI (default: sdlc)')
     .option('--marketplace', 'also write ../.claude-plugin/marketplace.json next to the plugin dir')
     .option('--force', 'write into a non-empty directory')
@@ -354,13 +391,13 @@ export function buildProgram(): Command {
 
   program
     .command('hook <event>')
-    .description('Policy dispatcher for agent hooks: pre-tool | session-start | stop (reads JSON on stdin)')
+    .description(cmdDesc('cmd.hook'))
     .option('--agent <agent>', 'claude | opencode', 'claude')
     .action((event, opts) => runHook(event, opts.agent));
 
   program
     .command('openspec')
-    .description('Run the bundled OpenSpec CLI (e.g. `sdlc openspec list --specs`)')
+    .description(cmdDesc('cmd.openspec'))
     .helpOption(false)
     .allowUnknownOption()
     .passThroughOptions()
@@ -371,6 +408,7 @@ export function buildProgram(): Command {
       process.exitCode = result.exitCode ?? 1;
     });
 
+  withLocaleOption(program);
   return program;
 }
 

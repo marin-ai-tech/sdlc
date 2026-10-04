@@ -49,7 +49,7 @@ export const STAGE_LABEL = {
 export const SLIDES = [
   {
     id: 'cover', layout: 'title',
-    title: { en: 'Building a calculator with scdl', ru: 'Разработка калькулятора с scdl' },
+    title: { en: 'Building a calculator with sdlc', ru: 'Разработка калькулятора с sdlc' },
     subtitle: {
       en: 'Every command of the SDLC harness, on one small real project. People decide, agents do the work.',
       ru: 'Все команды SDLC-харнесса на одном маленьком проекте. Решают люди, работу делают агенты.',
@@ -75,8 +75,8 @@ export const SLIDES = [
   {
     id: 'map', layout: 'flow', highlight: STAGES,
     layer: {
-      en: 'Spec layer: OpenSpec (changes, delta specs, validation, living specs). scdl adds the people, gates, evidence and guardrails around it.',
-      ru: 'Слой спецификаций — OpenSpec (изменения, дельты, валидация, живые спецификации). scdl добавляет вокруг него людей, гейты, доказательства и защитные правила.',
+      en: 'Spec layer: OpenSpec (changes, delta specs, validation, living specs). sdlc adds the people, gates, evidence and guardrails around it.',
+      ru: 'Слой спецификаций — OpenSpec (изменения, дельты, валидация, живые спецификации). sdlc добавляет вокруг него людей, гейты, доказательства и защитные правила.',
     },
     groups: [
       {
@@ -115,8 +115,8 @@ export const SLIDES = [
     id: 'setup', layout: 'steps',
     title: { en: 'Setup: one command, two tools', ru: 'Установка: одна команда, два инструмента' },
     lead: {
-      en: 'Alice installs scdl for Claude Code and OpenCode; an agent makes the repository AI-ready.',
-      ru: 'Алиса ставит scdl для Claude Code и OpenCode; агент готовит репозиторий к работе с ИИ.',
+      en: 'Alice installs sdlc for Claude Code and OpenCode; an agent makes the repository AI-ready.',
+      ru: 'Алиса ставит sdlc для Claude Code и OpenCode; агент готовит репозиторий к работе с ИИ.',
     },
     steps: ['init', 'layout-check', 'layout-scaffold'],
     more: ['doctor', 'license', 'help', 'layout-adapt', 'layout-convert', 'update'],
@@ -164,8 +164,8 @@ export const SLIDES = [
     id: 'openspec-change', layout: 'steps',
     title: { en: 'OpenSpec underneath: the change is an OpenSpec change', ru: 'Под капотом OpenSpec: обычное изменение OpenSpec' },
     lead: {
-      en: 'scdl does not fork OpenSpec. The change lives in openspec/changes and OpenSpec reads it as its own: list, status, deltas.',
-      ru: 'scdl не форкает OpenSpec. Изменение лежит в openspec/changes, и OpenSpec читает его как своё: список, статус, дельты.',
+      en: 'sdlc does not fork OpenSpec. The change lives in openspec/changes and OpenSpec reads it as its own: list, status, deltas.',
+      ru: 'sdlc не форкает OpenSpec. Изменение лежит в openspec/changes, и OpenSpec читает его как своё: список, статус, дельты.',
     },
     steps: ['os-list', 'os-status', 'os-show'],
     notes: {
@@ -301,9 +301,9 @@ export const SLIDES = [
 
 /** Russian notes for the steps (the English note comes from the transcript). */
 export const STEP_NOTE_RU = {
-  init: 'Алиса ставит scdl для Claude Code и OpenCode, со строкой статуса.',
+  init: 'Алиса ставит sdlc для Claude Code и OpenCode, со строкой статуса.',
   doctor: 'Проверка установки.',
-  license: 'Под какой лицензией проект использует scdl.',
+  license: 'Под какой лицензией проект использует sdlc.',
   help: 'Каталог: процессы, команды и решения, которые принимают только люди.',
   'layout-check': 'Готов ли проект к работе с ИИ? Пока нет.',
   'layout-scaffold': 'Агент создаёт AGENTS.md, CLAUDE.md и каркас документации.',
@@ -371,7 +371,7 @@ export const STEP_NOTE_RU = {
   report: 'Отчёт о прогрессе с диаграммами Mermaid.',
   dashboard: 'Дашборд — одна офлайн-страница HTML.',
   audit: 'Время прохождения и доля проверок с первого раза.',
-  log: 'Кто что сделал, с версией scdl и лицензией.',
+  log: 'Кто что сделал, с версией sdlc и лицензией.',
   statusline: 'Строка статуса Claude Code.',
   hook: 'Что агент узнаёт при старте сессии.',
   plugin: 'Те же процессы как плагин Claude Code.',

@@ -1,12 +1,12 @@
 # Notices
 
-Required Notice: Copyright (c) 2026 marin-ai technologies (https://github.com/marin-ai-tech/scdl)
+Required Notice: Copyright (c) 2026 marin-ai technologies (https://github.com/marin-ai-tech/sdlc)
 
-scdl is dual-licensed; see [LICENSE](LICENSE).
+sdlc is dual-licensed; see [LICENSE](LICENSE).
 
 ## OpenSpec (MIT License)
 
-scdl uses OpenSpec (https://github.com/Fission-AI/OpenSpec) unmodified as a
+sdlc uses OpenSpec (https://github.com/Fission-AI/OpenSpec) unmodified as a
 runtime dependency (`@fission-ai/openspec`), and adapts some OpenSpec material:
 
 - `src/core/tasks.ts` reuses OpenSpec's task-checkbox pattern so progress

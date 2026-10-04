@@ -1,18 +1,18 @@
-scdl is dual-licensed. You may use it under the Community License (free of
+sdlc is dual-licensed. You may use it under the Community License (free of
 charge) or under a Commercial License (paid, royalty-bearing).
 
-Required Notice: Copyright (c) 2026 marin-ai technologies (https://github.com/marin-ai-tech/scdl)
+Required Notice: Copyright (c) 2026 marin-ai technologies (https://github.com/marin-ai-tech/sdlc)
 
 1. Community License
 
    The PolyForm Noncommercial License 1.0.0
    (LICENSES/PolyForm-Noncommercial-1.0.0.md,
    https://polyformproject.org/licenses/noncommercial/1.0.0),
-   together with the scdl Additional Permissions 1.0
-   (LICENSES/scdl-Additional-Permissions.md, included with every copy of
-   scdl and published at https://github.com/marin-ai-tech/scdl).
+   together with the sdlc Additional Permissions 1.0
+   (LICENSES/sdlc-Additional-Permissions.md, included with every copy of
+   sdlc and published at https://github.com/marin-ai-tech/sdlc).
 
-   In short, you may use, copy, modify and distribute scdl, keeping the
+   In short, you may use, copy, modify and distribute sdlc, keeping the
    Required Notice above with every copy, for:
    - any noncommercial purpose, including personal use and use by charitable,
      educational, research, public health, public safety, environmental and
@@ -33,12 +33,12 @@ Required Notice: Copyright (c) 2026 marin-ai technologies (https://github.com/ma
 Your content
 
    The licensor claims no rights in content that you or your agents create with
-   scdl, such as intents, specifications, designs, plans, tasks, verification
+   sdlc, such as intents, specifications, designs, plans, tasks, verification
    and review records, and code. The artifact templates
    (schemas/sdlc/templates/*, assets/records/*) and the starter REVIEW.md, once
    they have become part of your artifacts, may be used, modified and
-   distributed by you without restriction. The provenance comments that scdl
-   writes into artifacts and logs record the scdl version and the license it
+   distributed by you without restriction. The provenance comments that sdlc
+   writes into artifacts and logs record the sdlc version and the license it
    was used under; they do not place your content under that license.
 
 Third-party material

@@ -1,6 +1,6 @@
-# scdl Contributor License Agreement 1.0
+# sdlc Contributor License Agreement 1.0
 
-scdl is dual-licensed: a free Community License and a paid Commercial License.
+sdlc is dual-licensed: a free Community License and a paid Commercial License.
 To offer both, the licensor needs the right to license every contribution under
 both. By submitting a contribution to this project (code, documentation,
 templates or any other material), you agree to the following with marin-ai technologies
@@ -32,4 +32,4 @@ templates or any other material), you agree to the following with marin-ai techn
 
 To accept, add this line to the description of your pull request:
 
-    I have read the scdl Contributor License Agreement 1.0 and agree to its terms.
+    I have read the sdlc Contributor License Agreement 1.0 and agree to its terms.

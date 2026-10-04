@@ -1,6 +1,21 @@
 # Changelog
 
-All notable changes to scdl. Versions follow [Semantic Versioning](https://semver.org/); while the major version is 0, a minor version may change behavior.
+All notable changes to sdlc. Versions follow [Semantic Versioning](https://semver.org/); while the major version is 0, a minor version may change behavior.
+
+## 0.6.2 — 2026-10-04
+
+### Changed
+- **The package is now called `sdlc`**, like its command and its repository (`marin-ai-tech/sdlc`). The old name `scdl` pointed every link and install command at a repository that does not exist. Renamed: the npm package, the Claude Code plugin marketplace (`/plugin marketplace add marin-ai-tech/sdlc`, then `/plugin install sdlc@sdlc`; if you added the old marketplace, add the new one and reinstall the plugin), the license names (`sdlc Additional Permissions`, `sdlc Commercial License`, `LICENSES/sdlc-Additional-Permissions.md`) and all links.
+- Projects written by `scdl` keep working: records with the old `scdl:` key and the old provenance line are read as before, so approvals do not go stale; new records use `sdlc:`. The `scdl` command still works for one more version and prints a deprecation warning; the hook still denies `scdl approve` and the other human-only commands to agents.
+
+### Fixed
+- **Installing works again.** `npm install -g github:marin-ai-tech/sdlc` failed with "tsc is not recognized": npm 11 leaks `-g` into the dependency install it runs to build a git package, which installs the clone globally on top of the real install. Install the latest release instead: `npm install -g https://github.com/marin-ai-tech/sdlc/releases/latest/download/sdlc.tgz`, or from git with the `release` branch, which carries the built code: `npm install -g github:marin-ai-tech/sdlc#release`. A version tag now runs `.github/workflows/release.yml`: tests, the `npm pack` archive attached to the GitHub release (as `sdlc-<version>.tgz` and `sdlc.tgz`), and the `release` branch updated.
+- Hints no longer say `npm install -g sdlc` or `npx sdlc`: an unrelated package named `sdlc` is on the npm registry. Project-local installs use `cli: npx --no-install sdlc`.
+
+### Added
+- **English and Russian.** Help, `Next:` hints, `sdlc status`, the init wizard, hook reasons, the session context, the Markdown report and the dashboard follow the locale: `--locale <code>`, then `SDLC_LOCALE`, then `locale:` in `openspec/sdlc.yaml`, then the system locale; English when there is no translation. JSON output, the log and change records stay English.
+- **Interactive `sdlc init`, like `openspec init`.** Run in a terminal with no flags, it welcomes you, asks for the tools (detected ones preselected), enforcement mode, Claude Code status line, OpenSpec `/opsx` workflows, artifact language and an optional starter `openspec/roles.yaml`, and writes nothing until you confirm the summary. Re-running it offers the current settings. Flags, `--json`, non-terminals and agent sessions never prompt.
+- **Interactive `sdlc init` offers the OpenSpec CLI and codegraph.** When either is missing, it asks to install it (OpenSpec pinned to the version sdlc ships, codegraph from npm) and offers to index the project with `codegraph init`; installs run only after a yes, once the settings are written, and a failed install warns with the command to run by hand. Agents, scripts and flag runs never install anything. `sdlc doctor` reports both tools and whether the project is indexed.
 
 ## 0.6.1 — 2026-10-01
 

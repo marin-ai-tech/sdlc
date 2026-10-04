@@ -129,7 +129,7 @@ export interface LicenseAssessment {
   fix?: string;
 }
 
-/** Whether the declared scdl license plausibly fits the project, for `sdlc license` and `sdlc doctor`. */
+/** Whether the declared sdlc license plausibly fits the project, for `sdlc license` and `sdlc doctor`. */
 export function assessLicense(license: SdlcConfig['license'], detected: ProjectLicense | undefined): LicenseAssessment {
   if (license.type === 'commercial') {
     return license.agreement

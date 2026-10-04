@@ -143,7 +143,7 @@ export async function archiveCommand(id: string | undefined, opts: ArchiveOption
     const by = formatIdentity(gitIdentity(ctx.root)) ?? agentEnvironment();
     const event = open.length > 0 ? 'change.archived.forced' : 'change.archived';
     const detail = open.length > 0 ? `open gates: ${open.map((g) => g.id).join(', ')}; ${opts.note ?? ''}` : undefined;
-    // Every artifact that goes into the archive records the scdl version and license that archived it.
+    // Every artifact that goes into the archive records the sdlc version and license that archived it.
     const originals = new Map(changeMarkdown(ref.dir).map((f) => [f, readText(path.join(ref.dir, f)) ?? '']));
     const stamping = tryStampArtifacts(ref.dir, [...originals.keys()], ctx.stamp);
     if (stamping.error && !opts.json) warn(`provenance lines were not written: ${stamping.error}`);
@@ -199,11 +199,11 @@ export async function archiveCommand(id: string | undefined, opts: ArchiveOption
 }
 
 
-/** ` [scdl 0.1.0 · community]` for events that recorded the harness version and license. */
+/** ` [sdlc 0.1.0 · community]` for events that recorded the harness version and license. */
 function stampSuffix(event: HistoryEvent): string {
-  if (!event.scdl) return '';
+  if (!event.sdlc) return '';
   const type = event.license?.split(' ')[0];
-  return c.dim(` [scdl ${event.scdl}${type ? ` · ${type}` : ''}]`);
+  return c.dim(` [sdlc ${event.sdlc}${type ? ` · ${type}` : ''}]`);
 }
 
 
@@ -240,7 +240,7 @@ export async function auditCommand(opts: { change?: string; json?: boolean }): P
     const rows = refs.map((ref) => {
       const state = readChangeState(ref.dir);
       for (const h of state.history) {
-        if (h.scdl) versions.add(h.scdl);
+        if (h.sdlc) versions.add(h.sdlc);
         if (h.license) licenses.add(h.license);
       }
       return { change: ref.id, archived: ref.archived, kind: state.kind, track: state.track, ...changeMetrics(state) };
@@ -249,7 +249,7 @@ export async function auditCommand(opts: { change?: string; json?: boolean }): P
       changes: rows.length,
       archived: rows.filter((r) => r.archived).length,
       ...aggregateMetrics(rows),
-      /** scdl versions and licenses recorded in the change histories. */
+      /** sdlc versions and licenses recorded in the change histories. */
       recordedWith: { versions: [...versions].sort(), licenses: [...licenses].sort() },
     };
     if (opts.json) return printJson({ aggregate, changes: rows, harness: ctx.stamp });
@@ -258,7 +258,7 @@ export async function auditCommand(opts: { change?: string; json?: boolean }): P
     line(`  median hours: intent→spec ${m.intentToSpecApproval ?? '-'} · spec→plan ${m.specToPlanApproval ?? '-'} · plan→verified ${m.planToVerified ?? '-'} · verified→review ${m.verifiedToReviewApproval ?? '-'} · total ${m.createdToArchived ?? '-'}`);
     line(`  verification first-pass rate: ${aggregate.verifyFirstPassRate ?? '-'}; rejections ${aggregate.rejections}; waivers ${aggregate.waivers}`);
     if (versions.size > 0) {
-      line(`  recorded with scdl ${[...versions].sort().join(', ')}; licenses: ${[...licenses].sort().join('; ')}`);
+      line(`  recorded with sdlc ${[...versions].sort().join(', ')}; licenses: ${[...licenses].sort().join('; ')}`);
     }
   } catch (error) {
     reportFailure(error, opts.json);
@@ -284,7 +284,7 @@ export async function logCommand(opts: { change?: string; limit?: string; json?:
     for (const e of shown) {
       const who = e.by ?? (e.agent ? `agent:${e.agent}` : '');
       line(`${e.ts}  ${e.event.padEnd(26)} ${e.change ? `${e.change} ` : ''}${who}${e.detail ? c.dim(` - ${e.detail}`) : ''}` +
-        c.dim(` [scdl ${e.scdl ?? '?'} · ${(e.license ?? '?').split(' ')[0]}]`));
+        c.dim(` [sdlc ${e.sdlc ?? '?'} · ${(e.license ?? '?').split(' ')[0]}]`));
     }
   } catch (error) {
     reportFailure(error, opts.json, { entries: [] });

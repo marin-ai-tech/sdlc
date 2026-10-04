@@ -9,7 +9,7 @@ export type Surface = 'skill' | 'plugin-skill' | 'claude-command' | 'opencode-co
 
 export interface RenderOptions {
   surface: Surface;
-  /** How agents invoke the harness CLI (`sdlc`, `npx sdlc`, ...). */
+  /** How agents invoke the harness CLI (`sdlc`, `npx --no-install sdlc`, ...). */
   cli: string;
 }
 
@@ -54,7 +54,7 @@ const TODO: Record<Surface, string> = {
   'opencode-agent': 'a task list',
 };
 
-/** Rewrites `sdlc ` invocations to the configured CLI prefix (for `npx sdlc` pins). */
+/** Rewrites `sdlc ` invocations to the configured CLI prefix (for `npx --no-install sdlc` pins). */
 export function applyCliPrefix(text: string, cli: string): string {
   if (cli === 'sdlc') return text;
   return text.replace(/(`|^|\s\$ |```bash\n)sdlc(?= [a-z-])/gm, (_m, lead: string) => `${lead}${cli}`);

@@ -2,6 +2,7 @@ import { spawnSync } from 'node:child_process';
 import * as path from 'node:path';
 import { SdlcError } from './errors.js';
 import { isFile } from './fs-utils.js';
+import { INSTALL_COMMAND } from './license.js';
 import { openspecPackageDir } from './openspec-schema.js';
 
 /**
@@ -61,7 +62,7 @@ export function runOpenSpec(
     throw new SdlcError(
       'openspec_unavailable',
       `Could not run OpenSpec (${bin.command}): ${result.error.message}`,
-      'Reinstall the harness (`npm install -g scdl`) or install OpenSpec: npm install -g @fission-ai/openspec'
+      `Reinstall the harness (${INSTALL_COMMAND}) or install OpenSpec: npm install -g @fission-ai/openspec`
     );
   }
   return {

@@ -1,4 +1,4 @@
-# scdl — AI-native SDLC harness for Claude Code and OpenCode, built on OpenSpec
+# sdlc — AI-native SDLC harness for Claude Code and OpenCode, built on OpenSpec
 
 `sdlc` runs the lifecycle from Anthropic's [AI-Native SDLC playbook](https://claude.com/blog/the-ai-native-sdlc-playbook) inside your coding agent:
 
@@ -32,16 +32,25 @@ On top of OpenSpec, `sdlc` adds the process parts the playbook asks for:
 - **Native agent UX.** Workflows ask with each tool's question tool (Claude Code AskUserQuestion, OpenCode `question`), mirror `tasks.md` into the tool todo list during `/sdlc:build`, and inject live CLI output into `/sdlc:status`, `/sdlc:next` and `/sdlc:help`. An answer in chat is never an approval — people run human decisions in their own terminal.
 - **Help and Next hints.** `sdlc help [topic]` and `/sdlc:help` catalog workflows and CLI commands with who runs them (agent or person). State-changing commands print a `Next:` hint (who acts next and how; the exact command when a person must act) and add `next` to JSON.
 - **Progress drawing.** `sdlc status --change <id>` shows a stage stepper and a task bar; `sdlc backlog list` shows a bar per epic; the markdown report includes Mermaid diagrams with sanitized labels.
-- **Claude Code status line.** `sdlc statusline` prints one line (change · stage · who acts); opt in with `sdlc init --statusline`. A user-defined status line is never replaced; `sdlc uninstall` removes only the scdl one.
+- **Claude Code status line.** `sdlc statusline` prints one line (change · stage · who acts); opt in with `sdlc init --statusline`. A user-defined status line is never replaced; `sdlc uninstall` removes only the sdlc one.
 
 ## Install
 
 ```bash
-npm install -g github:marin-ai-tech/scdl     # provides `sdlc` (and the OpenSpec it drives)
+npm install -g https://github.com/marin-ai-tech/sdlc/releases/latest/download/sdlc.tgz   # the latest release: `sdlc` and the OpenSpec it drives
 cd your-project && git init               # a git repository is expected
 sdlc init --tools claude,opencode         # or: --tools claude | --tools opencode
 sdlc doctor
 ```
+
+Other ways to install:
+- from git: `npm install -g github:marin-ai-tech/sdlc#release` (the `release` branch carries the built code; the default branch builds from source, and npm 11 cannot build a git package during a global install);
+- a specific version: `npm install -g https://github.com/marin-ai-tech/sdlc/releases/download/v<version>/sdlc-<version>.tgz`;
+- from source: clone, `npm install`, `npm pack`, then `npm install -g ./sdlc-<version>.tgz`.
+
+Do not run `npm install -g sdlc`: the package of that name on the npm registry is unrelated.
+
+Run `sdlc init` with no flags in a terminal to walk through the same choices interactively (tools, enforcement mode, status line, /opsx, language, roles) and confirm a summary before anything is written. The wizard also offers to install the OpenSpec CLI and codegraph when they are missing. Flags, `--json`, non-terminals and agent sessions keep the non-interactive behaviour.
 
 `sdlc init` does the following:
 - creates `openspec/` with OpenSpec itself if it is missing, and makes `sdlc` the default schema there (an existing OpenSpec project keeps its default);
@@ -51,14 +60,16 @@ sdlc doctor
 
 Commit the generated files: the whole team shares them.
 
-Options: `--mode block` (strict enforcement), `--cli "npx sdlc"` (project-local install), `--opsx` (also install OpenSpec's own `/opsx:*` workflows), `--delivery skills|commands|both`, `--no-hooks`, `--statusline` (Claude Code status line).
+Options: `--mode block` (strict enforcement), `--cli "npx --no-install sdlc"` (project-local install; `--no-install` keeps npx from fetching the unrelated registry package), `--opsx` (also install OpenSpec's own `/opsx:*` workflows), `--delivery skills|commands|both`, `--no-hooks`, `--statusline` (Claude Code status line).
 
 ### Claude Code plugin (organization-wide)
 
 ```text
-/plugin marketplace add marin-ai-tech/scdl
-/plugin install sdlc@scdl
+/plugin marketplace add marin-ai-tech/sdlc
+/plugin install sdlc@sdlc
 ```
+
+If you added the marketplace under its old name (`marin-ai-tech/scdl`, before 0.6.2), add it again under the new one and reinstall the plugin.
 
 The plugin ships the same workflows (`/sdlc:<id>`), subagents and hooks. With the plugin installed, run `sdlc init --tools none` (or `--tools opencode`) in projects so the project-level Claude files do not duplicate it.
 
@@ -99,13 +110,13 @@ The workflows are 13 short skills: `help`, `next`, `status`, `explore`, `intent`
 
 ## Version and license records
 
-Everything scdl writes records the scdl version and the license the project uses scdl under (`license` in `openspec/sdlc.yaml`):
+Everything sdlc writes records the sdlc version and the license the project uses sdlc under (`license` in `openspec/sdlc.yaml`):
 
 | Where | What |
 |---|---|
-| `openspec/.sdlc/log.jsonl` | append-only project log: setup, gate decisions, verification runs, archives, license changes and hook denials, one JSON line each with `scdl` and `license` (commit it; `merge=union` keeps branches mergeable). Shell command text is never logged. `sdlc log` prints it. |
-| `.sdlc.yaml` of each change | `harness: {scdl, license}` plus `scdl`/`license` on every history event, approval, rejection, waiver and verification record |
-| change artifacts | one line `<!-- sdlc-provenance: scdl <version> \| license: <license> \| <url> -->` at the end of the top-level markdown artifacts, written at approval, verification and archive. It is excluded from gate digests, so it never makes an approval stale. Delta specs are never stamped, because their text is merged into the living specs. |
+| `openspec/.sdlc/log.jsonl` | append-only project log: setup, gate decisions, verification runs, archives, license changes and hook denials, one JSON line each with `sdlc` and `license` (commit it; `merge=union` keeps branches mergeable). Shell command text is never logged. `sdlc log` prints it. |
+| `.sdlc.yaml` of each change | `harness: {sdlc, license}` plus `sdlc`/`license` on every history event, approval, rejection, waiver and verification record |
+| change artifacts | one line `<!-- sdlc-provenance: sdlc <version> \| license: <license> \| <url> -->` at the end of the top-level markdown artifacts, written at approval, verification and archive. It is excluded from gate digests, so it never makes an approval stale. Delta specs are never stamped, because their text is merged into the living specs. |
 | `verification.md` | a `Harness` line in the evidence block |
 | generated agent files | a notice with the version, the license in use and the `Required Notice` (skills, commands, subagents, the OpenCode plugin, `schema.yaml`; not the artifact templates) |
 | `sdlc status --markdown`, `--json` outputs | a footer line or a `harness` object |
@@ -136,8 +147,8 @@ Everything scdl writes records the scdl version and the license the project uses
 | `sdlc validate [--all]` | `openspec validate --strict`, delta target checks, overlaps |
 | `sdlc archive <id> --yes` | re-check gates, then `openspec archive` (delta merge) |
 | `sdlc audit [--change]` | audit trail and metrics |
-| `sdlc log [--change] [--limit]` | project log, with the scdl version and license of each entry |
-| `sdlc license` / `sdlc license set community \| commercial --agreement <id> [--licensee]` | show or record the license the project uses scdl under (setting it is human-only) |
+| `sdlc log [--change] [--limit]` | project log, with the sdlc version and license of each entry |
+| `sdlc license` / `sdlc license set community \| commercial --agreement <id> [--licensee]` | show or record the license the project uses sdlc under (setting it is human-only) |
 | `sdlc doctor` | installation health, including whether the declared license fits the project |
 | `sdlc hook <event>` | policy dispatcher used by the hooks and the plugin |
 | `sdlc plugin build [dir] --marketplace` | render the Claude Code plugin |
@@ -150,7 +161,8 @@ Every command except `statusline`, `dashboard`, `hook` and the `openspec` pass-t
 ```yaml
 version: 1
 schema: sdlc
-cli: sdlc                                  # "npx sdlc" for a project-local install
+cli: sdlc                                  # "npx --no-install sdlc" for a project-local install
+locale: ru                                 # optional: language of help, hints and reports (default: system, else en)
 tools: [claude, opencode]
 gates:
   intent:  { required: true,  approvers: [product-owner] }
@@ -181,6 +193,10 @@ log:
 ```
 
 Project context and per-artifact rules stay where OpenSpec keeps them (`openspec/config.yaml` → `context`, `rules`).
+
+### Language
+
+Help, `Next:` hints, `status`, the init wizard, hook reasons, the report and the dashboard follow the locale: `--locale <code>` on any command, then `SDLC_LOCALE`, then `locale:` in `openspec/sdlc.yaml`, then the system locale (`LC_ALL`, `LC_MESSAGES`, `LANG`, the OS). Without a translation the text is English. Shipped: English and Russian. JSON output, the project log and change records are always English, so agents and CI read the same thing everywhere.
 
 ### People and roles (`openspec/roles.yaml`, optional)
 
@@ -225,11 +241,11 @@ Research and design are in [`docs/en/`](docs/en/README.md):
 
 ## License
 
-scdl is dual-licensed.
+sdlc is dual-licensed.
 
-- **Community License** (free): the [PolyForm Noncommercial License 1.0.0](LICENSES/PolyForm-Noncommercial-1.0.0.md) with the [scdl Additional Permissions](LICENSES/scdl-Additional-Permissions.md). Use, modify and share scdl for any noncommercial purpose, for **open source projects** (complete source public under an OSI-approved license, also when a company maintains them), and for a 30-day evaluation. Keep the `Required Notice` line with every copy.
+- **Community License** (free): the [PolyForm Noncommercial License 1.0.0](LICENSES/PolyForm-Noncommercial-1.0.0.md) with the [sdlc Additional Permissions](LICENSES/sdlc-Additional-Permissions.md). Use, modify and share sdlc for any noncommercial purpose, for **open source projects** (complete source public under an OSI-approved license, also when a company maintains them), and for a 30-day evaluation. Keep the `Required Notice` line with every copy.
 - **Commercial License** (royalties): every other use, in particular business use on private repositories, internal systems, proprietary products, client work, hosted services and redistribution. See [COMMERCIAL-LICENSE.md](COMMERCIAL-LICENSE.md).
 
-You own what you and your agents create with scdl (intents, specs, plans, code, records); the provenance lines scdl writes do not change that. Portions adapted from OpenSpec remain under the MIT License ([NOTICE.md](NOTICE.md)). Contributions need the [CLA](CLA.md) (see [CONTRIBUTING.md](CONTRIBUTING.md)).
+You own what you and your agents create with sdlc (intents, specs, plans, code, records); the provenance lines sdlc writes do not change that. Portions adapted from OpenSpec remain under the MIT License ([NOTICE.md](NOTICE.md)). Contributions need the [CLA](CLA.md) (see [CONTRIBUTING.md](CONTRIBUTING.md)).
 
-Required Notice: Copyright (c) 2026 marin-ai technologies (https://github.com/marin-ai-tech/scdl)
+Required Notice: Copyright (c) 2026 marin-ai technologies (https://github.com/marin-ai-tech/sdlc)

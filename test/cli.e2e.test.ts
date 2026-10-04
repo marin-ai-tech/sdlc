@@ -8,7 +8,7 @@ import { readLog, type LogEntry } from '../src/core/log.js';
 import { harnessVersion } from '../src/core/version.js';
 
 const VERSION = harnessVersion();
-const COMMUNITY = 'community (PolyForm-Noncommercial-1.0.0 + scdl-Additional-Permissions-1.0)';
+const COMMUNITY = 'community (PolyForm-Noncommercial-1.0.0 + sdlc-Additional-Permissions-1.0)';
 
 const FILES: Record<string, string> = {
   'intent.md': '# Intent: say goodbye\n\nAuthor: Pat (web). Status: draft. Source: idea\n\n## Problem\nSessions end without a goodbye.\n\n## Proposed outcome\nUsers see a named farewell.\n\n## Affected users and systems\nAll users.\n\n## Constraints\nNone\n\n## Success measures\nShown on sign-out.\n\n## Out of scope\nNone\n\n## Open questions\nNone\n',
@@ -49,8 +49,8 @@ describe('sdlc CLI end to end (with the bundled OpenSpec)', () => {
       expect(fs.existsSync(path.join(root, f)), f).toBe(true);
     }
     expect(cli(['openspec', 'schema', 'validate', 'sdlc']).code).toBe(0);
-    expect(out.harness).toMatchObject({ tool: 'scdl', version: VERSION, license: COMMUNITY });
-    expect(logEntries()[0]).toMatchObject({ event: 'harness.initialized', by: 'Pat Owner <pat@example.com>', scdl: VERSION, license: COMMUNITY });
+    expect(out.harness).toMatchObject({ tool: 'sdlc', version: VERSION, license: COMMUNITY });
+    expect(logEntries()[0]).toMatchObject({ event: 'harness.initialized', by: 'Pat Owner <pat@example.com>', sdlc: VERSION, license: COMMUNITY });
     git(root, ['add', '-A']);
     git(root, ['commit', '-qm', 'sdlc init']);
   });
@@ -100,16 +100,16 @@ describe('sdlc CLI end to end (with the bundled OpenSpec)', () => {
     expect(cli(['next', '--json']).json().next).toMatchObject({ actor: 'agent', action: 'implement' });
   });
 
-  it('stamps approved artifacts and records the scdl version and license with every approval', () => {
-    const provenance = `<!-- sdlc-provenance: scdl ${VERSION} | license: ${COMMUNITY} | ${PROJECT_URL} -->`;
+  it('stamps approved artifacts and records the sdlc version and license with every approval', () => {
+    const provenance = `<!-- sdlc-provenance: sdlc ${VERSION} | license: ${COMMUNITY} | ${PROJECT_URL} -->`;
     for (const f of ['intent.md', 'proposal.md', 'design.md', 'plan.md', 'tasks.md']) {
       expect(read(path.join(changeDir(), f)).trimEnd().endsWith(provenance), f).toBe(true);
     }
     expect(read(path.join(changeDir(), 'specs/greeting/spec.md'))).not.toContain('sdlc-provenance');
     const state = parse(read(path.join(changeDir(), '.sdlc.yaml')));
-    expect(state.harness).toEqual({ scdl: VERSION, license: COMMUNITY });
-    expect(state.gates.plan.approvals[0]).toMatchObject({ role: 'engineer', scdl: VERSION, license: COMMUNITY });
-    expect(state.history.every((h: { scdl?: string; license?: string }) => h.scdl === VERSION && h.license === COMMUNITY)).toBe(true);
+    expect(state.harness).toEqual({ sdlc: VERSION, license: COMMUNITY });
+    expect(state.gates.plan.approvals[0]).toMatchObject({ role: 'engineer', sdlc: VERSION, license: COMMUNITY });
+    expect(state.history.every((h: { sdlc?: string; license?: string }) => h.sdlc === VERSION && h.license === COMMUNITY)).toBe(true);
     // Stamping is not content: every planning gate is still approved.
     const gates = cli(['status', '--change', 'add-farewell', '--json']).json().change.gates;
     expect(gates.filter((g: { id: string }) => ['intent', 'spec', 'plan'].includes(g.id)).map((g: { status: string }) => g.status))
@@ -125,13 +125,13 @@ describe('sdlc CLI end to end (with the bundled OpenSpec)', () => {
     expect(JSON.parse(denied.stdout).hookSpecificOutput.permissionDecision).toBe('deny');
     const session = cli(['hook', 'session-start'], {}, JSON.stringify({ cwd: root, source: 'startup' }));
     expect(JSON.parse(session.stdout).hookSpecificOutput.additionalContext).toMatch(/add-farewell/);
-    expect(JSON.parse(session.stdout).hookSpecificOutput.additionalContext).toContain(`scdl ${VERSION}, license: community`);
+    expect(JSON.parse(session.stdout).hookSpecificOutput.additionalContext).toContain(`sdlc ${VERSION}, license: community`);
   });
 
   it('logs hook denials with the rule and tool, never the command text', () => {
     cli(['hook', 'pre-tool'], {}, JSON.stringify({ cwd: root, tool_name: 'Bash', tool_input: { command: 'sdlc approve plan --token s3cr3t' } }));
     const denial = logEntries().filter((e) => e.event === 'hook.denied').at(-1)!;
-    expect(denial).toMatchObject({ agent: 'claude', detail: 'separation-of-duties: Bash', scdl: VERSION, license: COMMUNITY });
+    expect(denial).toMatchObject({ agent: 'claude', detail: 'separation-of-duties: Bash', sdlc: VERSION, license: COMMUNITY });
     expect(read(path.join(root, 'openspec/.sdlc/log.jsonl'))).not.toContain('s3cr3t');
   });
 
@@ -144,9 +144,9 @@ describe('sdlc CLI end to end (with the bundled OpenSpec)', () => {
     expect(v.json().status).toBe('passed');
     const evidence = read(path.join(changeDir(), 'verification.md'));
     expect(evidence).toMatch(/sdlc:evidence:start[\s\S]*npm test[\s\S]*sdlc:evidence:end/);
-    expect(evidence).toContain(`- **Harness**: scdl ${VERSION}, license: ${COMMUNITY}`);
-    expect(evidence.trimEnd()).toMatch(/<!-- sdlc-provenance: scdl [^\n]+ -->$/);
-    expect(parse(read(path.join(changeDir(), '.sdlc.yaml'))).verify).toMatchObject({ status: 'passed', scdl: VERSION, license: COMMUNITY });
+    expect(evidence).toContain(`- **Harness**: sdlc ${VERSION}, license: ${COMMUNITY}`);
+    expect(evidence.trimEnd()).toMatch(/<!-- sdlc-provenance: sdlc [^\n]+ -->$/);
+    expect(parse(read(path.join(changeDir(), '.sdlc.yaml'))).verify).toMatchObject({ status: 'passed', sdlc: VERSION, license: COMMUNITY });
     expect(cli(['verify', '--check', '--strict', '--change', 'add-farewell']).code).toBe(1);
     fs.writeFileSync(path.join(changeDir(), 'verification.md'), evidence.replace(/(## Behavioral verification[\s\S]*?\|---\|---\|---\|---\|\n)/, '$1| Named farewell | node --test | Goodbye, Ada | PASS |\n'));
     expect(cli(['verify', '--check', '--strict', '--change', 'add-farewell']).code).toBe(0);
@@ -178,10 +178,10 @@ describe('sdlc CLI end to end (with the bundled OpenSpec)', () => {
     const history = read(path.join(root, 'openspec/changes/archive', archived, '.sdlc.yaml'));
     expect(history).toMatch(/event: change.archived/);
     for (const f of ['intent.md', 'proposal.md', 'design.md', 'plan.md', 'tasks.md', 'verification.md', 'review.md']) {
-      expect(read(path.join(root, 'openspec/changes/archive', archived, f)), f).toContain(`sdlc-provenance: scdl ${VERSION}`);
+      expect(read(path.join(root, 'openspec/changes/archive', archived, f)), f).toContain(`sdlc-provenance: sdlc ${VERSION}`);
     }
     expect(read(path.join(root, 'openspec/specs/greeting/spec.md'))).not.toContain('sdlc-provenance');
-    expect(logEntries().at(-1)).toMatchObject({ event: 'change.archived', change: 'add-farewell', scdl: VERSION, license: COMMUNITY });
+    expect(logEntries().at(-1)).toMatchObject({ event: 'change.archived', change: 'add-farewell', sdlc: VERSION, license: COMMUNITY });
     expect(cli(['openspec', 'list', '--specs', '--json']).json().specs).toEqual([{ id: 'greeting', requirementCount: 1 }]);
     const audit = cli(['audit', '--change', 'add-farewell', '--json']).json();
     expect(audit.metrics.verifyFirstPass).toBe(true);
@@ -201,7 +201,7 @@ describe('sdlc CLI end to end (with the bundled OpenSpec)', () => {
     expect(cli(['license', 'set', 'commercial', '--json']).json().status[0].code).toBe('agreement_required');
     const set = cli(['license', 'set', 'commercial', '--agreement', 'ACME-7', '--licensee', 'Acme Corp', '--json']);
     expect(set.code, set.stdout).toBe(0);
-    const commercial = 'commercial (scdl-Commercial, agreement ACME-7, licensee Acme Corp)';
+    const commercial = 'commercial (sdlc-Commercial, agreement ACME-7, licensee Acme Corp)';
     expect(set.json().harness.license).toBe(commercial);
     expect(set.json().files.updated).toContain('.claude/agents/sdlc-verifier.md');
     expect(read(path.join(root, '.claude/agents/sdlc-verifier.md'))).toContain(`used under the ${commercial} license`);

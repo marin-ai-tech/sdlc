@@ -4,7 +4,7 @@ import { harnessPackageDir } from './openspec-schema.js';
 
 let cached: string | undefined;
 
-/** Version of the installed scdl package (from its package.json). */
+/** Version of the installed sdlc package (from its package.json). */
 export function harnessVersion(): string {
   if (cached) return cached;
   try {
