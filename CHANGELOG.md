@@ -2,6 +2,15 @@
 
 All notable changes to sdlc. Versions follow [Semantic Versioning](https://semver.org/); while the major version is 0, a minor version may change behavior.
 
+## 0.6.4 — 2026-10-04
+
+### Added
+- **The rest of the CLI follows the locale.** Commander's own messages (missing argument, unknown command or option, "did you mean"), every command's `--help` (titles, the description of every option, `-h` and `-V`) and the key hints of the init wizard's prompts are translated. English output is unchanged; the JSON help catalog stays English.
+- CONTRIBUTING.md explains how to add a language: copy `assets/locales/en.json`, translate the values, add the code to `LOCALES` and run the tests, which check completeness and placeholders.
+
+### Fixed
+- The Russian catalog no longer leaves English words in its messages (owner, workflow, branch, drift and others); a test keeps it that way.
+
 ## 0.6.3 — 2026-10-04
 
 ### Added

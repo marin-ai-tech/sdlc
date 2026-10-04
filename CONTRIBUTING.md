@@ -19,3 +19,11 @@ Thank you for helping improve sdlc.
    `node bin/sdlc.js plugin build plugin --marketplace`.
 3. **Notices.** Keep the `Required Notice:` lines in the license files and in
    generated files.
+
+
+## Adding a language (i18n)
+
+1. Copy `assets/locales/en.json` to `assets/locales/<code>.json` (for example `de.json`).
+2. Translate the values. Keep the keys, `{params}` placeholders, command names, flags and ids as they are.
+3. Add the language code to `LOCALES` in `src/core/i18n.ts`.
+4. Run `npm test` — the catalog tests check that every locale has every English key and matching placeholders.

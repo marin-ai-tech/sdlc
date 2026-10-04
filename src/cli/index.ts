@@ -14,7 +14,6 @@ import { runOpenSpec } from '../core/openspec.js';
 import { findProjectRoot } from '../core/project.js';
 import { runHook } from '../hook.js';
 import { LICENSE_TERMS, REQUIRED_NOTICE } from '../core/license.js';
-import { harnessVersion } from '../core/version.js';
 import { reportCommand } from '../commands/report.js';
 import { layoutCommand } from '../commands/layout.js';
 import { deferAdd, deferClose, deferList } from '../commands/defer.js';
@@ -23,12 +22,13 @@ import { exploreCommand, exploreListCommand } from '../commands/explore.js';
 import { importBmadCommand } from '../commands/import.js';
 import { backlogAdd, backlogClose, backlogEpicAdd, backlogList, backlogMove, backlogNext, backlogStart } from '../commands/backlog.js';
 import { rolesCheck, rolesMigrate, rolesWho } from '../commands/roles.js';
-import { catalog, resolveLocale, setLocale, systemLocale } from '../core/i18n.js';
+import { resolveLocale, setLocale, systemLocale, t } from '../core/i18n.js';
+import { applyCommanderLocale, localizeDescriptions, peekLocaleFlag } from './commander-i18n.js';
 import { loadConfig } from '../core/config.js';
 import { projectPaths } from '../core/project.js';
 
 function cmdDesc(key: string): string {
-  return catalog('en')[key] ?? key;
+  return t(key);
 }
 
 function applyLocale(flag: string | undefined): void {
@@ -63,6 +63,7 @@ export function buildProgram(): Command {
     const opts = actionCommand.optsWithGlobals() as { locale?: string };
     applyLocale(opts.locale);
   });
+  applyCommanderLocale(program);
   const roles = program.command('roles').description(cmdDesc('cmd.roles'));
   roles.command('check').description(cmdDesc('cmd.roles.check'))
     .option('--change <id>', 'change id').option('--base <ref>', 'base ref').option('--json', 'output JSON')
@@ -159,7 +160,6 @@ export function buildProgram(): Command {
   program
     .name('sdlc')
     .description(cmdDesc('cmd.program'))
-    .version(harnessVersion())
     .addHelpText('after', `\n${REQUIRED_NOTICE}\nLicense: ${LICENSE_TERMS}`)
     .enablePositionalOptions()
     .showHelpAfterError();
@@ -409,9 +409,11 @@ export function buildProgram(): Command {
     });
 
   withLocaleOption(program);
+  localizeDescriptions(program);
   return program;
 }
 
 export async function run(argv: string[]): Promise<void> {
+  applyLocale(peekLocaleFlag(argv));
   await buildProgram().parseAsync(argv);
 }

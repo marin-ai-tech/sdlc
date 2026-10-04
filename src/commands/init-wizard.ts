@@ -299,14 +299,29 @@ export function starterRoles(identity: GitIdentity): string {
  * The real prompter (@inquirer/prompts). Loaded lazily: every CLI call, including the hook that runs on each
  * agent tool call, imports this module, and only an interactive init needs the prompt library.
  */
+function promptNavHints(kind: 'checkbox' | 'select'): {
+  instructions: string;
+  theme: { style: { keysHelpTip: () => string } };
+} {
+  const text = t(kind === 'checkbox' ? 'init.prompt.checkboxHint' : 'init.prompt.selectHint');
+  return {
+    instructions: text,
+    theme: { style: { keysHelpTip: () => text } },
+  };
+}
+
 export function terminalPrompter(): Prompter {
   const prompts = () => import('@inquirer/prompts');
   return {
     async checkbox(message, choices) {
-      return (await prompts()).checkbox({ message, choices });
+      const hints = promptNavHints('checkbox');
+      return (await prompts()).checkbox({ message, choices, ...hints } as { message: string; choices: typeof choices });
     },
     async select(message, choices, initial) {
-      return (await prompts()).select({ message, choices, default: initial });
+      const hints = promptNavHints('select');
+      return (await prompts()).select({
+        message, choices, default: initial, ...hints,
+      } as { message: string; choices: typeof choices; default: typeof initial });
     },
     async confirm(message, initial) {
       return (await prompts()).confirm({ message, default: initial });

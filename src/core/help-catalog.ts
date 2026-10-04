@@ -1,4 +1,5 @@
 import type { Command } from 'commander';
+import { catalog } from './i18n.js';
 import { WORKFLOW_IDS, loadWorkflow } from '../integrations/assets.js';
 
 export const HUMAN_COMMANDS = [
@@ -55,10 +56,11 @@ function describe(command: Command, name: string): CatalogCommand {
   const args = command.registeredArguments.map((arg) => arg.required ? `<${arg.name()}>` : `[${arg.name()}]`);
   const required = command.options.filter((option) => option.mandatory).map((option) => option.flags.split(', ').at(-1));
   const usage = `sdlc ${name}${args.length ? ` ${args.join(' ')}` : ''}${required.length ? ` ${required.join(' ')}` : ''}`;
+  const key = `cmd.${name.replace(/ /g, '.')}`;
   return {
     name,
     usage,
-    description: command.description(),
+    description: catalog('en')[key] ?? command.description(),
     actor: (HUMAN_COMMANDS as readonly string[]).includes(name) ? 'human' : 'any',
     example: EXAMPLES[name] ?? generatedExample(command, name),
   };
