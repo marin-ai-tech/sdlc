@@ -8,14 +8,61 @@
 // - tool.execute.after:  append process reminders to the tool output the model reads
 // - shell.env:           mark agent shells so the CLI refuses agent self-approvals
 // - experimental.chat.system.transform: inject the lifecycle summary (like Claude's SessionStart)
-// The plugin fails open: if the CLI is missing or errors, OpenCode behaves as without it.
+// The pre-tool check fails closed: when `sdlc hook` cannot run (a spawn error such as a spurious ETIMEDOUT,
+// a signal, a non-zero exit status, an answer that is not JSON) it is run once more, and if that fails too
+// the call is blocked with the cause. An empty answer from `sdlc hook` is its "allow", not a failure.
+// Only a CLI that is not installed at all (ENOENT) lets OpenCode work without the gates, with a one-time warning.
+// The lifecycle summary and the after-tool reminders never block.
 import { spawnSync } from "node:child_process";
 
 const CLI = __SDLC_CLI__;
 const TIMEOUT_MS = 20000;
 const SUMMARY_TTL_MS = 60000;
+const CAUSE_MAX_LENGTH = 120;
 
-function runHook(event, payload, cwd) {
+/** A spawn error as an outcome: ENOENT means the CLI is not installed, anything else is a failed check. */
+function spawnFailure(error) {
+  if (error && error.code === "ENOENT") {
+    return { missing: true };
+  }
+  const cause = (error && (error.code || error.message)) || String(error);
+  return { failure: `spawn error ${cause}` };
+}
+
+/** A JSON answer as an outcome: a decision object, or a failure when it is not one. */
+function parseAnswer(answer) {
+  let decision;
+  try {
+    decision = JSON.parse(answer);
+  } catch {
+    return { failure: "the answer is not JSON" };
+  }
+  if (decision === null || typeof decision !== "object") {
+    return { failure: "the answer is not a JSON object" };
+  }
+  return { decision };
+}
+
+/** A finished run as an outcome: { decision } (undefined means allow), { missing } or { failure }. */
+function readRun(result) {
+  if (result.error) {
+    return spawnFailure(result.error);
+  }
+  if (result.signal) {
+    return { failure: `killed by ${result.signal}` };
+  }
+  if (result.status !== 0) {
+    return { failure: `exit status ${result.status}` };
+  }
+  const answer = String(result.stdout ?? "").trim();
+  if (!answer) {
+    return { decision: undefined };
+  }
+  return parseAnswer(answer);
+}
+
+/** Runs `sdlc hook <event>` once; never throws. */
+function runHookOnce(event, payload, cwd) {
   try {
     const result = spawnSync(CLI[0], [...CLI.slice(1), "hook", event, "--agent", "opencode"], {
       cwd,
@@ -24,16 +71,115 @@ function runHook(event, payload, cwd) {
       timeout: TIMEOUT_MS,
       env: { ...process.env, SDLC_AGENT: "opencode" },
     });
-    if (result.error || result.status !== 0 || !result.stdout) return undefined;
-    return JSON.parse(result.stdout);
-  } catch {
-    return undefined;
+    return readRun(result);
+  } catch (error) {
+    return spawnFailure(error);
   }
 }
 
+/**
+ * Runs the hook, and once more when the first run failed. A CLI that is missing only on the second
+ * run was found the first time, so that stays a failure rather than "not installed".
+ */
+function runHook(event, payload, cwd) {
+  const first = runHookOnce(event, payload, cwd);
+  if (!first.failure) {
+    return first;
+  }
+  const second = runHookOnce(event, payload, cwd);
+  if (second.missing) {
+    return { failure: `${first.failure}, then the CLI was not found` };
+  }
+  return second;
+}
+
+function shortCause(cause) {
+  const line = String(cause).split(/\r?\n/)[0];
+  if (line.length <= CAUSE_MAX_LENGTH) {
+    return line;
+  }
+  return `${line.slice(0, CAUSE_MAX_LENGTH)}...`;
+}
+
+function blockedError(cause) {
+  const message = [
+    `[sdlc] The SDLC harness check could not run (${shortCause(cause)}), so this call is blocked.`,
+    "Retry the call; if it keeps failing, run `sdlc doctor`.",
+  ].join(" ");
+  return new Error(message);
+}
+
+/** Warns once per plugin instance that the CLI is not installed and the gates are off. */
+function warnMissing(state) {
+  if (state.warnedMissing) {
+    return;
+  }
+  state.warnedMissing = true;
+  const message = [
+    `[sdlc] The sdlc CLI (${CLI.join(" ")}) was not found, so OpenCode runs without the SDLC harness checks.`,
+    "Install it or fix `cli:` in openspec/sdlc.yaml, then run `sdlc update`.",
+  ].join(" ");
+  console.error(message);
+}
+
+/** tool.execute.before: blocks a denied call and a call whose check could not run. */
+function checkToolCall(state, input, output) {
+  const payload = {
+    tool_name: input.tool,
+    tool_input: output.args ?? {},
+    session_id: input.sessionID,
+    cwd: state.directory,
+  };
+  const outcome = runHook("pre-tool", payload, state.directory);
+  if (outcome.missing) {
+    warnMissing(state);
+    return;
+  }
+  if (outcome.failure) {
+    throw blockedError(outcome.failure);
+  }
+  const decision = outcome.decision;
+  if (!decision) {
+    return;
+  }
+  if (decision.decision === "deny") {
+    throw new Error(decision.reason ?? "[sdlc] Blocked by the SDLC harness.");
+  }
+  if (decision.decision === "warn" && decision.reason) {
+    state.reminders.set(input.callID, decision.reason);
+  }
+}
+
+/** tool.execute.after: appends the reminder kept for this call. */
+function appendReminder(state, input, output) {
+  const reminder = state.reminders.get(input.callID);
+  if (!reminder) {
+    return;
+  }
+  state.reminders.delete(input.callID);
+  output.output = `${output.output ?? ""}\n\n${reminder}`;
+}
+
+/** The lifecycle summary, cached per session (a failed run too, so a hanging CLI cannot stall every turn). */
+function sessionSummary(state, sessionID) {
+  const key = sessionID ?? "default";
+  const cached = state.summaries.get(key);
+  const now = Date.now();
+  if (cached && now - cached.at < SUMMARY_TTL_MS) {
+    return cached.text;
+  }
+  const outcome = runHook("session-start", { session_id: key, cwd: state.directory }, state.directory);
+  if (outcome.missing) {
+    warnMissing(state);
+  }
+  const context = outcome.decision?.context;
+  const text = typeof context === "string" ? context : "";
+  state.summaries.set(key, { text, at: now });
+  return text;
+}
+
 export const SdlcPlugin = async ({ directory }) => {
-  const reminders = new Map();
-  const summaries = new Map();
+  const state = { directory, reminders: new Map(), summaries: new Map(), warnedMissing: false };
 
   return {
     "shell.env": async (_input, output) => {
@@ -41,36 +187,26 @@ export const SdlcPlugin = async ({ directory }) => {
     },
 
     "tool.execute.before": async (input, output) => {
-      const decision = runHook(
-        "pre-tool",
-        { tool_name: input.tool, tool_input: output.args ?? {}, session_id: input.sessionID, cwd: directory },
-        directory,
-      );
-      if (!decision) return;
-      if (decision.decision === "deny") {
-        throw new Error(decision.reason ?? "[sdlc] Blocked by the SDLC harness.");
-      }
-      if (decision.decision === "warn" && decision.reason) reminders.set(input.callID, decision.reason);
+      checkToolCall(state, input, output);
     },
 
     "tool.execute.after": async (input, output) => {
-      const reminder = reminders.get(input.callID);
-      if (!reminder) return;
-      reminders.delete(input.callID);
-      output.output = `${output.output ?? ""}\n\n${reminder}`;
+      try {
+        appendReminder(state, input, output);
+      } catch {
+        // A reminder is advice: never fail a call that already ran.
+      }
     },
 
     "experimental.chat.system.transform": async (input, output) => {
-      const key = input.sessionID ?? "default";
-      const cached = summaries.get(key);
-      const now = Date.now();
-      let text = cached && now - cached.at < SUMMARY_TTL_MS ? cached.text : undefined;
-      if (text === undefined) {
-        const result = runHook("session-start", { session_id: key, cwd: directory }, directory);
-        text = result?.context ?? "";
-        summaries.set(key, { text, at: now });
+      try {
+        const text = sessionSummary(state, input.sessionID);
+        if (text) {
+          output.system.push(text);
+        }
+      } catch {
+        // The summary is advice: never block the session.
       }
-      if (text) output.system.push(text);
     },
   };
 };

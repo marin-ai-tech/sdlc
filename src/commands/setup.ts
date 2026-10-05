@@ -30,6 +30,7 @@ import {
 } from '../integrations/install.js';
 import type { ToolId } from '../integrations/types.js';
 import { agentEnvironment } from '../core/agent-env.js';
+import { checkLayoutRequest, describeFolder, initWithLayout, type FolderDescription } from '../core/init-layout.js';
 import {
   codegraphIndexCommand,
   defaultInstaller,
@@ -49,6 +50,7 @@ import {
   type Prompter,
   type TerminalState,
 } from './init-wizard.js';
+import { layoutOptions, printLayoutText } from './init-layout.js';
 
 export interface InitOptions {
   tools?: string;
@@ -61,6 +63,11 @@ export interface InitOptions {
   language?: string;
   force?: boolean;
   json?: boolean;
+  /** AI-ready layout: scaffold | adapt | worktree | none. */
+  layout?: string;
+  /** Folder of the AI-ready worktree (with `layout: worktree`). */
+  worktree?: string;
+  gitInit?: boolean;
 }
 
 function assertDelivery(value: string | undefined): Delivery | undefined {
@@ -198,7 +205,8 @@ interface WizardResult {
 async function resolveWizard(
   root: string,
   opts: InitOptions,
-  deps: InitDeps = {}
+  deps: InitDeps = {},
+  folder?: FolderDescription,
 ): Promise<WizardResult | undefined> {
   const terminal = {
     stdinTTY: !!process.stdin.isTTY,
@@ -210,7 +218,7 @@ async function resolveWizard(
     return { opts, roles: false, install: [], index: false };
   }
   const probe = deps.probe ?? defaultProbe;
-  const defaults = initDefaults(root, detectTools(root), probe);
+  const defaults = { ...initDefaults(root, detectTools(root), probe), folder };
   const choices = await askInitChoices(deps.prompter ?? terminalPrompter(), defaults);
   if (!choices) {
     line(t('init.nothingWritten'));
@@ -254,6 +262,7 @@ function optsFromChoices(opts: InitOptions, choices: InitChoices): InitOptions {
     statusline: choices.statusline,
     opsx: choices.opsx,
     ...(choices.language ? { language: choices.language } : {}),
+    ...layoutOptions(choices),
   };
 }
 
@@ -272,6 +281,22 @@ export interface InitDeps {
   installer?: Installer;
 }
 
+/** What init did in one folder; printed as JSON or text. */
+interface InitOutcome {
+  root: string;
+  config: SdlcConfig;
+  hadConfig: boolean;
+  openspecCreated: boolean;
+  schemaDefaulted: boolean;
+  tools: ToolId[];
+  detectedCommands: string[];
+  result: InstallResult;
+  reviewCreated: boolean;
+  opsx?: 'installed' | 'failed';
+  rolesNote?: string;
+  license: ReturnType<typeof assessLicense>;
+}
+
 export async function initCommand(target: string | undefined, opts: InitOptions, deps?: InitDeps): Promise<void> {
   try {
     const root = path.resolve(target ?? process.cwd());
@@ -283,101 +308,131 @@ export async function initCommand(target: string | undefined, opts: InitOptions,
     if (nested && nested !== root && !isDirectory(path.join(root, 'openspec'))) {
       warn(t('init.nestedOpenSpec', { nested, root }));
     }
-    const resolved = await resolveWizard(root, opts, deps);
+    // Classified before anything is written; the wizard and the layout step use it.
+    const folder = describeFolder(root);
+    const resolved = await resolveWizard(root, opts, deps, folder);
     if (!resolved) return;
-    opts = resolved.opts;
-    const paths = projectPaths(root);
-    const openspec = ensureOpenSpec(paths, opts.language);
-    const hadConfig = isFile(paths.sdlcConfig);
-    const config = hadConfig ? loadConfig(paths.sdlcConfig) : defaultConfig();
-
-    const detected = detectTools(root);
-    const fallback: ToolId[] = config.tools.length > 0
-      ? (config.tools.filter((t) => t in ADAPTERS) as ToolId[])
-      : detected.length > 0 ? detected : ['claude', 'opencode'];
-    const tools = parseTools(opts.tools, fallback);
-    config.tools = tools;
-    config.delivery = assertDelivery(opts.delivery) ?? config.delivery;
-    config.cli = opts.cli ?? config.cli;
-    config.statusline = opts.statusline || config.statusline;
-    config.enforcement.mode = assertMode(opts.mode) ?? config.enforcement.mode;
-    let detectedCommands: string[] = [];
-    if (!hadConfig && config.verify.commands.length === 0) {
-      const found = detectVerifyCommands(root);
-      config.verify.commands = found.map((f) => ({ name: f.name, run: f.run, required: true }));
-      detectedCommands = found.map((f) => `${f.run} (${f.why})`);
-    }
-    saveConfig(paths.sdlcConfig, config);
-    let rolesNote: string | undefined;
-    if (resolved.roles) {
-      const rolesAction = writeStarterRoles(root);
-      rolesNote = `roles: ${rolesAction} openspec/roles.yaml`;
-    }
-
-    // New OpenSpec roots default to the sdlc schema so OpenSpec's own /opsx
-    // workflows produce SDLC changes too; existing roots keep their default.
-    const schemaDefaulted = openspec.created ? setDefaultSchema(paths, config.schema) : false;
-    const result = installIntegrations(root, config, tools, { force: opts.force, hooks: opts.hooks });
-    const reviewCreated = ensureReviewPolicy(root, config);
-
-    let opsx: 'installed' | 'failed' | undefined;
-    if (opts.opsx && tools.length > 0) {
-      const r = runOpenSpec(['init', root, '--tools', tools.join(','), '--no-animation'], { cwd: root });
-      opsx = r.ok ? 'installed' : 'failed';
-    }
-    const stamp = harnessStamp(config);
-    logSetup(root, config, hadConfig ? 'harness.reinitialized' : 'harness.initialized', tools);
-    const license = assessLicense(
-      config.license,
-      detectProjectLicense(root),
-      opts.json ? 'en' : currentLocale(),
-    );
-
-    if (resolved.install.length > 0 || resolved.index) {
-      await runChosenInstalls(
-        root,
-        resolved.install,
-        { wanted: resolved.index, tools },
-        deps?.installer ?? defaultInstaller,
-      );
-    }
-
-    if (opts.json) {
-      printJson({
-        harness: stamp,
-        license: { ...config.license, assessment: license },
-        root,
-        openspec: { created: openspec.created, defaultSchema: schemaDefaulted ? config.schema : undefined },
-        config: { path: paths.sdlcConfig, created: !hadConfig, verifyCommands: config.verify.commands.map((v) => v.run) },
-        tools,
-        files: result.files,
-        claudeHooks: result.claudeHooks,
-        statusLine: result.statusLine,
-        reviewPolicy: reviewCreated ? config.review.policy : undefined,
-        ...(opsx ? { opsx } : {}),
-        ...(rolesNote ? { roles: rolesNote } : {}),
-      });
-      return;
-    }
-    line(c.bold(t('init.done', { root })));
-    line((openspec.created ? t('init.openspecCreated') : t('init.openspecExisting')) + (schemaDefaulted ? t('init.defaultSchema', { schema: config.schema }) : ''));
-    line(t(hadConfig ? 'init.configKept' : 'init.configCreated', { mode: config.enforcement.mode }));
-    if (!hadConfig) {
-      line(detectedCommands.length > 0
-        ? t('init.verifyDetected', { commands: detectedCommands.join('; ') })
-        : c.yellow(t('init.verifyEmpty')));
-    }
-    if (reviewCreated) line(t('init.reviewPolicy', { policy: config.review.policy }));
-    line(t('init.toolsLine', { tools: tools.length > 0 ? tools.map((id) => ADAPTERS[id].name).join(', ') : t('init.none') }));
-    if (rolesNote) line(`  ${rolesNote}`);
-    if (opsx) line(t('init.opsxLine', { opsx: stateLabel(opsx) }));
-    line(`  ${stampTextLocalized(stamp)}`);
-    if (license.status !== 'ok') warn(`${license.message}. ${license.fix ?? ''}`.trim());
-    printInstall(result, config);
-    if (result.statusLine === 'kept (user-defined)') warn(t('init.keptStatusline'));
+    const chosen = resolved.opts;
+    // The terminal seam (deps.io) names the agent session in tests; the CLI reads the environment.
+    const request = checkLayoutRequest(root, chosen, deps?.io ? deps.io.agent : agentEnvironment());
+    const runInit = (dir: string) => setupProject(dir, chosen, resolved, deps);
+    const done = await initWithLayout(root, folder, request, chosen, runInit);
+    if (chosen.json) return printJson({ ...initJson(done.outcome), layout: done.layout });
+    printInitText(done.outcome);
+    printLayoutText(done);
   } catch (error) {
     reportFailure(error, opts.json);
   }
+}
+
+interface Settings {
+  paths: ProjectPaths;
+  openspecCreated: boolean;
+  hadConfig: boolean;
+  config: SdlcConfig;
+  tools: ToolId[];
+  detectedCommands: string[];
+}
+
+/** OpenSpec's planning home and openspec/sdlc.yaml with the chosen options. */
+function writeSettings(root: string, opts: InitOptions): Settings {
+  const paths = projectPaths(root);
+  const openspec = ensureOpenSpec(paths, opts.language);
+  const hadConfig = isFile(paths.sdlcConfig);
+  const config = hadConfig ? loadConfig(paths.sdlcConfig) : defaultConfig();
+  const detected = detectTools(root);
+  const fallback: ToolId[] = config.tools.length > 0
+    ? (config.tools.filter((t) => t in ADAPTERS) as ToolId[])
+    : detected.length > 0 ? detected : ['claude', 'opencode'];
+  const tools = parseTools(opts.tools, fallback);
+  config.tools = tools;
+  config.delivery = assertDelivery(opts.delivery) ?? config.delivery;
+  config.cli = opts.cli ?? config.cli;
+  config.statusline = opts.statusline || config.statusline;
+  config.enforcement.mode = assertMode(opts.mode) ?? config.enforcement.mode;
+  let detectedCommands: string[] = [];
+  if (!hadConfig && config.verify.commands.length === 0) {
+    const found = detectVerifyCommands(root);
+    config.verify.commands = found.map((f) => ({ name: f.name, run: f.run, required: true }));
+    detectedCommands = found.map((f) => `${f.run} (${f.why})`);
+  }
+  saveConfig(paths.sdlcConfig, config);
+  return { paths, openspecCreated: openspec.created, hadConfig, config, tools, detectedCommands };
+}
+
+/** The whole init in one folder: settings, integrations, review policy, log, chosen installs. */
+async function setupProject(
+  root: string,
+  opts: InitOptions,
+  resolved: WizardResult,
+  deps?: InitDeps,
+): Promise<InitOutcome> {
+  const { paths, openspecCreated, hadConfig, config, tools, detectedCommands } = writeSettings(root, opts);
+  const rolesNote = resolved.roles ? `roles: ${writeStarterRoles(root)} openspec/roles.yaml` : undefined;
+  // New OpenSpec roots default to the sdlc schema so OpenSpec's own /opsx
+  // workflows produce SDLC changes too; existing roots keep their default.
+  const schemaDefaulted = openspecCreated ? setDefaultSchema(paths, config.schema) : false;
+  const result = installIntegrations(root, config, tools, { force: opts.force, hooks: opts.hooks });
+  const reviewCreated = ensureReviewPolicy(root, config);
+  let opsx: 'installed' | 'failed' | undefined;
+  if (opts.opsx && tools.length > 0) {
+    const r = runOpenSpec(['init', root, '--tools', tools.join(','), '--no-animation'], { cwd: root });
+    opsx = r.ok ? 'installed' : 'failed';
+  }
+  logSetup(root, config, hadConfig ? 'harness.reinitialized' : 'harness.initialized', tools);
+  const license = assessLicense(config.license, detectProjectLicense(root), opts.json ? 'en' : currentLocale());
+  if (resolved.install.length > 0 || resolved.index) {
+    const installer = deps?.installer ?? defaultInstaller;
+    await runChosenInstalls(root, resolved.install, { wanted: resolved.index, tools }, installer);
+  }
+  return {
+    root, config, hadConfig, openspecCreated, schemaDefaulted, tools, detectedCommands, result, reviewCreated,
+    opsx, rolesNote, license,
+  };
+}
+
+function initJson(o: InitOutcome): Record<string, unknown> {
+  const { config, result } = o;
+  return {
+    harness: harnessStamp(config),
+    license: { ...config.license, assessment: o.license },
+    root: o.root,
+    openspec: { created: o.openspecCreated, defaultSchema: o.schemaDefaulted ? config.schema : undefined },
+    config: {
+      path: projectPaths(o.root).sdlcConfig,
+      created: !o.hadConfig,
+      verifyCommands: config.verify.commands.map((v) => v.run),
+    },
+    tools: o.tools,
+    files: result.files,
+    claudeHooks: result.claudeHooks,
+    statusLine: result.statusLine,
+    reviewPolicy: o.reviewCreated ? config.review.policy : undefined,
+    ...(o.opsx ? { opsx: o.opsx } : {}),
+    ...(o.rolesNote ? { roles: o.rolesNote } : {}),
+  };
+}
+
+function printInitText(o: InitOutcome): void {
+  const { config, tools, result, license } = o;
+  const schema = o.schemaDefaulted ? t('init.defaultSchema', { schema: config.schema }) : '';
+  const names = tools.length > 0 ? tools.map((id) => ADAPTERS[id].name).join(', ') : t('init.none');
+  line(c.bold(t('init.done', { root: o.root })));
+  line((o.openspecCreated ? t('init.openspecCreated') : t('init.openspecExisting')) + schema);
+  line(t(o.hadConfig ? 'init.configKept' : 'init.configCreated', { mode: config.enforcement.mode }));
+  if (!o.hadConfig) {
+    line(o.detectedCommands.length > 0
+      ? t('init.verifyDetected', { commands: o.detectedCommands.join('; ') })
+      : c.yellow(t('init.verifyEmpty')));
+  }
+  if (o.reviewCreated) line(t('init.reviewPolicy', { policy: config.review.policy }));
+  line(t('init.toolsLine', { tools: names }));
+  if (o.rolesNote) line(`  ${o.rolesNote}`);
+  if (o.opsx) line(t('init.opsxLine', { opsx: stateLabel(o.opsx) }));
+  line(`  ${stampTextLocalized(harnessStamp(config))}`);
+  if (license.status !== 'ok') warn(`${license.message}. ${license.fix ?? ''}`.trim());
+  printInstall(result, config);
+  if (result.statusLine === 'kept (user-defined)') warn(t('init.keptStatusline'));
 }
 
 /** Setup events go to the project log with the tools involved. */

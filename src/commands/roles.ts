@@ -7,6 +7,7 @@ import { readChangeState } from '../core/change-state.js';
 import { resolveChange } from '../core/changes.js';
 import { APPROVAL_GATES, type ApprovalGateId } from '../core/config.js';
 import { SdlcError } from '../core/errors.js';
+import { humanCommandFix } from '../core/human-command.js';
 import {
   approvalEmails, changeAuthors, checkApproval, DEFAULT_SEPARATION, readRolesFile, ROLES_PATH,
 } from '../core/roles.js';
@@ -111,7 +112,8 @@ export function rolesMigrate(opts: Options): void {
   try {
     if (agentEnvironment()) throw new SdlcError(
       'agent_cannot_edit_roles',
-      { key: 'error.only_a_person_may_migrate_roles' }
+      { key: 'error.only_a_person_may_migrate_roles' },
+      humanCommandFix('roles migrate')
     );
     const ctx = loadProject();
     const file = path.join(ctx.root, ROLES_PATH);

@@ -3,6 +3,7 @@ import { line, printJson, reportFailure } from '../cli/output.js';
 import { agentEnvironment } from '../core/agent-env.js';
 import { analyzeAdoption, applyAdoption } from '../core/adopt.js';
 import { SdlcError } from '../core/errors.js';
+import { humanCommandFix } from '../core/human-command.js';
 import { t } from '../core/i18n.js';
 
 interface Options { apply?: boolean; json?: boolean }
@@ -58,7 +59,7 @@ function showApplied(draft: Draft, written: boolean): void {
 export function adoptCommand(opts: Options): void {
   try {
     if (opts.apply && agentEnvironment()) {
-      throw new SdlcError('agent_cannot_adopt', { key: 'error.agent_cannot_adopt' });
+      throw new SdlcError('agent_cannot_adopt', { key: 'error.agent_cannot_adopt' }, humanCommandFix('adopt --apply'));
     }
     const ctx = loadProject();
     const draft = analyzeAdoption(ctx);

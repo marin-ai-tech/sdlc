@@ -45,6 +45,8 @@ The role mapping belongs in `openspec/sdlc.yaml`, separate from OpenSpec's `cont
 
 ## 7.5. New project: scaffold
 
+In an empty folder the `sdlc init` wizard does this for you; with flags, `sdlc init --layout scaffold`. By hand:
+
 ```bash
 sdlc init
 sdlc layout scaffold --dry-run
@@ -55,6 +57,8 @@ sdlc layout check --json
 `sdlc layout scaffold [--dry-run] [--json]` renders templates at canonical paths for missing roles, including a starter ADR in `docs/decisions/`. It never overwrites an existing file. The dry run lists what would be created without writing it; JSON gives the created and kept paths. Review the starter text and replace placeholders with the project's actual facts.
 
 ## 7.6. Existing project: adapt
+
+`sdlc init` in an existing project shows the differences first and offers adapt or a worktree (`--layout adapt`, `--layout worktree --worktree <path>`).
 
 Use `sdlc layout adapt [--dry-run] [--json]` when existing documents should stay where they are. It detects aliases such as `ARCHITECTURE.md`, `docs/adr/`, and `CONTRIBUTING.md`, records noncanonical role paths under `layout:` in `openspec/sdlc.yaml`, creates only missing roles at canonical paths, and writes `AGENTS.md` with links to the real locations. It moves nothing. Preview first, then apply and check:
 

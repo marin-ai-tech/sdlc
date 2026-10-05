@@ -50,7 +50,7 @@ Other ways to install:
 
 Do not run `npm install -g sdlc`: the package of that name on the npm registry is unrelated.
 
-Run `sdlc init` with no flags in a terminal to walk through the same choices interactively (tools, enforcement mode, status line, /opsx, language, roles) and confirm a summary before anything is written. The wizard also offers to install the OpenSpec CLI and codegraph when they are missing. Flags, `--json`, non-terminals and agent sessions keep the non-interactive behaviour.
+Run `sdlc init` with no flags in a terminal to walk through the same choices interactively (tools, enforcement mode, status line, /opsx, language, roles) and confirm a summary before anything is written. The wizard also offers to install the OpenSpec CLI and codegraph when they are missing. Flags, `--json`, non-terminals and agent sessions keep the non-interactive behaviour. In an empty folder the wizard makes the project AI-ready at once; in an existing one it shows the differences from the AI-ready layout and offers to build the AI-ready project in a new git worktree, or to adapt in place (`--layout scaffold|adapt|worktree --worktree <path>` without the wizard).
 
 `sdlc init` does the following:
 - creates `openspec/` with OpenSpec itself if it is missing, and makes `sdlc` the default schema there (an existing OpenSpec project keeps its default);
@@ -125,7 +125,7 @@ Everything sdlc writes records the sdlc version and the license the project uses
 
 | Command | Purpose |
 |---|---|
-| `sdlc init [path] [--statusline]` / `update` / `uninstall` | set up, regenerate, remove integrations (planning data is never touched); `--statusline` opts in the Claude Code status line |
+| `sdlc init [path] [--statusline] [--layout <mode>] [--worktree <path>] [--git-init]` / `update` / `uninstall` | set up, regenerate, remove integrations (planning data is never touched); `--statusline` opts in the Claude Code status line; `--layout` makes the project AI-ready (in place or in a new worktree) |
 | `sdlc new <id> [--kind --risk --track --source-type --source-ref --skip-specs]` | start a change (an OpenSpec change folder + `.sdlc.yaml`) |
 | `sdlc explore <slug> \| list` | create or list optional research notes before intent |
 | `sdlc track set <full\|lite> --change <id> [--note <text>]` | human confirmation of the suggested track before plan approval |

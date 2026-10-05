@@ -10,6 +10,7 @@ import type { ProjectPaths } from './project.js';
 import { HUMAN_COMMANDS } from './help-catalog.js';
 import { nextBacklogItem, readBacklog } from './backlog.js';
 import { t } from './i18n.js';
+import { quotedCommand } from './human-command.js';
 
 /**
  * Deterministic guardrails behind the advisory skills - the playbook's
@@ -194,7 +195,7 @@ function evaluateCommand(command: string, ctx: PolicyContext, env: NodeJS.Proces
     return {
       decision: 'deny',
       rule: 'separation-of-duties',
-      reason: t('hook.separationOfDuties'),
+      reason: t('hook.separationOfDuties', { command: quotedCommand(cmd) }),
     };
   }
   const spelled = normalizePaths(cmd);

@@ -6,6 +6,7 @@ import { readChangeState, TRACKS, type Track } from '../core/change-state.js';
 import { resolveChange } from '../core/changes.js';
 import { SdlcError } from '../core/errors.js';
 import { formatIdentity, gitIdentity } from '../core/git.js';
+import { humanCommandFix } from '../core/human-command.js';
 import { t } from '../core/i18n.js';
 
 interface TrackOptions { change: string; note?: string; json?: boolean }
@@ -19,7 +20,7 @@ export async function trackSetCommand(trackArg: string, opts: TrackOptions): Pro
     if (agent) throw new SdlcError(
       'agent_cannot_set_track',
       { key: 'error.an_agent_session_x_cannot_set_the_track', params: { agent: agent } },
-      { key: 'fix.run_this_command_yourself_in_a_terminal_outside_' }
+      humanCommandFix(`track set ${trackArg} --change ${opts.change}`)
     );
     const ctx = loadProject();
     const ref = resolveChange(ctx.paths, opts.change);

@@ -29,6 +29,7 @@ import { resolveLocale, setLocale, systemLocale, t } from '../core/i18n.js';
 import { applyCommanderLocale, localizeDescriptions, peekLocaleFlag } from './commander-i18n.js';
 import { loadConfig } from '../core/config.js';
 import { projectPaths } from '../core/project.js';
+import { recordInvocation } from '../core/human-command.js';
 
 function cmdDesc(key: string): string {
   return t(key);
@@ -197,6 +198,9 @@ export function buildProgram(): Command {
     .option('--statusline', 'install the Claude Code status line')
     .option('--language <language>', 'artifact language for a new OpenSpec config')
     .option('--force', 'overwrite generated files even if edited locally')
+    .option('--layout <action>', 'AI-ready documents: scaffold | adapt | worktree | none (default: none)')
+    .option('--worktree <path>', 'folder for the new AI-ready worktree (with --layout worktree)')
+    .option('--git-init', 'run git init when the folder is not a git repository')
     .option('--json', 'output JSON')
     .action((path, opts) => initCommand(path, opts));
 
@@ -435,6 +439,7 @@ export function buildProgram(): Command {
 }
 
 export async function run(argv: string[]): Promise<void> {
+  recordInvocation(argv.slice(2));
   applyLocale(peekLocaleFlag(argv));
   await buildProgram().parseAsync(argv);
 }

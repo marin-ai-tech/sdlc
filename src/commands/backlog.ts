@@ -23,6 +23,7 @@ import {
 } from '../core/change-state.js';
 import { SdlcError } from '../core/errors.js';
 import { formatIdentity, gitIdentity } from '../core/git.js';
+import { humanCommandFix } from '../core/human-command.js';
 import { appendLog } from '../core/log.js';
 import * as path from 'node:path';
 import { assertValidChangeId } from '../core/changes.js';
@@ -221,11 +222,12 @@ export function backlogNext(opts: Options): void {
   run(opts, (ctx) => nextBacklogItem(readBacklog(ctx.root)) ?? null);
 }
 
-function human(): void {
+function human(cli: string, fallback: string): void {
   if (agentEnvironment()) {
     throw new SdlcError(
       'agent_cannot_prioritize',
-      { key: 'error.backlog_priority_is_a_product_decision_ask_a_per' }
+      { key: 'error.backlog_priority_is_a_product_decision_ask_a_per' },
+      humanCommandFix(fallback, cli)
     );
   }
 }
@@ -234,7 +236,7 @@ export function backlogMove(id: string, opts: Options): void {
   run(
     opts,
     (ctx) => {
-      human();
+      human(ctx.config.cli, `backlog move ${id}`);
       const targets = [
         opts.top && { top: true as const },
         opts.before && { before: text(opts.before)! },
@@ -255,7 +257,7 @@ export function backlogClose(id: string, status: 'done' | 'dropped', opts: Optio
     opts,
     (ctx) => {
       if (status === 'dropped') {
-        human();
+        human(ctx.config.cli, `backlog drop ${id}`);
       }
       const note = text(opts.note);
       if (!note) {

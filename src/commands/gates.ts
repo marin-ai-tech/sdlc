@@ -8,6 +8,7 @@ import { resolveChange } from '../core/changes.js';
 import { ALL_GATES, APPROVAL_GATES, type ApprovalGateId, type GateId, type SdlcConfig } from '../core/config.js';
 import { baseDigests, readChangeDeltas } from '../core/deltas.js';
 import { SdlcError } from '../core/errors.js';
+import { humanCommandFix } from '../core/human-command.js';
 import { defaultBaseRef, formatIdentity, gitIdentity } from '../core/git.js';
 import { approvalEmails, changeAuthors, checkApproval, readRolesFile, type RolesFile } from '../core/roles.js';
 import { evaluateChange, type LifecycleView } from '../core/lifecycle.js';
@@ -24,7 +25,7 @@ export function assertHuman(config: SdlcConfig, action: string): void {
     throw new SdlcError(
       'agent_cannot_approve',
       { key: 'error.sdlc_x_records_a_human_decision_and_cannot_run_i', params: { action: action, agent: agent } },
-      { key: 'fix.run_it_yourself_in_a_terminal_outside_the_agent' }
+      humanCommandFix(action, config.cli)
     );
   }
 }

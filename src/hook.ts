@@ -16,6 +16,10 @@ import { findProjectRoot, projectPaths } from './core/project.js';
  * fails open: a missing project, a harness that is not initialized, or any
  * internal error allows the action, because a broken guardrail must not
  * wedge every edit (`sdlc doctor` surfaces those problems instead).
+ * That empty answer is a decision: the OpenCode plugin lets the call through,
+ * but a hook that cannot run (spawn error, signal, non-zero exit, output that
+ * is not JSON) is retried once and then blocks the call; only a CLI that is
+ * not installed at all lets the call through there.
  */
 type HookEvent = 'pre-tool' | 'session-start' | 'stop';
 type Agent = 'claude' | 'opencode';

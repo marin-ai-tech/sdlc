@@ -17,13 +17,35 @@ export interface WorktreeResult {
   warnings: string[];
 }
 
-function requireGit(root: string, args: string[]): string {
+export function requireGit(root: string, args: string[]): string {
   const result = git(root, args);
   if (!result.ok) throw new SdlcError(
     'git_error',
     { key: 'error.git_x_failed', params: { detail: result.stderr || `git ${args[0]} failed` } }
   );
   return result.stdout;
+}
+
+/** Refuses a taken branch (`branch_exists`) or worktree path (`worktree_exists`). */
+export function assertWorktreeFree(root: string, branch: string, target: string): void {
+  if (git(root, ['show-ref', '--verify', '--quiet', `refs/heads/${branch}`]).ok)
+    throw new SdlcError('branch_exists', { key: 'error.branch_already_exists_x', params: { branch: branch } });
+  if (fs.existsSync(target)) throw new SdlcError(
+    'worktree_exists',
+    { key: 'error.worktree_path_already_exists_x', params: { target: target } }
+  );
+}
+
+/** `git worktree add -b <branch> <target> HEAD`, creating the parent folder. */
+export function addWorktree(root: string, target: string, branch: string): void {
+  fs.mkdirSync(path.dirname(target), { recursive: true });
+  requireGit(root, ['worktree', 'add', '-b', branch, target, 'HEAD']);
+}
+
+/** Rollback of addWorktree: removes the worktree and its branch. */
+export function removeWorktree(root: string, target: string, branch: string): void {
+  requireGit(root, ['worktree', 'remove', '--force', target]);
+  requireGit(root, ['branch', '-D', branch]);
 }
 
 export function convertInWorktree(root: string, stamp: HarnessStamp, options: { worktree?: string; branch?: string }): WorktreeResult {
@@ -34,17 +56,11 @@ export function convertInWorktree(root: string, stamp: HarnessStamp, options: { 
     );
   const branch = options.branch ?? 'sdlc/layout-convert';
   const target = path.resolve(options.worktree ?? path.join(path.dirname(root), `${path.basename(root)}-layout-convert`));
-  if (git(root, ['show-ref', '--verify', '--quiet', `refs/heads/${branch}`]).ok)
-    throw new SdlcError('branch_exists', { key: 'error.branch_already_exists_x', params: { branch: branch } });
-  if (fs.existsSync(target)) throw new SdlcError(
-    'worktree_exists',
-    { key: 'error.worktree_path_already_exists_x', params: { target: target } }
-  );
+  assertWorktreeFree(root, branch, target);
   const warnings: string[] = [];
   if (requireGit(root, ['status', '--porcelain', '--untracked-files=all']))
     warnings.push('Uncommitted changes in the main working copy are not included.');
-  fs.mkdirSync(path.dirname(target), { recursive: true });
-  requireGit(root, ['worktree', 'add', '-b', branch, target, 'HEAD']);
+  addWorktree(root, target, branch);
   let keep = false;
   try {
     const configPath = projectPaths(target).sdlcConfig;
@@ -70,9 +86,6 @@ export function convertInWorktree(root: string, stamp: HarnessStamp, options: { 
     keep = true;
     return { plan, applied: true, mode: 'worktree', worktree: { path: target, branch, commit }, warnings };
   } finally {
-    if (!keep) {
-      requireGit(root, ['worktree', 'remove', '--force', target]);
-      requireGit(root, ['branch', '-D', branch]);
-    }
+    if (!keep) removeWorktree(root, target, branch);
   }
 }

@@ -27,11 +27,15 @@
  *   defaultInstaller): each chosen install, then codegraphIndexCommand(tools) in the root when `index` is chosen. A failed
  *   command prints a warning with the command to run by hand; init still succeeds. Non-interactive runs never
  *   probe or install. `InitDeps` gains `probe?: Probe` and `installer?: Installer`.
+ * - AI-ready layout (src/commands/init-layout.ts): with `defaults.folder`, right after the welcome an empty folder
+ *   is offered `git init` (only without git) and gets the layout scaffolded; an existing one sees the diagnosis
+ *   and chooses worktree | adapt | none (worktree asks for the folder). Without it nothing changes.
  * - `initCommand(target, opts, deps)` in setup.ts asks before any file is written; a declined summary prints
  *   "Nothing written." and creates nothing; accepted choices behave exactly like the matching flags, plus
  *   roles.yaml when chosen (never overwriting an existing one).
  */
 import type { EnforcementMode } from '../core/config.js';
+import type { FolderDescription } from '../core/init-layout.js';
 import {
   detectDependencies,
   installCommand,
@@ -47,8 +51,9 @@ import { ADAPTERS } from '../integrations/install.js';
 import { TOOL_IDS, type ToolId } from '../integrations/types.js';
 import type { InitOptions } from './setup.js';
 import { t } from '../core/i18n.js';
+import { askLayoutChoices, layoutSummaryLines, type LayoutChoices } from './init-layout.js';
 
-export interface InitChoices {
+export interface InitChoices extends Partial<LayoutChoices> {
   tools: ToolId[];
   mode: EnforcementMode;
   statusline: boolean;
@@ -90,6 +95,8 @@ export interface InitDefaults {
   language: string;
   /** Status of the optional tools; absent = do not ask about them. */
   dependencies?: DependencyStatus[];
+  /** The folder init runs in; absent = no git or layout questions. */
+  folder?: FolderDescription;
 }
 
 function modeChoiceList(): Array<{ value: EnforcementMode; name: string }> {
@@ -131,6 +138,7 @@ export function shouldPrompt(opts: InitOptions, io: TerminalState): boolean {
   if (opts.language !== undefined) return false;
   if (opts.force) return false;
   if (opts.json) return false;
+  if (opts.layout !== undefined || opts.worktree !== undefined || opts.gitInit) return false;
   return true;
 }
 
@@ -168,6 +176,7 @@ function formatSummary(choices: InitChoices): string {
     t('init.summary.roles', { value: yn(choices.roles) }),
     t('init.summary.install', { value: install }),
     t('init.summary.index', { value: yn(choices.index) }),
+    ...layoutSummaryLines(choices),
   ].join('\n');
 }
 
@@ -199,6 +208,7 @@ export async function askInitChoices(
 ): Promise<InitChoices | undefined> {
   try {
     prompter.say(welcomeText());
+    const layout = defaults.folder ? await askLayoutChoices(prompter, defaults.folder) : {};
     const tools = await prompter.checkbox(t('init.tools'), toolChoices(defaults));
     const depChoices = await askDependencyChoices(prompter, defaults);
     const mode = await prompter.select(t('init.mode'), modeChoices(defaults), defaults.mode);
@@ -221,6 +231,7 @@ export async function askInitChoices(
       roles,
       install: depChoices.install,
       index: depChoices.index,
+      ...layout,
     };
     prompter.say(formatSummary(choices));
     const ok = await prompter.confirm(t('init.write'), true);

@@ -2,6 +2,17 @@
 
 All notable changes to sdlc. Versions follow [Semantic Versioning](https://semver.org/); while the major version is 0, a minor version may change behavior.
 
+## 0.7.1 — 2026-10-05
+
+### Fixed
+- **OpenCode: a failed check no longer lets the call through.** On Windows OpenCode sometimes kills the plugin's `sdlc hook` run after a few milliseconds; the plugin took every failure for "sdlc is not installed" and allowed the call, so an agent's edit of a protected file could pass unchecked (gate approvals were still refused by the CLI). The plugin now runs a failed check once more and then blocks the call with the reason; only a missing CLI is let through, with a warning.
+
+### Changed
+- A refused human decision gives the exact command to run in your own terminal and explains that a `!` command in the OpenCode or Claude Code chat runs in the agent's shell, so it counts as the agent's.
+
+### Added
+- **`sdlc init` makes the project AI-ready.** In an empty folder the wizard creates the agent documents at once and offers `git init`. In an existing project it shows how the project differs from the AI-ready layout and offers to build the AI-ready project in a new git worktree in a folder you name — the setup, the moved documents and the missing ones in one commit on `sdlc/ai-ready`, your working copy untouched — or to adapt in place. Flags: `--layout scaffold|adapt|worktree|none`, `--worktree <path>`, `--git-init`; only a person may create the worktree.
+
 ## 0.7.0 — 2026-10-05
 
 ### Added

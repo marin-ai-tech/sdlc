@@ -16,6 +16,8 @@ From git, install the `release` branch, which carries the built code: `npm insta
 
 With no flags in a terminal, `sdlc init` guides you through the setup (tools, enforcement mode, status line, /opsx, language, roles) and shows a summary before writing. The wizard also offers to install the OpenSpec CLI and codegraph when they are missing. Scripts, `--json`, non-terminals and agent sessions never prompt.
 
+**AI-ready from the start.** In an empty folder (nothing but `.git`, `.gitignore`, `LICENSE`, `README`) the wizard creates the agent documents right away and offers `git init` when there is no repository. In an existing project it first shows how the project differs from the AI-ready layout — missing documents and documents under other names — and offers three choices: build the AI-ready project in a new git worktree in a folder you name (the whole setup happens there, in one commit on the `sdlc/ai-ready` branch; your working copy is not touched), adapt in place (`layout adapt`), or skip. Without the wizard: `--layout scaffold|adapt|worktree|none` with `--worktree <path>`, and `--git-init`; without `--layout` init only reports the differences. Only a person may create the worktree, because it commits on their behalf.
+
 `sdlc init`:
 - creates `openspec/` by running `openspec init` if it does not exist, and makes `sdlc` the default schema. In an existing OpenSpec project, the default schema does not change;
 - copies the schema to `openspec/schemas/sdlc/` and creates `openspec/sdlc.yaml`. Verification commands are detected automatically from `package.json`, `Makefile`, `pyproject`, `go.mod` or `Cargo.toml`;
@@ -140,6 +142,8 @@ Record postponed work with `sdlc defer add <title> --why <text> [--change <id>] 
 ### Roles and separation of duties
 
 With `openspec/roles.yaml`, approvals are tied to people in git: the approver's email must belong to a person holding a role the gate accepts, the authors of the code do not approve its review or release, listed gate pairs need different people, and a per-person limit applies. `sdlc roles who <gate> --change <id>` shows who may approve and why others may not. With `signing: warn | required`, `sdlc approvals verify` checks that each approval arrived in a commit signed by the approver. See [Roles, separation of duties and signed approvals](08-roles-and-signing.md).
+
+**Decisions are taken in your own terminal, not in the agent chat.** In OpenCode and Claude Code a command typed with `!` runs in the agent's shell, so `!sdlc approve …` is refused like the agent's own attempt; custom commands are no way around it either (an agent can run them). The refusal gives the exact command to run in your terminal.
 
 ### Import BMAD planning
 
