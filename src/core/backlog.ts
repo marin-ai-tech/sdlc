@@ -2,7 +2,7 @@
  * The backlog: `openspec/backlog.md`, the ordered list of planned changes.
  * One item is one future OpenSpec change; epics group items under a goal.
  * The order in the file is the priority: the first ready open item is next.
- * People and agents both edit the file; the CLI parses it tolerantly.
+ * People may edit the file by hand; agents refine it through the CLI.
  *
  *   # Backlog
  *
@@ -34,6 +34,7 @@ import { CHANGE_KINDS, RISK_LEVELS, type ChangeKind, type RiskLevel } from './ch
 import { SdlcError } from './errors.js';
 import { readText, writeTextAtomic } from './fs-utils.js';
 import { parseBacklogText, renderBacklog } from './backlog-format.js';
+import { assertUsableDependency } from './backlog-deps.js';
 
 export const BACKLOG_PATH = 'openspec/backlog.md';
 export const BACKLOG_STATUSES = ['open', 'in-progress', 'done', 'dropped'] as const;
@@ -108,7 +109,7 @@ export interface EpicProgress {
 const NEXT_ID_COMMENT_RE = (prefix: string): RegExp =>
   new RegExp(`<!-- next-${prefix}: (\\d+) -->`, 'g');
 
-function oneLine(value: string, name: string): void {
+export function oneLine(value: string, name: string): void {
   if (!value.trim() || /[\r\n]/.test(value)) {
     throw new SdlcError('invalid_option', { key: 'error.x_must_be_one_non_empty_line', params: { name: name } });
   }
@@ -124,13 +125,13 @@ export function readBacklog(root: string): Backlog {
   return parseBacklog(readText(path.join(root, BACKLOG_PATH)) ?? '');
 }
 
-function save(root: string, backlog: Backlog): void {
+export function save(root: string, backlog: Backlog): void {
   const file = path.join(root, BACKLOG_PATH);
   const previous = readText(file) ?? '';
   writeTextAtomic(file, renderBacklog(backlog, previous));
 }
 
-function itemOrThrow(backlog: Backlog, id: string): BacklogItem {
+export function itemOrThrow(backlog: Backlog, id: string): BacklogItem {
   const item = backlog.items.find((entry) => entry.id === id);
   if (!item) {
     throw new SdlcError('unknown_backlog_item', { key: 'error.unknown_backlog_item_x', params: { id: id } });
@@ -156,7 +157,7 @@ function historicalId(root: string, prefix: string, current: string[]): string {
   return `${prefix}${Math.max(fromCurrent, ...saved, 1)}`;
 }
 
-function validateItemInput(input: BacklogItemInput): void {
+export function validateItemInput(input: BacklogItemInput): void {
   for (const [key, value] of Object.entries(input)) {
     if (typeof value === 'string') {
       oneLine(value, key);
@@ -173,7 +174,7 @@ function validateItemInput(input: BacklogItemInput): void {
   }
 }
 
-function assertNoDependencyCycle(backlog: Backlog, dependsOn: string[]): void {
+export function assertNoDependencyCycle(backlog: Backlog, dependsOn: string[]): void {
   const seen = new Set<string>();
   const visit = (id: string): void => {
     if (seen.has(id)) {
@@ -228,7 +229,7 @@ export function addBacklogItem(root: string, input: BacklogItemInput): BacklogIt
     epicOrThrow(backlog, input.epic);
   }
   for (const id of input.dependsOn ?? []) {
-    itemOrThrow(backlog, id);
+    assertUsableDependency(itemOrThrow(backlog, id));
   }
   assertNoDependencyCycle(backlog, input.dependsOn ?? []);
   const id = historicalId(

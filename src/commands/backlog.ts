@@ -30,6 +30,7 @@ import { readChangeState } from '../core/change-state.js';
 import { writeTextAtomic } from '../core/fs-utils.js';
 import { createChange } from './changes.js';
 import { t } from '../core/i18n.js';
+import { editBacklogItem } from '../core/backlog-edit.js';
 
 type Options = Record<string, unknown> & { json?: boolean };
 
@@ -119,6 +120,23 @@ export function backlogAdd(title: string, opts: Options): void {
       });
     },
     'backlog.added'
+  );
+}
+
+export function backlogEdit(id: string, opts: Options): void {
+  run(
+    opts,
+    (ctx) => editBacklogItem(ctx.root, id, {
+      title: text(opts.title),
+      outcome: text(opts.outcome),
+      kind: text(opts.kind) as ChangeKind | undefined,
+      risk: text(opts.risk) as RiskLevel | undefined,
+      acceptance: values(opts.accept).length ? values(opts.accept) : undefined,
+      addAcceptance: values(opts.addAccept).length ? values(opts.addAccept) : undefined,
+      dependsOn: values(opts.depends).length ? values(opts.depends) : undefined,
+      clearDepends: opts.clearDepends === true,
+    }),
+    'backlog.edited'
   );
 }
 

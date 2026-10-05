@@ -39,7 +39,7 @@
 | `openspec/explorations/<slug>.md` | agent + people | optional research and pressure test before intent; a change cites it with `--source-type exploration --source-ref openspec/explorations/<slug>.md` |
 | `openspec/deferred-work.md` | team | registry of deferred decisions and findings (`D<n>`) |
 | `openspec/roles.yaml` | people (maintainers) | optional: people (emails, SSH signing keys), roles, separation rules, signing mode; agents cannot edit it |
-| `openspec/backlog.md` | people + CLI | ordered backlog of planned changes: epics `E<n>` and items `B<n>` (one item = one future OpenSpec change); ids never reused; file order is priority; readiness is computed (outcome, acceptance, dependencies done), never stored |
+| `openspec/backlog.md` | people + CLI (agents only through the CLI; the hook denies their direct edits) | ordered backlog of planned changes: epics `E<n>` and items `B<n>` (one item = one future OpenSpec change); ids never reused; file order is priority; readiness is computed (outcome, acceptance, dependencies done), never stored |
 | `openspec/changes/<id>/sources/bmad/` | importer | retained BMAD source artifacts for an imported change |
 | `openspec/schemas/sdlc/**` | harness → OpenSpec | schema and artifact templates |
 | `openspec/changes/<id>/{intent,proposal,design,plan,tasks}.md`, `specs/**` | agent + people | artifacts (OpenSpec format) |

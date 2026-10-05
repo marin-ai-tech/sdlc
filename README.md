@@ -26,7 +26,7 @@ On top of OpenSpec, `sdlc` adds the process parts the playbook asks for:
 - **Human track confirmation.** `sdlc new` suggests a track; a person can confirm or change it with `sdlc track set` before plan approval.
 - **Deferred-work registry.** `sdlc defer` tracks postponed findings in `openspec/deferred-work.md` and exposes them in reports.
 - **BMAD import.** `sdlc import bmad` maps planning artifacts into an unapproved OpenSpec change, or into the backlog with `--to-backlog` (epics and tickets, or a PRD/SPEC).
-- **AI-ready project layout.** `sdlc layout check | scaffold | adapt | convert` checks and builds the documents agents rely on (`AGENTS.md`, `CLAUDE.md`, architecture, conventions, runbook…), maps existing paths, or plans a conversion.
+- **AI-ready project layout.** `sdlc layout check | scaffold | adapt | convert` checks and builds the documents agents rely on (`AGENTS.md`, `CLAUDE.md`, architecture, conventions, runbook…), maps existing paths, or plans a conversion. `sdlc adopt` drafts settings and roles for an existing project (stack, CI, CODEOWNERS, git authors); `/sdlc:adopt` (`/sdlc-adopt`) fills the documents from the code.
 - **Reports and dashboard.** `sdlc report` (Markdown with Mermaid, JSON or HTML) and `sdlc dashboard` (one offline HTML page) show stages, gates, backlog, deferred work and metrics; an example background process keeps the page current.
 - **Audit and metrics.** `sdlc audit` builds a timeline of who approved what and when, plus the playbook's lead-time and first-pass metrics.
 - **Native agent UX.** Workflows ask with each tool's question tool (Claude Code AskUserQuestion, OpenCode `question`), mirror `tasks.md` into the tool todo list during `/sdlc:build`, and inject live CLI output into `/sdlc:status`, `/sdlc:next` and `/sdlc:help`. An answer in chat is never an approval — people run human decisions in their own terminal.
@@ -93,7 +93,7 @@ The plugin ships the same workflows (`/sdlc:<id>`), subagents and hooks. With th
 
 People run approvals **in their own terminal**. Inside an agent session `sdlc approve` refuses by design.
 
-**Backlog.** Plan work in `openspec/backlog.md` before a change exists: `sdlc backlog add` / `epic add`, list and reorder with `list` / `move`, start a ready item with `sdlc backlog start <B-id>` (creates the change and a draft `intent.md`), or close with `done` / `drop`. Priority (`move`) and dropping an item are human decisions. With no active change, `sdlc next` points at the next ready backlog item.
+**Backlog.** Plan work in `openspec/backlog.md` before a change exists: `sdlc backlog add` / `epic add`, list and reorder with `list` / `move`, refine an item with `edit`, start a ready item with `sdlc backlog start <B-id>` (creates the change and a draft `intent.md`), or close with `done` / `drop`. Priority (`move`) and dropping an item are human decisions; agents change the file only through these commands. `/sdlc:backlog` (`/sdlc-backlog`) does the same from the agent. With no active change, `sdlc next` points at the next ready backlog item.
 
 Small bounded work: `sdlc new fix-null-name --kind bugfix --risk low`. Review its track suggestion, then confirm `sdlc track set lite --change fix-null-name` in your terminal before plan approval.
 
@@ -130,12 +130,13 @@ Everything sdlc writes records the sdlc version and the license the project uses
 | `sdlc explore <slug> \| list` | create or list optional research notes before intent |
 | `sdlc track set <full\|lite> --change <id> [--note <text>]` | human confirmation of the suggested track before plan approval |
 | `sdlc defer add \| list \| close` | manage the deferred-work registry |
-| `sdlc backlog add \| epic add \| list \| next \| start \| move \| drop \| done` | manage planned changes in `openspec/backlog.md` (order = priority; `move`/`drop` are human-only) |
+| `sdlc backlog add \| epic add \| list \| next \| edit \| start \| move \| drop \| done` | manage planned changes in `openspec/backlog.md` (order = priority; `move`/`drop` are human-only) |
 | `sdlc import bmad <path> (--change <id> \| --to-backlog) [--dry-run]` | import BMAD planning into an unapproved change, or epics/tickets (or a PRD/SPEC) into the backlog |
 | `sdlc status [--change] [--markdown] [--json]` / `sdlc next` | stages, gates, approvals, evidence, who acts next (with `--change`, a stage stepper and task bar); with no active change, the next ready backlog item |
 | `sdlc help [topic] [--json]` | catalog of workflows and CLI commands with who runs them (agent or person) |
 | `sdlc statusline` | one-line Claude Code status (change · stage · who acts); reads JSON on stdin |
 | `sdlc layout check [--json]` / `scaffold [--dry-run] [--json]` / `adapt [--dry-run] [--json]` / `convert [--apply] [--json]` | check layout readiness, create missing documents, map existing paths, or plan and apply conversion |
+| `sdlc adopt [--apply] [--json]` | draft verify commands, protected paths and `roles.yaml` for an existing project; `--apply` writes them (human-only) |
 | `sdlc report [--format md\|json\|html] [--since] [--change] [--out]` / `sdlc dashboard [--since] [--change] [--out]` | progress report and self-contained HTML dashboard |
 | `sdlc instructions <artifact> --change <id> --json` | artifact instructions (from OpenSpec for planning artifacts; from the harness for verification, review, release) |
 | `sdlc approve \| reject \| waive <gate> --change <id> [--as <role>] [--note]` | human gate decisions (with `openspec/roles.yaml`: the person, the role and separation of duties are checked) |

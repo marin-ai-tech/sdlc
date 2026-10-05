@@ -9,6 +9,8 @@ export const WORKFLOW_IDS = [
   'help',
   'next',
   'status',
+  'adopt',
+  'backlog',
   'explore',
   'intent',
   'spec',

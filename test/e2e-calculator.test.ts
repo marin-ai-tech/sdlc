@@ -143,6 +143,8 @@ describe('demo: a team builds a calculator with sdlc (every command)', () => {
     step('layout-scaffold', 'setup', 'agent', ['layout', 'scaffold'], 'The agent creates AGENTS.md, CLAUDE.md and the docs skeleton.');
     step('layout-adapt', 'setup', 'agent', ['layout', 'adapt', '--dry-run'], 'Nothing to adapt: everything is at its canonical place.');
     step('layout-convert', 'setup', 'agent', ['layout', 'convert'], 'Nothing to convert (dry run).');
+    step('adopt', 'setup', 'agent', ['adopt'], 'The agent drafts settings and roles from the repository: stack, CI, CODEOWNERS, git authors.');
+    step('adopt-apply-agent', 'setup', 'agent', ['adopt', '--apply'], 'Applying the draft is a person\'s decision: refused for the agent.', { expect: 1 });
     step('update', 'setup', 'alice', ['update', '--dry-run'], 'Generated files are up to date.');
     commit('alice', 'Install sdlc and the AI-ready layout');
   });
@@ -176,6 +178,7 @@ describe('demo: a team builds a calculator with sdlc (every command)', () => {
     step('move-agent', 'backlog', 'agent', ['backlog', 'move', 'B3', '--before', 'B2'], 'Priority is a person\'s decision: refused for the agent.', { expect: 1 });
     step('move', 'backlog', 'alice', ['backlog', 'move', 'B3', '--before', 'B2'], 'Alice puts memory before percent.');
     step('add-b4', 'backlog', 'agent', ['backlog', 'add', 'Scientific notation'], 'An unrefined idea: no outcome yet.');
+    step('edit-b4', 'backlog', 'agent', ['backlog', 'edit', 'B4', '--outcome', 'large results in scientific notation', '--accept', '120000 * 1000 shows 1.2e+8'], 'The agent refines the idea; an edit never changes its place.');
     step('drop', 'backlog', 'alice', ['backlog', 'drop', 'B4', '--note', 'Not for the till'], 'Alice drops it.');
     step('list', 'backlog', 'bob', ['backlog', 'list'], 'The backlog with readiness and the epic bar.');
     step('backlog-next', 'backlog', 'bob', ['backlog', 'next'], 'The first ready item.');

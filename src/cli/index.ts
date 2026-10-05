@@ -20,8 +20,11 @@ import { deferAdd, deferClose, deferList } from '../commands/defer.js';
 import { trackSetCommand } from '../commands/track.js';
 import { exploreCommand, exploreListCommand } from '../commands/explore.js';
 import { importBmadCommand } from '../commands/import.js';
-import { backlogAdd, backlogClose, backlogEpicAdd, backlogList, backlogMove, backlogNext, backlogStart } from '../commands/backlog.js';
+import {
+  backlogAdd, backlogClose, backlogEdit, backlogEpicAdd, backlogList, backlogMove, backlogNext, backlogStart,
+} from '../commands/backlog.js';
 import { rolesCheck, rolesMigrate, rolesWho } from '../commands/roles.js';
+import { adoptCommand } from '../commands/adopt.js';
 import { resolveLocale, setLocale, systemLocale, t } from '../core/i18n.js';
 import { applyCommanderLocale, localizeDescriptions, peekLocaleFlag } from './commander-i18n.js';
 import { loadConfig } from '../core/config.js';
@@ -64,6 +67,10 @@ export function buildProgram(): Command {
     applyLocale(opts.locale);
   });
   applyCommanderLocale(program);
+  program.command('adopt').description(cmdDesc('cmd.adopt'))
+    .option('--apply', 'apply the adoption draft (human only)')
+    .option('--json', 'output JSON')
+    .action((opts) => adoptCommand(opts));
   const roles = program.command('roles').description(cmdDesc('cmd.roles'));
   roles.command('check').description(cmdDesc('cmd.roles.check'))
     .option('--change <id>', 'change id').option('--base <ref>', 'base ref').option('--json', 'output JSON')
@@ -92,6 +99,20 @@ export function buildProgram(): Command {
     .option('--source-ref <ref>', 'origin reference')
     .option('--json', 'output JSON')
     .action((title, opts) => backlogAdd(title, opts));
+  backlog.command('edit <B-id>').description(cmdDesc('cmd.backlog.edit'))
+    .option('--title <text>', 'replacement title')
+    .option('--outcome <text>', 'desired outcome')
+    .option('--accept <text>', 'acceptance criterion',
+      (value, previous: string[]) => [...previous, value], [] as string[])
+    .option('--add-accept <text>', 'additional acceptance criterion',
+      (value, previous: string[]) => [...previous, value], [] as string[])
+    .option('--depends <B-id>', 'backlog dependency id',
+      (value, previous: string[]) => [...previous, value], [] as string[])
+    .option('--clear-depends', 'remove all backlog dependencies')
+    .option('--kind <kind>', 'kind of change')
+    .option('--risk <risk>', 'risk level')
+    .option('--json', 'output JSON')
+    .action((id, opts) => backlogEdit(id, opts));
   backlog.command('list').description(cmdDesc('cmd.backlog.list'))
     .option('--epic <E-id>', 'filter by epic id')
     .option('--status <status>', 'filter by status')

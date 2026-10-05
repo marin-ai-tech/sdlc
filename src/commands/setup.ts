@@ -172,6 +172,18 @@ function printInstall(result: InstallResult, config: SdlcConfig): void {
       const ctx = renderContext(config, result.tools);
       line(t('init.startChangeLine', { name: adapter.name.padEnd(12), intent: adapter.invocation('intent', ctx), next: adapter.invocation('next', ctx) }));
     }
+    printAdoptHint(result.tools, config);
+  }
+}
+
+/** An existing project: the adopt workflow fills the agent documents and drafts the settings. */
+function printAdoptHint(tools: InstallResult['tools'], config: SdlcConfig): void {
+  line();
+  line(c.bold(t('init.adoptProject')));
+  const ctx = renderContext(config, tools);
+  for (const tool of tools) {
+    const adapter = ADAPTERS[tool];
+    line(t('init.adoptLine', { name: adapter.name.padEnd(12), adopt: adapter.invocation('adopt', ctx) }));
   }
 }
 

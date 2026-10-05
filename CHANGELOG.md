@@ -2,6 +2,21 @@
 
 All notable changes to sdlc. Versions follow [Semantic Versioning](https://semver.org/); while the major version is 0, a minor version may change behavior.
 
+## 0.7.0 — 2026-10-05
+
+### Added
+- **`/sdlc:backlog` (`/sdlc-backlog`): the backlog from the agent.** Without input it shows the list, the next ready item and what blocks the others; with an epic or an idea it proposes items with an outcome and acceptance criteria and adds only the ones you confirm; with `B<n>` it brings the item to ready and offers to start it. Reordering and dropping stay yours: the workflow gives you the command.
+- **`sdlc backlog edit <B-id>`** changes an open or in-progress item's title, outcome, acceptance criteria, dependencies, kind or risk, never its place or status.
+- **`sdlc adopt`** analyses an existing project (stack, CI, CODEOWNERS, git authors) and drafts the verify commands, protected paths and `openspec/roles.yaml`; `sdlc adopt --apply` writes them, and only a person may run it.
+- **`/sdlc:adopt` (`/sdlc-adopt`)** prepares an existing project for agents: layout check, adapt and scaffold, documents filled from the code with file references, then the settings draft. `sdlc init` suggests it.
+
+### Fixed
+- The hook catches state-file writes it used to miss: `git checkout`/`restore` of an older copy, PowerShell cmdlets (`Set-Content`, `Copy-Item`…), backslash and `./` spellings, `ln`, patch renames, and paths written in another letter case on Windows and macOS (protected and test paths too). Human-only commands are recognized after global options (`sdlc --locale en approve …`), through `sdlc.cmd` and across line continuations.
+- `sdlc backlog add` refuses a dependency on a dropped item.
+
+### Changed
+- Agents can no longer edit `openspec/backlog.md` directly; they use the `sdlc backlog` commands, so the order and removal of items stay a person's decision. People still edit the file by hand.
+
 ## 0.6.4 — 2026-10-04
 
 ### Added

@@ -17,6 +17,8 @@ const EXAMPLES: Record<string, string> = {
   'backlog drop': 'sdlc backlog drop B2 --note "No longer needed"',
   'license set': 'sdlc license set community',
   'roles migrate': 'sdlc roles migrate',
+  adopt: 'sdlc adopt --json',
+  'adopt --apply': 'sdlc adopt --apply',
   'backlog epic add': 'sdlc backlog epic add "Checkout" --goal "Customers pay without calling support" --json',
   'defer add': 'sdlc defer add "Retry failed payments" --why "Out of scope for this change" --json',
   'defer close': 'sdlc defer close D1 --status done --note "Fixed in add-retries" --json',
@@ -74,15 +76,18 @@ function entries(command: Command, prefix = ''): CatalogCommand[] {
   });
 }
 
+/** Human-only forms of commands any actor may run otherwise: name -> usage. */
+const ACTION_VARIANTS: Record<string, string> = {
+  'tests unlock': 'sdlc tests unlock --change <id>',
+  'license set': 'sdlc license set <community|commercial> [--agreement <id>] [--licensee <name>]',
+  'adopt --apply': 'sdlc adopt --apply',
+};
+
 function actionVariants(commands: CatalogCommand[]): CatalogCommand[] {
-  const variants = ['tests unlock', 'license set'];
-  return variants.map((name) => {
+  return Object.entries(ACTION_VARIANTS).map(([name, usage]) => {
     const parent = commands.find((item) => item.name === name.split(' ')[0])!;
-    const usage = name === 'license set'
-      ? 'sdlc license set <community|commercial> [--agreement <id>] [--licensee <name>]'
-      : 'sdlc tests unlock --change <id>';
-    return { ...parent, name, usage,
-      actor: 'human', example: EXAMPLES[name] };
+    const description = catalog('en')[`cmd.${name.replace(/ /g, '.')}`] ?? parent.description;
+    return { ...parent, name, usage, description, actor: 'human', example: EXAMPLES[name] };
   });
 }
 

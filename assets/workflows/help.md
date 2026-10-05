@@ -18,6 +18,7 @@ Summarize what exists now from the live output. Give a short cheat sheet with th
 {{cmd:explore}} investigates an idea; {{cmd:intent}} captures it; {{cmd:spec}} designs it.
 {{cmd:plan}} plans work; {{cmd:build}} implements; {{cmd:verify}} checks; {{cmd:review}} reviews.
 {{cmd:status}} shows state; {{cmd:next}} advances the next available step.
+{{cmd:backlog}} plans and starts backlog items; {{cmd:adopt}} prepares an existing project for agents.
 
 Name decisions reserved for the person, including approvals, track changes, and backlog moves or drops.
 Explain their consequences and give the exact CLI command for each decision that is currently needed.

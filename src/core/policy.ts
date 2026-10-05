@@ -44,11 +44,22 @@ const EDIT_TOOLS = new Set(['edit', 'write', 'multiedit', 'notebookedit', 'patch
 const BASH_TOOLS = new Set(['bash', 'shell', 'powershell', 'terminal', 'run_command']);
 const READ_TOOLS = new Set(['read', 'grep', 'glob', 'ls', 'list', 'webfetch', 'websearch']);
 
-/** Extracts the files a patch touches from the common `*** Update File:` envelope. */
+/** `*** Update File: <path>` and the like, plus the target of a rename (`*** Move to: <path>`). */
+const PATCH_ENVELOPE_FILE = /^\*\*\*\s+(?:(?:Update|Add|Delete)\s+File|Move\s+to):\s*(.+)$/gm;
+const UNIFIED_DIFF_FILE = /^\+\+\+\s+(?:b\/)?(.+)$/gm;
+
+/** Extracts the files a patch touches from the common `*** Update File:` envelope or a unified diff. */
 function patchFiles(patch: string): string[] {
   const files: string[] = [];
-  for (const m of patch.matchAll(/^\*\*\*\s+(?:Update|Add|Delete)\s+File:\s*(.+)$/gm)) files.push(m[1].trim());
-  for (const m of patch.matchAll(/^\+\+\+\s+(?:b\/)?(.+)$/gm)) if (m[1].trim() !== '/dev/null') files.push(m[1].trim());
+  for (const m of patch.matchAll(PATCH_ENVELOPE_FILE)) {
+    files.push(m[1].trim());
+  }
+  for (const m of patch.matchAll(UNIFIED_DIFF_FILE)) {
+    const file = m[1].trim();
+    if (file !== '/dev/null') {
+      files.push(file);
+    }
+  }
   return files;
 }
 
@@ -81,18 +92,59 @@ function relToRoot(root: string, cwd: string, file: string): string | undefined 
 
 function matcher(globs: string[]): (p: string) => boolean {
   if (globs.length === 0) return () => false;
-  const m = picomatch(globs, { dot: true });
+  // nocase: on Windows and macOS `SRC/Payments` is the same directory as `src/payments`.
+  const m = picomatch(globs, { dot: true, nocase: true });
   return (p) => m(p);
 }
 
+/** The binary as agents spell it: `sdlc`, its old name, `sdlc.js` and the Windows shims `sdlc.cmd`, `sdlc.ps1`. */
+const CLI_BINARY = String.raw`\b(?:sdlc|scdl)(?:\.(?:js|cmd|ps1|exe))?`;
+/** Global options between the binary and the subcommand: `--locale en`, `--locale=ru`, `-h`. */
+const GLOBAL_OPTIONS = String.raw`(?:\s+--?[a-z][\w-]*(?:=[^\s;&|]+|\s+[^\s;&|-][^\s;&|]*)?)*`;
+const HUMAN_NAMES = HUMAN_COMMANDS.map((name) => name.replace(/ /g, '\\s+')).join('|');
 // Every human-only catalog command is guarded here, including license set.
-const APPROVAL_COMMAND = new RegExp(
-  `\\b(?:sdlc|scdl)(?:\\.js)?\\s+(?:${HUMAN_COMMANDS.map((name) => name.replace(/ /g, '\\s+')).join('|')})\\b`
-);
+// Case-insensitive: `SDLC.CMD approve` runs the same command on Windows.
+const APPROVAL_COMMAND = new RegExp(`${CLI_BINARY}${GLOBAL_OPTIONS}\\s+(?:${HUMAN_NAMES})\\b`, 'i');
+const ADOPT_APPLY_COMMAND = new RegExp(`${CLI_BINARY}${GLOBAL_OPTIONS}\\s+adopt\\b[^;&|\\r\\n]*--apply\\b`, 'i');
+
+/** Joins `\`-newline (sh) and backtick-newline (PowerShell) continuations, so a split command reads as one. */
+function joinContinuations(command: string): string {
+  return command.replace(/[\\`]\r?\n/g, ' ');
+}
+
+/** One spelling per path before matching: forward slashes, no `/./` segments, no doubled slashes. */
+function normalizePaths(command: string): string {
+  return command
+    .replace(/\\/g, '/')
+    .replace(/\/(?:\.\/)+/g, '/')
+    .replace(/\/{2,}/g, '/');
+}
+
 /** Harness records only the CLI writes: per-change `.sdlc.yaml` and the project log. */
-const STATE_FILE_WRITE = /\.sdlc\.yaml|\.sdlc\/log\.jsonl|openspec\/roles\.yaml/;
-const STATE_FILE = /(^|\/)\.sdlc\.yaml$|^openspec\/\.sdlc\/log\.jsonl$|^openspec\/roles\.yaml$/;
-const WRITE_OPS = /(>>?|\btee\b|\bsed\s+-i|\bperl\s+-i|\bmv\b|\bcp\b|\brm\b|\btruncate\b|\bpython[0-9.]*\b|\bnode\b\s+-e|\bdd\b)/;
+// Case-insensitive: Windows and macOS file systems ignore case, so `OPENSPEC/Backlog.md` is the same file.
+const STATE_FILE_WRITE = /\.sdlc\.yaml|\.sdlc\/log\.jsonl|openspec\/(?:roles\.yaml|backlog\.md)/i;
+const STATE_FILE = new RegExp(
+  '(^|/)\\.sdlc\\.yaml$|^openspec/\\.sdlc/log\\.jsonl$|^openspec/(?:roles\\.yaml|backlog\\.md)$',
+  'i'
+);
+/** The backlog's order and removal are a person's decision; agents change the file through `sdlc backlog`. */
+const BACKLOG_FILE = 'openspec/backlog.md';
+
+/** The reason for a state-file denial: the backlog has its own, pointing at the backlog commands. */
+function stateReason(backlog: boolean, edit: boolean): string {
+  if (backlog) return t('hook.backlogIntegrity');
+  return t(edit ? 'hook.stateIntegrityEdit' : 'hook.stateIntegrityBash');
+}
+
+const WRITE_OPS = new RegExp([
+  />>?/, /\btee\b/, /\bsed\s+-i/, /\bperl\s+-i/, /\bmv\b/, /\bcp\b/, /\brm\b/, /\btruncate\b/,
+  /\bpython[0-9.]*\b/, /\bnode\b\s+-e/, /\bdd\b/,
+  // A link is a write by proxy: the next write to the link lands in the state file.
+  /\bln\b/,
+  // git can put an older copy back; PowerShell writes through cmdlets rather than redirection.
+  /\bgit\s+(?:checkout|restore|apply|mv|rm)\b/,
+  /\b(?:Set|Add|Clear)-Content\b/, /\bOut-File\b/, /\b(?:Copy|Move|Remove|Rename|New)-Item\b/,
+].map((pattern) => pattern.source).join('|'), 'i');
 
 export interface PolicyContext {
   paths: ProjectPaths;
@@ -134,6 +186,37 @@ function gateOk(view: LifecycleView | undefined, id: string): boolean {
   return !!g && (g.status === 'approved' || g.status === 'waived' || g.status === 'n/a');
 }
 
+/** Shell commands: human-only CLI steps, writes to state files, releases without an approved release gate. */
+function evaluateCommand(command: string, ctx: PolicyContext, env: NodeJS.ProcessEnv): Decision {
+  const cmd = joinContinuations(command);
+  if (ctx.config.enforcement.forbidAgentApprovals &&
+      (APPROVAL_COMMAND.test(cmd) || ADOPT_APPLY_COMMAND.test(cmd))) {
+    return {
+      decision: 'deny',
+      rule: 'separation-of-duties',
+      reason: t('hook.separationOfDuties'),
+    };
+  }
+  const spelled = normalizePaths(cmd);
+  if (STATE_FILE_WRITE.test(spelled) && WRITE_OPS.test(spelled)) {
+    const backlogOnly = spelled.toLowerCase().includes(BACKLOG_FILE) && !/\.sdlc|roles\.yaml/i.test(spelled);
+    return {
+      decision: 'deny',
+      rule: 'state-integrity',
+      reason: stateReason(backlogOnly, false),
+    };
+  }
+  const release = ctx.config.release.commands.find((p) => new RegExp(p, 'i').test(cmd));
+  if (!release || env.SDLC_RELEASE_APPROVAL) return { decision: 'allow' };
+  const authorized = snapshots(ctx, true).filter((c) => gateOk(c.view, 'release'));
+  if (authorized.length > 0) return { decision: 'allow' };
+  return {
+    decision: 'deny',
+    rule: 'release-gate',
+    reason: t('hook.releaseGate', { pattern: release }),
+  };
+}
+
 export function evaluateToolCall(call: ToolCall, ctx: PolicyContext): Decision {
   const { config, paths } = ctx;
   const env = ctx.env ?? process.env;
@@ -143,35 +226,7 @@ export function evaluateToolCall(call: ToolCall, ctx: PolicyContext): Decision {
     ({ decision: mode === 'block' ? 'deny' : 'warn', rule, reason });
 
   if (call.kind === 'bash' && call.command) {
-    const cmd = call.command;
-    if (config.enforcement.forbidAgentApprovals && APPROVAL_COMMAND.test(cmd)) {
-      return {
-        decision: 'deny',
-        rule: 'separation-of-duties',
-        reason: t('hook.separationOfDuties'),
-      };
-    }
-    if (STATE_FILE_WRITE.test(cmd) && WRITE_OPS.test(cmd)) {
-      return {
-        decision: 'deny',
-        rule: 'state-integrity',
-        reason: t('hook.stateIntegrityBash'),
-      };
-    }
-    const release = config.release.commands.find((p) => new RegExp(p, 'i').test(cmd));
-    if (release) {
-      if (env.SDLC_RELEASE_APPROVAL) return { decision: 'allow' };
-      const changes = snapshots(ctx, true);
-      const authorized = changes.filter((c) => gateOk(c.view, 'release'));
-      if (authorized.length === 0) {
-        return {
-          decision: 'deny',
-          rule: 'release-gate',
-          reason: t('hook.releaseGate', { pattern: release }),
-        };
-      }
-    }
-    return { decision: 'allow' };
+    return evaluateCommand(call.command, ctx, env);
   }
 
   if (call.kind !== 'edit' || call.files.length === 0) return { decision: 'allow' };
@@ -180,11 +235,12 @@ export function evaluateToolCall(call: ToolCall, ctx: PolicyContext): Decision {
     .filter((r): r is string => r !== undefined);
   if (rels.length === 0) return { decision: 'allow' };
 
-  if (rels.some((r) => STATE_FILE.test(r))) {
+  const stateHits = rels.filter((r) => STATE_FILE.test(r));
+  if (stateHits.length > 0) {
     return {
       decision: 'deny',
       rule: 'state-integrity',
-      reason: t('hook.stateIntegrityEdit'),
+      reason: stateReason(stateHits.every((r) => r.toLowerCase() === BACKLOG_FILE), true),
     };
   }
 

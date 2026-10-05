@@ -85,7 +85,15 @@ Use `--apply --in-place` to convert the current working copy directly; it requir
 
 Conversion never moves pinned `README.md`, `README`, `README.txt`, `README.rst`, `CONTRIBUTING.md`, `SECURITY.md`, or anything under `.github/`. It never reads, rewrites, or moves `openspec/`, `node_modules/`, `.git/`, `dist/`, `build/`, or `vendor/`. For in-place conversion, review the resulting diff and use git to restore it if needed.
 
-## 7.8. Progress: report and dashboard
+## 7.8. Existing project: settings and documents (adopt)
+
+`sdlc adopt [--json]` analyses the repository and drafts the settings; it writes nothing. It reports the stack (`package.json`, `go.mod`, `pyproject.toml`, `Cargo.toml`, `pom.xml`, `*.csproj` and similar), CI files, and the people found in git history and CODEOWNERS (email owners; `@handles` without an email are listed as unresolved; bots are skipped). The draft proposes the verify commands and protected paths that are not configured yet (CI configuration, CODEOWNERS) and an `openspec/roles.yaml` with a holder for every role a gate needs: `code-owner` for the owners of catch-all CODEOWNERS patterns (owners of narrower patterns are listed to check), every other role and `maintainer` for you, the person running it, to hand over later. When `sdlc.yaml` still keeps `roles:`, the draft leaves them alone and points to `sdlc roles migrate`.
+
+`sdlc adopt --apply` writes the draft: it adds the proposed commands and paths to `openspec/sdlc.yaml`, keeping everything already there, and writes `openspec/roles.yaml` only when the file does not exist. Applying is a person's decision: agents are refused by the CLI and the hook. A second run with nothing new writes nothing.
+
+In Claude Code and OpenCode, `/sdlc:adopt` (`/sdlc-adopt`) prepares the whole project: `sdlc layout check`, `layout adapt` for existing documents (conversion is only proposed), `layout scaffold` for missing ones, then the agent fills them from the code — architecture, conventions, build and test commands, glossary, sensitive areas, decisions — with a file reference for every statement and "to check" on anything uncertain. It ends with the `sdlc adopt` draft and the command for you to apply it. `sdlc init` suggests this workflow for an existing project.
+
+## 7.9. Progress: report and dashboard
 
 `sdlc report [--format md|json|html] [--since YYYY-MM-DD] [--change <id>] [--out <file>]` summarizes the reporting period, active changes by lifecycle stage, blocked changes, changes awaiting a person, median lead times, verification first-pass rate, project-log events, and layout readiness. The change filter selects one active or archived change. The date filters events and changes moved during the period. An output file must stay inside the project.
 
@@ -100,6 +108,6 @@ Conversion never moves pinned `README.md`, `README`, `README.txt`, `README.rst`,
     path: artifacts/sdlc-dashboard.html
 ```
 
-## 7.9. Limits and next steps
+## 7.10. Limits and next steps
 
 The layout describes a small set of exact paths and aliases; it does not infer a role from arbitrary files. Review generated templates and mappings before relying on them. `sdlc import bmad` imports BMAD planning artifacts; broader convention imports from frameworks such as Spec Kit and Kiro remain a later step.

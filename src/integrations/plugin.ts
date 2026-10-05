@@ -44,7 +44,7 @@ export function renderClaudePlugin(cli = 'sdlc'): PluginFile[] {
     content: `${JSON.stringify({
       name: PLUGIN_NAME,
       version,
-      description: 'AI-native SDLC workflows (intent, spec, plan, build, verify, review, release, archive, triage) with gates, built on OpenSpec. Requires the `sdlc` CLI (npm package sdlc).',
+      description: 'AI-native SDLC workflows (adopt, backlog, explore, intent, spec, plan, build, verify, review, release, archive, triage) with gates, built on OpenSpec. Requires the `sdlc` CLI (npm package sdlc).',
       author: { name: LICENSOR, url: LICENSOR_URL },
       homepage: PROJECT_URL,
       repository: PROJECT_URL,
