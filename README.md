@@ -93,7 +93,7 @@ The plugin ships the same workflows (`/sdlc:<id>`), subagents and hooks. With th
 
 People run approvals **in their own terminal**. Inside an agent session `sdlc approve` refuses by design.
 
-**Backlog.** Plan work in `openspec/backlog.md` before a change exists: `sdlc backlog add` / `epic add`, list and reorder with `list` / `move`, refine an item with `edit`, start a ready item with `sdlc backlog start <B-id>` (creates the change and a draft `intent.md`), or close with `done` / `drop`. Priority (`move`) and dropping an item are human decisions; agents change the file only through these commands. `/sdlc:backlog` (`/sdlc-backlog`) does the same from the agent. With no active change, `sdlc next` points at the next ready backlog item.
+**Backlog.** Plan work in `openspec/backlog.md` before a change exists: `sdlc backlog add` / `epic add` / `epic edit`, list and reorder with `list` / `move`, refine an item with `edit`, start a ready item with `sdlc backlog start <B-id>` (creates the change and a draft `intent.md`), or close with `done` / `drop`. Priority (`move`) and dropping an item are human decisions; agents change the file only through these commands. `/sdlc:backlog` (`/sdlc-backlog`) does the same from the agent. With no active change, `sdlc next` points at the next ready backlog item.
 
 Small bounded work: `sdlc new fix-null-name --kind bugfix --risk low`. Review its track suggestion, then confirm `sdlc track set lite --change fix-null-name` in your terminal before plan approval.
 
@@ -130,7 +130,7 @@ Everything sdlc writes records the sdlc version and the license the project uses
 | `sdlc explore <slug> \| list` | create or list optional research notes before intent |
 | `sdlc track set <full\|lite> --change <id> [--note <text>]` | human confirmation of the suggested track before plan approval |
 | `sdlc defer add \| list \| close` | manage the deferred-work registry |
-| `sdlc backlog add \| epic add \| list \| next \| edit \| start \| move \| drop \| done` | manage planned changes in `openspec/backlog.md` (order = priority; `move`/`drop` are human-only) |
+| `sdlc backlog add \| epic add \| epic edit \| list \| next \| edit \| start \| move \| drop \| done` | manage planned changes in `openspec/backlog.md` (order = priority; `move`/`drop` are human-only) |
 | `sdlc import bmad <path> (--change <id> \| --to-backlog) [--dry-run]` | import BMAD planning into an unapproved change, or epics/tickets (or a PRD/SPEC) into the backlog |
 | `sdlc status [--change] [--markdown] [--json]` / `sdlc next` | stages, gates, approvals, evidence, who acts next (with `--change`, a stage stepper and task bar); with no active change, the next ready backlog item |
 | `sdlc help [topic] [--json]` | catalog of workflows and CLI commands with who runs them (agent or person) |

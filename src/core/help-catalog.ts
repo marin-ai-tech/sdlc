@@ -20,6 +20,7 @@ const EXAMPLES: Record<string, string> = {
   adopt: 'sdlc adopt --json',
   'adopt --apply': 'sdlc adopt --apply',
   'backlog epic add': 'sdlc backlog epic add "Checkout" --goal "Customers pay without calling support" --json',
+  'backlog epic edit': 'sdlc backlog epic edit E1 --title "0.8.0 Checkout" --json',
   'defer add': 'sdlc defer add "Retry failed payments" --why "Out of scope for this change" --json',
   'defer close': 'sdlc defer close D1 --status done --note "Fixed in add-retries" --json',
   'import bmad': 'sdlc import bmad _bmad-output/epic-1 --to-backlog --dry-run --json',

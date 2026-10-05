@@ -32,6 +32,7 @@ import { writeTextAtomic } from '../core/fs-utils.js';
 import { createChange } from './changes.js';
 import { t } from '../core/i18n.js';
 import { editBacklogItem } from '../core/backlog-edit.js';
+import { editEpic } from '../core/backlog-epic-edit.js';
 
 type Options = Record<string, unknown> & { json?: boolean };
 
@@ -65,7 +66,7 @@ function run(
       );
     }
     if (opts.json) {
-      const key = event === 'backlog.epic.added' ? 'epic' : 'item';
+      const key = event?.startsWith('backlog.epic.') ? 'epic' : 'item';
       printJson({ [key]: result ?? null, harness: ctx.stamp });
     } else {
       const message = result
@@ -83,6 +84,18 @@ export function backlogEpicAdd(title: string, opts: Options): void {
     opts,
     (ctx) => addEpic(ctx.root, { title, goal: text(opts.goal) }),
     'backlog.epic.added'
+  );
+}
+
+export function backlogEpicEdit(id: string, opts: Options): void {
+  run(
+    opts,
+    (ctx) => editEpic(ctx.root, id, {
+      title: text(opts.title),
+      goal: text(opts.goal),
+      clearGoal: opts.clearGoal === true,
+    }),
+    'backlog.epic.edited'
   );
 }
 

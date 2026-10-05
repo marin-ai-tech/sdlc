@@ -172,6 +172,7 @@ describe('demo: a team builds a calculator with sdlc (every command)', () => {
 
   it('4. backlog: an epic, items with acceptance criteria and dependencies; people own the priority', () => {
     step('epic-add', 'backlog', 'agent', ['backlog', 'epic', 'add', 'Calculator MVP', '--goal', 'Cashiers stop using their phones for sums'], 'The epic.');
+    step('epic-edit', 'backlog', 'agent', ['backlog', 'epic', 'edit', 'E1', '--goal', 'Cashiers stop using their phones for sums at the till'], 'The agent sharpens the epic goal; titles and goals change, the order does not.');
     step('add-b1', 'backlog', 'agent', ['backlog', 'add', 'Basic arithmetic', '--epic', 'E1', '--kind', 'feature', '--risk', 'low', '--outcome', 'add, subtract, multiply and divide', '--accept', '2 + 3 = 5', '--accept', '10 / 4 = 2.5', '--source-type', 'exploration', '--source-ref', 'openspec/explorations/calculator.md'], 'First item, from the exploration.');
     step('add-b2', 'backlog', 'agent', ['backlog', 'add', 'Percent', '--epic', 'E1', '--outcome', '15% of 200', '--accept', '15% of 200 = 30', '--depends', 'B1'], 'Depends on B1.');
     step('add-b3', 'backlog', 'agent', ['backlog', 'add', 'Memory M+ / MR', '--epic', 'E1', '--outcome', 'keep a running total', '--accept', 'M+ 5, M+ 3, MR = 8', '--depends', 'B1'], 'Depends on B1.');

@@ -138,7 +138,7 @@ export const SLIDES = [
       ru: 'У задачи есть результат, критерии приёмки и зависимости. Порядок и удаление задач решает продукт.',
     },
     steps: ['add-b1', 'move-agent', 'list'],
-    more: ['epic-add', 'add-b2', 'add-b3', 'move', 'add-b4', 'edit-b4', 'drop', 'backlog-next'],
+    more: ['epic-add', 'epic-edit', 'add-b2', 'add-b3', 'move', 'add-b4', 'edit-b4', 'drop', 'backlog-next'],
   },
   {
     id: 'start', layout: 'steps',
@@ -317,6 +317,7 @@ export const STEP_NOTE_RU = {
   explore: 'Агент открывает исследование: нужен ли кассе свой калькулятор?',
   'explore-list': 'Исследования в проекте.',
   'epic-add': 'Эпик.',
+  'epic-edit': 'Агент уточняет цель эпика; заголовок и цель меняются, порядок — нет.',
   'add-b1': 'Первая задача, из исследования.',
   'add-b2': 'Зависит от B1.',
   'add-b3': 'Зависит от B1.',

@@ -2,6 +2,11 @@
 
 All notable changes to sdlc. Versions follow [Semantic Versioning](https://semver.org/); while the major version is 0, a minor version may change behavior.
 
+## 0.7.2 — 2026-10-05
+
+### Added
+- `sdlc backlog epic edit <E-id>` changes an epic's title or goal (`--title`, `--goal`, `--clear-goal`), for example to retarget an epic to another version; items and their order never change. Any actor may run it.
+
 ## 0.7.1 — 2026-10-05
 
 ### Fixed

@@ -21,7 +21,8 @@ import { trackSetCommand } from '../commands/track.js';
 import { exploreCommand, exploreListCommand } from '../commands/explore.js';
 import { importBmadCommand } from '../commands/import.js';
 import {
-  backlogAdd, backlogClose, backlogEdit, backlogEpicAdd, backlogList, backlogMove, backlogNext, backlogStart,
+  backlogAdd, backlogClose, backlogEdit, backlogEpicAdd, backlogEpicEdit, backlogList, backlogMove, backlogNext,
+  backlogStart,
 } from '../commands/backlog.js';
 import { rolesCheck, rolesMigrate, rolesWho } from '../commands/roles.js';
 import { adoptCommand } from '../commands/adopt.js';
@@ -82,11 +83,17 @@ export function buildProgram(): Command {
   roles.command('migrate').description(cmdDesc('cmd.roles.migrate'))
     .option('--json', 'output JSON').action((opts) => rolesMigrate(opts));
   const backlog = program.command('backlog').description(cmdDesc('cmd.backlog'));
-  backlog.command('epic').description(cmdDesc('cmd.backlog.epic'))
-    .command('add <title>').description(cmdDesc('cmd.backlog.epic.add'))
+  const epic = backlog.command('epic').description(cmdDesc('cmd.backlog.epic'));
+  epic.command('add <title>').description(cmdDesc('cmd.backlog.epic.add'))
     .option('--goal <text>', 'goal of the epic')
     .option('--json', 'output JSON')
     .action((title, opts) => backlogEpicAdd(title, opts));
+  epic.command('edit <E-id>').description(cmdDesc('cmd.backlog.epic.edit'))
+    .option('--title <text>', 'replacement title')
+    .option('--goal <text>', 'replacement goal of the epic')
+    .option('--clear-goal', 'remove the goal of the epic')
+    .option('--json', 'output JSON')
+    .action((id, opts) => backlogEpicEdit(id, opts));
   backlog.command('add <title>').description(cmdDesc('cmd.backlog.add'))
     .option('--epic <E-id>', 'parent epic id')
     .option('--kind <kind>', 'kind of change')
