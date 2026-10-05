@@ -1,6 +1,7 @@
 import { line } from './output.js';
 import type { ProjectContext } from './context.js';
-import { listActiveChanges, resolveChange } from '../core/changes.js';
+import { recordAwaiting } from '../core/awaiting.js';
+import { listActiveChanges, resolveChange, type ChangeRef } from '../core/changes.js';
 import { nextBacklogItem, readBacklog } from '../core/backlog.js';
 import { t } from '../core/i18n.js';
 import { evaluateChange, type NextAction } from '../core/lifecycle.js';
@@ -34,23 +35,22 @@ function backlogHint(ctx: ProjectContext): NextHint | undefined {
   };
 }
 
+/** The change's next step; a gate that now waits for a person is recorded in the project log. */
+function changeNext(ctx: ProjectContext, ref: ChangeRef): NextHint | undefined {
+  const view = evaluateChange(ctx.root, ref, ctx.config, { skipFingerprint: true });
+  recordAwaiting(ctx.root, ctx.config, view, ctx.stamp);
+  if (view.next.actor === 'none') return undefined;
+  return view.next;
+}
+
 /**
  * Next action for a change id, or (with no id) the first active change /
  * ready backlog item — same sources as `sdlc next` / evaluateChange.next.
  */
 export function resolveNext(ctx: ProjectContext, changeId?: string): NextHint | undefined {
-  if (changeId) {
-    const ref = resolveChange(ctx.paths, changeId, { allowArchived: true });
-    const view = evaluateChange(ctx.root, ref, ctx.config, { skipFingerprint: true });
-    if (view.next.actor === 'none') return undefined;
-    return view.next;
-  }
+  if (changeId) return changeNext(ctx, resolveChange(ctx.paths, changeId, { allowArchived: true }));
   const active = listActiveChanges(ctx.paths);
-  if (active.length > 0) {
-    const view = evaluateChange(ctx.root, active[0], ctx.config, { skipFingerprint: true });
-    if (view.next.actor === 'none') return undefined;
-    return view.next;
-  }
+  if (active.length > 0) return changeNext(ctx, active[0]);
   return backlogHint(ctx);
 }
 

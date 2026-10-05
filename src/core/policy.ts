@@ -1,9 +1,7 @@
-import * as path from 'node:path';
 import picomatch from 'picomatch';
 import type { SdlcConfig } from './config.js';
 import { readChangeState } from './change-state.js';
 import { listActiveChanges } from './changes.js';
-import { isWithin, toPosix } from './fs-utils.js';
 import { harnessStamp, stampText } from './license.js';
 import { evaluateChange, sharedFingerprint, type LifecycleView } from './lifecycle.js';
 import type { ProjectPaths } from './project.js';
@@ -11,6 +9,18 @@ import { HUMAN_COMMANDS } from './help-catalog.js';
 import { nextBacklogItem, readBacklog } from './backlog.js';
 import { t } from './i18n.js';
 import { quotedCommand } from './human-command.js';
+import { removesSdlcCli } from './policy-cli.js';
+import { clearsAgentMarker } from './policy-markers.js';
+import { handBackLine, shellTakeoverDenial, takeoverDenial } from './takeover.js';
+import {
+  BACKLOG_FILE,
+  linkedStateFiles,
+  relToRoot,
+  shellStateWrites,
+  STATE_FILE,
+  STATE_FILE_WRITE,
+  WRITE_OPS,
+} from './policy-shell.js';
 
 /**
  * Deterministic guardrails behind the advisory skills - the playbook's
@@ -85,12 +95,6 @@ export function normalizeToolCall(tool: string, input: Record<string, unknown>, 
   return { tool, kind, files: [...new Set(files)], ...(command ? { command } : {}), cwd };
 }
 
-function relToRoot(root: string, cwd: string, file: string): string | undefined {
-  const abs = path.isAbsolute(file) ? file : path.resolve(cwd, file);
-  if (!isWithin(root, abs)) return undefined;
-  return toPosix(path.relative(root, abs));
-}
-
 function matcher(globs: string[]): (p: string) => boolean {
   if (globs.length === 0) return () => false;
   // nocase: on Windows and macOS `SRC/Payments` is the same directory as `src/payments`.
@@ -102,6 +106,8 @@ function matcher(globs: string[]): (p: string) => boolean {
 const CLI_BINARY = String.raw`\b(?:sdlc|scdl)(?:\.(?:js|cmd|ps1|exe))?`;
 /** Global options between the binary and the subcommand: `--locale en`, `--locale=ru`, `-h`. */
 const GLOBAL_OPTIONS = String.raw`(?:\s+--?[a-z][\w-]*(?:=[^\s;&|]+|\s+[^\s;&|-][^\s;&|]*)?)*`;
+/** The CLI and its global options, as the takeover rule matches an sdlc step on a held change. */
+const CLI_PREFIX = `${CLI_BINARY}${GLOBAL_OPTIONS}`;
 const HUMAN_NAMES = HUMAN_COMMANDS.map((name) => name.replace(/ /g, '\\s+')).join('|');
 // Every human-only catalog command is guarded here, including license set.
 // Case-insensitive: `SDLC.CMD approve` runs the same command on Windows.
@@ -121,31 +127,11 @@ function normalizePaths(command: string): string {
     .replace(/\/{2,}/g, '/');
 }
 
-/** Harness records only the CLI writes: per-change `.sdlc.yaml` and the project log. */
-// Case-insensitive: Windows and macOS file systems ignore case, so `OPENSPEC/Backlog.md` is the same file.
-const STATE_FILE_WRITE = /\.sdlc\.yaml|\.sdlc\/log\.jsonl|openspec\/(?:roles\.yaml|backlog\.md)/i;
-const STATE_FILE = new RegExp(
-  '(^|/)\\.sdlc\\.yaml$|^openspec/\\.sdlc/log\\.jsonl$|^openspec/(?:roles\\.yaml|backlog\\.md)$',
-  'i'
-);
-/** The backlog's order and removal are a person's decision; agents change the file through `sdlc backlog`. */
-const BACKLOG_FILE = 'openspec/backlog.md';
-
 /** The reason for a state-file denial: the backlog has its own, pointing at the backlog commands. */
 function stateReason(backlog: boolean, edit: boolean): string {
   if (backlog) return t('hook.backlogIntegrity');
   return t(edit ? 'hook.stateIntegrityEdit' : 'hook.stateIntegrityBash');
 }
-
-const WRITE_OPS = new RegExp([
-  />>?/, /\btee\b/, /\bsed\s+-i/, /\bperl\s+-i/, /\bmv\b/, /\bcp\b/, /\brm\b/, /\btruncate\b/,
-  /\bpython[0-9.]*\b/, /\bnode\b\s+-e/, /\bdd\b/,
-  // A link is a write by proxy: the next write to the link lands in the state file.
-  /\bln\b/,
-  // git can put an older copy back; PowerShell writes through cmdlets rather than redirection.
-  /\bgit\s+(?:checkout|restore|apply|mv|rm)\b/,
-  /\b(?:Set|Add|Clear)-Content\b/, /\bOut-File\b/, /\b(?:Copy|Move|Remove|Rename|New)-Item\b/,
-].map((pattern) => pattern.source).join('|'), 'i');
 
 export interface PolicyContext {
   paths: ProjectPaths;
@@ -164,7 +150,9 @@ function snapshots(ctx: PolicyContext, full = false): ChangeSnapshot[] {
   const fingerprint = full ? sharedFingerprint(ctx.paths.root) : undefined;
   return listActiveChanges(ctx.paths).map((ref) => {
     try {
-      const view = evaluateChange(ctx.paths.root, ref, ctx.config, full ? { fingerprint } : { skipFingerprint: true });
+      // The hook never needs the names of the people who may approve (roles.yaml lookups): skipPeople.
+      const options = full ? { fingerprint, skipPeople: true } : { skipFingerprint: true, skipPeople: true };
+      const view = evaluateChange(ctx.paths.root, ref, ctx.config, options);
       return { id: ref.id, view, testsLocked: view.testsLocked, kind: view.kind };
     } catch {
       // A broken change must not wedge every edit in the repo; surface it via `sdlc doctor`.
@@ -187,9 +175,28 @@ function gateOk(view: LifecycleView | undefined, id: string): boolean {
   return !!g && (g.status === 'approved' || g.status === 'waived' || g.status === 'n/a');
 }
 
-/** Shell commands: human-only CLI steps, writes to state files, releases without an approved release gate. */
-function evaluateCommand(command: string, ctx: PolicyContext, env: NodeJS.ProcessEnv): Decision {
+/** A shell write to a state file, by its path text or (after `cd`, by glob, through a link) by what it resolves to. */
+function stateWriteDenial(spelled: string, ctx: PolicyContext, cwd: string): Decision | undefined {
+  if (STATE_FILE_WRITE.test(spelled) && WRITE_OPS.test(spelled)) {
+    const backlogOnly = spelled.toLowerCase().includes(BACKLOG_FILE) && !/\.sdlc|roles\.yaml/i.test(spelled);
+    return { decision: 'deny', rule: 'state-integrity', reason: stateReason(backlogOnly, false) };
+  }
+  const hits = shellStateWrites(spelled, ctx.paths.root, cwd);
+  if (hits.length === 0) return undefined;
+  const backlogOnly = hits.every((hit) => hit.toLowerCase() === BACKLOG_FILE);
+  return { decision: 'deny', rule: 'state-integrity', reason: stateReason(backlogOnly, false) };
+}
+
+/**
+ * Shell commands: cleared agent markers, human-only CLI steps, removing the CLI, writes to state files, a change a
+ * person holds, releases without an approved release gate.
+ */
+function evaluateCommand(command: string, ctx: PolicyContext, env: NodeJS.ProcessEnv, cwd: string): Decision {
   const cmd = joinContinuations(command);
+  // First: a command that clears the markers would also slip past the CLI's own agent check.
+  if (clearsAgentMarker(cmd)) {
+    return { decision: 'deny', rule: 'agent-marker', reason: t('hook.agentMarker') };
+  }
   if (ctx.config.enforcement.forbidAgentApprovals &&
       (APPROVAL_COMMAND.test(cmd) || ADOPT_APPLY_COMMAND.test(cmd))) {
     return {
@@ -198,15 +205,13 @@ function evaluateCommand(command: string, ctx: PolicyContext, env: NodeJS.Proces
       reason: t('hook.separationOfDuties', { command: quotedCommand(cmd) }),
     };
   }
+  if (removesSdlcCli(cmd)) return { decision: 'deny', rule: 'cli-removal', reason: t('hook.cliRemoval') };
   const spelled = normalizePaths(cmd);
-  if (STATE_FILE_WRITE.test(spelled) && WRITE_OPS.test(spelled)) {
-    const backlogOnly = spelled.toLowerCase().includes(BACKLOG_FILE) && !/\.sdlc|roles\.yaml/i.test(spelled);
-    return {
-      decision: 'deny',
-      rule: 'state-integrity',
-      reason: stateReason(backlogOnly, false),
-    };
-  }
+  const stateDenial = stateWriteDenial(spelled, ctx, cwd);
+  if (stateDenial) return stateDenial;
+  // A change a person holds: no shell writes to its paths, no sdlc steps on it but the read-only ones.
+  const held = shellTakeoverDenial(ctx.paths, spelled, cwd, CLI_PREFIX);
+  if (held) return held;
   const release = ctx.config.release.commands.find((p) => new RegExp(p, 'i').test(cmd));
   if (!release || env.SDLC_RELEASE_APPROVAL) return { decision: 'allow' };
   const authorized = snapshots(ctx, true).filter((c) => gateOk(c.view, 'release'));
@@ -227,16 +232,15 @@ export function evaluateToolCall(call: ToolCall, ctx: PolicyContext): Decision {
     ({ decision: mode === 'block' ? 'deny' : 'warn', rule, reason });
 
   if (call.kind === 'bash' && call.command) {
-    return evaluateCommand(call.command, ctx, env);
+    return evaluateCommand(call.command, ctx, env, call.cwd);
   }
 
   if (call.kind !== 'edit' || call.files.length === 0) return { decision: 'allow' };
   const rels = call.files
     .map((f) => relToRoot(paths.root, call.cwd, f))
     .filter((r): r is string => r !== undefined);
-  if (rels.length === 0) return { decision: 'allow' };
-
-  const stateHits = rels.filter((r) => STATE_FILE.test(r));
+  // A link (or a new file in a linked directory) that resolves to a state file is that state file.
+  const stateHits = [...rels.filter((r) => STATE_FILE.test(r)), ...linkedStateFiles(call.files, paths.root, call.cwd)];
   if (stateHits.length > 0) {
     return {
       decision: 'deny',
@@ -244,6 +248,7 @@ export function evaluateToolCall(call: ToolCall, ctx: PolicyContext): Decision {
       reason: stateReason(stateHits.every((r) => r.toLowerCase() === BACKLOG_FILE), true),
     };
   }
+  if (rels.length === 0) return { decision: 'allow' };
 
   const isProtected = matcher(config.enforcement.protectedPaths);
   const protectedHit = rels.find(isProtected);
@@ -254,6 +259,10 @@ export function evaluateToolCall(call: ToolCall, ctx: PolicyContext): Decision {
       reason: t('hook.protectedPath', { path: protectedHit }),
     };
   }
+
+  // A change a person holds: no agent edits in its folder and planned files (in the project, without a plan).
+  const held = takeoverDenial(paths, rels);
+  if (held) return held;
 
   const isTest = matcher(config.enforcement.testPaths);
   const isExempt = matcher(config.enforcement.exemptPaths);
@@ -291,8 +300,11 @@ export function evaluateToolCall(call: ToolCall, ctx: PolicyContext): Decision {
   return { decision: 'allow' };
 }
 
-/** Short lifecycle summary injected at session start (Claude SessionStart / OpenCode session). */
-export function sessionSummary(ctx: PolicyContext): string | undefined {
+/**
+ * Short lifecycle summary injected at session start (Claude SessionStart / OpenCode session). `observe` sees every
+ * evaluated view, so the hook can record the gates that wait for a person without evaluating twice.
+ */
+export function sessionSummary(ctx: PolicyContext, observe?: (view: LifecycleView) => void): string | undefined {
   const changes = listActiveChanges(ctx.paths);
   if (changes.length === 0) {
     const item = nextBacklogItem(readBacklog(ctx.paths.root));
@@ -305,11 +317,14 @@ export function sessionSummary(ctx: PolicyContext): string | undefined {
   for (const ref of changes.slice(0, 8)) {
     try {
       const view = evaluateChange(ctx.paths.root, ref, ctx.config, { skipFingerprint: true });
+      observe?.(view);
       const who = view.next.actor === 'human'
         ? t('session.whoPerson')
         : view.next.actor === 'agent' ? t('session.whoAgent') : '';
       const message = view.next.key ? t(view.next.key, view.next.params) : view.next.message;
       lines.push(t('session.changeLine', { change: view.change, stage: view.stage, who, message }));
+      const handBack = handBackLine(ref.dir, view.change);
+      if (handBack) lines.push(handBack);
     } catch (error) {
       const err = error instanceof Error ? error.message : String(error);
       lines.push(t('session.evalError', { id: ref.id, error: err }));

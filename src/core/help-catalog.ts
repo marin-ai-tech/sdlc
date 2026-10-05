@@ -3,13 +3,14 @@ import { catalog } from './i18n.js';
 import { WORKFLOW_IDS, loadWorkflow } from '../integrations/assets.js';
 
 export const HUMAN_COMMANDS = [
-  'approve', 'reject', 'waive', 'tests unlock', 'track set',
-  'backlog move', 'backlog drop', 'license set', 'roles migrate',
+  'approve', 'reject', 'rework', 'waive', 'tests unlock', 'track set',
+  'backlog move', 'backlog drop', 'license set', 'roles migrate', 'takeover', 'release-control',
 ] as const;
 
 const EXAMPLES: Record<string, string> = {
   approve: 'sdlc approve plan --change add-export',
   reject: 'sdlc reject plan --change add-export --note "Revise scope"',
+  rework: 'sdlc rework spec --change add-export --reason missing-requirement --note "No empty-name case"',
   waive: 'sdlc waive spec --change docs-only --note "No behavior change"',
   'tests unlock': 'sdlc tests unlock --change fix-login',
   'track set': 'sdlc track set lite --change docs-only',
@@ -17,6 +18,8 @@ const EXAMPLES: Record<string, string> = {
   'backlog drop': 'sdlc backlog drop B2 --note "No longer needed"',
   'license set': 'sdlc license set community',
   'roles migrate': 'sdlc roles migrate',
+  takeover: 'sdlc takeover --change add-export --note "I will fix the migration myself" --json',
+  'release-control': 'sdlc release-control --change add-export --note "Migration fixed, carry on" --json',
   adopt: 'sdlc adopt --json',
   'adopt --apply': 'sdlc adopt --apply',
   'backlog epic add': 'sdlc backlog epic add "Checkout" --goal "Customers pay without calling support" --json',
@@ -25,6 +28,7 @@ const EXAMPLES: Record<string, string> = {
   'defer close': 'sdlc defer close D1 --status done --note "Fixed in add-retries" --json',
   'import bmad': 'sdlc import bmad _bmad-output/epic-1 --to-backlog --dry-run --json',
   explore: 'sdlc explore checkout-flow --json',
+  trace: 'sdlc trace add-export --json',
   archive: 'sdlc archive add-export --yes --json',
   openspec: 'sdlc openspec list --specs',
 };

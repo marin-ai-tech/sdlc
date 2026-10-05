@@ -6,8 +6,9 @@ import {
   type ApprovalRecord,
   type ChangeState,
   type GateState,
+  type TakeoverRecord,
 } from './change-state.js';
-import { t } from './i18n.js';
+import { t, type MessageParams } from './i18n.js';
 import type { ChangeRef } from './changes.js';
 import { digestFiles, withoutCheckboxState } from './digest.js';
 import { readDeferred } from './deferred.js';
@@ -20,8 +21,12 @@ import {
   type ArtifactState,
   type SchemaInfo,
 } from './openspec-schema.js';
+import { takeoverNext } from './takeover.js';
 import { checkCoverage, parseCoverage, parseFindings, summarizeFindings, type FindingSummary } from './review.js';
 import { parseTasks, type TaskProgress } from './tasks.js';
+import { awaitedRoles, awaitingReason, quorum } from './approval-quorum.js';
+import { nameApprovers, type NamedApprover } from './named-approvers.js';
+import { effectiveGates, markReworks } from './rework.js';
 
 /**
  * The six stages of Anthropic's AI-native SDLC playbook, plus the two terminal
@@ -78,11 +83,15 @@ export interface GateEvaluation {
   approvals: ApprovalRecord[];
   staleApprovals: ApprovalRecord[];
   missingRoles: string[];
+  /** Approval gates: how many different people must approve (`min_approvals`, default 1). */
+  minApprovals?: number;
   reason?: string;
   /** Catalog key for localized status text; reason stays English. */
   reasonKey?: string;
   /** Params for the catalog key (locale-independent). */
   reasonParams?: Record<string, string | number>;
+  /** The rework that sent the change back to this gate, while it holds (`sdlc rework`). */
+  rework?: { reason: string; note: string; by: string; at: string };
 }
 
 export interface NextAction {
@@ -100,6 +109,8 @@ export interface NextAction {
     | 'archive'
     /** No active change: start the first ready backlog item (`sdlc backlog start`). */
     | 'start-backlog-item'
+    /** A person took the change over (`sdlc takeover`); it is theirs until `sdlc release-control`. */
+    | 'taken-over'
     | 'none';
   /** Workflow id of the skill/command that performs the action (e.g. `spec`). */
   workflow?: string;
@@ -111,7 +122,9 @@ export interface NextAction {
   /** Catalog key for localized Next text; message stays English. */
   key?: string;
   /** Params for the catalog key (locale-independent). */
-  params?: Record<string, string | number>;
+  params?: MessageParams;
+  /** With openspec/roles.yaml, an approve-gate step: the people who may take the decision now. */
+  people?: NamedApprover[];
 }
 
 export interface LifecycleView {
@@ -138,6 +151,8 @@ export interface LifecycleView {
     commit?: string;
   };
   testsLocked: boolean;
+  /** Set while a person holds the change (`sdlc takeover`). */
+  takeover?: TakeoverRecord;
   next: NextAction;
   warnings: string[];
 }
@@ -201,15 +216,10 @@ function evaluateApprovalGate(
   trustRecorded = false
 ): GateEvaluation {
   const required = config.gates[id].required && !(state.track === 'lite' && (id === 'intent' || id === 'spec'));
-  const base = {
-    id,
-    stage: GATE_STAGE[id],
-    required,
-    artifacts,
-    ...(digest ? { digest } : {}),
-  };
   const all = gateState?.approvals ?? [];
   const valid = trustRecorded ? all : digest ? all.filter((a) => a.digest === digest) : [];
+  const q = quorum(valid, config.gates[id]);
+  const base = { id, stage: GATE_STAGE[id], required, artifacts, minApprovals: q.min, ...(digest ? { digest } : {}) };
   const stale = trustRecorded ? [] : digest ? all.filter((a) => a.digest !== digest) : all;
   const roles = requiredRoles(config, id, state);
   const validRoles = new Set(valid.map((a) => a.role));
@@ -244,7 +254,7 @@ function evaluateApprovalGate(
       info,
     );
   }
-  if (missingRoles.length === 0) {
+  if (missingRoles.length === 0 && q.met) {
     return { ...base, status: 'approved', satisfied: true, ...open };
   }
   if (stale.length > 0 && valid.length === 0) {
@@ -253,7 +263,7 @@ function evaluateApprovalGate(
       lr('gate.stale'),
     );
   }
-  const awaiting = lr('gate.awaiting', { roles: missingRoles.join(', ') });
+  const awaiting = lr(...awaitingReason(missingRoles, q));
   return withLocalizedReason(
     { ...base, status: 'pending' as const, satisfied: !required, ...open },
     awaiting,
@@ -268,6 +278,8 @@ export interface EvaluateOptions {
    * so evaluating many changes in one command indexes the worktree only once.
    */
   fingerprint?: string | null;
+  /** Leave out the names of the people who may take the next decision (the hook does not show them). */
+  skipPeople?: boolean;
 }
 
 /** Computes the fingerprint once for callers that evaluate several changes. */
@@ -283,6 +295,7 @@ export function evaluateChange(
 ): LifecycleView {
   const warnings: string[] = [];
   const state = readChangeState(ref.dir);
+  const decided = effectiveGates(state);
   const schemaName = resolveChangeSchemaName(ref.dir, root);
   const schema = loadSchemaInfo(schemaName, root);
   const artifacts = computeArtifactStates(schema, ref.dir);
@@ -331,7 +344,7 @@ export function evaluateChange(
     const digest = missing.length === 0
       ? digestFiles(ref.dir, coveredFiles(covered), (rel, content) => (rel === tracks ? withoutCheckboxState(content) : content))
       : undefined;
-    const evaluation = evaluateApprovalGate(id, config, state, state.gates[id], digest, blocked, covered, ref.archived);
+    const evaluation = evaluateApprovalGate(id, config, state, decided[id], digest, blocked, covered, ref.archived);
     gates.push(evaluation);
     if (!evaluation.satisfied && !upstreamOpen) upstreamOpen = lr('gate.waitingOn', { gate: id });
   }
@@ -352,7 +365,7 @@ export function evaluateChange(
   {
     let status: GateStatus;
     let info: LocalizedReason | undefined;
-    const waiver = state.gates.verify?.waived;
+    const waiver = decided.verify?.waived;
     if (waiver) {
       status = 'waived';
       info = lr('gate.waived', { by: waiver.by, note: waiver.note });
@@ -435,12 +448,12 @@ export function evaluateChange(
       .digest('hex')}`;
   };
   const fastModeReason = options.skipFingerprint ? lr('gate.fastMode') : undefined;
-  const reviewEval = evaluateApprovalGate('review', config, state, state.gates.review,
+  const reviewEval = evaluateApprovalGate('review', config, state, decided.review,
     codeDigest(['review.md']), fastModeReason ?? reviewBlocked, [], ref.archived);
   gates.push(reviewEval);
   if (!reviewEval.satisfied && !upstreamOpen) upstreamOpen = lr('gate.waitingOn', { gate: 'review' });
 
-  const releaseEval = evaluateApprovalGate('release', config, state, state.gates.release,
+  const releaseEval = evaluateApprovalGate('release', config, state, decided.release,
     codeDigest(['review.md', 'release.md']), fastModeReason ?? upstreamOpen, [], ref.archived);
   gates.push(releaseEval);
 
@@ -448,7 +461,8 @@ export function evaluateChange(
     warnings.push('not a git repository: verification and review freshness cannot be checked');
   }
 
-  const stage = deriveStage(ref, gates, tasks);
+  const evaluated = markReworks(gates, state);
+  const stage = deriveStage(ref, evaluated, tasks);
   const view: LifecycleView = {
     change: ref.id,
     dir: ref.dir,
@@ -465,16 +479,20 @@ export function evaluateChange(
     stageTitle: STAGE_TITLES[stage],
     artifacts,
     tasks,
-    gates,
+    gates: evaluated,
     ...(review ? { review } : {}),
     verification,
     testsLocked: state.tests_locked === true,
+    ...(state.takeover ? { takeover: state.takeover } : {}),
     next: { actor: 'none', action: 'none', message: '' },
     warnings: state.track_suggestion
       ? [...warnings, `Track ${state.track_suggestion.track} suggested; confirm with \`${config.cli} track set ${state.track_suggestion.track} --change ${ref.id}\`.`]
       : warnings,
   };
-  view.next = nextAction(view, config, mapping);
+  // A change a person has taken over waits for them; otherwise the next step names the people who may act.
+  const held = ref.archived ? undefined : takeoverNext(state, ref.id);
+  const next = held ?? nextAction(view, config, mapping);
+  view.next = held || options.skipPeople ? next : nameApprovers(root, config, view, state, next);
   return view;
 }
 
@@ -550,10 +568,9 @@ function nextAction(
         { gate: id, reason: g.reason ?? '', artifacts: mapping[id].join(', ') },
       );
     }
-    const role = g.missingRoles[0]?.split(' | ')[0];
-    const who = g.status === 'stale'
-      ? withArticle(g.missingRoles)
-      : capitalize(withArticle(g.missingRoles));
+    const awaited = awaitedRoles(g.missingRoles, config.gates[id]);
+    const role = awaited[0]?.split(' | ')[0];
+    const who = g.status === 'stale' ? withArticle(awaited) : capitalize(withArticle(awaited));
     return withKey(
       {
         actor: 'human', action: 'approve-gate', gate: id, workflow,
@@ -561,7 +578,7 @@ function nextAction(
       },
       g.status === 'stale' ? 'next.reapprove' : 'next.approve',
       // `who` is English with an article; `roles` is the bare list other languages build their own sentence from.
-      { gate: id, who, roles: g.missingRoles.join(', '), artifacts: mapping[id].join(', ') },
+      { gate: id, who, roles: awaited.join(', '), artifacts: mapping[id].join(', ') },
     );
   }
 

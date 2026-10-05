@@ -18,7 +18,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "command -v sdlc >/dev/null 2>&1 && sdlc hook pre-tool || true",
+            "command": "command -v sdlc >/dev/null 2>&1 || exit 0; in=$(cat); out=$(printf '%s' \"$in\" | sdlc hook pre-tool) || out=$(printf '%s' \"$in\" | sdlc hook pre-tool) || { printf '%s\\n' '[sdlc] The SDLC harness check could not run (sdlc hook pre-tool failed twice), so this call is blocked. Retry the call; if it keeps failing, run `sdlc doctor`.' >&2; exit 2; }; printf '%s' \"$out\"",
             "timeout": 30,
             "statusMessage": "SDLC gate check"
           }

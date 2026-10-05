@@ -56,6 +56,17 @@ export interface RejectionRecord extends Provenance {
   note?: string;
 }
 
+/** A person sent the change back to this gate's stage (`sdlc rework`). */
+export interface ReworkRecord extends Provenance {
+  role?: string;
+  by: string;
+  at: string;
+  reason: string;
+  note: string;
+  /** The change's stage before the rework. */
+  from: string;
+}
+
 export interface VerifyCommandRecord {
   name: string;
   command: string;
@@ -83,6 +94,7 @@ export interface GateState {
   approvals?: ApprovalRecord[];
   rejection?: RejectionRecord;
   waived?: WaiverRecord;
+  rework?: ReworkRecord;
 }
 
 export interface HistoryEvent extends Provenance {
@@ -92,8 +104,22 @@ export interface HistoryEvent extends Provenance {
   detail?: string;
 }
 
+/** A person holds the change (`sdlc takeover`): the agent waits until they hand it back. */
+export interface TakeoverRecord {
+  by: string;
+  at: string;
+  note: string;
+}
+
+/**
+ * Record format: 2 when the record carries a gate `rework` or a `takeover`, else 1. An older CLI refuses version 2
+ * with its "unsupported version" error instead of reading the record without those fields; this one reads both.
+ */
+export type StateVersion = 1 | 2;
+const SUPPORTED_VERSIONS: readonly unknown[] = [1, 2];
+
 export interface ChangeState {
-  version: 1;
+  version: StateVersion;
   /** sdlc version and license that last wrote this record. */
   harness?: { sdlc: string; license: string };
   kind: ChangeKind;
@@ -104,6 +130,7 @@ export interface ChangeState {
   source?: { type: SourceType; ref?: string; url?: string };
   links?: Record<string, string>;
   tests_locked?: boolean;
+  takeover?: TakeoverRecord;
   gates: {
     intent?: GateState;
     spec?: GateState;
@@ -159,11 +186,19 @@ function renameLegacyKeys(value: unknown): unknown {
   return out;
 }
 
+/** A takeover record as read: a malformed one still holds the change (fail closed), with what it carries. */
+function takeoverOf(value: unknown): { takeover?: TakeoverRecord } {
+  if (!value || typeof value !== 'object') return {};
+  const raw = value as Record<string, unknown>;
+  const text = (field: unknown, fallback: string) => (typeof field === 'string' ? field : fallback);
+  return { takeover: { by: text(raw.by, 'unknown'), at: text(raw.at, ''), note: text(raw.note, '') } };
+}
+
 export function readChangeState(changeDir: string): ChangeState {
   const file = statePath(changeDir);
   if (!isFile(file)) return { ...newChangeState(), created: '' };
   const raw = renameLegacyKeys(readYamlObject(file) ?? {}) as Record<string, unknown>;
-  if (raw.version !== undefined && raw.version !== 1) {
+  if (raw.version !== undefined && !SUPPORTED_VERSIONS.includes(raw.version)) {
     throw new SdlcError(
       'unsupported_state_version',
       { key: 'error.x_has_unsupported_version_x', params: { file: file, p2: String(raw.version) } }
@@ -174,7 +209,7 @@ export function readChangeState(changeDir: string): ChangeState {
   const harness = raw.harness && typeof raw.harness === 'object' ? (raw.harness as Record<string, unknown>) : undefined;
   const suggestion = raw.track_suggestion && typeof raw.track_suggestion === 'object' ? raw.track_suggestion as Record<string, unknown> : undefined;
   return {
-    version: 1,
+    version: raw.version === 2 ? 2 : 1,
     ...(harness && typeof harness.sdlc === 'string' && typeof harness.license === 'string'
       ? { harness: { sdlc: harness.sdlc, license: harness.license } }
       : {}),
@@ -195,17 +230,25 @@ export function readChangeState(changeDir: string): ChangeState {
       : {}),
     ...(raw.links && typeof raw.links === 'object' ? { links: raw.links as Record<string, string> } : {}),
     ...(raw.tests_locked === true ? { tests_locked: true } : {}),
+    ...takeoverOf(raw.takeover),
     gates,
     ...(raw.verify && typeof raw.verify === 'object' ? { verify: raw.verify as VerifyRecord } : {}),
     history: Array.isArray(raw.history) ? (raw.history as HistoryEvent[]) : [],
   };
 }
 
+/** The format a record needs: 2 with a gate rework or a takeover (fields older CLIs do not know), else 1. */
+export function stateVersion(state: Pick<ChangeState, 'gates' | 'takeover'>): StateVersion {
+  const reworked = Object.values(state.gates).some((gate) => gate?.rework !== undefined);
+  return reworked || state.takeover !== undefined ? 2 : 1;
+}
+
 /** Writes the record; with a stamp, `harness` records the sdlc version and license writing it. */
 export function writeChangeState(changeDir: string, state: ChangeState, stamp?: HarnessStamp): void {
   if (stamp) state.harness = { sdlc: stamp.version, license: stamp.license };
+  state.version = stateVersion(state);
   const ordered: Record<string, unknown> = {
-    version: 1,
+    version: state.version,
     ...(state.harness ? { harness: state.harness } : {}),
     kind: state.kind,
     risk: state.risk,
@@ -215,6 +258,7 @@ export function writeChangeState(changeDir: string, state: ChangeState, stamp?: 
     ...(state.source ? { source: state.source } : {}),
     ...(state.links && Object.keys(state.links).length > 0 ? { links: state.links } : {}),
     ...(state.tests_locked ? { tests_locked: true } : {}),
+    ...(state.takeover ? { takeover: state.takeover } : {}),
     gates: state.gates,
     ...(state.verify ? { verify: state.verify } : {}),
     history: state.history,

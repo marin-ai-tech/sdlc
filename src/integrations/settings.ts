@@ -31,13 +31,40 @@ function isOurs(handler: HookHandler): boolean {
   return typeof handler.command === 'string' && OURS.test(handler.command) && /\b(sdlc|scdl)\b/.test(handler.command);
 }
 
+/** Single-quotes a word for sh. */
+function shQuote(text: string): string {
+  return `'${text.replace(/'/g, `'\\''`)}'`;
+}
+
+/** The reason Claude Code shows (stderr of exit 2) when the PreToolUse check could not run twice in a row. */
+function blockedNotice(cli: string): string {
+  return [
+    `[sdlc] The SDLC harness check could not run (${cli} hook pre-tool failed twice), so this call is blocked.`,
+    `Retry the call; if it keeps failing, run \`${cli} doctor\`.`,
+  ].join(' ');
+}
+
+/**
+ * PreToolUse fails closed, like the OpenCode plugin since 0.7.1: the input is read once and given to both
+ * attempts; a second failure blocks the call (exit 2, the reason on stderr). Only the answer of the attempt that
+ * succeeded reaches stdout. A machine without the CLI keeps working: exit 0, no output.
+ */
+function guardedPreTool(cli: string, guard: string): string {
+  const attempt = `out=$(printf '%s' "$in" | ${cli} hook pre-tool)`;
+  const block = `{ printf '%s\\n' ${shQuote(blockedNotice(cli))} >&2; exit 2; }`;
+  return [`${guard} || exit 0`, 'in=$(cat)', `${attempt} || ${attempt} || ${block}`, `printf '%s' "$out"`].join('; ');
+}
+
+/** The command of a hook handler; it runs in bash (Git Bash on Windows). */
 export function hookCommand(cli: string, event: 'session-start' | 'pre-tool' | 'stop'): string {
   const invocation = `${cli} hook ${event}`;
-  // Fail open (and quietly) on tool calls when the CLI is not installed on this
-  // machine; the SessionStart hook stays unguarded so a missing CLI is visible once.
+  // The SessionStart hook stays unguarded so a missing CLI is visible once.
   if (event === 'session-start') return invocation;
   const bin = cli.split(/\s+/)[0];
-  return `command -v ${bin} >/dev/null 2>&1 && ${invocation} || true`;
+  const guard = `command -v ${bin} >/dev/null 2>&1`;
+  if (event === 'pre-tool') return guardedPreTool(cli, guard);
+  // Stop only reminds; it stays fail-open (and quiet) when the CLI is missing or fails.
+  return `${guard} && ${invocation} || true`;
 }
 
 export function harnessHooks(cli: string): HooksConfig {

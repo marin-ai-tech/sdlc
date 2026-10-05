@@ -160,9 +160,19 @@ The intent and the spec are optional: the change starts with plan.md and tasks.m
 
 Record postponed work with `sdlc defer add <title> --why <text> [--change <id>] [--finding <F-id>] [--revisit <text>]`, inspect it with `sdlc defer list [--open] [--change <id>]`, and close it with `sdlc defer close <D-id> --status done|dropped --note <text>`. The registry is `openspec/deferred-work.md`; each `### D<n> [open] Title` entry has `**Change**`, optional `**Finding**`, `**Why**`, `**Revisit when**`, and `**Created**` fields. Mark the review finding `deferred (D<n>)`; the review check requires a link to an open item. Reports and dashboards show the registry.
 
+### Send a change back, take it over
+
+`sdlc rework <gate> --change <id> --reason <category> --note "<what has to change>"` sends a change back to the stage of a gate (intent, spec, plan, review). The gate counts as rejected until it is approved again, and approvals made before the rework stop counting, the later gates' too. Reasons come from `rework.reasons` in `sdlc.yaml` (default: missing-requirement, wrong-assumption, design-flaw, implementation-bug, test-gap, scope-change, other); the audit counts them. Approving a gate records a checkpoint (`refs/sdlc/<change>/<gate>`; branches and HEAD stay); `--reset` restores from it only the files listed under "Files that change" in plan.md and the change folder, and refuses when they have uncommitted edits. External actions are not undone.
+
+`sdlc takeover --change <id> --note "<why>"` takes a change from the agent: until `sdlc release-control --change <id> --note "<for the agent>"`, the hook denies agent edits in the change folder and in the plan's files (without plan.md, in the whole project), and `next` says to wait for you. The agent sees the hand-back note. Both commands, like rework, are a person's.
+
+### Trace a change
+
+`sdlc trace <change> [--json]` links the intent, the requirements and scenarios of the delta specs, the tasks, the commits, the verification evidence and the review findings, for an active or archived change, and lists the gaps: a requirement without a scenario, a scenario without evidence, a task without a commit, a finding without a status. A commit belongs to a task through the trailers `SDLC-Change: <id>` and `SDLC-Task: <n.m>`; `/sdlc:build` asks the agent to add them.
+
 ### Roles and separation of duties
 
-With `openspec/roles.yaml`, approvals are tied to people in git: the approver's email must belong to a person holding a role the gate accepts, the authors of the code do not approve its review or release, listed gate pairs need different people, and a per-person limit applies. `sdlc roles who <gate> --change <id>` shows who may approve and why others may not. With `signing: warn | required`, `sdlc approvals verify` checks that each approval arrived in a commit signed by the approver. See [Roles, separation of duties and signed approvals](08-roles-and-signing.md).
+With `openspec/roles.yaml`, approvals are tied to people in git: the approver's email must belong to a person holding a role the gate accepts, the authors of the code do not approve its review or release, listed gate pairs need different people, and a per-person limit applies. `sdlc roles who <gate> --change <id>` shows who may approve and why others may not; the `Next:` hint and the workflows name the same people ("Alice Ivanova or Carol Smirnova (product-owner)"). `gates.<g>.min_approvals: N` makes a gate wait for approvals from N different people; one person approving again replaces only their own approval. With `signing: warn | required`, `sdlc approvals verify` checks that each approval arrived in a commit signed by the approver. See [Roles, separation of duties and signed approvals](08-roles-and-signing.md).
 
 **Decisions are taken in your own terminal, not in the agent chat.** In OpenCode and Claude Code a command typed with `!` runs in the agent's shell, so `!sdlc approve …` is refused like the agent's own attempt; custom commands are no way around it either (an agent can run them). The refusal gives the exact command to run in your terminal.
 
@@ -186,7 +196,7 @@ gates:
   intent:  { required: true,  approvers: [product-owner] }
   spec:    { required: true,  approvers: [product-owner], high_risk_approvers: [tech-lead] }
   plan:    { required: true,  approvers: [engineer],      high_risk_approvers: [tech-lead] }
-  review:  { required: true,  approvers: [code-owner] }
+  review:  { required: true,  approvers: [code-owner], min_approvals: 2 }   # two different people (default 1)
   release: { required: false, approvers: [release-manager] }
   verify:  { required: true }
 roles:                        # optional: who may approve for a role (openspec/roles.yaml replaces this)
@@ -234,7 +244,7 @@ Project context and rules for artifacts are set in the same place as in OpenSpec
 sdlc validate --all --json            # deltas + cross-change overlaps
 sdlc status --json                    # stages and gates of all changes
 sdlc review check --change <id>       # exit 1 if important findings are open
-sdlc audit --json                     # playbook metrics (lead times, first-pass)
+sdlc audit --json                     # playbook metrics (lead times, first-pass, waits on people, rework reasons)
 sdlc log --json                       # project log with the sdlc version and license of each entry
 sdlc approvals verify --mode required # every approval in a commit signed by the approver (roles.yaml)
 ```

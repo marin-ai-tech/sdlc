@@ -1,3 +1,4 @@
+import { parseMinApprovals } from './approval-quorum.js';
 import { SdlcError } from './errors.js';
 import { isFile } from './fs-utils.js';
 import { LAYOUT_ROLE_IDS, type LayoutMapping, type LayoutRoleId } from './layout.js';
@@ -33,6 +34,8 @@ export interface GateConfig {
    * (intent -> intent; plan, tasks -> plan; every other planning artifact -> spec).
    */
   artifacts?: string[];
+  /** Different people who must approve (`min_approvals`, an integer of 1 or more). Unset = 1. */
+  minApprovals?: number;
 }
 
 export interface VerifyCommand {
@@ -101,6 +104,8 @@ export interface SdlcConfig {
    * it differs from the canonical one (`sdlc layout adapt`). Empty = canonical.
    */
   layout: LayoutMapping;
+  /** Reason categories `sdlc rework --reason` accepts. */
+  rework: { reasons: string[] };
   /** UI locale (en, ru). Optional; absent means resolve from flag/env/system. */
   locale?: string;
 }
@@ -129,6 +134,11 @@ export const DEFAULT_RELEASE_COMMANDS = [
   '\\bkubectl\\b.*\\b(apply|rollout|delete)\\b.*\\bprod(uction)?\\b',
   '\\bterraform\\s+apply\\b.*\\bprod(uction)?\\b',
   '\\bhelm\\s+(upgrade|install)\\b.*\\bprod(uction)?\\b',
+];
+
+export const DEFAULT_REWORK_REASONS = [
+  'missing-requirement', 'wrong-assumption', 'design-flaw', 'implementation-bug', 'test-gap', 'scope-change',
+  'other',
 ];
 
 export function defaultConfig(): SdlcConfig {
@@ -164,6 +174,7 @@ export function defaultConfig(): SdlcConfig {
     license: { type: 'community' },
     log: { enabled: true, hookDecisions: true },
     layout: {},
+    rework: { reasons: [...DEFAULT_REWORK_REASONS] },
   };
 }
 
@@ -265,6 +276,8 @@ export function parseConfig(raw: Raw, file = 'openspec/sdlc.yaml'): SdlcConfig {
         target.highRiskApprovers;
       const artifacts = asStringArray(gate.artifacts, where(`gates.${id}.artifacts`));
       if (artifacts) target.artifacts = artifacts;
+      const minApprovals = parseMinApprovals(gate.min_approvals, where(`gates.${id}.min_approvals`));
+      if (minApprovals) target.minApprovals = minApprovals;
     }
   }
 
@@ -405,6 +418,9 @@ export function parseConfig(raw: Raw, file = 'openspec/sdlc.yaml'): SdlcConfig {
     config.log.hookDecisions = asBool(log.hook_decisions, where('log.hook_decisions')) ?? config.log.hookDecisions;
   }
 
+  const rework = asObject(raw.rework, where('rework'));
+  config.rework.reasons = asStringArray(rework?.reasons, where('rework.reasons')) ?? config.rework.reasons;
+
   const locale = asString(raw.locale, where('locale'));
   if (locale !== undefined) config.locale = locale;
 
@@ -444,6 +460,7 @@ export function serializeConfig(config: SdlcConfig): Record<string, unknown> {
       approvers: gate.approvers,
       ...(gate.highRiskApprovers.length > 0 ? { high_risk_approvers: gate.highRiskApprovers } : {}),
       ...(gate.artifacts ? { artifacts: gate.artifacts } : {}),
+      ...(gate.minApprovals ? { min_approvals: gate.minApprovals } : {}),
     };
   }
   gates.verify = { required: config.gates.verify.required };
@@ -492,6 +509,7 @@ export function serializeConfig(config: SdlcConfig): Record<string, unknown> {
     },
     log: { enabled: config.log.enabled, hook_decisions: config.log.hookDecisions },
     ...(Object.keys(config.layout).length ? { layout: config.layout } : {}),
+    ...(config.rework.reasons.join() === DEFAULT_REWORK_REASONS.join() ? {} : { rework: config.rework }),
     ...(config.locale ? { locale: config.locale } : {}),
   };
 }

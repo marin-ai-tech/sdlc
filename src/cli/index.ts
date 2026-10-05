@@ -8,6 +8,8 @@ import { doctorCommand } from '../commands/doctor.js';
 import { approvalsVerify } from '../commands/approvals.js';
 import { pluginBuildCommand } from '../commands/plugin.js';
 import { approveCommand, rejectCommand, testsCommand, waiveCommand } from '../commands/gates.js';
+import { releaseControlCommand, takeoverCommand } from '../commands/takeover.js';
+import { reworkCommand } from '../commands/rework.js';
 import { initCommand, uninstallCommand, updateCommand } from '../commands/setup.js';
 import { reviewCommand, verifyCommand } from '../commands/verify.js';
 import { runOpenSpec } from '../core/openspec.js';
@@ -26,6 +28,7 @@ import {
 } from '../commands/backlog.js';
 import { rolesCheck, rolesMigrate, rolesWho } from '../commands/roles.js';
 import { adoptCommand } from '../commands/adopt.js';
+import { traceCommand } from '../commands/trace.js';
 import { resolveLocale, setLocale, systemLocale, t } from '../core/i18n.js';
 import { applyCommanderLocale, localizeDescriptions, peekLocaleFlag } from './commander-i18n.js';
 import { loadConfig } from '../core/config.js';
@@ -313,6 +316,27 @@ export function buildProgram(): Command {
       .action((gate, opts) => fn(gate, opts));
   }
 
+  program.command('takeover').description(cmdDesc('cmd.takeover'))
+    .option('--change <id>', 'change id')
+    .option('--note <text>', 'why you take the change over (required; the agent sees it)')
+    .option('--json', 'output JSON')
+    .action((opts) => takeoverCommand(opts));
+  program.command('release-control').description(cmdDesc('cmd.release-control'))
+    .option('--change <id>', 'change id')
+    .option('--note <text>', 'hand-back note for the agent (required)')
+    .option('--json', 'output JSON')
+    .action((opts) => releaseControlCommand(opts));
+  program
+    .command('rework <gate>')
+    .description(cmdDesc('cmd.rework'))
+    .option('--change <id>', 'change id')
+    .option('--reason <category>', 'why the change goes back: a category from rework.reasons in sdlc.yaml')
+    .option('--note <text>', 'what has to change (required)')
+    .option('--as <role>', 'role you send the change back as')
+    .option('--reset', 'restore the planned files and the change folder from the gate checkpoint')
+    .option('--json', 'output JSON')
+    .action((gate, opts) => reworkCommand(gate, opts));
+
   program.command('approvals').description(cmdDesc('cmd.approvals'))
     .command('verify').description(cmdDesc('cmd.approvals.verify'))
     .option('--mode <mode>', 'off | warn | required')
@@ -420,6 +444,12 @@ export function buildProgram(): Command {
     .option('--force', 'write into a non-empty directory')
     .option('--json', 'output JSON')
     .action((dir, opts) => pluginBuildCommand(dir, opts));
+
+  program
+    .command('trace <change>')
+    .description(cmdDesc('cmd.trace'))
+    .option('--json', 'output JSON')
+    .action((change, opts) => traceCommand(change, opts));
 
   program
     .command('hook <event>')

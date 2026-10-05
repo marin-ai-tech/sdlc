@@ -114,8 +114,10 @@ describe('sdlc CLI end to end (with the bundled OpenSpec)', () => {
     const gates = cli(['status', '--change', 'add-farewell', '--json']).json().change.gates;
     expect(gates.filter((g: { id: string }) => ['intent', 'spec', 'plan'].includes(g.id)).map((g: { status: string }) => g.status))
       .toEqual(['approved', 'approved', 'approved']);
+    // Since 0.8.0 the log also records when each gate started waiting for a person (gate.<g>.awaiting, for the audit).
     expect(logEntries().filter((e) => e.change === 'add-farewell').map((e) => e.event))
-      .toEqual(['change.created', 'gate.intent.approved', 'gate.spec.approved', 'gate.plan.approved']);
+      .toEqual(['change.created', 'gate.intent.awaiting', 'gate.intent.approved', 'gate.spec.awaiting',
+        'gate.spec.approved', 'gate.plan.awaiting', 'gate.plan.approved']);
   });
 
   it('hooks answer Claude Code in its own JSON format', () => {

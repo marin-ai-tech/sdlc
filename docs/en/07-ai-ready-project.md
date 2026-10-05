@@ -101,7 +101,7 @@ In Claude Code and OpenCode, `/sdlc:adopt` (`/sdlc-adopt`) prepares the whole pr
 
 `sdlc report [--format md|json|html] [--since YYYY-MM-DD] [--change <id>] [--out <file>]` summarizes the reporting period, active changes by lifecycle stage, blocked changes, changes awaiting a person, median lead times, verification first-pass rate, project-log events, and layout readiness. The change filter selects one active or archived change. The date filters events and changes moved during the period. An output file must stay inside the project.
 
-`sdlc dashboard [--since YYYY-MM-DD] [--change <id>] [--out <file>]` writes the same model as a single self-contained HTML page. `sdlc report --format html` renders the same page. It uses no network assets and supports light and dark display, so it can be attached to a PR or kept as a CI artifact.
+`sdlc dashboard [--since YYYY-MM-DD] [--change <id>] [--out <file>]` writes the same model as a single self-contained HTML page. `sdlc report --format html` renders the same page. Each change has its own section (anchor `#change-<id>`, linked from the list): the timeline, how long each gate waited for a person, the reworks with reasons, the gaps of `sdlc trace`, and who acts now by name. It uses no network assets and supports light and dark display, so it can be attached to a PR or kept as a CI artifact.
 
 ```yaml
 # Example GitHub Actions steps after checkout and CLI setup

@@ -18,11 +18,13 @@ import { listActiveChanges, listArchivedChanges, resolveChange } from '../core/c
 import { readChangeState } from '../core/change-state.js';
 import { evaluateChange, sharedFingerprint, STAGES, STAGE_TITLES } from '../core/lifecycle.js';
 import { aggregateMetrics, changeMetrics } from '../core/metrics.js';
+import { changeLog } from '../core/awaiting.js';
 import { readLog } from '../core/log.js';
 import { detectLayout } from '../core/layout.js';
 import { readText } from '../core/fs-utils.js';
 import { readDeferred, type DeferredItem } from '../core/deferred.js';
 import { epicProgress, readBacklog, type BacklogItem } from '../core/backlog.js';
+import { buildChangePage, type ChangePage } from './change-page.js';
 
 export interface ReportOptions {
   /** ISO date (YYYY-MM-DD) or timestamp: events and "moved in period" start here. Unset = everything. */
@@ -59,6 +61,8 @@ export interface ReportChange {
   ageHours?: number;
   /** The change had at least one history event inside the period. */
   movedInPeriod: boolean;
+  /** The dashboard page of the change: timeline, waits, reworks, trace gaps, who acts now. */
+  page: ChangePage;
 }
 
 export interface ReportModel {
@@ -151,7 +155,8 @@ function projectName(root: string): string {
   }
 }
 
-function toReportChange(ref: ChangeRef, view: LifecycleView, state: ChangeState, since: string | undefined, now: Date): ReportChange {
+function toReportChange(ref: ChangeRef, view: LifecycleView, state: ChangeState, since: string | undefined, now: Date,
+  page: ChangePage): ReportChange {
   const ageHours = state.created
     ? Math.round((now.getTime() - Date.parse(state.created)) / 36e5 * 10) / 10
     : undefined;
@@ -172,6 +177,7 @@ function toReportChange(ref: ChangeRef, view: LifecycleView, state: ChangeState,
     warnings: view.warnings,
     ...(ageHours !== undefined && Number.isFinite(ageHours) && ageHours >= 0 ? { ageHours } : {}),
     movedInPeriod: !since || state.history.some((event) => event.at >= since),
+    page,
   };
 }
 
@@ -210,12 +216,15 @@ export function buildReport(ctx: ProjectContext, opts: ReportOptions = {}): Repo
     ? [resolveChange(ctx.paths, opts.change, { allowArchived: true })]
     : [...active, ...archived];
   const fingerprint = sharedFingerprint(ctx.root);
+  const log = readLog(ctx.root);
   const rows = refs.map((ref) => {
     const state = readChangeState(ref.dir);
     const view = evaluateChange(ctx.root, ref, ctx.config, { fingerprint });
+    const metrics = changeMetrics(state, changeLog(log, ref.id));
+    const page = buildChangePage({ root: ctx.root, config: ctx.config, ref, state, view, metrics });
     return {
-      change: toReportChange(ref, view, state, since, now),
-      metrics: changeMetrics(state),
+      change: toReportChange(ref, view, state, since, now, page),
+      metrics,
     };
   });
   const changes = rows.map((row) => row.change);

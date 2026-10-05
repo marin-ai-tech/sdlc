@@ -2,6 +2,7 @@ import type { ReportModel, ReportChange } from './model.js';
 import { PROJECT_URL } from '../core/license.js';
 import { currentLocale, t } from '../core/i18n.js';
 import { STAGES } from '../core/lifecycle.js';
+import { CHANGE_PAGE_CSS, changeAnchor, renderChangePages } from './change-page.js';
 
 const escapeHtml = (value: unknown): string => String(value ?? '').replace(/[&<>"']/g, (character) => ({
   '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
@@ -124,7 +125,7 @@ function changeCard(change: ReportChange): string {
   const actorKey = change.next.actor === 'human' ? 'actor.person' : `actor.${change.next.actor}`;
   const cli = change.next.cli ? `<code>${e(change.next.cli)}</code>` : '';
   return `<article class="change ${blocked ? 'blocked' : ''}">`
-    + `<div class="change-top"><div><h3>${e(change.id)}</h3>`
+    + `<div class="change-top"><div><h3><a href="#${e(changeAnchor(change.id))}">${e(change.id)}</a></h3>`
     + `<p class="badges">${changeBadges(change, blocked)}</p></div>`
     + `<span class="stage-label">${e(stageLabel(change.stage))}</span></div>`
     + `<ol class="stepper" aria-label="Lifecycle stages">${changeStepper(change)}</ol>`
@@ -280,6 +281,7 @@ export function renderReportHtml(model: ReportModel): string {
   const main = overview(model)
     + pipeline(model)
     + changes(model)
+    + renderChangePages(model.changes)
     + backlog(model)
     + deferred(model)
     + leadTimes(model)
@@ -289,7 +291,7 @@ export function renderReportHtml(model: ReportModel): string {
     + `<a href="${PROJECT_URL}">sdlc</a> ${e(model.harness.version)} · ${e(model.harness.license)}`;
   return `<!doctype html><html lang="${lang}"><head><meta charset="utf-8">`
     + `<meta name="viewport" content="width=device-width, initial-scale=1">`
-    + `<title>${e(title)}</title><style>${css}</style></head>`
+    + `<title>${e(title)}</title><style>${css}${CHANGE_PAGE_CSS}</style></head>`
     + `<body>${header(model)}<main>${main}</main>`
     + `<footer>${footer}</footer></body></html>`;
 }

@@ -1,6 +1,7 @@
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
+import { recordAwaiting } from './core/awaiting.js';
 import { loadConfig } from './core/config.js';
 import { isFile, isWithin, toPosix } from './core/fs-utils.js';
 import { resolveLocale, setLocale, systemLocale } from './core/i18n.js';
@@ -16,10 +17,12 @@ import { findProjectRoot, projectPaths } from './core/project.js';
  * fails open: a missing project, a harness that is not initialized, or any
  * internal error allows the action, because a broken guardrail must not
  * wedge every edit (`sdlc doctor` surfaces those problems instead).
- * That empty answer is a decision: the OpenCode plugin lets the call through,
- * but a hook that cannot run (spawn error, signal, non-zero exit, output that
- * is not JSON) is retried once and then blocks the call; only a CLI that is
- * not installed at all lets the call through there.
+ * That empty answer is a decision: the OpenCode plugin and the Claude Code
+ * PreToolUse command let the call through, but a hook that cannot run is
+ * retried once with the same input and then blocks the call (OpenCode: spawn
+ * error, signal, non-zero exit, output that is not JSON; Claude Code: a
+ * non-zero exit, blocked with exit 2); only a CLI that is not installed at all
+ * lets the call through there.
  */
 type HookEvent = 'pre-tool' | 'session-start' | 'stop';
 type Agent = 'claude' | 'opencode';
@@ -144,7 +147,7 @@ export async function runHook(event: string, agentFlag: string | undefined): Pro
       }
       case 'session-start': {
         if (!config.enforcement.sessionContext) return;
-        const summary = sessionSummary(ctx);
+        const summary = sessionSummary(ctx, (view) => recordAwaiting(root, config, view));
         if (!summary) return;
         if (agent === 'opencode') write({ context: summary });
         else write({ hookSpecificOutput: { hookEventName: 'SessionStart', additionalContext: summary } });

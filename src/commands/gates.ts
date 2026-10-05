@@ -11,8 +11,11 @@ import { SdlcError } from '../core/errors.js';
 import { humanCommandFix } from '../core/human-command.js';
 import { defaultBaseRef, formatIdentity, gitIdentity } from '../core/git.js';
 import { approvalEmails, changeAuthors, checkApproval, readRolesFile, type RolesFile } from '../core/roles.js';
+import { assertByAllowed, sameApprover, stillNeeded } from '../core/approval-quorum.js';
 import { evaluateChange, type LifecycleView } from '../core/lifecycle.js';
+import { recordAwaiting } from '../core/awaiting.js';
 import { changeMarkdown, tryStampArtifacts } from '../core/stamp.js';
+import { recordCheckpoint } from '../core/checkpoint.js';
 
 /**
  * Gate decisions: approve, reject, waive, and the test lock. These record
@@ -56,7 +59,7 @@ function assertRoleMember(config: SdlcConfig, role: string, identity: string): v
   }
 }
 
-function roleDecision(root: string, config: SdlcConfig, roles: RolesFile, gate: ApprovalGateId,
+export function roleDecision(root: string, config: SdlcConfig, roles: RolesFile, gate: ApprovalGateId,
   state: ReturnType<typeof readChangeState>, requested: string | undefined, separation: boolean) {
   const email = gitIdentity(root).email ?? '';
   const accepted = [...config.gates[gate].approvers, ...config.gates[gate].highRiskApprovers];
@@ -85,7 +88,7 @@ function roleDecision(root: string, config: SdlcConfig, roles: RolesFile, gate: 
   return { role, person: check.person!.id };
 }
 
-function approvalIdentity(root: string, roles: RolesFile | undefined, by: string | undefined): string {
+export function approvalIdentity(root: string, roles: RolesFile | undefined, by: string | undefined): string {
   if (!roles) return resolveIdentity(root, by);
   const email = gitIdentity(root).email;
   if (!email) throw new SdlcError('no_identity', { key: 'error.git_user_email_is_required_with_roles_yaml' });
@@ -100,7 +103,7 @@ function approvalIdentity(root: string, roles: RolesFile | undefined, by: string
   return `${person.name} <${email}>`;
 }
 
-function parseGate(value: string, allowed: readonly string[]): GateId {
+export function parseGate(value: string, allowed: readonly string[]): GateId {
   if (!allowed.includes(value)) {
     throw new SdlcError(
       'invalid_gate',
@@ -151,8 +154,10 @@ export async function approveCommand(gateArg: string, opts: DecisionOptions): Pr
     const ctx = loadProject();
     const gate = parseGate(gateArg, APPROVAL_GATES) as ApprovalGateId;
     assertHuman(ctx.config, 'approve');
+    assertByAllowed(ctx.config.gates[gate], readRolesFile(ctx.root) !== undefined, opts.by);
     const ref = resolveChange(ctx.paths, opts.change);
     const view = evaluateChange(ctx.root, ref, ctx.config);
+    recordAwaiting(ctx.root, ctx.config, view, ctx.stamp);
     const evaluation = view.gates.find((g) => g.id === gate)!;
     if (evaluation.status === 'blocked') {
       throw new SdlcError(
@@ -174,8 +179,10 @@ export async function approveCommand(gateArg: string, opts: DecisionOptions): Pr
     const identity = approvalIdentity(ctx.root, roles, opts.by);
     if (!roles) assertRoleMember(ctx.config, role, identity);
 
+    recordCheckpoint(ctx.root, ref.id, gate);
     const current: GateState = state.gates[gate] ?? {};
-    const approvals = (current.approvals ?? []).filter((a) => a.role !== role);
+    // A person approving again replaces only their own approval; other people's approvals stay.
+    const approvals = (current.approvals ?? []).filter((a) => !sameApprover(a, identity, person));
     approvals.push({
       role,
       by: identity,
@@ -209,7 +216,7 @@ export async function approveCommand(gateArg: string, opts: DecisionOptions): Pr
     line(`${c.green(t('gate.approvedLine', { gate, identity, role }))} `
       + c.dim(`(${evaluation.digest.slice(7, 19)})`));
     if (status.status !== 'approved') {
-      line(`  ${t('gate.stillNeeded', { roles: status.missingRoles.join(', ') })}`);
+      line(`  ${t('gate.stillNeeded', { roles: stillNeeded(status) })}`);
     }
     emitNextHint(ctx, ref.id);
   } catch (error) {

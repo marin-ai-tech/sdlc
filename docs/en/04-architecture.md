@@ -35,7 +35,7 @@
 | File | Owner | Contents |
 |---|---|---|
 | `openspec/config.yaml` | OpenSpec | default schema, `context`, `rules`; the harness respects them and passes them into the instructions |
-| `openspec/sdlc.yaml` | harness | gates, roles, verification commands, review policy, release commands, enforcement, `cli`, `tools` |
+| `openspec/sdlc.yaml` | harness | gates (with `min_approvals`), `rework.reasons`, roles, verification commands, review policy, release commands, enforcement, `cli`, `tools` |
 | `openspec/explorations/<slug>.md` | agent + people | optional research and pressure test before intent; a change cites it with `--source-type exploration --source-ref openspec/explorations/<slug>.md` |
 | `openspec/deferred-work.md` | team | registry of deferred decisions and findings (`D<n>`) |
 | `openspec/roles.yaml` | people (maintainers) | optional: people (emails, SSH signing keys), roles, separation rules, signing mode; agents cannot edit it |
@@ -43,7 +43,8 @@
 | `openspec/changes/<id>/sources/bmad/` | importer | retained BMAD source artifacts for an imported change |
 | `openspec/schemas/sdlc/**` | harness → OpenSpec | schema and artifact templates |
 | `openspec/changes/<id>/{intent,proposal,design,plan,tasks}.md`, `specs/**` | agent + people | artifacts (OpenSpec format) |
-| `openspec/changes/<id>/.sdlc.yaml` | **CLI only** | kind, risk, track, `track_suggestion`, source, approvals with digests (and `person` when `roles.yaml` exists), verify result, event history |
+| `openspec/changes/<id>/.sdlc.yaml` | **CLI only** | `version` (2 when the record holds a rework or a takeover, else 1), kind, risk, track, `track_suggestion`, source, approvals with digests (and `person` when `roles.yaml` exists), reworks (`gates.<g>.rework`), `takeover` while a person holds the change, verify result, event history |
+| `refs/sdlc/<change>/<gate>` (git) | **CLI only** | checkpoint: a snapshot commit of the working tree when the gate was approved, for `rework --reset`; branches and HEAD are never moved |
 | `…/verification.md` | CLI + verifier | automatic evidence block (generated) + behavioral table by scenario |
 | `…/review.md` | reviewer | findings `### F<n> [severity][pass] …` with statuses and `## Coverage` for passes and lenses |
 | `…/release.md` | agent | changelog, rollout per environment, control bands, rollback |
@@ -90,7 +91,7 @@ One engine (`src/core/policy.ts`) and one dispatcher (`sdlc hook pre-tool | sess
 | Stopping without fresh verification (`verify_before_stop`) | optional | Claude Code: `Stop → decision: block` |
 | Session context | — | Claude: `SessionStart.additionalContext`; OpenCode: `experimental.chat.system.transform` |
 
-`enforcement.mode: off | warn | block`. In `warn`, the hard rules still apply. If the CLI is not installed, hooks allow the action and `sdlc doctor` shows the problem: a missing guardrail must not block every edit. A check that **fails** is different: the OpenCode plugin runs it once more and then blocks the call with the reason (since 0.7.1; OpenCode on Windows sometimes kills the check after a few milliseconds, and a failed check used to let the call through). Inside the CLI, an uninitialized project or an internal error still answers "allow".
+`enforcement.mode: off | warn | block`. In `warn`, the hard rules still apply. If the CLI is not installed, hooks allow the action and `sdlc doctor` shows the problem: a missing guardrail must not block every edit. A check that **fails** is different: the OpenCode plugin (since 0.7.1) and the Claude Code hook command (since 0.8.0) run it once more and then block the call with the reason (OpenCode on Windows sometimes kills the check after a few milliseconds, and a failed check used to let the call through). Inside the CLI, an uninitialized project or an internal error still answers "allow".
 
 **Claude Code:** `SessionStart`, `PreToolUse` (`Edit|Write|MultiEdit|NotebookEdit|Bash`) and `Stop` are merged into `.claude/settings.json`. The response uses the `hookSpecificOutput.permissionDecision/additionalContext` format. Other hooks are left untouched. The harness recognizes its own handlers by the `sdlc hook` command.
 
@@ -137,7 +138,7 @@ Planning commands include `sdlc explore <slug> | list`, `sdlc track set <full|li
 | State in `.sdlc.yaml`, not in `.openspec.yaml` | OpenSpec rewrites its metadata through zod and drops unknown keys | one more file in the change folder |
 | Digests instead of "approved" flags | an approval cannot "survive" an edit to the artifact | fixing a typo requires a new approval |
 | Git tree id instead of "HEAD + diff" | a commit does not make verification stale | git is required; outside git, freshness is not checked (a warning) |
-| Hooks allow when the CLI is missing, block when a check fails (OpenCode) | a missing installation does not paralyze work, a flaky check does not open a hole | without the CLI the rules do not apply (`doctor` catches this); a Claude Code check that crashes or times out is still allowed by Claude Code itself (backlog) |
+| Hooks allow when the CLI is missing, block when a check fails | a missing installation does not paralyze work, a flaky check does not open a hole | without the CLI the rules do not apply (`doctor` catches this); a Claude Code check that exceeds the hook timeout (30 s) is still allowed by Claude Code itself |
 | Identity = git user | zero infrastructure | a git email can be forged by a person with access to the repository; `roles.yaml` with `signing: required` and `sdlc approvals verify` in CI close this, together with branch protection (see the playbook) |
 
 ## 4.9. Limitations and what comes next

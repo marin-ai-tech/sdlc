@@ -22,6 +22,7 @@ import { SdlcError } from '../core/errors.js';
 import { isFile, isWithin } from '../core/fs-utils.js';
 import { formatIdentity, gitIdentity } from '../core/git.js';
 import { evaluateChange, sharedFingerprint, type LifecycleView } from '../core/lifecycle.js';
+import { recordAwaiting } from '../core/awaiting.js';
 import { openspecFailure, runOpenSpec, runOpenSpecJson } from '../core/openspec.js';
 import { loadSchemaInfo } from '../core/openspec-schema.js';
 import { PROJECT_URL } from '../core/license.js';
@@ -253,6 +254,7 @@ export async function statusCommand(opts: StatusOptions): Promise<void> {
     if (opts.change) {
       const ref = resolveChange(ctx.paths, opts.change, { allowArchived: true });
       const view = evaluateChange(ctx.root, ref, ctx.config);
+      recordAwaiting(ctx.root, ctx.config, view, ctx.stamp);
       const warnings = changeWarnings(ctx, view, overlaps);
       if (opts.json) return printJson({ change: { ...view, warnings }, root: { path: ctx.root }, harness: ctx.stamp });
       if (opts.markdown) return line(`${markdownReport(view, warnings)}\n\n${reportFooter(ctx)}`);
@@ -268,6 +270,7 @@ export async function statusCommand(opts: StatusOptions): Promise<void> {
         return { change: ref.id, error: error instanceof Error ? error.message : String(error) } as unknown as LifecycleView & { error: string };
       }
     });
+    recordAwaiting(ctx.root, ctx.config, views.filter((v) => !('error' in v)), ctx.stamp);
     if (opts.json) return printJson({ changes: views, overlaps, root: { path: ctx.root }, harness: ctx.stamp });
     if (opts.markdown) {
       const reports = views.map((v) => ('error' in v ? `### ${v.change}\n\n${(v as { error: string }).error}` : markdownReport(v, v.warnings)));
@@ -312,6 +315,7 @@ export async function nextCommand(opts: { change?: string; json?: boolean }): Pr
     }
     const ref = resolveChange(ctx.paths, opts.change);
     const view = evaluateChange(ctx.root, ref, ctx.config);
+    recordAwaiting(ctx.root, ctx.config, view, ctx.stamp);
     if (opts.json) {
       printJson({ change: view.change, stage: view.stage, stageTitle: view.stageTitle, track: view.track, next: view.next, root: { path: ctx.root } });
       return;

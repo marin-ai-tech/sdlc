@@ -2,6 +2,26 @@
 
 All notable changes to sdlc. Versions follow [Semantic Versioning](https://semver.org/); while the major version is 0, a minor version may change behavior.
 
+## 0.8.0 — 2026-10-05
+
+### Added
+- **The `Next:` hint names people.** With `openspec/roles.yaml`, a decision that needs a person names the people who may take it now (the same as `sdlc roles who`, minus those who already approved); JSON `next.people`. The workflows name them too.
+- **Several approvers for one gate:** `gates.<g>.min_approvals: N` waits for approvals from N different people. A second approver of the same role no longer displaces the first.
+- **`sdlc rework <gate>`** sends a change back to a gate's stage with a reason category and a note; approvals made before it stop counting. Approving a gate records a checkpoint, and `rework --reset` restores the planned files and the change folder from it. Human-only.
+- **`sdlc takeover` / `sdlc release-control`**: a person takes a change from the agent (the hook denies agent edits of its files meanwhile) and hands it back with a note the agent sees. Human-only.
+- **The audit shows waits, reworks and attempts.** The log records when a gate starts waiting for a person (`gate.<g>.awaiting`, once per digest); `sdlc audit` reports the wait per gate, the reworks with reasons, approvals per gate and verify attempts to the first pass, and the project audit adds median waits and the most frequent rework reasons.
+- **A page per change in the dashboard:** the timeline, waits on people, reworks with reasons, trace gaps and who acts now by name, linked from the list of changes.
+- **`sdlc trace <change>`** links intent, requirements, scenarios, tasks, commits, verification evidence and review findings, and lists the gaps. Commits link to tasks through the trailers `SDLC-Change` and `SDLC-Task`, which `/sdlc:build` now asks for.
+
+### Fixed
+- **Claude Code: a failed check no longer lets the call through.** The PreToolUse command ended with `|| true`; it now runs the check once more and then blocks the call with the reason (a machine without the CLI still works), as the OpenCode plugin does since 0.7.1.
+- **Agents cannot pass for a person by clearing their markers:** unsetting, blanking or un-exporting `CLAUDECODE`, `OPENCODE`, `AGENT` or `SDLC_AGENT` is denied.
+- **State files are protected however the path is spelled:** a write after `cd` by bare name, through a glob, or through a symbolic link is denied, as are Windows and PowerShell writes (`del`, `copy`, `[IO.File]::WriteAllText`), `sed -E -i`, `perl -pi`, `find -delete`, `git -C … checkout`, writes to a whole folder that holds state (`rm -rf openspec/changes/<id>`, `git checkout -- openspec/`), creating a hard link to a state file, and uninstalling the sdlc CLI.
+
+### Changed
+- A change record that holds a rework or a takeover is written as `version: 2` of `.sdlc.yaml`; older sdlc versions refuse it with an explicit error instead of silently dropping what they do not know. Other records stay `version: 1`.
+- Without `roles.yaml`, `sdlc approve --by` is refused on a gate that needs several approvers: the text after `--by` is not an identity check and must not add approvers.
+
 ## 0.7.3 — 2026-10-05
 
 ### Fixed

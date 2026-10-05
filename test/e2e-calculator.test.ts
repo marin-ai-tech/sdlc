@@ -191,6 +191,8 @@ describe('demo: a team builds a calculator with sdlc (every command)', () => {
     step('track-agent', 'change', 'agent', ['track', 'set', 'lite', '--change', 'basic-arithmetic'], 'An agent cannot pick the lite track.', { expect: 1 });
     step('status', 'change', 'bob', ['status', '--change', 'basic-arithmetic'], 'The stepper: intent is current.');
     step('instructions', 'change', 'agent', ['instructions', 'intent', '--change', 'basic-arithmetic', '--json'], 'What the intent must contain.');
+    step('takeover', 'change', 'alice', ['takeover', '--change', 'basic-arithmetic', '--note', 'I will word the intent with the cashiers myself'], 'Alice takes the change over: the agent may not edit it until she hands it back.');
+    step('release-control', 'change', 'alice', ['release-control', '--change', 'basic-arithmetic', '--note', 'Cashiers agreed on the four operations; carry on'], 'Alice hands it back with a note the agent sees.');
   });
 
   it('6. intent → spec → plan, each approved by the right person', () => {
@@ -210,6 +212,10 @@ describe('demo: a team builds a calculator with sdlc (every command)', () => {
     write(path.join(change('basic-arithmetic'), 'tasks.md'), TASKS);
     step('approve-plan', 'gates', 'bob', ['approve', 'plan', '--change', 'basic-arithmetic'], 'Bob, the engineer, approves the plan.');
     commit('bob', 'Plan for basic arithmetic'); // each approver commits their own approval
+    step('rework', 'gates', 'alice', ['rework', 'spec', '--change', 'basic-arithmetic', '--reason', 'missing-requirement', '--note', 'Say what 10 / 0 shows on the till'], 'Alice sends the change back to the spec with a reason; the plan approval stops counting.');
+    step('approve-spec-again', 'gates', 'alice', ['approve', 'spec', '--change', 'basic-arithmetic'], 'The spec is approved again.');
+    step('approve-plan-again', 'gates', 'bob', ['approve', 'plan', '--change', 'basic-arithmetic'], 'The plan needs its own new approval.');
+    commit('alice', 'Rework of the spec, approvals renewed');
   });
 
   it('6b. OpenSpec underneath: the sdlc change is a plain OpenSpec change', () => {
@@ -251,6 +257,7 @@ describe('demo: a team builds a calculator with sdlc (every command)', () => {
     commit('alice', 'Release approvals for basic arithmetic');
     step('approvals-verify', 'release', 'bob', ['approvals', 'verify'], "Signed approvals check (warn mode): Alice and Carol sign; Bob's plan approval is unsigned, reported but not blocking.");
     step('archive', 'release', 'alice', ['archive', 'basic-arithmetic', '--yes'], 'The delta merges into the living spec; B1 closes.');
+    step('trace', 'release', 'bob', ['trace', 'basic-arithmetic'], 'From intent to evidence: requirements, scenarios, tasks, commits, findings, and the gaps.');
     commit('alice', 'Archive basic arithmetic');
     git(root, ['checkout', '-q', 'main']);
     git(root, ['merge', '-q', '--no-ff', '--no-edit', 'basic-arithmetic']);

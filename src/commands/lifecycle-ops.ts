@@ -18,6 +18,8 @@ import { stampText, stampTextLocalized } from '../core/license.js';
 import { appendLog, readLog } from '../core/log.js';
 import { changeMarkdown, tryStampArtifacts } from '../core/stamp.js';
 import { aggregateMetrics, changeMetrics } from '../core/metrics.js';
+import { changeLog } from '../core/awaiting.js';
+import { printChangeFlow, printProjectFlow } from './audit-flow.js';
 import { readBacklog, setBacklogStatus } from '../core/backlog.js';
 import { closeDeferred, readDeferred } from '../core/deferred.js';
 
@@ -258,7 +260,7 @@ export async function auditCommand(opts: { change?: string; json?: boolean }): P
       const ref = resolveChange(ctx.paths, opts.change, { allowArchived: true });
       const state = readChangeState(ref.dir);
       const commits = commitsTouching(ctx.root, [path.relative(ctx.root, ref.dir)]);
-      const metrics = changeMetrics(state);
+      const metrics = changeMetrics(state, changeLog(readLog(ctx.root), ref.id));
       if (opts.json) {
         printJson({ change: ref.id, archived: ref.archived, kind: state.kind, risk: state.risk, track: state.track, source: state.source,
           ...(state.harness ? { recordedWith: state.harness } : {}), history: state.history, commits, metrics, harness: ctx.stamp });
@@ -285,18 +287,21 @@ export async function auditCommand(opts: { change?: string; json?: boolean }): P
       line(`  ${t('audit.verifyRuns', {
         runs: metrics.verifyRuns, first, rejections: metrics.rejections, waivers: metrics.waivers,
       })}`);
+      printChangeFlow(metrics);
       return;
     }
     const refs = [...listActiveChanges(ctx.paths), ...listArchivedChanges(ctx.paths)];
     const versions = new Set<string>();
     const licenses = new Set<string>();
+    const log = readLog(ctx.root);
     const rows = refs.map((ref) => {
       const state = readChangeState(ref.dir);
       for (const h of state.history) {
         if (h.sdlc) versions.add(h.sdlc);
         if (h.license) licenses.add(h.license);
       }
-      return { change: ref.id, archived: ref.archived, kind: state.kind, track: state.track, ...changeMetrics(state) };
+      const metrics = changeMetrics(state, changeLog(log, ref.id));
+      return { change: ref.id, archived: ref.archived, kind: state.kind, track: state.track, ...metrics };
     });
     const aggregate = {
       changes: rows.length,
@@ -319,6 +324,7 @@ export async function auditCommand(opts: { change?: string; json?: boolean }): P
       rate: aggregate.verifyFirstPassRate ?? '-',
       rejections: aggregate.rejections, waivers: aggregate.waivers,
     })}`);
+    printProjectFlow(aggregate);
     if (versions.size > 0) {
       line(`  ${t('audit.recordedWith', {
         versions: [...versions].sort().join(', '),
