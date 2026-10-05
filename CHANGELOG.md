@@ -2,6 +2,11 @@
 
 All notable changes to sdlc. Versions follow [Semantic Versioning](https://semver.org/); while the major version is 0, a minor version may change behavior.
 
+## Unreleased
+
+### Documentation
+- The guide (5.2) and the README describe the path for an existing project step by step: `sdlc init` → `/sdlc:adopt` → `/sdlc:explore` per idea → `/sdlc:backlog` → `backlog start` → the gates → `archive` → the next item; where each step needs a person.
+
 ## 0.7.2 — 2026-10-05
 
 ### Added

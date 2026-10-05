@@ -75,8 +75,12 @@ The plugin ships the same workflows (`/sdlc:<id>`), subagents and hooks. With th
 
 ## Use
 
+**The path for an existing project:** `sdlc init` → `/sdlc:adopt` (documents filled from the code; you apply the settings with `sdlc adopt --apply`) → `/sdlc:explore <idea>` when an idea needs research → `/sdlc:backlog` (items you confirm; you set the order) → `sdlc backlog start B<n>` → `/sdlc:intent` and `/sdlc:next` through the gates → `sdlc archive` → the next item, until the backlog is empty. Step by step: [the guide, 5.2](docs/en/05-guide.md#52-working-with-sdlc-from-init-to-an-empty-backlog).
+
 | Stage | Claude Code | OpenCode | Who decides |
 |---|---|---|---|
+| Prepare an existing project: documents from the code, settings draft | `/sdlc:adopt` | `/sdlc-adopt` | you: `sdlc adopt --apply` |
+| Plan the backlog: decompose, refine, start items | `/sdlc:backlog` | `/sdlc-backlog` | you: `sdlc backlog move` / `drop` |
 | Explore before intent | `/sdlc:explore` | `/sdlc-explore` | — |
 | Help: workflows and CLI catalog | `/sdlc:help` | `/sdlc-help` | — |
 | Plan: capture `intent.md` | `/sdlc:intent "<idea>"` | `/sdlc-intent "<idea>"` | product owner: `sdlc approve intent` |

@@ -36,7 +36,28 @@ After `init`, commit the generated files: they are shared by the team.
 
 **License.** By default, a project uses sdlc under the free Community License. It covers noncommercial use, open source projects and a 30-day evaluation. `sdlc init` and `sdlc doctor` warn you if the project has no OSI-approved license. Commercial use requires a commercial license. After the agreement is signed, record the license with `sdlc license set commercial --agreement <id> --licensee "<company>"`.
 
-## 5.2. Lifecycle of a change
+## 5.2. Working with sdlc: from init to an empty backlog
+
+The usual path for an existing project:
+
+| # | Step | Claude Code / OpenCode | Who decides |
+|---|---|---|---|
+| 1 | Set up: `sdlc init` in the project root. The wizard compares the project with the AI-ready layout and offers to build the AI-ready project in a new git worktree, to adapt in place, or to skip. | — | you, in the wizard |
+| 2 | Prepare the project for agents: the documents are filled from the code (architecture, conventions, build and test commands, glossary, sensitive areas) with a file reference for every statement, then a draft of the settings and roles. | `/sdlc:adopt` / `/sdlc-adopt` | you apply the settings: `sdlc adopt --apply` |
+| 3 | Optional, per idea: research an idea before deciding. A note in `openspec/explorations/<slug>.md` with a recommendation (proceed, reshape, stop); on proceed, a backlog item linked to the note. | `/sdlc:explore <idea>` / `/sdlc-explore <idea>` | nobody: no decision is taken here |
+| 4 | Plan the backlog: items with an outcome and acceptance criteria, added after you confirm them. | `/sdlc:backlog` / `/sdlc-backlog` | you set the order: `sdlc backlog move`, `drop` |
+| 5 | Take the next ready item: `sdlc backlog start B<n>` creates the change with a draft intent; then the lifecycle of a change (5.3). | `/sdlc:intent`, then `/sdlc:next` | you approve each gate in your terminal |
+| 6 | Close: `sdlc archive` merges the deltas into the living specs and marks the item `done`. With no active change, `/sdlc:next` proposes the next ready item. | `/sdlc:archive` / `/sdlc-archive` | — |
+
+Repeat steps 3–6 until the backlog is empty. A new idea goes through step 3 at any time; an alert or an incident through `/sdlc:triage` (`/sdlc-triage`).
+
+- In an empty folder step 1 already creates the agent documents (and offers `git init`), so step 2 mostly drafts the settings and roles.
+- Step 3 is not a study of the whole project (that is step 2) and not a gate: skip it when the idea is clear and add the item in step 4.
+- Commit after steps 1 and 2: the generated files and documents are shared by the team.
+- With several approvers, check `openspec/roles.yaml` after `sdlc adopt --apply`: roles without a better holder go to you, marked to check.
+- Approve gates in your own terminal: a `!` command in the agent chat runs in the agent's shell and is refused.
+
+## 5.3. Lifecycle of a change
 
 | Step | Who | Claude Code | OpenCode | CLI |
 |---|---|---|---|---|
@@ -100,7 +121,7 @@ People edit `openspec/backlog.md` by hand as well; agents change it only through
 
 ### Explore before intent
 
-Use `/sdlc:explore` (`/sdlc-explore`) to research and pressure-test an idea. `sdlc explore <slug>` creates `openspec/explorations/<slug>.md`; `sdlc explore list` lists notes. Start a linked change with `sdlc new <id> --source-type exploration --source-ref openspec/explorations/<slug>.md`. Exploration is optional and does not approve intent.
+Step 3 of the path in 5.2. Use `/sdlc:explore` (`/sdlc-explore`) to research and pressure-test an idea. `sdlc explore <slug>` creates `openspec/explorations/<slug>.md`; `sdlc explore list` lists notes. Start a linked change with `sdlc new <id> --source-type exploration --source-ref openspec/explorations/<slug>.md`. Exploration is optional and does not approve intent.
 
 ### Track suggestion and confirmation
 
@@ -153,7 +174,7 @@ Run `sdlc import bmad <path> --change <id> [--dry-run]` on BMAD PRD, SPEC and ar
 
 Run `sdlc import bmad <path> --to-backlog [--dry-run]` to load BMAD into `openspec/backlog.md` instead of a change. Supply exactly one of `--change` or `--to-backlog`. From `tickets.toml` / `bmad-ticket` output: each epic becomes a backlog epic, each entry an item (`story` → `feature`, `bug` → `bugfix`, `spike` → `chore`); acceptance comes from the story's criteria when present, otherwise `verify`; `after` becomes `Depends on`. From a PRD or SPEC without tickets: one epic named after the document, requirements as items. Nothing is started or approved by the import.
 
-## 5.3. Configuring `openspec/sdlc.yaml`
+## 5.4. Configuring `openspec/sdlc.yaml`
 
 ```yaml
 version: 1
@@ -207,7 +228,7 @@ log:
 
 Project context and rules for artifacts are set in the same place as in OpenSpec: `openspec/config.yaml` → `context:` and `rules.<artifact>`. They are included in the instructions for intent, proposal, specs, design, plan and tasks.
 
-## 5.4. CI and headless mode
+## 5.5. CI and headless mode
 
 ```bash
 sdlc validate --all --json            # deltas + cross-change overlaps
@@ -220,11 +241,11 @@ sdlc approvals verify --mode required # every approval in a commit signed by the
 
 For `claude -p`, allow the required tools in advance: `--allowedTools "Bash(sdlc *),Read,Write,Edit"`. In CI, it is convenient to add `sdlc status --markdown` to the PR description.
 
-## 5.5. Keeping the dashboard current
+## 5.6. Keeping the dashboard current
 
 `scripts/examples/dashboard-watch.mjs` rebuilds `reports/dashboard.html` whenever `openspec/` changes and can serve it on localhost with an auto-refresh; examples run it as a Windows task, a systemd or launchd service, or a CI step. See [the demo and automation](09-demo-and-automation.md).
 
-## 5.6. Updating and uninstalling
+## 5.7. Updating and uninstalling
 
 ```bash
 npm install -g https://github.com/marin-ai-tech/sdlc/releases/latest/download/sdlc.tgz   # the latest release
