@@ -84,7 +84,7 @@ export function layoutOptions(choices: Partial<LayoutChoices>): LayoutOptions {
   };
 }
 
-/** After the usual init output, which already names the adopt workflow of each tool. */
+/** Printed before the init output of the worktree, which then names the adopt workflow of each tool. */
 function printWorktreeHints(layout: LayoutOutcome, notes: WorktreeNotes | undefined): void {
   const worktree = layout.worktree;
   if (!worktree) return;

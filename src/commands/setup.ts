@@ -318,8 +318,11 @@ export async function initCommand(target: string | undefined, opts: InitOptions,
     const runInit = (dir: string) => setupProject(dir, chosen, resolved, deps);
     const done = await initWithLayout(root, folder, request, chosen, runInit);
     if (chosen.json) return printJson({ ...initJson(done.outcome), layout: done.layout });
+    // A worktree build leaves the main copy without sdlc: its result comes first, then the init output of the
+    // worktree itself (its path, its start hints).
+    if (done.layout.action === 'worktree') printLayoutText(done);
     printInitText(done.outcome);
-    printLayoutText(done);
+    if (done.layout.action !== 'worktree') printLayoutText(done);
   } catch (error) {
     reportFailure(error, opts.json);
   }

@@ -2,7 +2,12 @@
 
 All notable changes to sdlc. Versions follow [Semantic Versioning](https://semver.org/); while the major version is 0, a minor version may change behavior.
 
-## Unreleased
+## 0.7.3 — 2026-10-05
+
+### Fixed
+- **CLI writes keep what people wrote in `openspec/backlog.md`.** Every backlog command rewrote the whole file from what it understood and dropped notes under items and epics, unknown fields, fenced blocks, extra sections and an unknown status such as `[blocked]`. Since agents may change the backlog only through the CLI, a routine agent edit could erase a person's notes. A command now changes its own item or epic and leaves everything else as it was.
+- **Settings writes keep comments and hand-added keys in `openspec/sdlc.yaml`.** `adopt --apply`, `license set`, `init` and `layout adapt` rewrote the file; now only the changed keys are written, and a file with nothing new is not touched.
+- After `sdlc init --layout worktree` the output leads with the new worktree; the start hints that follow belong to the worktree, not to the main copy, which has no sdlc.
 
 ### Documentation
 - The guide (5.2) and the README describe the path for an existing project step by step: `sdlc init` → `/sdlc:adopt` → `/sdlc:explore` per idea → `/sdlc:backlog` → `backlog start` → the gates → `archive` → the next item; where each step needs a person.

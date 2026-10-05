@@ -1,7 +1,8 @@
 import { SdlcError } from './errors.js';
 import { isFile } from './fs-utils.js';
 import { LAYOUT_ROLE_IDS, type LayoutMapping, type LayoutRoleId } from './layout.js';
-import { readYamlObject, writeYaml } from './yaml-io.js';
+import { readYamlObject } from './yaml-io.js';
+import { updateYamlFile } from './yaml-update.js';
 
 export const APPROVAL_GATES = ['intent', 'spec', 'plan', 'review', 'release'] as const;
 export type ApprovalGateId = (typeof APPROVAL_GATES)[number];
@@ -503,6 +504,13 @@ export const CONFIG_HEADER = `# SDLC harness configuration (https://github.com/m
 # See LICENSE and COMMERCIAL-LICENSE.md in the sdlc package; change it with \`sdlc license set\`.
 `;
 
+/** Writes only what changed, so comments and keys people added by hand stay (see `updateYamlFile`). */
 export function saveConfig(file: string, config: SdlcConfig): void {
-  writeYaml(file, serializeConfig(config), CONFIG_HEADER);
+  let previous: Record<string, unknown> = {};
+  try {
+    previous = isFile(file) ? serializeConfig(loadConfig(file)) : {};
+  } catch {
+    previous = {};
+  }
+  updateYamlFile(file, previous, serializeConfig(config), CONFIG_HEADER);
 }
