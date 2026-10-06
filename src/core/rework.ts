@@ -1,39 +1,46 @@
 import { ALL_GATES, type GateId, type SdlcConfig } from './config.js';
 import type { ChangeState, GateState } from './change-state.js';
+import { decidedAfter, orderOf, type Ordered } from './decision-order.js';
 import { SdlcError } from './errors.js';
 import { t } from './i18n.js';
 import type { GateEvaluation } from './lifecycle.js';
 
 /**
  * Rework: a person sends a change back to a gate's stage with a reason category and a note
- * (`sdlc rework`). The gate counts as rejected until an approval newer than the rework, and
+ * (`sdlc rework`). The gate counts as rejected until an approval recorded after the rework, and
  * approvals and waivers of that gate and of every later gate made before the rework stop counting.
  */
 export const REWORK_GATES = ['intent', 'spec', 'plan', 'review'] as const;
 export type ReworkGateId = (typeof REWORK_GATES)[number];
 
-/** Per gate, the latest rework at it or at an earlier gate: decisions recorded before then no longer count. */
-function cutoffs(state: ChangeState): Partial<Record<GateId, string>> {
-  const out: Partial<Record<GateId, string>> = {};
-  let latest: string | undefined;
+/**
+ * Per gate, the latest rework at it or at an earlier gate: decisions recorded before then no longer count.
+ * "Before" follows the order the decisions were recorded in (`decision-order.ts`), else their time.
+ */
+function cutoffs(state: ChangeState): Partial<Record<GateId, Ordered>> {
+  const out: Partial<Record<GateId, Ordered>> = {};
+  let latest: Ordered | undefined;
   for (const id of ALL_GATES) {
-    const at = state.gates[id]?.rework?.at;
-    if (at && (!latest || at > latest)) latest = at;
+    const rework = state.gates[id]?.rework;
+    if (rework?.at && (!latest || decidedAfter(rework, latest))) latest = orderOf(rework);
     if (latest) out[id] = latest;
   }
   return out;
 }
 
-function afterCutoff(gate: GateState, cutoff: string): GateState {
+/** The gate's rejection once its rework counts as one, unless a rejection was recorded after the rework. */
+function reworkRejection(gate: GateState): GateState['rejection'] {
   const rework = gate.rework;
-  const rejection = rework && !(gate.rejection && gate.rejection.at > rework.at)
-    ? { by: rework.by, at: rework.at, note: rework.note }
-    : gate.rejection;
+  if (!rework || (gate.rejection && decidedAfter(gate.rejection, rework))) return gate.rejection;
+  return { by: rework.by, ...orderOf(rework), note: rework.note };
+}
+
+function afterCutoff(gate: GateState, cutoff: Ordered): GateState {
   return {
     ...gate,
-    approvals: (gate.approvals ?? []).filter((a) => a.at > cutoff),
-    waived: gate.waived && gate.waived.at > cutoff ? gate.waived : undefined,
-    rejection,
+    approvals: (gate.approvals ?? []).filter((a) => decidedAfter(a, cutoff)),
+    waived: gate.waived && decidedAfter(gate.waived, cutoff) ? gate.waived : undefined,
+    rejection: reworkRejection(gate),
   };
 }
 
@@ -54,7 +61,7 @@ export function markReworks(gates: GateEvaluation[], state: ChangeState): GateEv
   return gates.map((gate) => {
     const rework = state.gates[gate.id]?.rework;
     const rejection = state.gates[gate.id]?.rejection;
-    if (!rework || gate.status !== 'rejected' || (rejection && rejection.at > rework.at)) return gate;
+    if (!rework || gate.status !== 'rejected' || (rejection && decidedAfter(rejection, rework))) return gate;
     const params = { by: rework.by, reason: rework.reason, note: rework.note };
     return {
       ...gate,

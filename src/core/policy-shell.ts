@@ -149,7 +149,7 @@ function moveTo(state: DirState, verb: string, args: string[]): void {
 }
 
 /** Directories that may hold a change's `.sdlc.yaml`: the change directories on disk, active and archived. */
-function changeDirs(root: string): string[] {
+export function changeDirs(root: string): string[] {
   const dirs: string[] = [];
   for (const parent of ['openspec/changes', 'openspec/changes/archive']) {
     try {

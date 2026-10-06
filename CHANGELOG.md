@@ -2,6 +2,12 @@
 
 All notable changes to sdlc. Versions follow [Semantic Versioning](https://semver.org/); while the major version is 0, a minor version may change behavior.
 
+## 0.8.1 — 2026-10-06
+
+### Fixed
+- **The order of decisions no longer depends on the clocks of the machines.** `.sdlc.yaml` travels through git between machines; an approval recorded where the clock ran ahead kept counting after a later rework, and a rework or rejection recorded with a skewed clock hid a real re-approval. Every decision now carries a sequence number in the record and is ordered by it; records written before keep the time rule.
+- **An edit of a hard link to a state file is denied** (the file is compared with the state files by inode when it has more than one link).
+
 ## 0.8.0 — 2026-10-05
 
 ### Added

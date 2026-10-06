@@ -1,4 +1,5 @@
 import * as path from 'node:path';
+import { isSeq } from './decision-order.js';
 import { SdlcError } from './errors.js';
 import { isFile } from './fs-utils.js';
 import type { HarnessStamp } from './license.js';
@@ -43,6 +44,8 @@ export interface ApprovalRecord extends Provenance {
   by: string;
   person?: string;
   at: string;
+  /** Order of the decision in the record (B39), written by the CLI; absent in records from sdlc 0.8.0 and earlier. */
+  seq?: number;
   digest: string;
   note?: string;
   /** Digest of each main spec the change modifies, at approval time (spec gate). */
@@ -53,6 +56,8 @@ export interface RejectionRecord extends Provenance {
   role?: string;
   by: string;
   at: string;
+  /** Order of the decision in the record (B39), written by the CLI; absent in records from sdlc 0.8.0 and earlier. */
+  seq?: number;
   note?: string;
 }
 
@@ -61,6 +66,8 @@ export interface ReworkRecord extends Provenance {
   role?: string;
   by: string;
   at: string;
+  /** Order of the decision in the record (B39), written by the CLI; absent in records from sdlc 0.8.0 and earlier. */
+  seq?: number;
   reason: string;
   note: string;
   /** The change's stage before the rework. */
@@ -87,6 +94,8 @@ export interface VerifyRecord extends Provenance {
 export interface WaiverRecord extends Provenance {
   by: string;
   at: string;
+  /** Order of the decision in the record (B39), written by the CLI; absent in records from sdlc 0.8.0 and earlier. */
+  seq?: number;
   note: string;
 }
 
@@ -131,6 +140,8 @@ export interface ChangeState {
   links?: Record<string, string>;
   tests_locked?: boolean;
   takeover?: TakeoverRecord;
+  /** The last decision order number the CLI gave in this record (B39); see `decision-order.ts`. */
+  seq?: number;
   gates: {
     intent?: GateState;
     spec?: GateState;
@@ -231,6 +242,7 @@ export function readChangeState(changeDir: string): ChangeState {
     ...(raw.links && typeof raw.links === 'object' ? { links: raw.links as Record<string, string> } : {}),
     ...(raw.tests_locked === true ? { tests_locked: true } : {}),
     ...takeoverOf(raw.takeover),
+    ...(isSeq(raw.seq) ? { seq: raw.seq } : {}),
     gates,
     ...(raw.verify && typeof raw.verify === 'object' ? { verify: raw.verify as VerifyRecord } : {}),
     history: Array.isArray(raw.history) ? (raw.history as HistoryEvent[]) : [],
@@ -259,6 +271,7 @@ export function writeChangeState(changeDir: string, state: ChangeState, stamp?: 
     ...(state.links && Object.keys(state.links).length > 0 ? { links: state.links } : {}),
     ...(state.tests_locked ? { tests_locked: true } : {}),
     ...(state.takeover ? { takeover: state.takeover } : {}),
+    ...(state.seq !== undefined ? { seq: state.seq } : {}),
     gates: state.gates,
     ...(state.verify ? { verify: state.verify } : {}),
     history: state.history,

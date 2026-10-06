@@ -1,11 +1,14 @@
 import { t } from '../core/i18n.js';
-import { loadProject, recordChangeEvent } from '../cli/context.js';
+import { loadProject, recordChangeEvent, type ProjectContext } from '../cli/context.js';
 import { c, line, printJson, reportFailure, warn } from '../cli/output.js';
 import { emitNextHint, resolveNext } from '../cli/next-hint.js';
 import { agentEnvironment } from '../core/agent-env.js';
-import { provenance, readChangeState, type GateState } from '../core/change-state.js';
-import { resolveChange } from '../core/changes.js';
+import {
+  provenance, readChangeState, type ApprovalRecord, type ChangeState, type GateState,
+} from '../core/change-state.js';
+import { resolveChange, type ChangeRef } from '../core/changes.js';
 import { ALL_GATES, APPROVAL_GATES, type ApprovalGateId, type GateId, type SdlcConfig } from '../core/config.js';
+import { nextSeq } from '../core/decision-order.js';
 import { baseDigests, readChangeDeltas } from '../core/deltas.js';
 import { SdlcError } from '../core/errors.js';
 import { humanCommandFix } from '../core/human-command.js';
@@ -149,6 +152,31 @@ function approvalRole(
   return { role, person: decided?.person };
 }
 
+interface ApprovalFields {
+  role: string;
+  person: string | undefined;
+  identity: string;
+  digest: string;
+  note?: string;
+}
+
+/** The approval as recorded: who, in which role, what they signed, and its place in the record's decision order. */
+function approvalRecord(
+  ctx: ProjectContext, ref: ChangeRef, state: ChangeState, gate: ApprovalGateId, fields: ApprovalFields,
+): ApprovalRecord {
+  return {
+    role: fields.role,
+    by: fields.identity,
+    ...(fields.person ? { person: fields.person } : {}),
+    at: new Date().toISOString(),
+    seq: nextSeq(state),
+    digest: fields.digest,
+    ...(fields.note ? { note: fields.note } : {}),
+    ...(gate === 'spec' ? { base: baseDigests(ctx.paths, readChangeDeltas(ref.dir)) } : {}),
+    ...provenance(ctx.stamp),
+  };
+}
+
 export async function approveCommand(gateArg: string, opts: DecisionOptions): Promise<void> {
   try {
     const ctx = loadProject();
@@ -183,16 +211,8 @@ export async function approveCommand(gateArg: string, opts: DecisionOptions): Pr
     const current: GateState = state.gates[gate] ?? {};
     // A person approving again replaces only their own approval; other people's approvals stay.
     const approvals = (current.approvals ?? []).filter((a) => !sameApprover(a, identity, person));
-    approvals.push({
-      role,
-      by: identity,
-      ...(person ? { person } : {}),
-      at: new Date().toISOString(),
-      digest: evaluation.digest,
-      ...(opts.note ? { note: opts.note } : {}),
-      ...(gate === 'spec' ? { base: baseDigests(ctx.paths, readChangeDeltas(ref.dir)) } : {}),
-      ...provenance(ctx.stamp),
-    });
+    const fields = { role, person, identity, digest: evaluation.digest, note: opts.note };
+    approvals.push(approvalRecord(ctx, ref, state, gate, fields));
     state.gates[gate] = { ...current, approvals };
     recordChangeEvent(
       ctx, ref, state, `gate.${gate}.approved`, identity, `role ${role}${opts.note ? `: ${opts.note}` : ''}`,
@@ -243,6 +263,7 @@ export async function rejectCommand(gateArg: string, opts: DecisionOptions): Pro
         ...(opts.as ? { role: opts.as } : {}),
         by: identity,
         at: new Date().toISOString(),
+        seq: nextSeq(state),
         note: opts.note,
         ...provenance(ctx.stamp),
       },
@@ -278,7 +299,9 @@ export async function waiveCommand(gateArg: string, opts: DecisionOptions): Prom
     const key = gate as keyof typeof state.gates;
     state.gates[key] = {
       ...(state.gates[key] ?? {}),
-      waived: { by: identity, at: new Date().toISOString(), note: opts.note, ...provenance(ctx.stamp) },
+      waived: {
+        by: identity, at: new Date().toISOString(), seq: nextSeq(state), note: opts.note, ...provenance(ctx.stamp),
+      },
     };
     recordChangeEvent(ctx, ref, state, `gate.${gate}.waived`, identity, opts.note);
     const next = resolveNext(ctx, ref.id);

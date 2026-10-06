@@ -75,7 +75,9 @@ function keypair(dir: string, name: string, email: string): { pubPath: string; p
   return { pubPath: `${priv}.pub`, pub: fs.readFileSync(`${priv}.pub`, 'utf-8').trim() };
 }
 
-describe('demo: a team builds a calculator with sdlc (every command)', () => {
+// Each step is a run of sequential CLI calls (step 6 takes ~22 s alone); under a loaded machine the default 60 s
+// limit was hit (bridge gate, 2026-10-06), so the demo gets three times the margin.
+describe('demo: a team builds a calculator with sdlc (every command)', { timeout: 180000 }, () => {
   let root: string;
   let env: NodeJS.ProcessEnv;
   let keys: Record<'alice' | 'carol', { pubPath: string; pub: string }>;

@@ -7,6 +7,7 @@ import { resolveChange, type ChangeRef } from '../core/changes.js';
 import {
   assertNoLinks, checkpointRef, checkpointScope, dirtyFiles, restoreFromCheckpoint, type CheckpointScope,
 } from '../core/checkpoint.js';
+import { nextSeq } from '../core/decision-order.js';
 import { SdlcError } from '../core/errors.js';
 import { isFile, readText } from '../core/fs-utils.js';
 import { t } from '../core/i18n.js';
@@ -74,6 +75,7 @@ function recordRework(ctx: ProjectContext, ref: ChangeRef, state: ChangeState, r
       ...(rework.role ? { role: rework.role } : {}),
       by: rework.by,
       at: new Date().toISOString(),
+      seq: nextSeq(state),
       reason: rework.reason,
       note: rework.note,
       from: rework.from,

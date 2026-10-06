@@ -12,6 +12,7 @@ import { quotedCommand } from './human-command.js';
 import { removesSdlcCli } from './policy-cli.js';
 import { clearsAgentMarker } from './policy-markers.js';
 import { handBackLine, shellTakeoverDenial, takeoverDenial } from './takeover.js';
+import { hardLinkedStateFiles } from './policy-hardlink.js';
 import {
   BACKLOG_FILE,
   linkedStateFiles,
@@ -239,8 +240,12 @@ export function evaluateToolCall(call: ToolCall, ctx: PolicyContext): Decision {
   const rels = call.files
     .map((f) => relToRoot(paths.root, call.cwd, f))
     .filter((r): r is string => r !== undefined);
-  // A link (or a new file in a linked directory) that resolves to a state file is that state file.
-  const stateHits = [...rels.filter((r) => STATE_FILE.test(r)), ...linkedStateFiles(call.files, paths.root, call.cwd)];
+  // A link (or a new file in a linked directory) that resolves to a state file is that state file; so is a hard link.
+  const stateHits = [
+    ...rels.filter((r) => STATE_FILE.test(r)),
+    ...linkedStateFiles(call.files, paths.root, call.cwd),
+    ...hardLinkedStateFiles(call.files, paths.root, call.cwd),
+  ];
   if (stateHits.length > 0) {
     return {
       decision: 'deny',

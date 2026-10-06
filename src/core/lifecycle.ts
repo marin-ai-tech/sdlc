@@ -10,6 +10,7 @@ import {
 } from './change-state.js';
 import { t, type MessageParams } from './i18n.js';
 import type { ChangeRef } from './changes.js';
+import { decidedAfterAll } from './decision-order.js';
 import { digestFiles, withoutCheckboxState } from './digest.js';
 import { readDeferred } from './deferred.js';
 import { isFile, readText } from './fs-utils.js';
@@ -177,10 +178,6 @@ function requiredRoles(config: SdlcConfig, gate: ApprovalGateId, state: ChangeSt
   return { anyOf: g.approvers, allOf: state.risk === 'high' ? g.highRiskApprovers : [] };
 }
 
-function latestTime(records: Array<{ at: string }>): string | undefined {
-  return records.map((r) => r.at).sort().at(-1);
-}
-
 /**
  * Evaluates an approval gate against the digest of what it covers. Approvals
  * whose digest no longer matches are "stale": the approver signed off on
@@ -244,8 +241,8 @@ function evaluateApprovalGate(
     );
   }
   const rejection = gateState?.rejection;
-  const lastApproval = latestTime(valid);
-  if (rejection && (!lastApproval || rejection.at > lastApproval)) {
+  // Rejected unless an approval was recorded after the rejection (by `seq`, else by time: decision-order.ts).
+  if (rejection && decidedAfterAll(rejection, valid)) {
     const info = rejection.note
       ? lr('gate.rejectedNote', { by: rejection.by, note: rejection.note })
       : lr('gate.rejected', { by: rejection.by });

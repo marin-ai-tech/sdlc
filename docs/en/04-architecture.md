@@ -43,7 +43,7 @@
 | `openspec/changes/<id>/sources/bmad/` | importer | retained BMAD source artifacts for an imported change |
 | `openspec/schemas/sdlc/**` | harness → OpenSpec | schema and artifact templates |
 | `openspec/changes/<id>/{intent,proposal,design,plan,tasks}.md`, `specs/**` | agent + people | artifacts (OpenSpec format) |
-| `openspec/changes/<id>/.sdlc.yaml` | **CLI only** | `version` (2 when the record holds a rework or a takeover, else 1), kind, risk, track, `track_suggestion`, source, approvals with digests (and `person` when `roles.yaml` exists), reworks (`gates.<g>.rework`), `takeover` while a person holds the change, verify result, event history |
+| `openspec/changes/<id>/.sdlc.yaml` | **CLI only** | `version` (2 when the record holds a rework or a takeover, else 1), kind, risk, track, `track_suggestion`, source, approvals with digests (and `person` when `roles.yaml` exists; each decision carries `seq`, its order in the record), reworks (`gates.<g>.rework`), `takeover` while a person holds the change, verify result, event history |
 | `refs/sdlc/<change>/<gate>` (git) | **CLI only** | checkpoint: a snapshot commit of the working tree when the gate was approved, for `rework --reset`; branches and HEAD are never moved |
 | `…/verification.md` | CLI + verifier | automatic evidence block (generated) + behavioral table by scenario |
 | `…/review.md` | reviewer | findings `### F<n> [severity][pass] …` with statuses and `## Coverage` for passes and lenses |
