@@ -129,7 +129,7 @@ Everything sdlc writes records the sdlc version and the license the project uses
 
 | Command | Purpose |
 |---|---|
-| `sdlc init [path] [--statusline] [--layout <mode>] [--worktree <path>] [--git-init]` / `update` / `uninstall` | set up, regenerate, remove integrations (planning data is never touched); `--statusline` opts in the Claude Code status line; `--layout` makes the project AI-ready (in place or in a new worktree) |
+| `sdlc init [path] [--statusline] [--layout <mode>] [--worktree <path>] [--git-init]` / `update` / `uninstall` | set up, regenerate, remove integrations (planning data is never touched); `--statusline` opts in the Claude Code status line; `--layout` makes the project AI-ready (in place or in a new worktree); in an agent session they never weaken the guard, and `uninstall` is human-only |
 | `sdlc new <id> [--kind --risk --track --source-type --source-ref --skip-specs]` | start a change (an OpenSpec change folder + `.sdlc.yaml`) |
 | `sdlc explore <slug> \| list` | create or list optional research notes before intent |
 | `sdlc track set <full\|lite> --change <id> [--note <text>]` | human confirmation of the suggested track before plan approval |

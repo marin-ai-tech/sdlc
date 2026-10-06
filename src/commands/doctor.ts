@@ -18,6 +18,7 @@ import { harnessVersion } from '../core/version.js';
 import { readRolesFile } from '../core/roles.js';
 import { readManifest, sha256 } from '../integrations/manifest.js';
 import { SETTINGS_PATH } from '../integrations/settings.js';
+import { hooksDisabledFiles } from '../core/user-guard.js';
 
 interface Check {
   check: string;
@@ -263,6 +264,12 @@ export async function doctorCommand(opts: { json?: boolean }): Promise<void> {
           tt('doctor.fix.gitEmail'),
         );
       }
+    }
+
+    // A disabled hook cannot say so itself (B42): the user's and the project's settings files.
+    for (const file of hooksDisabledFiles(root, process.env)) {
+      const fix = tt('doctor.fix.hooksDisabled', { path: file });
+      add('hooks disabled', 'warn', tt('doctor.hooksDisabled', { path: file }), fix);
     }
 
     const errors = checks.filter((ch) => ch.status === 'error').length;

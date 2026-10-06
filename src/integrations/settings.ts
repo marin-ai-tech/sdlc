@@ -77,7 +77,8 @@ export function harnessHooks(cli: string): HooksConfig {
     ],
     PreToolUse: [
       {
-        matcher: 'Edit|Write|MultiEdit|NotebookEdit|Bash',
+        // PowerShell: Claude Code's Windows shell tool writes files too, so its calls reach the same rules (B41).
+        matcher: 'Edit|Write|MultiEdit|NotebookEdit|Bash|PowerShell',
         hooks: [
           { type: 'command', command: hookCommand(cli, 'pre-tool'), timeout: 30, statusMessage: 'SDLC gate check' },
         ],

@@ -15,6 +15,7 @@ import { isWithin, toPosix } from './fs-utils.js';
  * Heuristics on the command text: a computed directory (`cd "$DIR"`, `cd ~`) is not followed, so bare names after
  * it are not resolved; a glob is read with bash rules (`*` does not match a leading dot); a `.sdlc.yaml` reached
  * through a glob is found in the glob's own directory under openspec/ and in the change directories on disk.
+ * The same machinery serves the guard's own configuration (B41, `policy-guard.ts`) through `shellWrites`.
  */
 
 /** Harness records only the CLI writes: per-change `.sdlc.yaml`, the project log, roles and the backlog. */
@@ -69,10 +70,11 @@ export function relToRoot(root: string, cwd: string, file: string): string | und
   return toPosix(path.relative(root, abs));
 }
 
-function stateRel(root: string, abs: string | undefined): string | undefined {
+/** The root-relative path of `abs` when it matches `pattern`, or undefined. */
+function relMatching(root: string, abs: string | undefined, pattern: RegExp): string | undefined {
   if (abs === undefined) return undefined;
   const rel = relToRoot(root, root, abs);
-  return rel !== undefined && STATE_FILE.test(rel) ? rel : undefined;
+  return rel !== undefined && pattern.test(rel) ? rel : undefined;
 }
 
 function realOrSelf(target: string): string {
@@ -83,29 +85,60 @@ function realOrSelf(target: string): string {
   }
 }
 
-/** The real path of a file, or of its parent directory plus the name when the file does not exist yet. */
-function realTarget(abs: string): string | undefined {
+/**
+ * The real path of a file; for a file that does not exist yet, the real path of its parent directory plus the name;
+ * for a dangling link, the same for the path it points to (a write through it creates that file).
+ */
+export function realTarget(abs: string): string | undefined {
   try {
     return fs.realpathSync(abs);
   } catch {
-    try {
-      return path.join(fs.realpathSync(path.dirname(abs)), path.basename(abs));
-    } catch {
-      return undefined;
-    }
+    return realParent(linkTarget(abs) ?? abs);
   }
 }
 
-/** Edit targets that resolve, through links, to a state file; root-relative. */
-export function linkedStateFiles(files: string[], root: string, cwd: string): string[] {
+function realParent(abs: string): string | undefined {
+  try {
+    return path.join(fs.realpathSync(path.dirname(abs)), path.basename(abs));
+  } catch {
+    return undefined;
+  }
+}
+
+/** Where a symbolic link points, absolute; undefined for anything that is not a link. */
+function linkTarget(abs: string): string | undefined {
+  try {
+    return path.resolve(path.dirname(abs), fs.readlinkSync(abs));
+  } catch {
+    return undefined;
+  }
+}
+
+/** Edit targets that resolve, through links, to a file matching `pattern`; root-relative. */
+export function linkedFiles(files: string[], root: string, cwd: string, pattern: RegExp): string[] {
   const realRoot = realOrSelf(root);
   const hits: string[] = [];
   for (const file of files) {
     const real = realTarget(path.resolve(cwd, file));
-    const rel = stateRel(realRoot, real);
+    const rel = relMatching(realRoot, real, pattern);
     if (rel !== undefined) hits.push(rel);
   }
   return hits;
+}
+
+/** Edit targets that resolve, through links, to a state file; root-relative. */
+export function linkedStateFiles(files: string[], root: string, cwd: string): string[] {
+  return linkedFiles(files, root, cwd, STATE_FILE);
+}
+
+/**
+ * What a shell rule protects: the files and the folders that hold them (root-relative patterns), and the paths a
+ * glob word is matched against (`folders`: the command can replace a whole folder).
+ */
+export interface ProtectedSet {
+  file: RegExp;
+  folder: RegExp;
+  candidates(root: string, glob: string, folders: boolean): string[];
 }
 
 interface DirState {
@@ -133,7 +166,7 @@ function words(segment: string): string[] {
 }
 
 /** A word as an absolute path from the current directory, or undefined when it cannot be told. */
-function absolute(dir: string | undefined, word: string | undefined): string | undefined {
+export function absolute(dir: string | undefined, word: string | undefined): string | undefined {
   if (word === undefined || word.startsWith('-') || UNRESOLVED.test(word)) return undefined;
   if (path.isAbsolute(word)) return path.resolve(word);
   return dir === undefined ? undefined : path.resolve(dir, word);
@@ -178,37 +211,35 @@ function stateCandidates(root: string, glob: string, folders: boolean): string[]
   return [...files, 'openspec', 'openspec/changes', 'openspec/.sdlc', ...dirs];
 }
 
-/** The state file (or, for a folder write, state folder) a glob word can match, read with bash rules. */
-function globHit(root: string, dir: string | undefined, word: string, folders: boolean): string | undefined {
+/** The state files and the folders that hold them. */
+const STATE_SET: ProtectedSet = { file: STATE_FILE, folder: STATE_FOLDER, candidates: stateCandidates };
+
+/** The protected file (or, for a folder write, folder) a glob word can match, read with bash rules. */
+function globHit(root: string, dir: string | undefined, word: string, folders: boolean, set: ProtectedSet) {
   const abs = absolute(dir, word);
   const rel = abs === undefined ? undefined : relToRoot(root, root, abs);
   if (rel === undefined) return undefined;
   try {
     const matches = picomatch(rel, { nocase: true });
-    return stateCandidates(root, rel, folders).find((candidate) => matches(candidate));
+    return set.candidates(root, rel, folders).find((candidate) => matches(candidate));
   } catch {
     return undefined;
   }
 }
 
-/** A folder that holds state files, root-relative, or undefined. */
-function stateFolder(root: string, abs: string | undefined): string | undefined {
-  if (abs === undefined) return undefined;
-  const rel = relToRoot(root, root, abs);
-  return rel !== undefined && STATE_FOLDER.test(rel) ? rel : undefined;
-}
-
-function wordHit(root: string, dir: string | undefined, word: string, folders: boolean): string | undefined {
-  if (GLOB_CHARS.test(word)) return globHit(root, dir, word, folders);
+/** The protected file (or folder) a word names, by its path or through a link; root-relative. */
+function wordHit(root: string, dir: string | undefined, word: string, folders: boolean, set: ProtectedSet) {
+  if (GLOB_CHARS.test(word)) return globHit(root, dir, word, folders, set);
   const abs = absolute(dir, word);
   if (abs === undefined) return undefined;
-  const file = stateRel(root, abs) ?? stateRel(realOrSelf(root), realTarget(abs));
+  const realRoot = realOrSelf(root);
+  const file = relMatching(root, abs, set.file) ?? relMatching(realRoot, realTarget(abs), set.file);
   if (file !== undefined || !folders) return file;
-  return stateFolder(root, abs) ?? stateFolder(realOrSelf(root), realTarget(abs));
+  return relMatching(root, abs, set.folder) ?? relMatching(realRoot, realTarget(abs), set.folder);
 }
 
 /** A simple command that writes, with the directory its relative paths start from. */
-interface WriteSegment {
+export interface WriteSegment {
   text: string;
   dir: string | undefined;
   words: string[];
@@ -231,7 +262,7 @@ function gitDir(dir: string | undefined, list: string[]): { dir: string | undefi
 }
 
 /** The simple commands of a shell command that write, following `cd`/`pushd`/`popd` and `git -C`. */
-function writeSegments(command: string, cwd: string): WriteSegment[] {
+export function writeSegments(command: string, cwd: string): WriteSegment[] {
   const state: DirState = { dir: path.resolve(cwd), stack: [] };
   const out: WriteSegment[] = [];
   for (const segment of simpleCommands(command)) {
@@ -252,11 +283,19 @@ function writeSegments(command: string, cwd: string): WriteSegment[] {
  * (openspec/, a change folder, openspec/.sdlc) it deletes, restores, moves or copies into; root-relative.
  */
 export function shellStateWrites(command: string, root: string, cwd: string): string[] {
+  return shellWrites(command, root, cwd, STATE_SET);
+}
+
+/**
+ * Files of a protected set a shell command writes by path, by a bare name after `cd`, by a glob or through a link,
+ * and folders of the set it deletes, restores, moves or copies into; root-relative.
+ */
+export function shellWrites(command: string, root: string, cwd: string, set: ProtectedSet): string[] {
   const hits: string[] = [];
   for (const segment of writeSegments(command, cwd)) {
     const folders = FOLDER_OPS.test(segment.text);
     for (const word of segment.words) {
-      const hit = wordHit(root, segment.dir, word, folders);
+      const hit = wordHit(root, segment.dir, word, folders, set);
       if (hit !== undefined) hits.push(hit);
     }
   }

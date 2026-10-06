@@ -5,6 +5,8 @@ import { WORKFLOW_IDS, loadWorkflow } from '../integrations/assets.js';
 export const HUMAN_COMMANDS = [
   'approve', 'reject', 'rework', 'waive', 'tests unlock', 'track set',
   'backlog move', 'backlog drop', 'license set', 'roles migrate', 'takeover', 'release-control',
+  // Removing the harness switches the guard off: a person's decision (B41).
+  'uninstall',
 ] as const;
 
 const EXAMPLES: Record<string, string> = {
@@ -20,6 +22,7 @@ const EXAMPLES: Record<string, string> = {
   'roles migrate': 'sdlc roles migrate',
   takeover: 'sdlc takeover --change add-export --note "I will fix the migration myself" --json',
   'release-control': 'sdlc release-control --change add-export --note "Migration fixed, carry on" --json',
+  uninstall: 'sdlc uninstall --dry-run',
   adopt: 'sdlc adopt --json',
   'adopt --apply': 'sdlc adopt --apply',
   'backlog epic add': 'sdlc backlog epic add "Checkout" --goal "Customers pay without calling support" --json',

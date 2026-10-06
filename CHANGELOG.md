@@ -2,6 +2,13 @@
 
 All notable changes to sdlc. Versions follow [Semantic Versioning](https://semver.org/); while the major version is 0, a minor version may change behavior.
 
+## 0.8.2 — 2026-10-06
+
+### Fixed
+- **An agent can no longer switch the guard off.** Its edits and shell writes of the files that configure the guard are denied, also in `warn` mode (rule `guard-config`): `openspec/sdlc.yaml`, `.claude/settings.json` and `.claude/settings.*.json`, `.opencode/plugins/sdlc.js`, `.mcp.json`, `opencode.json(c)` and the manifest `openspec/.sdlc/manifest.json`. In an agent session `sdlc init` and `sdlc update` refuse a lower enforcement mode, a dropped tool, `--no-hooks` and another `--cli` (`agent_cannot_weaken_guard`); without such flags they still restore the generated files. `sdlc uninstall` is a person's command.
+- **User-level agent settings are protected too.** `disableAllHooks` in the user's Claude Code settings or the global OpenCode config switches the hooks off for every project: an agent's edits and shell writes of `~/.claude/settings.json` (or `$CLAUDE_CONFIG_DIR/settings.json`), `~/.config/opencode/opencode.json(c)` and `$OPENCODE_CONFIG` are denied, and `sdlc doctor` warns when user or project settings already carry `disableAllHooks: true`.
+- **Claude Code: writes through the PowerShell tool reach the rules.** The PreToolUse matcher covers `PowerShell`; run `sdlc update` to refresh `.claude/settings.json`.
+
 ## 0.8.1 — 2026-10-06
 
 ### Fixed

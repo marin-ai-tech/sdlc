@@ -13,6 +13,8 @@ import { removesSdlcCli } from './policy-cli.js';
 import { clearsAgentMarker } from './policy-markers.js';
 import { handBackLine, shellTakeoverDenial, takeoverDenial } from './takeover.js';
 import { hardLinkedStateFiles } from './policy-hardlink.js';
+import { guardDenial, guardEditHits, shellGuardWrites } from './policy-guard.js';
+import { userGuardEditHits, userShellGuardWrites } from './user-guard.js';
 import {
   BACKLOG_FILE,
   linkedStateFiles,
@@ -31,7 +33,8 @@ import {
  *
  * Two classes of rule:
  * - hard rules (protected paths, locked tests, forged approvals, production
- *   release without authorization) deny whenever enforcement is not `off`;
+ *   release without authorization, the state files and the guard's own
+ *   configuration) deny whenever enforcement is not `off`;
  * - process rules (no code before an approved plan) deny in `block` mode and
  *   only remind the agent in `warn` mode.
  */
@@ -189,8 +192,8 @@ function stateWriteDenial(spelled: string, ctx: PolicyContext, cwd: string): Dec
 }
 
 /**
- * Shell commands: cleared agent markers, human-only CLI steps, removing the CLI, writes to state files, a change a
- * person holds, releases without an approved release gate.
+ * Shell commands: cleared agent markers, human-only CLI steps, removing the CLI, writes to state files and to the
+ * guard's configuration, a change a person holds, releases without an approved release gate.
  */
 function evaluateCommand(command: string, ctx: PolicyContext, env: NodeJS.ProcessEnv, cwd: string): Decision {
   const cmd = joinContinuations(command);
@@ -210,6 +213,10 @@ function evaluateCommand(command: string, ctx: PolicyContext, env: NodeJS.Proces
   const spelled = normalizePaths(cmd);
   const stateDenial = stateWriteDenial(spelled, ctx, cwd);
   if (stateDenial) return stateDenial;
+  // The guard's own configuration (B41): the files that switch the rules on; also the user-level ones (B42).
+  const guardHits = [...shellGuardWrites(spelled, ctx.paths.root, cwd), ...userShellGuardWrites(spelled, cwd, env)];
+  const guard = guardDenial(guardHits);
+  if (guard) return guard;
   // A change a person holds: no shell writes to its paths, no sdlc steps on it but the read-only ones.
   const held = shellTakeoverDenial(ctx.paths, spelled, cwd, CLI_PREFIX);
   if (held) return held;
@@ -253,6 +260,10 @@ export function evaluateToolCall(call: ToolCall, ctx: PolicyContext): Decision {
       reason: stateReason(stateHits.every((r) => r.toLowerCase() === BACKLOG_FILE), true),
     };
   }
+  // User-level agent settings (B42) lie outside the project: checked on the absolute paths, before `rels` alone.
+  const userHits = userGuardEditHits(call.files, call.cwd, env);
+  const guard = guardDenial([...guardEditHits(call.files, rels, paths.root, call.cwd), ...userHits]);
+  if (guard) return guard;
   if (rels.length === 0) return { decision: 'allow' };
 
   const isProtected = matcher(config.enforcement.protectedPaths);

@@ -30,6 +30,9 @@ import {
 } from '../integrations/install.js';
 import type { ToolId } from '../integrations/types.js';
 import { agentEnvironment } from '../core/agent-env.js';
+import { assertKeepsGuard } from '../core/guard-setup.js';
+import { humanCommandFix } from '../core/human-command.js';
+import { assertHuman } from './gates.js';
 import { checkLayoutRequest, describeFolder, initWithLayout, type FolderDescription } from '../core/init-layout.js';
 import {
   codegraphIndexCommand,
@@ -314,7 +317,9 @@ export async function initCommand(target: string | undefined, opts: InitOptions,
     if (!resolved) return;
     const chosen = resolved.opts;
     // The terminal seam (deps.io) names the agent session in tests; the CLI reads the environment.
-    const request = checkLayoutRequest(root, chosen, deps?.io ? deps.io.agent : agentEnvironment());
+    const agent = deps?.io ? deps.io.agent : agentEnvironment();
+    const request = checkLayoutRequest(root, chosen, agent);
+    assertInitKeepsGuard(root, chosen, agent);
     const runInit = (dir: string) => setupProject(dir, chosen, resolved, deps);
     const done = await initWithLayout(root, folder, request, chosen, runInit);
     if (chosen.json) return printJson({ ...initJson(done.outcome), layout: done.layout });
@@ -326,6 +331,17 @@ export async function initCommand(target: string | undefined, opts: InitOptions,
   } catch (error) {
     reportFailure(error, opts.json);
   }
+}
+
+/** An agent's init over an existing sdlc.yaml may restore or strengthen the guard, not weaken it (B41). */
+function assertInitKeepsGuard(root: string, opts: InitOptions, agent: string | undefined): void {
+  const file = projectPaths(root).sdlcConfig;
+  if (agent === undefined || !isFile(file)) return;
+  const config = loadConfig(file);
+  const tools = opts.tools === undefined ? undefined : parseTools(opts.tools, []);
+  const request = { mode: assertMode(opts.mode), tools, hooks: opts.hooks, cli: opts.cli };
+  const fix = humanCommandFix('init', config.cli);
+  assertKeepsGuard(config, request, { agent, knownTools: Object.keys(ADAPTERS), fix });
 }
 
 interface Settings {
@@ -470,6 +486,9 @@ export async function updateCommand(target: string | undefined, opts: UpdateOpti
     const config = loadConfig(paths.sdlcConfig);
     const tools = parseTools(opts.tools, config.tools.filter((t) => t in ADAPTERS) as ToolId[]);
     if (opts.tools !== undefined && !opts.dryRun) {
+      // An agent may restore the configured tools, not drop one (B41); before anything is written.
+      const fix = humanCommandFix('update', config.cli);
+      assertKeepsGuard(config, { tools }, { agent: agentEnvironment(), knownTools: Object.keys(ADAPTERS), fix });
       config.tools = tools;
       saveConfig(paths.sdlcConfig, config);
     }
@@ -487,10 +506,21 @@ export async function updateCommand(target: string | undefined, opts: UpdateOpti
   }
 }
 
+/** The project's configuration; a missing or unreadable sdlc.yaml falls back to the defaults. */
+function configOrDefault(paths: ProjectPaths): SdlcConfig {
+  try {
+    return isFile(paths.sdlcConfig) ? loadConfig(paths.sdlcConfig) : defaultConfig();
+  } catch {
+    return defaultConfig();
+  }
+}
+
 export async function uninstallCommand(target: string | undefined, opts: { force?: boolean; dryRun?: boolean; json?: boolean }): Promise<void> {
   try {
     const root = findProjectRoot(path.resolve(target ?? process.cwd()));
     if (!root) throw new SdlcError('no_project_root', { key: 'error.no_openspec_directory_found' });
+    // Removing the harness switches the guard off: a person's decision (B41).
+    assertHuman(configOrDefault(projectPaths(root)), 'uninstall');
     const result = uninstallIntegrations(root, { force: opts.force, dryRun: opts.dryRun });
     const paths = projectPaths(root);
     if (!opts.dryRun && isFile(paths.sdlcConfig)) {

@@ -87,13 +87,14 @@ One engine (`src/core/policy.ts`) and one dispatcher (`sdlc hook pre-tool | sess
 | Protected paths (`protected_paths`) | hard | deny |
 | Tests locked (`sdlc tests lock` during a bug fix) | hard | deny edits to `test_paths` |
 | Agent approves a gate / edits `.sdlc.yaml`, `openspec/roles.yaml` or the project log | hard | deny |
+| Agent edits the guard's own configuration (`openspec/sdlc.yaml`, `.claude/settings*.json`, `.opencode/plugins/sdlc.js`, `.mcp.json`, `opencode.json(c)`, the manifest; user-level `~/.claude/settings.json`, `$CLAUDE_CONFIG_DIR/settings.json`, `~/.config/opencode/opencode.json(c)`, `$OPENCODE_CONFIG`), by edit or shell; runs `sdlc uninstall`, or `sdlc init`/`update` with flags that weaken the guard (lower mode, fewer tools, `--no-hooks`, another `--cli`) | hard | deny (rule `guard-config`; the CLI refuses with `agent_cannot_weaken_guard`); `init`/`update` without such flags still restore the files |
 | Production release without authorization (`release.commands`) | hard | deny until there is a `release` approval or `SDLC_RELEASE_APPROVAL` |
 | Stopping without fresh verification (`verify_before_stop`) | optional | Claude Code: `Stop → decision: block` |
 | Session context | — | Claude: `SessionStart.additionalContext`; OpenCode: `experimental.chat.system.transform` |
 
 `enforcement.mode: off | warn | block`. In `warn`, the hard rules still apply. If the CLI is not installed, hooks allow the action and `sdlc doctor` shows the problem: a missing guardrail must not block every edit. A check that **fails** is different: the OpenCode plugin (since 0.7.1) and the Claude Code hook command (since 0.8.0) run it once more and then block the call with the reason (OpenCode on Windows sometimes kills the check after a few milliseconds, and a failed check used to let the call through). Inside the CLI, an uninitialized project or an internal error still answers "allow".
 
-**Claude Code:** `SessionStart`, `PreToolUse` (`Edit|Write|MultiEdit|NotebookEdit|Bash`) and `Stop` are merged into `.claude/settings.json`. The response uses the `hookSpecificOutput.permissionDecision/additionalContext` format. Other hooks are left untouched. The harness recognizes its own handlers by the `sdlc hook` command.
+**Claude Code:** `SessionStart`, `PreToolUse` (`Edit|Write|MultiEdit|NotebookEdit|Bash|PowerShell`; PowerShell since 0.8.2) and `Stop` are merged into `.claude/settings.json`. The response uses the `hookSpecificOutput.permissionDecision/additionalContext` format. Other hooks are left untouched. The harness recognizes its own handlers by the `sdlc hook` command.
 
 **OpenCode:** `.opencode/plugins/sdlc.js` is loaded automatically:
 - `tool.execute.before` calls `sdlc hook pre-tool --agent opencode`; a denial is thrown as an exception;
