@@ -25,13 +25,15 @@ wrong, a person runs `sdlc tests unlock --change <id>`.
 
 ## state-integrity
 
-Hard rule. `.sdlc.yaml`, `openspec/roles.yaml`, the log, the inbox and the backlog are records only the CLI writes.
+Hard rule. `.sdlc.yaml`, `openspec/roles.yaml`, the log, the inbox, the team record and the backlog are records only the CLI
+writes.
 **Do:** use the commands: `sdlc approve` (a person), `sdlc backlog add|edit`, `sdlc verify`.
 
 ## guard-config
 
 Hard rule. The file configures the guard itself: `openspec/sdlc.yaml`, `.claude/settings*.json`, the OpenCode plugin,
-`.mcp.json`, `opencode.json`, the manifest, the user's agent settings. **Do:** ask a person to make the change;
+`.mcp.json`, `opencode.json`, the manifest, the user's agent settings, the accepted team roles in `docs/agents/`, and
+the files sdlc generates for the agents (`sdlc-*` subagents, workflow skills and commands). **Do:** ask a person to make the change;
 `sdlc update` restores generated files.
 
 ## separation-of-duties

@@ -11,7 +11,7 @@ import type { Locale } from './i18n.js';
 
 /** The topics in the order of the index. */
 export const GUIDE_TOPICS = [
-  'start', 'lifecycle', 'gates', 'roles', 'tracks', 'bugfix', 'backlog', 'rework', 'verify', 'review', 'mcp', 'config',
+  'start', 'lifecycle', 'gates', 'roles', 'team', 'tracks', 'bugfix', 'backlog', 'rework', 'verify', 'review', 'mcp', 'config',
   'denials', 'faq',
 ] as const;
 

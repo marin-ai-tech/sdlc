@@ -13,6 +13,8 @@ import { applyRegistryServers, removeRegistryServers, type ServerChanges } from 
 import { assertNoSecretLiterals } from '../mcp/registry.js';
 import { mergeClaudeHooks, mergeClaudeStatusLine, type SettingsChange } from './settings.js';
 import { renderSkills } from './skills.js';
+import { renderTeamSkills } from './team-skills.js';
+import { acceptedRoles } from '../team/accepted.js';
 import { TOOL_IDS, type GeneratedFile, type RenderContext, type ToolAdapter, type ToolId } from './types.js';
 
 export const ADAPTERS: Record<ToolId, ToolAdapter> = {
@@ -58,13 +60,15 @@ export function schemaFiles(stamp: HarnessStamp): GeneratedFile[] {
   });
 }
 
-export function renderContext(config: SdlcConfig, tools: ToolId[]): RenderContext {
+/** What the generated files are rendered from; with `root`, also the project's accepted roles (B70). */
+export function renderContext(config: SdlcConfig, tools: ToolId[], root?: string): RenderContext {
   const stamp = harnessStamp(config);
-  return { tools, delivery: config.delivery, cli: config.cli, version: stamp.version, config, stamp };
+  const base = { tools, delivery: config.delivery, cli: config.cli, version: stamp.version, config, stamp };
+  return root === undefined ? base : { ...base, root, team: acceptedRoles(root) };
 }
 
 export function renderAll(ctx: RenderContext): GeneratedFile[] {
-  const files: GeneratedFile[] = [...schemaFiles(ctx.stamp), ...renderSkills(ctx)];
+  const files: GeneratedFile[] = [...schemaFiles(ctx.stamp), ...renderSkills(ctx), ...renderTeamSkills(ctx)];
   for (const tool of ctx.tools) files.push(...ADAPTERS[tool].render(ctx));
   return files;
 }
@@ -88,7 +92,7 @@ export function installIntegrations(
 ): InstallResult {
   // A literal secret in the registry is refused before anything is written (`mcp_secret_literal`).
   assertNoSecretLiterals(config.mcp?.servers ?? []);
-  const ctx = renderContext(config, tools);
+  const ctx = renderContext(config, tools, root);
   const files = renderAll(ctx);
   const report = applyFiles(root, files, {
     force: options.force,
@@ -113,7 +117,7 @@ export function installIntegrations(
  * hook settings, so their notices follow a license change.
  */
 export function refreshGeneratedFiles(root: string, config: SdlcConfig): ApplyReport {
-  const ctx = renderContext(config, config.tools.filter((t) => t in ADAPTERS) as ToolId[]);
+  const ctx = renderContext(config, config.tools.filter((t) => t in ADAPTERS) as ToolId[], root);
   return applyFiles(root, renderAll(ctx), { version: ctx.version, license: ctx.stamp.license });
 }
 

@@ -3,6 +3,7 @@ import { loadWorkflow, WORKFLOW_IDS } from './assets.js';
 import { appendNotice, renderBody, yamlString } from './render.js';
 import { stageAllowedTools, stageResources, stageSection } from './stage-resources.js';
 import type { GeneratedFile, RenderContext, ToolId } from './types.js';
+import { agentNames } from '../team/render.js';
 
 /**
  * Skills follow the Agent Skills format and are written ONCE per project.
@@ -27,10 +28,11 @@ export function renderSkills(ctx: RenderContext): GeneratedFile[] {
   if (ctx.delivery === 'commands') return [];
   const root = skillsRoot(ctx.tools);
   if (!root) return [];
+  const agents = agentNames(ctx.team);
   return WORKFLOW_IDS.map((id) => {
     const wf = loadWorkflow(id);
     const name = `sdlc-${id}`;
-    const resources = stageResources(ctx.config, id);
+    const resources = stageResources(ctx.config, id, ctx.team);
     const content = appendNotice([
       '---',
       `name: ${name}`,
@@ -45,7 +47,7 @@ export function renderSkills(ctx: RenderContext): GeneratedFile[] {
       `  generatedBy: "sdlc ${ctx.version}"`,
       '---',
       '',
-      renderBody(wf.body, { surface: 'skill', cli: ctx.cli }) + stageSection(resources),
+      renderBody(wf.body, { surface: 'skill', cli: ctx.cli, agents }) + stageSection(resources),
     ].join('\n'), generatedNotice(ctx.stamp, 'markdown'));
     return { path: `${root}/${name}/SKILL.md`, content, tool: 'shared' as const, kind: 'skill' as const };
   });

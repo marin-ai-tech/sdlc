@@ -163,6 +163,7 @@ describe('every command speaks the locale (stage 2)', () => {
     expect(offenders).toEqual([]);
   }, 600000);
 
+  // About 40 CLI runs: well under a minute alone, past 120 s under a full parallel run.
   it('negative: JSON and error codes are the same in every locale', () => {
     const { root, env } = project();
     runCli(['init', '--tools', 'none', '--json'], root, env);
@@ -181,7 +182,7 @@ describe('every command speaks the locale (stage 2)', () => {
       if (ru !== en) leaks.push(args.join(' '));
     }
     expect(leaks).toEqual([]);
-  }, 120000);
+  }, 300000);
 });
 
 describe('roles, signatures and the change header speak the locale', () => {

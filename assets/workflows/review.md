@@ -15,7 +15,7 @@ Review the change - Stage 5 (Deploy). Every change gets the same passes with sev
 
 1. **Check the gate.** `sdlc status --change <id> --json`: the `verify` gate must be `passed`. Otherwise run {{cmd:verify}} first.
 2. **Gather context**: `sdlc review context --change <id> --json` returns the base ref, changed files, the review policy (REVIEW.md passes, severity definitions, nit cap, exclusions), spec/plan/design paths, and **plan drift** - files changed but not named in plan.md, and planned files that were not touched.
-3. **Run every pass and lens in fresh context.** Delegate to the `sdlc-reviewer` subagent once per pass or lens:
+3. **Run every pass and lens in fresh context.** Delegate to the `{{agent:reviewer}}` subagent once per pass or lens:
    - **bugs**: logic errors, broken edge cases, subtle regressions
    - **security**: injection, authentication/authorization gaps, secrets, PII in logs or errors
    - **compliance**: the diff implements every spec scenario and only those; it follows plan.md (explain each plan-drift file) and the design decisions and policies

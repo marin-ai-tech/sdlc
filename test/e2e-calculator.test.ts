@@ -323,6 +323,12 @@ describe('demo: a team builds a calculator with sdlc (every command)', { timeout
     step('events-list', 'visibility', 'agent', ['events', 'list'], 'Process events waiting for the team\'s servers; no receivers are configured here.');
     step('events-flush', 'visibility', 'bob', ['events', 'flush'], 'Bob sends the waiting events now; nothing waits.');
     step('mcp', 'visibility', 'agent', ['mcp', 'serve'], 'Other AI systems read the process over MCP.', { input: MCP_LIST });
+    // The agent team (0.11.0): the built-in roles as drafts, a person accepts one, the subagent knows this project.
+    step('team-sync', 'visibility', 'agent', ['team', 'sync'], 'The agent brings the built-in roles as drafts: analyst, architect, developer, tester, reviewer.');
+    step('team-accept-agent', 'visibility', 'agent', ['team', 'accept', 'tester'], 'What a role says is a person\'s decision: refused for the agent.', { expect: 1 });
+    step('team-accept', 'visibility', 'bob', ['team', 'accept', 'tester'], 'Bob accepts the tester: the subagent sdlc-tester gets this project\'s checks and takes over from sdlc-verifier.');
+    step('team-list', 'visibility', 'bob', ['team', 'list'], 'The team: the tester is accepted, the other roles are still drafts.');
+    step('team-check', 'visibility', 'bob', ['team', 'check'], 'The skills of the accepted roles, checked: checksums, scripts and tool grants; the built-in tester lists none.');
     step('plugin', 'visibility', 'bob', ['plugin', 'build', path.join(tempDir('sdlc-demo-plugin-'), 'plugin')], 'The same workflows as a Claude Code plugin.');
     step('uninstall', 'visibility', 'alice', ['uninstall', '--dry-run'], 'Uninstall keeps every planning file.');
   });

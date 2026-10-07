@@ -1,4 +1,5 @@
 import { generatedNotice } from '../core/license.js';
+import { agentNames, roleBody, subagentName } from '../team/render.js';
 import { AGENT_IDS, loadAgent, loadWorkflow, WORKFLOW_IDS } from './assets.js';
 import { appendNotice, renderBody, yamlString } from './render.js';
 import { allowedToolsFor } from './skills.js';
@@ -13,6 +14,41 @@ const CLAUDE_TOOL_NAMES: Record<string, string> = {
   edit: 'Edit',
   write: 'Write',
 };
+
+/** A subagent file `.claude/agents/<name>.md`: name, description and Claude tool names in the front matter. */
+function agentFile(agent: { name: string; description: string; tools: string[] }, body: string, notice: string) {
+  const tools = agent.tools.map((t) => CLAUDE_TOOL_NAMES[t] ?? t).join(', ');
+  const content = appendNotice([
+    '---',
+    `name: ${agent.name}`,
+    `description: ${yamlString(agent.description)}`,
+    `tools: ${tools}`,
+    '---',
+    '',
+    body,
+  ].join('\n'), notice);
+  return { path: `.claude/agents/${agent.name}.md`, content, tool: 'claude' as const, kind: 'agent' as const };
+}
+
+/**
+ * The subagents: the built-in ones, then one per accepted role of the team (B70). A role named like a built-in
+ * subagent (`sdlc-reviewer`) takes its file; the others (`sdlc-verifier`) stay as aliases.
+ */
+function agentFiles(ctx: RenderContext, notice: string): GeneratedFile[] {
+  const team = ctx.team ?? [];
+  const names = new Set(team.map(subagentName));
+  const files: GeneratedFile[] = [];
+  for (const id of AGENT_IDS) {
+    const agent = loadAgent(id);
+    if (names.has(agent.name)) continue;
+    files.push(agentFile(agent, renderBody(agent.body, { surface: 'claude-agent', cli: ctx.cli }), notice));
+  }
+  for (const role of team) {
+    const agent = { name: subagentName(role), description: role.description, tools: role.tools };
+    files.push(agentFile(agent, roleBody(role, ctx), notice));
+  }
+  return files;
+}
 
 /**
  * Claude Code integration:
@@ -34,10 +70,11 @@ export const claudeAdapter: ToolAdapter = {
   render(ctx: RenderContext): GeneratedFile[] {
     const files: GeneratedFile[] = [];
     const notice = generatedNotice(ctx.stamp, 'markdown');
+    const agents = agentNames(ctx.team);
     if (ctx.delivery !== 'skills') {
       for (const id of WORKFLOW_IDS) {
         const wf = loadWorkflow(id);
-        const resources = stageResources(ctx.config, id);
+        const resources = stageResources(ctx.config, id, ctx.team);
         const content = appendNotice([
           '---',
           `description: ${yamlString(wf.commandDescription)}`,
@@ -45,25 +82,12 @@ export const claudeAdapter: ToolAdapter = {
           `allowed-tools: ${stageAllowedTools(allowedToolsFor(ctx.cli), resources)}`,
           '---',
           '',
-          renderBody(wf.body, { surface: 'claude-command', cli: ctx.cli }) + stageSection(resources),
+          renderBody(wf.body, { surface: 'claude-command', cli: ctx.cli, agents }) + stageSection(resources),
         ].join('\n'), notice);
         files.push({ path: `.claude/commands/sdlc/${id}.md`, content, tool: 'claude', kind: 'command' });
       }
     }
-    for (const id of AGENT_IDS) {
-      const agent = loadAgent(id);
-      const tools = agent.tools.map((t) => CLAUDE_TOOL_NAMES[t] ?? t).join(', ');
-      const content = appendNotice([
-        '---',
-        `name: ${agent.name}`,
-        `description: ${yamlString(agent.description)}`,
-        `tools: ${tools}`,
-        '---',
-        '',
-        renderBody(agent.body, { surface: 'claude-agent', cli: ctx.cli }),
-      ].join('\n'), notice);
-      files.push({ path: `.claude/agents/${agent.name}.md`, content, tool: 'claude', kind: 'agent' });
-    }
+    files.push(...agentFiles(ctx, notice));
     return files;
   },
 };

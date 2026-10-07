@@ -9,7 +9,9 @@ import { changeDirs, inboxFiles } from './policy-shell.js';
  * link is compared by device and inode with the state files of the project. The guard's own configuration (B41)
  * uses the same comparison with its files (`hardLinkedFiles`).
  */
-const FIXED_STATE_FILES = ['openspec/roles.yaml', 'openspec/backlog.md', 'openspec/.sdlc/log.jsonl'];
+const FIXED_STATE_FILES = [
+  'openspec/roles.yaml', 'openspec/backlog.md', 'openspec/.sdlc/log.jsonl', 'openspec/.sdlc/team.json',
+];
 
 interface FileId {
   dev: bigint;

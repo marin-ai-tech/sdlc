@@ -19,6 +19,7 @@ On top of OpenSpec, `sdlc` adds the process parts the playbook asks for:
 - **Review** follows `REVIEW.md` passes (bugs, security, compliance). Findings are graded by severity. A human code owner approves once no important finding is open, and **plan drift** is computed against `plan.md`.
 - **Deterministic guardrails.** Claude Code hooks and an OpenCode plugin enforce the gates: no code before an approved plan, locked tests during bug fixes, protected paths, no production release without authorization, no keys or tokens added in agent edits, and no agent edits of the guard's own configuration.
 - **MCP in both directions.** `sdlc mcp serve` lets other AI systems read the process (status, next step, instructions, trace, audit); it offers no decisions. The team's MCP servers are described once in `openspec/sdlc.yaml` and laid out for Claude Code and OpenCode. `verify.mcp` checks are called by the CLI itself as gate evidence, and results from runs outside an agent session wait in `sdlc inbox` for the agent. The hook allows each server only at its stages, and each stage's workflows list the skills, subagents and servers configured for it. See [docs/en/10-integrations.md](docs/en/10-integrations.md) and the use cases in [docs/en/11-mcp-use-cases.md](docs/en/11-mcp-use-cases.md).
+- **The agent team.** Role agents — analyst, architect, developer, tester, reviewer — adapted to the project: from the team's MCP registry, a git or npm pack, or the built-in set, with a Project rules section the agent drafts from the code; sdlc adds where each role writes and the project's facts (checks, protected paths, people). A person accepts each role (`sdlc team accept`), and agents cannot edit accepted roles or vetted skills. See [docs/en/12-agent-team.md](docs/en/12-agent-team.md).
 - **Reviewer suggestion and context packs.** `sdlc review suggest` proposes a reviewer from roles, CODEOWNERS and open reviews, never the code's author; `docs/context/` sources reach the agent at their stage, and stale ones are marked.
 - **Checks OpenSpec lacks.** Before a merge, delta targets are checked. Overlapping edits across open changes are flagged. So are base-spec drift and spec scenarios with no verification evidence.
 - **Right-sized process.** A `lite` track skips intent and spec for small, bounded work.
@@ -113,7 +114,7 @@ Small bounded work: `sdlc new fix-null-name --kind bugfix --risk low`. Review it
 | Subagents | `.claude/agents/sdlc-{verifier,reviewer,researcher,simplifier}.md` | `.opencode/agents/sdlc-*.md` (`mode: subagent`, `permission` map) |
 | Guardrails | hooks merged into `.claude/settings.json` | `.opencode/plugins/sdlc.js` |
 
-The workflows are 14 short skills: `help`, `guide`, `next`, `status`, `explore`, `intent`, `spec`, `plan`, `build`, `verify`, `review`, `release`, `archive`, `triage`. They pull state, templates and instructions from the CLI at run time (`sdlc status|next|instructions --json`). Generated files are tracked in `openspec/.sdlc/manifest.json`, so `sdlc update` never overwrites a file you edited unless you pass `--force`.
+The workflows are 15 short skills: `help`, `guide`, `team`, `next`, `status`, `explore`, `intent`, `spec`, `plan`, `build`, `verify`, `review`, `release`, `archive`, `triage`. They pull state, templates and instructions from the CLI at run time (`sdlc status|next|instructions --json`). Generated files are tracked in `openspec/.sdlc/manifest.json`, so `sdlc update` never overwrites a file you edited unless you pass `--force`.
 
 ## Version and license records
 
@@ -147,6 +148,7 @@ Everything sdlc writes records the sdlc version and the license the project uses
 | `sdlc layout check [--json]` / `scaffold [--dry-run] [--json]` / `adapt [--dry-run] [--json]` / `convert [--apply] [--json]` | check layout readiness, create missing documents, map existing paths, or plan and apply conversion |
 | `sdlc rework <gate> --change <id> --reason <r> --note <t> [--reset]` | send a change back to a gate's stage with a reason; later approvals stop counting; `--reset` restores the planned files from the gate checkpoint (human-only) |
 | `sdlc takeover` / `release-control --change <id> --note <t>` | take a change from the agent and hand it back with a note (human-only) |
+| `sdlc team sync \| list \| check [--json]` / `team accept <role>` | the agent team: drafts from the registry, packs and built-ins; roles and their status; vetted skills; a person accepts a role (or `--skill <id>`) |
 | `sdlc events list \| flush [--json]` | process events waiting for delivery to the team's server; deliver them now |
 | `sdlc release check --change <id> [--json]` | run the release gate's MCP checks without approving |
 | `sdlc mcp serve` / `sdlc mcp check [--json]` | sdlc as a read-only MCP server (`init --mcp` registers it); connect to the registry servers and list their tools |

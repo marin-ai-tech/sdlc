@@ -2,6 +2,17 @@
 
 All notable changes to sdlc. Versions follow [Semantic Versioning](https://semver.org/); while the major version is 0, a minor version may change behavior.
 
+## 0.11.0 — 2026-10-07
+
+### Added
+- **The agent team.** Role agents — analyst, architect, developer, tester and reviewer — defined in `docs/agents/<role>.md` and generated as subagents for Claude Code and OpenCode, wired to their stages. sdlc adds to every role where it writes (the artifacts of its stages) and the facts of the project (checks, protected and test paths, people and separation rules, language, documents, context packs and MCP servers of its stages), so roles follow the project. The built-in roles (en, ru) are written for sdlc's artifacts and boundaries.
+- **Where roles come from:** `sdlc team sync` takes them from the team's MCP registry (`team.registry`: list_roles, get_role, list_skills, get_skill, checked by checksum), then from packs (`packs`: a git repository at a pinned ref or an npm package; no code of a pack runs), then from the built-in set; everything arrives as drafts. The team workflow (`/sdlc:team`) drafts a Project rules section into each role from the code, or from the idea of an empty project.
+- **A person accepts.** `sdlc team accept <role>` (a person's command) makes a draft the role, says whether it differs from its source, and records it in `openspec/.sdlc/team.json`; a role edited afterwards is not generated until accepted again. Skills install with a matching checksum only, and skills with scripts only after `sdlc team accept --skill <id>`; `sdlc team check` reports every skill. Accepted tester and reviewer roles replace `sdlc-verifier` and `sdlc-reviewer`.
+- **Guide topic** `sdlc guide team`, and a documentation chapter with user cases: [The agent team](docs/en/12-agent-team.md).
+
+### Fixed
+- **Agents cannot edit the files sdlc generates for them** (the `sdlc-*` subagents, workflow skills and commands) or accepted roles and team skills: an agent could rewrite the tester or the verify workflow to pass anything.
+
 ## 0.10.0 — 2026-10-07
 
 ### Added

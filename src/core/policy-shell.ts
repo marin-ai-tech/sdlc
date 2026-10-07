@@ -20,14 +20,15 @@ import { INBOX_DIR } from '../mcp/inbox.js';
  */
 
 /**
- * Harness records only the CLI writes: per-change `.sdlc.yaml`, the project log, roles, the backlog and the inbox
- * of MCP results kept for the agent (`openspec/.sdlc/inbox/<id>.json`).
+ * Harness records only the CLI writes: per-change `.sdlc.yaml`, the project log, roles, the backlog, the inbox
+ * of MCP results kept for the agent (`openspec/.sdlc/inbox/<id>.json`) and the record of the accepted roles of the
+ * agent team (`openspec/.sdlc/team.json`, B72).
  */
 // Case-insensitive: Windows and macOS file systems ignore case, so `OPENSPEC/Backlog.md` is the same file.
 export const STATE_FILE_WRITE =
-  /\.sdlc\.yaml|\.sdlc\/log\.jsonl|\.sdlc\/inbox(?:\/|\b)|openspec\/(?:roles\.yaml|backlog\.md)/i;
+  /\.sdlc\.yaml|\.sdlc\/log\.jsonl|\.sdlc\/team\.json|\.sdlc\/inbox(?:\/|\b)|openspec\/(?:roles\.yaml|backlog\.md)/i;
 export const STATE_FILE = new RegExp(
-  '(^|/)\\.sdlc\\.yaml$|^openspec/\\.sdlc/log\\.jsonl$|^openspec/\\.sdlc/inbox/[^/]+$' +
+  '(^|/)\\.sdlc\\.yaml$|^openspec/\\.sdlc/(?:log\\.jsonl|team\\.json)$|^openspec/\\.sdlc/inbox/[^/]+$' +
     '|^openspec/(?:roles\\.yaml|backlog\\.md)$',
   'i'
 );
@@ -63,7 +64,9 @@ const FOLDER_OPS = anyOf(FILE_OPS);
 const STATE_FOLDER = /^openspec(?:\/changes(?:\/archive)?(?:\/[^/]+)?|\/\.sdlc(?:\/inbox)?)?$/i;
 
 /** The state files at fixed places; a `.sdlc.yaml` may sit in any change directory. */
-const FIXED_STATE_FILES = ['openspec/backlog.md', 'openspec/roles.yaml', 'openspec/.sdlc/log.jsonl', '.sdlc.yaml'];
+const FIXED_STATE_FILES = [
+  'openspec/backlog.md', 'openspec/roles.yaml', 'openspec/.sdlc/log.jsonl', 'openspec/.sdlc/team.json', '.sdlc.yaml',
+];
 const GLOB_CHARS = /[*?[{]/;
 const DIR_COMMAND = /^(?:cd|chdir|pushd|Set-Location|sl|Push-Location)$/i;
 const POP_COMMAND = /^(?:popd|Pop-Location)$/i;

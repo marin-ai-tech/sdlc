@@ -4,6 +4,8 @@ import { isFile } from './fs-utils.js';
 import { LAYOUT_ROLE_IDS, type LayoutMapping, type LayoutRoleId } from './layout.js';
 import { parseEvents, type EventReceiver } from '../mcp/event-config.js';
 import { parseMcpChecks, parseMcpServers, type McpCheck, type McpServer } from '../mcp/registry.js';
+import { parsePacksConfig, type PackConfig } from '../team/pack-config.js';
+import { parseTeamConfig, type TeamConfig } from '../team/team-config.js';
 import { parseStages, type StagesConfig } from './stage-config.js';
 import { readYamlObject } from './yaml-io.js';
 import { updateYamlFile } from './yaml-update.js';
@@ -137,6 +139,16 @@ export interface SdlcConfig {
    * none (then nothing is queued or sent); never written back, so the file keeps it as people wrote it.
    */
   events?: EventReceiver[];
+  /**
+   * The agent team (B71): `registry` names the server of `mcp.servers` the roles and skills come from. Absent when
+   * sdlc.yaml has no `team`; never written back, so the file keeps it as people wrote it.
+   */
+  team?: TeamConfig;
+  /**
+   * Packs (B76): git repositories (`{ name, git, ref }`) or npm packages (`{ name, npm }`) that bring roles and
+   * skills, read by `sdlc team sync` after the registry. Absent when sdlc.yaml has none; never written back.
+   */
+  packs?: PackConfig[];
 }
 
 export const DEFAULT_TEST_PATHS = [
@@ -277,6 +289,10 @@ export function parseConfig(raw: Raw, file = 'openspec/sdlc.yaml'): SdlcConfig {
   }
   const events = parseEvents(raw.events, where, (config.mcp?.servers ?? []).map((server) => server.name));
   if (events.length > 0) config.events = events;
+  const team = parseTeamConfig(raw.team, where, (config.mcp?.servers ?? []).map((server) => server.name));
+  if (team) config.team = team;
+  const packs = parsePacksConfig(raw.packs, where);
+  if (packs.length > 0) config.packs = packs;
   if (!/^[A-Za-z0-9@._/ -]+$/.test(config.cli)) {
     throw new SdlcError(
       'invalid_config',

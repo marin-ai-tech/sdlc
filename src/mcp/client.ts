@@ -120,7 +120,8 @@ function firstText(content: unknown): string | undefined {
   return typeof part?.text === 'string' ? part.text : undefined;
 }
 
-function parseAnswer(answer: Record<string, unknown>): ToolAnswer {
+/** A tool call's raw answer as a ToolAnswer. */
+export function parseAnswer(answer: Record<string, unknown>): ToolAnswer {
   const text = firstText(answer.content);
   const isError = answer.isError === true;
   if (answer.structuredContent !== undefined) return { isError, result: answer.structuredContent, text };

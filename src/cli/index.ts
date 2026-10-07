@@ -28,6 +28,7 @@ import {
   backlogStart,
 } from '../commands/backlog.js';
 import { rolesCheck, rolesMigrate, rolesWho } from '../commands/roles.js';
+import { teamAcceptCommand, teamCheckCommand, teamListCommand, teamSyncCommand } from '../commands/team.js';
 import { adoptCommand } from '../commands/adopt.js';
 import { traceCommand } from '../commands/trace.js';
 import { mcpCheckCommand, mcpServeCommand } from '../commands/mcp.js';
@@ -93,6 +94,16 @@ export function buildProgram(): Command {
     .action((gate, opts) => rolesWho(gate, opts));
   roles.command('migrate').description(cmdDesc('cmd.roles.migrate'))
     .option('--json', 'output JSON').action((opts) => rolesMigrate(opts));
+  const team = program.command('team').description(cmdDesc('cmd.team'));
+  team.command('sync').description(cmdDesc('cmd.team.sync'))
+    .option('--json', 'output JSON').action((opts) => teamSyncCommand(opts));
+  team.command('accept [role]').description(cmdDesc('cmd.team.accept'))
+    .option('--skill <id>', 'accept a skill of the team registry, scripts included (human only)')
+    .option('--json', 'output JSON').action((role, opts) => teamAcceptCommand(role, opts));
+  team.command('list').description(cmdDesc('cmd.team.list'))
+    .option('--json', 'output JSON').action((opts) => teamListCommand(opts));
+  team.command('check').description(cmdDesc('cmd.team.check'))
+    .option('--json', 'output JSON').action((opts) => teamCheckCommand(opts));
   const backlog = program.command('backlog').description(cmdDesc('cmd.backlog'));
   const epic = backlog.command('epic').description(cmdDesc('cmd.backlog.epic'));
   epic.command('add <title>').description(cmdDesc('cmd.backlog.epic.add'))

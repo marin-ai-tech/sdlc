@@ -1,5 +1,6 @@
 import type { SdlcConfig } from '../core/config.js';
 import type { StageConfigId } from '../core/stage-config.js';
+import type { RoleFile } from '../team/role-file.js';
 
 /**
  * Stage resources in the generated workflows (B14). A workflow of a stage ends with the skills, subagents and MCP
@@ -28,14 +29,24 @@ export interface StageResources {
   servers: string[];
 }
 
+/** The subagents of a stage: the configured ones, then the accepted roles of the team for that stage (B70). */
+function stageAgents(configured: string[], stage: StageConfigId, team: readonly RoleFile[]): string[] {
+  const roles = team.filter((role) => role.stages.includes(stage)).map((role) => `sdlc-${role.id}`);
+  return [...new Set([...configured, ...roles])];
+}
+
 /** The resources of a workflow's stage; undefined when the workflow has no stage or the stage has none. */
-export function stageResources(config: SdlcConfig, workflow: string): StageResources | undefined {
+export function stageResources(
+  config: SdlcConfig,
+  workflow: string,
+  team: readonly RoleFile[] = []
+): StageResources | undefined {
   const stage = WORKFLOW_STAGE[workflow];
   if (!stage) return undefined;
   const own = config.stages[stage];
   const servers = (config.mcp?.servers ?? []).filter((s) => s.stages.includes(stage)).map((s) => s.name);
   const skills = own?.skills ?? [];
-  const agents = own?.agents ?? [];
+  const agents = stageAgents(own?.agents ?? [], stage, team);
   if (skills.length + agents.length + servers.length === 0) return undefined;
   return { stage, skills, agents, servers };
 }

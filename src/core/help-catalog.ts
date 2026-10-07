@@ -7,6 +7,8 @@ export const HUMAN_COMMANDS = [
   'backlog move', 'backlog drop', 'license set', 'roles migrate', 'takeover', 'release-control',
   // Removing the harness switches the guard off: a person's decision (B41).
   'uninstall',
+  // What a role of the agent team says is a person's decision (B72).
+  'team accept',
 ] as const;
 
 const EXAMPLES: Record<string, string> = {
@@ -41,6 +43,10 @@ const EXAMPLES: Record<string, string> = {
   'inbox list': 'sdlc inbox list --json',
   'inbox done': 'sdlc inbox done 20261006T184222020Z-ci-green-3f9a1c --json',
   guide: 'sdlc guide denials#plan-gate --json',
+  'team sync': 'sdlc team sync --json',
+  'team accept': 'sdlc team accept tester',
+  'team list': 'sdlc team list --json',
+  'team check': 'sdlc team check --json',
 };
 
 /** A real value per argument name, so a generated example can be run as it is. */

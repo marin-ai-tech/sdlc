@@ -11,6 +11,8 @@ export interface RenderOptions {
   surface: Surface;
   /** How agents invoke the harness CLI (`sdlc`, `npx --no-install sdlc`, ...). */
   cli: string;
+  /** Built-in agent id -> the subagent named instead by `{{agent:<id>}}` (an accepted role, B70); else `sdlc-<id>`. */
+  agents?: Record<string, string>;
 }
 
 /**
@@ -80,7 +82,8 @@ export function renderBody(body: string, options: RenderOptions): string {
       if (surface.endsWith('-agent')) return `Run \`${command}\`.`;
       return `!\`${command}\`\nIf the output above is missing, run \`${command}\`.`;
     })
-    .replace(/\{\{plan-mode\}\}/g, PLAN_MODE[surface]);
+    .replace(/\{\{plan-mode\}\}/g, PLAN_MODE[surface])
+    .replace(/\{\{agent:([a-z-]+)\}\}/g, (_m, id: string) => options.agents?.[id] ?? `sdlc-${id}`);
   out = applyCliPrefix(out, options.cli);
   const leftover = out.match(/\{\{[^}]+\}\}/);
   if (leftover) throw new Error(`Unresolved template placeholder ${leftover[0]} for surface ${surface}`);
