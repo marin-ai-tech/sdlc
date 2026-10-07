@@ -38,6 +38,7 @@ const EXAMPLES: Record<string, string> = {
   'mcp check': 'sdlc mcp check --json',
   'inbox list': 'sdlc inbox list --json',
   'inbox done': 'sdlc inbox done 20261006T184222020Z-ci-green-3f9a1c --json',
+  guide: 'sdlc guide denials#plan-gate --json',
 };
 
 /** A real value per argument name, so a generated example can be run as it is. */

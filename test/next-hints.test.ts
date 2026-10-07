@@ -70,9 +70,14 @@ describe('session start context', () => {
     expect(context).toMatch(/sdlc backlog start B1/);
   });
 
-  it('negative: with no change and an empty backlog it stays silent', () => {
+  // 0.9.1: the session start always says the agent can be asked how sdlc works (a changed requirement); with no change
+  // and an empty backlog that line is the whole summary.
+  it('negative: with no change and an empty backlog it only offers the guide', () => {
     const { root, cli } = project();
     const r = cli(['hook', 'session-start'], {}, JSON.stringify({ cwd: root, source: 'startup' }));
-    expect(r.stdout.trim()).toBe('');
+    const context = JSON.parse(r.stdout).hookSpecificOutput.additionalContext as string;
+    expect(context.split(/\r?\n/)).toHaveLength(1);
+    expect(context).toContain('sdlc guide');
+    expect(context).not.toMatch(/backlog start|active changes/);
   });
 });

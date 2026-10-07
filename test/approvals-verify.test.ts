@@ -54,6 +54,7 @@ function approveIntent(p: ReturnType<typeof project>, change: string) {
 }
 
 describe('sdlc approvals verify', () => {
+  // Signs commits with ssh-keygen and runs several approvals: ~20 s alone, past 60 s under a full parallel run.
   it('required: a valid signed approval passes; a forged one (Bob posing as Alice) fails; unsigned and uncommitted approvals fail', () => {
     const p = project('required');
     p.identity('Alice', 'alice@corp.example');
@@ -74,7 +75,7 @@ describe('sdlc approvals verify', () => {
     const byChange = Object.fromEntries(r.json().results.filter((x: { gate?: string }) => x.gate).map((x: { change: string; status: string }) => [x.change, x.status]));
     expect(byChange).toMatchObject({ good: 'valid', forged: 'wrong-signer', unsigned: 'unsigned', pending: 'not-committed' });
     expect(r.json()).toMatchObject({ mode: 'required', ok: false });
-  });
+  }, 180000);
 
   it('warn: the same findings are reported but the command succeeds', () => {
     const p = project('warn');

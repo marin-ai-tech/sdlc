@@ -32,6 +32,7 @@ On top of OpenSpec, `sdlc` adds the process parts the playbook asks for:
 - **Reports and dashboard.** `sdlc report` (Markdown with Mermaid, JSON or HTML) and `sdlc dashboard` (one offline HTML page) show stages, gates, backlog, deferred work and metrics; an example background process keeps the page current.
 - **Audit and metrics.** `sdlc audit` builds a timeline of who approved what and when, plus the playbook's lead-time and first-pass metrics, how long each gate waited for a person, the reworks with their reasons, and verify attempts until the first pass.
 - **Native agent UX.** Workflows ask with each tool's question tool (Claude Code AskUserQuestion, OpenCode `question`), mirror `tasks.md` into the tool todo list during `/sdlc:build`, and inject live CLI output into `/sdlc:status`, `/sdlc:next` and `/sdlc:help`. An answer in chat is never an approval — people run human decisions in their own terminal.
+- **Ask the agent how sdlc works.** The guide workflow answers questions about working with sdlc for your project, from short articles that ship with sdlc in English and Russian (`sdlc guide [topic]`); every hook denial names the section that explains it. `sdlc next --me` lists what waits for you, and `sdlc approve --preview` shows what you are about to approve.
 - **Help and Next hints.** `sdlc help [topic]` and `/sdlc:help` catalog workflows and CLI commands with who runs them (agent or person). State-changing commands print a `Next:` hint (who acts next and how; the exact command when a person must act) and add `next` to JSON.
 - **Progress drawing.** `sdlc status --change <id>` shows a stage stepper and a task bar; `sdlc backlog list` shows a bar per epic; the markdown report includes Mermaid diagrams with sanitized labels.
 - **Claude Code status line.** `sdlc statusline` prints one line (change · stage · who acts); opt in with `sdlc init --statusline`. A user-defined status line is never replaced; `sdlc uninstall` removes only the sdlc one.
@@ -112,7 +113,7 @@ Small bounded work: `sdlc new fix-null-name --kind bugfix --risk low`. Review it
 | Subagents | `.claude/agents/sdlc-{verifier,reviewer,researcher,simplifier}.md` | `.opencode/agents/sdlc-*.md` (`mode: subagent`, `permission` map) |
 | Guardrails | hooks merged into `.claude/settings.json` | `.opencode/plugins/sdlc.js` |
 
-The workflows are 13 short skills: `help`, `next`, `status`, `explore`, `intent`, `spec`, `plan`, `build`, `verify`, `review`, `release`, `archive`, `triage`. They pull state, templates and instructions from the CLI at run time (`sdlc status|next|instructions --json`). Generated files are tracked in `openspec/.sdlc/manifest.json`, so `sdlc update` never overwrites a file you edited unless you pass `--force`.
+The workflows are 14 short skills: `help`, `guide`, `next`, `status`, `explore`, `intent`, `spec`, `plan`, `build`, `verify`, `review`, `release`, `archive`, `triage`. They pull state, templates and instructions from the CLI at run time (`sdlc status|next|instructions --json`). Generated files are tracked in `openspec/.sdlc/manifest.json`, so `sdlc update` never overwrites a file you edited unless you pass `--force`.
 
 ## Version and license records
 
@@ -139,6 +140,8 @@ Everything sdlc writes records the sdlc version and the license the project uses
 | `sdlc backlog add \| epic add \| epic edit \| list \| next \| edit \| start \| move \| drop \| done` | manage planned changes in `openspec/backlog.md` (order = priority; `move`/`drop` are human-only) |
 | `sdlc import bmad <path> (--change <id> \| --to-backlog) [--dry-run]` | import BMAD planning into an unapproved change, or epics/tickets (or a PRD/SPEC) into the backlog |
 | `sdlc status [--change] [--markdown] [--json]` / `sdlc next` | stages, gates, approvals, evidence, who acts next (with `--change`, a stage stepper and task bar); with no active change, the next ready backlog item |
+| `sdlc guide [topic[#section]] [--json]` | how sdlc works: short articles (en, ru) the guide workflow answers from; `denials#<rule>` explains a hook denial |
+| `sdlc next --me [--json]` / `sdlc approve <gate> --change <id> --preview` | what waits for me, with the commands; what I am about to approve (writes nothing) |
 | `sdlc help [topic] [--json]` | catalog of workflows and CLI commands with who runs them (agent or person) |
 | `sdlc statusline` | one-line Claude Code status (change · stage · who acts); reads JSON on stdin |
 | `sdlc layout check [--json]` / `scaffold [--dry-run] [--json]` / `adapt [--dry-run] [--json]` / `convert [--apply] [--json]` | check layout readiness, create missing documents, map existing paths, or plan and apply conversion |

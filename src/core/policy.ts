@@ -345,22 +345,27 @@ function evaluateRules(call: ToolCall, ctx: PolicyContext): Decision {
 }
 
 /** Session start with no active change: the next backlog item, then the open inbox items. */
-function idleSummary(ctx: PolicyContext, inbox: string[]): string | undefined {
+function idleSummary(ctx: PolicyContext, inbox: string[]): string[] {
   const item = nextBacklogItem(readBacklog(ctx.paths.root));
-  if (!item) return inbox.length > 0 ? inbox.join('\n') : undefined;
+  if (!item) return inbox;
   const start = `${ctx.config.cli} backlog start ${item.id}`;
-  return [t('session.backlogNext', { id: item.id, title: item.title, start }), ...inbox].join('\n');
+  return [t('session.backlogNext', { id: item.id, title: item.title, start }), ...inbox];
+}
+
+/** The last line of every session summary: the agent can be asked how sdlc works (0.9.1). */
+function withGuideLine(lines: string[]): string {
+  return [...lines, t('session.guide')].join('\n');
 }
 
 /**
  * Short lifecycle summary injected at session start (Claude SessionStart / OpenCode session). `observe` sees every
  * evaluated view, so the hook can record the gates that wait for a person without evaluating twice.
  */
-export function sessionSummary(ctx: PolicyContext, observe?: (view: LifecycleView) => void): string | undefined {
+export function sessionSummary(ctx: PolicyContext, observe?: (view: LifecycleView) => void): string {
   const changes = listActiveChanges(ctx.paths);
   // MCP results kept for the agent from outside its session (the inbox): one line per open item.
   const inbox = inboxSessionLines(ctx.paths.root, ctx.config.cli);
-  if (changes.length === 0) return idleSummary(ctx, inbox);
+  if (changes.length === 0) return withGuideLine(idleSummary(ctx, inbox));
   const stamp = stampText(harnessStamp(ctx.config));
   const lines = [t('session.header', { stamp })];
   for (const ref of changes.slice(0, 8)) {
@@ -382,7 +387,7 @@ export function sessionSummary(ctx: PolicyContext, observe?: (view: LifecycleVie
   if (changes.length > 8) lines.push(t('session.more', { count: changes.length - 8 }));
   lines.push(...inbox);
   lines.push(t('session.enforcement', { mode: ctx.config.enforcement.mode }));
-  return lines.join('\n');
+  return withGuideLine(lines);
 }
 
 /** Stop-time check: a change whose tasks are all done must carry fresh verification evidence. */

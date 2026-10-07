@@ -150,6 +150,7 @@ describe('demo: a team builds a calculator with sdlc (every command)', { timeout
     step('doctor', 'setup', 'alice', ['doctor'], 'Installation health.');
     step('license', 'setup', 'alice', ['license'], 'Which license the project uses sdlc under.');
     step('help', 'setup', 'bob', ['help'], 'The catalog: workflows, commands, and the decisions only people take.');
+    step('guide', 'setup', 'bob', ['guide', 'gates'], 'How sdlc works, from the guide the agent answers from.');
     step('layout-check', 'setup', 'agent', ['layout', 'check'], 'Is the project AI-ready? Not yet.');
     step('layout-scaffold', 'setup', 'agent', ['layout', 'scaffold'], 'The agent creates AGENTS.md, CLAUDE.md and the docs skeleton.');
     step('layout-adapt', 'setup', 'agent', ['layout', 'adapt', '--dry-run'], 'Nothing to adapt: everything is at its canonical place.');

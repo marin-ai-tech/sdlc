@@ -2,6 +2,13 @@
 
 All notable changes to sdlc. Versions follow [Semantic Versioning](https://semver.org/); while the major version is 0, a minor version may change behavior.
 
+## 0.9.1 — 2026-10-07
+
+### Added
+- **Ask the agent how sdlc works.** A guide workflow (`/sdlc:guide`, `/sdlc-guide`, or a plain question) answers how to work with sdlc for your project: stages, gates and approvals, roles, tracks, bug fixes, the backlog, rework and takeover, verification, review, MCP, configuration and hook denials. The material ships with sdlc in English and Russian (`sdlc guide [topic[#section]]`), so it always matches the installed version; the session start mentions it; every hook denial names the section that explains it (`sdlc guide denials#<rule>`); the sdlc MCP server offers it as the `guide` tool.
+- **`sdlc next --me`**: every gate across the active changes that you may take now, with the command.
+- **`sdlc approve <gate> --change <id> --preview`**: what you are about to approve — the artifacts, what changed since the last approval, the approvals so far and needed, open findings and verification for review and release, and whether you may approve. It writes nothing.
+
 ## 0.9.0 — 2026-10-06
 
 ### Added

@@ -18,7 +18,7 @@ sdlc init --tools none        # OpenSpec root, sdlc schema, openspec/sdlc.yaml (
 sdlc init --tools opencode    # ...or also set up OpenCode in the same project
 ```
 
-Workflows: `/sdlc:help`, `/sdlc:next`, `/sdlc:status`, `/sdlc:adopt`, `/sdlc:backlog`, `/sdlc:explore`, `/sdlc:intent`, `/sdlc:spec`, `/sdlc:plan`, `/sdlc:build`, `/sdlc:verify`, `/sdlc:review`, `/sdlc:release`, `/sdlc:archive`, `/sdlc:triage`.
+Workflows: `/sdlc:help`, `/sdlc:guide`, `/sdlc:next`, `/sdlc:status`, `/sdlc:adopt`, `/sdlc:backlog`, `/sdlc:explore`, `/sdlc:intent`, `/sdlc:spec`, `/sdlc:plan`, `/sdlc:build`, `/sdlc:verify`, `/sdlc:review`, `/sdlc:release`, `/sdlc:archive`, `/sdlc:triage`.
 
 ## License
 

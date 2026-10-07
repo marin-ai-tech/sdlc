@@ -4,7 +4,7 @@ import * as path from 'node:path';
 import { recordAwaiting } from './core/awaiting.js';
 import { loadConfig } from './core/config.js';
 import { isFile, isWithin, toPosix } from './core/fs-utils.js';
-import { resolveLocale, setLocale, systemLocale } from './core/i18n.js';
+import { resolveLocale, setLocale, systemLocale, t } from './core/i18n.js';
 import { appendLog } from './core/log.js';
 import { evaluateToolCall, normalizeToolCall, sessionSummary, stopCheck, type Decision, type ToolCall } from './core/policy.js';
 import { findProjectRoot, projectPaths } from './core/project.js';
@@ -67,13 +67,20 @@ function firstTimeThisSession(sessionId: string | undefined, key: string): boole
   return true;
 }
 
+/** The reason the agent reads: the rule, its text, and the guide section that explains the rule. */
+function hookReason(decision: Decision): string {
+  const text = `[sdlc:${decision.rule}] ${decision.reason ?? ''}`.trim();
+  const section = decision.rule ? `denials#${decision.rule}` : 'denials';
+  return `${text} ${t('hook.guideHint', { section })}`;
+}
+
 /** Answers the agent; returns true when a denial or a (first) warning was delivered. */
 function respondPreTool(agent: Agent, decision: Decision, sessionId: string | undefined): boolean {
   if (decision.decision === 'allow') {
     if (agent === 'opencode') write({ decision: 'allow' });
     return false;
   }
-  const reason = `[sdlc:${decision.rule}] ${decision.reason ?? ''}`.trim();
+  const reason = hookReason(decision);
   if (agent === 'opencode') {
     if (decision.decision === 'warn' && !firstTimeThisSession(sessionId, decision.rule ?? 'warn')) {
       write({ decision: 'allow' });

@@ -119,7 +119,7 @@ export const SLIDES = [
       ru: 'Алиса ставит sdlc для Claude Code и OpenCode; агент готовит репозиторий к работе с ИИ.',
     },
     steps: ['init', 'layout-check', 'layout-scaffold'],
-    more: ['doctor', 'license', 'help', 'layout-adapt', 'layout-convert', 'adopt', 'adopt-apply-agent', 'update'],
+    more: ['doctor', 'license', 'help', 'guide', 'layout-adapt', 'layout-convert', 'adopt', 'adopt-apply-agent', 'update'],
   },
   {
     id: 'explore', layout: 'steps',
@@ -319,6 +319,7 @@ export const STEP_NOTE_RU = {
   doctor: 'Проверка установки.',
   license: 'Под какой лицензией проект использует sdlc.',
   help: 'Каталог: процессы, команды и решения, которые принимают только люди.',
+  guide: 'Как работает sdlc — из справочника, по которому отвечает агент.',
   'layout-check': 'Готов ли проект к работе с ИИ? Пока нет.',
   'layout-scaffold': 'Агент создаёт AGENTS.md, CLAUDE.md и каркас документации.',
   'layout-adapt': 'Адаптировать нечего: всё на своих местах.',

@@ -1,5 +1,6 @@
 import { Command } from 'commander';
 import { helpCommand } from '../commands/help.js';
+import { guideCommand } from '../commands/guide.js';
 import { statuslineCommand } from '../commands/statusline.js';
 import { archiveCommand, auditCommand, logCommand, validateCommand } from '../commands/lifecycle-ops.js';
 import { licenseCommand } from '../commands/license.js';
@@ -31,6 +32,8 @@ import { adoptCommand } from '../commands/adopt.js';
 import { traceCommand } from '../commands/trace.js';
 import { mcpCheckCommand, mcpServeCommand } from '../commands/mcp.js';
 import { inboxDoneCommand, inboxListCommand } from '../commands/inbox.js';
+import { nextMeCommand } from '../commands/next-me.js';
+import { approvePreviewCommand } from '../commands/approve-preview.js';
 import { resolveLocale, setLocale, systemLocale, t } from '../core/i18n.js';
 import { applyCommanderLocale, localizeDescriptions, peekLocaleFlag } from './commander-i18n.js';
 import { loadConfig } from '../core/config.js';
@@ -278,6 +281,8 @@ export function buildProgram(): Command {
 
   program.command('help [topic]').description(cmdDesc('cmd.help'))
     .option('--json', 'output JSON').action((topic, opts) => helpCommand(topic, opts));
+  program.command('guide [topic]').description(cmdDesc('cmd.guide'))
+    .option('--json', 'output JSON').action((topic, opts) => guideCommand(topic, opts));
   program.command('statusline').description(cmdDesc('cmd.statusline'))
     .action(() => statuslineCommand());
   const mcp = program.command('mcp').description(cmdDesc('cmd.mcp'));
@@ -306,8 +311,9 @@ export function buildProgram(): Command {
     .command('next')
     .description(cmdDesc('cmd.next'))
     .option('--change <id>', 'change id (defaults to the only active change)')
+    .option('--me', 'what waits for me: the gates I may decide now, across every active change (read-only)')
     .option('--json', 'output JSON')
-    .action((opts) => nextCommand(opts));
+    .action((opts) => (opts.me ? nextMeCommand(opts) : nextCommand(opts)));
 
   program
     .command('instructions <artifact>')
@@ -321,15 +327,18 @@ export function buildProgram(): Command {
     ['reject', rejectCommand, cmdDesc('cmd.reject')],
     ['waive', waiveCommand, cmdDesc('cmd.waive')],
   ] as const) {
-    program
+    const decision = program
       .command(`${name} <gate>`)
       .description(desc)
       .option('--change <id>', 'change id')
       .option('--as <role>', 'role you approve as (e.g. product-owner, tech-lead, engineer, code-owner)')
       .option('--note <text>', 'reason or comment (required for reject and waive)')
       .option('--by <identity>', 'override the git identity recorded as the decider')
-      .option('--json', 'output JSON')
-      .action((gate, opts) => fn(gate, opts));
+      .option('--json', 'output JSON');
+    if (name === 'approve') {
+      decision.option('--preview', 'show what would be approved and whether you may approve it, without approving');
+    }
+    decision.action((gate, opts) => (opts.preview ? approvePreviewCommand(gate, opts) : fn(gate, opts)));
   }
 
   program.command('takeover').description(cmdDesc('cmd.takeover'))

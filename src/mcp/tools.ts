@@ -73,6 +73,12 @@ export const READ_TOOLS: readonly ReadTool[] = [
     inputSchema: schema({ topic: 'help topic; omit for the catalog' }),
     argv: (a) => ['help', ...(a.topic === undefined ? [] : [a.topic])],
   },
+  {
+    name: 'guide',
+    description: 'What `sdlc guide [topic] --json` prints: how sdlc works - the topics, an article or a section.',
+    inputSchema: schema({ topic: 'guide topic, or topic#section (e.g. denials#plan-gate); omit for the index' }),
+    argv: (a) => ['guide', ...(a.topic === undefined ? [] : [a.topic])],
+  },
 ];
 
 export function findTool(name: string): ReadTool | undefined {

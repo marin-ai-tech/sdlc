@@ -19,7 +19,8 @@ const INTENT = [
   '## Success measures', 'M.', '', '## Out of scope', 'None', '', '## Open questions', 'None', '',
 ].join('\n');
 
-const READ_TOOLS = ['audit', 'help', 'instructions', 'next', 'status', 'trace'];
+// 0.9.1 adds `guide` (how sdlc works): read-only like the rest, a changed requirement.
+const READ_TOOLS = ['audit', 'guide', 'help', 'instructions', 'next', 'status', 'trace'];
 
 function project() {
   const root = tempDir('sdlc-mcp-serve-');
