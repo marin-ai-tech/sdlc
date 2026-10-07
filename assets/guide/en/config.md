@@ -11,7 +11,10 @@ also controls the guard itself.
 |---|---|
 | `gates.<gate>` | `required`, `approvers` (roles), `high_risk_approvers`, `min_approvals` |
 | `verify.commands` | the project's checks: `{ name, run, required }` |
-| `verify.mcp` | checks the CLI calls on an MCP server |
+| `verify.mcp`, `release.mcp` | checks the CLI calls on an MCP server, for the verify and the release gate |
+| `project.name` | the project's name in MCP and events (default: the folder name) |
+| `events` | receivers of process events: `{ server, tool, on, args }` |
+| `gates.<gate>.overdue_hours` | after how long a waiting gate raises an overdue event |
 | `review` | `policy` (REVIEW.md), `passes`, `lenses`, `base`, `block_on` |
 | `release.commands` | regexes for production commands the agent may not run before the release approval |
 | `enforcement.mode` | `off`, `warn` (remind), `block` (deny process rules); hard rules apply in warn too |

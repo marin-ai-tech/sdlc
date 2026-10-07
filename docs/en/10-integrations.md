@@ -235,7 +235,16 @@ Everything above depends on the agent not being able to switch the guard off. Si
 
 In an agent session, `sdlc init` and `sdlc update` refuse to weaken the guard: a lower mode, fewer tools, `--no-hooks` or another `--cli`. `sdlc uninstall` is a person's command. `sdlc doctor` warns about `disableAllHooks`.
 
-## 10.10. Limits we accept
+## 10.10. Since 0.10.0
+
+- `sdlc mcp serve --project <path>` serves projects from outside their folders; several projects in one server.
+- The server offers read-only resources: context packs, living specs, change artifacts, documents for agents.
+- `release.mcp` checks hold the release approval until an outside system agrees; `sdlc release check` runs them beforehand.
+- `events` push process events to an MCP server, with the people a gate waits for and overdue gates.
+
+Chapter 11 shows the use cases.
+
+## 10.11. Limits we accept
 
 - **The secret patterns** are a floor, not a scanner: keep a secret scanner in CI as well.
 - **The shell rules are heuristics on the command text.** A path built at run time (`cd "$DIR"`, a variable set in the same command) can slip past them. A computed path is much rarer in an agent's command than a literal one.

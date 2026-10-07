@@ -4,7 +4,7 @@ import { c, line, printJson, reportFailure, warn } from '../cli/output.js';
 import { emitNextHint, resolveNext } from '../cli/next-hint.js';
 import { agentEnvironment } from '../core/agent-env.js';
 import {
-  provenance, readChangeState, type ApprovalRecord, type ChangeState, type GateState,
+  provenance, readChangeState, type ApprovalRecord, type ChangeState, type GateState, type ReleaseCheckRecord,
 } from '../core/change-state.js';
 import { resolveChange, type ChangeRef } from '../core/changes.js';
 import { ALL_GATES, APPROVAL_GATES, type ApprovalGateId, type GateId, type SdlcConfig } from '../core/config.js';
@@ -19,6 +19,7 @@ import { evaluateChange, type LifecycleView } from '../core/lifecycle.js';
 import { recordAwaiting } from '../core/awaiting.js';
 import { changeMarkdown, tryStampArtifacts } from '../core/stamp.js';
 import { recordCheckpoint } from '../core/checkpoint.js';
+import { approvalChecks } from '../mcp/release-checks.js';
 
 /**
  * Gate decisions: approve, reject, waive, and the test lock. These record
@@ -158,6 +159,8 @@ interface ApprovalFields {
   identity: string;
   digest: string;
   note?: string;
+  /** The release checks that passed (release gate with `release.mcp` only). */
+  checks?: ReleaseCheckRecord[];
 }
 
 /** The approval as recorded: who, in which role, what they signed, and its place in the record's decision order. */
@@ -172,6 +175,7 @@ function approvalRecord(
     seq: nextSeq(state),
     digest: fields.digest,
     ...(fields.note ? { note: fields.note } : {}),
+    ...(fields.checks ? { checks: fields.checks } : {}),
     ...(gate === 'spec' ? { base: baseDigests(ctx.paths, readChangeDeltas(ref.dir)) } : {}),
     ...provenance(ctx.stamp),
   };
@@ -206,12 +210,14 @@ export async function approveCommand(gateArg: string, opts: DecisionOptions): Pr
     );
     const identity = approvalIdentity(ctx.root, roles, opts.by);
     if (!roles) assertRoleMember(ctx.config, role, identity);
+    // B47: the release checks run after every other check and before anything is written.
+    const checks = gate === 'release' ? await approvalChecks(ctx.config, ctx.root, ref.id) : undefined;
 
     recordCheckpoint(ctx.root, ref.id, gate);
     const current: GateState = state.gates[gate] ?? {};
     // A person approving again replaces only their own approval; other people's approvals stay.
     const approvals = (current.approvals ?? []).filter((a) => !sameApprover(a, identity, person));
-    const fields = { role, person, identity, digest: evaluation.digest, note: opts.note };
+    const fields = { role, person, identity, digest: evaluation.digest, note: opts.note, checks };
     approvals.push(approvalRecord(ctx, ref, state, gate, fields));
     state.gates[gate] = { ...current, approvals };
     recordChangeEvent(
@@ -229,7 +235,7 @@ export async function approveCommand(gateArg: string, opts: DecisionOptions): Pr
     if (opts.json) {
       printJson({
         change: ref.id, gate, role, by: identity, status: status.status,
-        missingRoles: status.missingRoles, ...(next ? { next } : {}),
+        missingRoles: status.missingRoles, ...(checks ? { checks } : {}), ...(next ? { next } : {}),
       });
       return;
     }

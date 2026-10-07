@@ -32,8 +32,11 @@ import { adoptCommand } from '../commands/adopt.js';
 import { traceCommand } from '../commands/trace.js';
 import { mcpCheckCommand, mcpServeCommand } from '../commands/mcp.js';
 import { inboxDoneCommand, inboxListCommand } from '../commands/inbox.js';
+import { eventsFlushCommand, eventsListCommand } from '../commands/events.js';
+import { deliverAfterCommand } from '../mcp/events.js';
 import { nextMeCommand } from '../commands/next-me.js';
 import { approvePreviewCommand } from '../commands/approve-preview.js';
+import { releaseCheckCommand } from '../commands/release.js';
 import { resolveLocale, setLocale, systemLocale, t } from '../core/i18n.js';
 import { applyCommanderLocale, localizeDescriptions, peekLocaleFlag } from './commander-i18n.js';
 import { loadConfig } from '../core/config.js';
@@ -287,7 +290,9 @@ export function buildProgram(): Command {
     .action(() => statuslineCommand());
   const mcp = program.command('mcp').description(cmdDesc('cmd.mcp'));
   mcp.command('serve').description(cmdDesc('cmd.mcp.serve'))
-    .action(() => mcpServeCommand());
+    .option('--project <path>', 'serve this sdlc project instead of the current folder (repeatable)',
+      (value, previous: string[]) => [...previous, value], [] as string[])
+    .action((opts) => mcpServeCommand(opts));
   mcp.command('check').description(cmdDesc('cmd.mcp.check'))
     .option('--json', 'output JSON')
     .action((opts) => mcpCheckCommand(opts));
@@ -298,6 +303,18 @@ export function buildProgram(): Command {
   inbox.command('done <id>').description(cmdDesc('cmd.inbox.done'))
     .option('--json', 'output JSON')
     .action((id, opts) => inboxDoneCommand(id, opts));
+  const events = program.command('events').description(cmdDesc('cmd.events'));
+  events.command('list').description(cmdDesc('cmd.events.list'))
+    .option('--json', 'output JSON')
+    .action((opts) => eventsListCommand(opts));
+  events.command('flush').description(cmdDesc('cmd.events.flush'))
+    .option('--json', 'output JSON')
+    .action((opts) => eventsFlushCommand(opts));
+  const release = program.command('release').description(cmdDesc('cmd.release'));
+  release.command('check').description(cmdDesc('cmd.release.check'))
+    .option('--change <id>', 'change id (defaults to the only active change)')
+    .option('--json', 'output JSON')
+    .action((opts) => releaseCheckCommand(opts));
 
   program.command('track').description(cmdDesc('cmd.track'))
     .command('set <track>')
@@ -500,8 +517,28 @@ export function buildProgram(): Command {
   return program;
 }
 
+/**
+ * Commands after which queued events are not sent (B45): a hook must stay fast, the MCP server's stdout is the
+ * protocol, and `events flush` has just sent them.
+ */
+const NO_DELIVERY = ['hook', 'mcp serve', 'events flush'];
+
+/** `mcp serve` for the `serve` subcommand of `mcp`. */
+function commandPath(command: Command): string {
+  const names: string[] = [];
+  for (let at: Command | null = command; at?.parent; at = at.parent) names.unshift(at.name());
+  return names.join(' ');
+}
+
+async function deliverAfter(command: Command): Promise<void> {
+  if (NO_DELIVERY.includes(commandPath(command))) return;
+  await deliverAfterCommand();
+}
+
 export async function run(argv: string[]): Promise<void> {
   recordInvocation(argv.slice(2));
   applyLocale(peekLocaleFlag(argv));
-  await buildProgram().parseAsync(argv);
+  const program = buildProgram();
+  program.hook('postAction', (_program, actionCommand) => deliverAfter(actionCommand));
+  await program.parseAsync(argv);
 }

@@ -3,6 +3,7 @@ import * as path from 'node:path';
 import type { SdlcConfig } from './config.js';
 import { ensureDir, isFile, readText } from './fs-utils.js';
 import { harnessStamp, type HarnessStamp } from './license.js';
+import { queueEvent, type QueueConfig } from '../mcp/outbox.js';
 
 /**
  * Append-only project log: one JSON object per line in
@@ -23,6 +24,8 @@ export interface LogEntry {
   detail?: string;
   /** Agent integration that triggered the entry (hook decisions). */
   agent?: string;
+  /** Person ids from roles.yaml a waiting gate waits for (`gate.<g>.awaiting`, `gate.<g>.overdue`; B54). */
+  waitingFor?: string[];
   sdlc: string;
   license: string;
 }
@@ -33,7 +36,7 @@ const GITATTRIBUTES = 'log.jsonl merge=union\n';
 
 export function appendLog(
   root: string,
-  config: Pick<SdlcConfig, 'license' | 'log'>,
+  config: Pick<SdlcConfig, 'license' | 'log'> & QueueConfig,
   input: LogInput,
   stamp: HarnessStamp = harnessStamp(config)
 ): void {
@@ -50,10 +53,12 @@ export function appendLog(
       ...(input.by ? { by: input.by } : {}),
       ...(input.detail ? { detail: input.detail } : {}),
       ...(input.agent ? { agent: input.agent } : {}),
+      ...(input.waitingFor ? { waitingFor: input.waitingFor } : {}),
       sdlc: stamp.version,
       license: stamp.license,
     };
     fs.appendFileSync(file, `${JSON.stringify(entry)}\n`, 'utf-8');
+    queueEvent(root, config, entry);
   } catch {
     // The log is a record, not a gate: failing to write it never fails a command or a hook.
   }

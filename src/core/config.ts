@@ -2,6 +2,7 @@ import { parseMinApprovals } from './approval-quorum.js';
 import { SdlcError } from './errors.js';
 import { isFile } from './fs-utils.js';
 import { LAYOUT_ROLE_IDS, type LayoutMapping, type LayoutRoleId } from './layout.js';
+import { parseEvents, type EventReceiver } from '../mcp/event-config.js';
 import { parseMcpChecks, parseMcpServers, type McpCheck, type McpServer } from '../mcp/registry.js';
 import { parseStages, type StagesConfig } from './stage-config.js';
 import { readYamlObject } from './yaml-io.js';
@@ -38,6 +39,8 @@ export interface GateConfig {
   artifacts?: string[];
   /** Different people who must approve (`min_approvals`, an integer of 1 or more). Unset = 1. */
   minApprovals?: number;
+  /** Hours a person may keep the gate waiting before `gate.<g>.overdue` is logged (B55). Unset = never overdue. */
+  overdueHours?: number;
 }
 
 export interface VerifyCommand {
@@ -78,6 +81,8 @@ export interface SdlcConfig {
   release: {
     /** Regular expressions; a matching agent shell command needs release authorization. */
     commands: string[];
+    /** MCP checks the CLI calls when a person approves the release (B47); absent when sdlc.yaml has none. */
+    mcp?: McpCheck[];
   };
   enforcement: {
     mode: EnforcementMode;
@@ -122,6 +127,16 @@ export interface SdlcConfig {
   mcp?: { serve: boolean; servers?: McpServer[] };
   /** Skills and subagents per stage (B14); never written back, so the file keeps it as people wrote it. */
   stages: StagesConfig;
+  /**
+   * The project's name for `sdlc mcp serve --project` (B46). Absent when sdlc.yaml has none (the folder name is
+   * used then); never written back, so the file keeps it as people wrote it.
+   */
+  project?: { name: string };
+  /**
+   * The event sink (B45): receivers of process events, each a registry server and tool. Absent when sdlc.yaml has
+   * none (then nothing is queued or sent); never written back, so the file keeps it as people wrote it.
+   */
+  events?: EventReceiver[];
 }
 
 export const DEFAULT_TEST_PATHS = [
@@ -252,11 +267,16 @@ export function parseConfig(raw: Raw, file = 'openspec/sdlc.yaml'): SdlcConfig {
   config.cli = asString(raw.cli, where('cli')) ?? config.cli;
   config.statusline = asBool(raw.statusline, where('statusline')) ?? config.statusline;
   config.stages = parseStages(raw.stages, where);
+  const project = asObject(raw.project, where('project'));
+  const projectName = asString(project?.name, where('project.name'));
+  if (projectName !== undefined) config.project = { name: projectName };
   const mcp = asObject(raw.mcp, where('mcp'));
   if (mcp) {
     const serve = asBool(mcp.serve, where('mcp.serve')) ?? false;
     config.mcp = { serve, servers: parseMcpServers(mcp.servers, where) };
   }
+  const events = parseEvents(raw.events, where, (config.mcp?.servers ?? []).map((server) => server.name));
+  if (events.length > 0) config.events = events;
   if (!/^[A-Za-z0-9@._/ -]+$/.test(config.cli)) {
     throw new SdlcError(
       'invalid_config',
@@ -300,6 +320,8 @@ export function parseConfig(raw: Raw, file = 'openspec/sdlc.yaml'): SdlcConfig {
       if (artifacts) target.artifacts = artifacts;
       const minApprovals = parseMinApprovals(gate.min_approvals, where(`gates.${id}.min_approvals`));
       if (minApprovals) target.minApprovals = minApprovals;
+      const overdueHours = asNumber(gate.overdue_hours, where(`gates.${id}.overdue_hours`));
+      if (overdueHours) target.overdueHours = overdueHours;
     }
   }
 
@@ -368,6 +390,8 @@ export function parseConfig(raw: Raw, file = 'openspec/sdlc.yaml'): SdlcConfig {
 
   const release = asObject(raw.release, where('release'));
   if (release) {
+    const releaseChecks = parseMcpChecks(release.mcp, where, 'release.mcp');
+    if (releaseChecks.length > 0) config.release.mcp = releaseChecks;
     const commands = asStringArray(release.commands, where('release.commands'));
     if (commands) {
       for (const pattern of commands) {
@@ -486,6 +510,7 @@ export function serializeConfig(config: SdlcConfig): Record<string, unknown> {
       ...(gate.highRiskApprovers.length > 0 ? { high_risk_approvers: gate.highRiskApprovers } : {}),
       ...(gate.artifacts ? { artifacts: gate.artifacts } : {}),
       ...(gate.minApprovals ? { min_approvals: gate.minApprovals } : {}),
+      ...(gate.overdueHours ? { overdue_hours: gate.overdueHours } : {}),
     };
   }
   gates.verify = { required: config.gates.verify.required };

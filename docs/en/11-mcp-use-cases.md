@@ -11,11 +11,14 @@ MCP works in two directions here:
 
 | Capability | Direction | Command or setting | Who uses it |
 |---|---|---|---|
-| Read the process: status, next step, artifact instructions, trace, audit, help | sdlc → others | `sdlc mcp serve`, registered by `sdlc init --mcp` | agents, orchestrators, chat clients, IDE assistants |
+| Read the process: status, next step, artifact instructions, trace, audit, help, guide | sdlc → others | `sdlc mcp serve`, registered by `sdlc init --mcp` | agents, orchestrators, chat clients, IDE assistants |
+| Read the team's knowledge: context packs, living specs, change artifacts, documents for agents | sdlc → others | MCP resources of `sdlc mcp serve` (0.10.0) | other agents and assistants |
+| Several projects in one server | sdlc → others | `sdlc mcp serve --project <path> --project <path>` (0.10.0) | Claude Desktop, central scripts |
 | One registry of the team's MCP servers for Claude Code and OpenCode | config → tools | `mcp.servers` in `openspec/sdlc.yaml` | the team lead, once |
 | Check that the servers are reachable and what they can do | sdlc → servers | `sdlc mcp check` | whoever adds a server |
-| A server's answer as gate evidence | sdlc → servers | `verify.mcp` | the verify gate |
+| A server's answer as gate evidence | sdlc → servers | `verify.mcp`; `release.mcp` for the release gate (0.10.0) | the verify and release gates |
 | Results for the agent from runs it was not part of | sdlc → agent | `sdlc inbox`, the session-start summary | the agent |
+| Tell other systems what happens: gates waiting, approvals, verification, archives, overdue gates | sdlc → servers | `events` in `openspec/sdlc.yaml` (0.10.0) | a central server, a chat bot, a ticket system |
 | Which servers an agent may call at which stage | hook | `mcp.servers.<name>.stages` | enforced on every agent |
 | Which skills, subagents and servers a stage uses | generated workflows | `stages.<stage>` | the agent, as guidance |
 
@@ -31,20 +34,23 @@ sdlc init --mcp          # writes the sdlc entry into .mcp.json and opencode.jso
 
 Claude Code asks once, in an interactive session, before it starts a project server.
 
-**Claude Desktop or another client** that starts servers outside the project. `sdlc mcp serve` serves the project of the folder it starts in, so the command has to go to the project first. In Claude Desktop, edit `claude_desktop_config.json`:
+**Claude Desktop or another client** that starts servers outside the project: name the projects with `--project` (since 0.10.0). In Claude Desktop, edit `claude_desktop_config.json`:
 
 ```json
 {
   "mcpServers": {
-    "sdlc-claims": {
-      "command": "cmd",
-      "args": ["/c", "cd /d C:\\work\\claims && sdlc mcp serve"]
+    "sdlc": {
+      "command": "sdlc",
+      "args": ["mcp", "serve", "--project", "C:\\work\\claims", "--project", "C:\\work\\billing"]
     }
   }
 }
 ```
 
-On macOS and Linux, use `"command": "sh", "args": ["-c", "cd ~/work/claims && exec sdlc mcp serve"]`. Use one entry per project.
+- With one project, the tools are exactly as in the project.
+- With several, every tool takes a `project` argument: the project's `project.name` from `openspec/sdlc.yaml`, else its folder name. `status` without it answers for all projects.
+- A folder that is not an sdlc project, or two projects with the same name, stop the server at start.
+- Without `--project`, the server serves the folder it starts in.
 
 **Your own script** with the official SDK (`@modelcontextprotocol/sdk`):
 
@@ -83,6 +89,23 @@ Every tool answers with exactly the JSON of the matching CLI command (`sdlc stat
 *How:* it calls `status` for all changes and `next` for each of them, and sends every change whose next actor is the agent to a free executor. A change whose next actor is a person is put on a list for that person. `instructions` gives the executor the template and rules of the artifact it has to write.
 
 *What you get:* the dispatch rule comes from the gates, not from the orchestrator's guess. An executor can never be handed a step that belongs to a person.
+
+### Other agents read the team's knowledge
+
+*Who:* any agent or assistant connected to the sdlc server, even one that does not run the sdlc workflows.
+
+*How:* the server offers resources (since 0.10.0), all read-only:
+
+| URI | What |
+|---|---|
+| `sdlc://context/<file>` | a context pack from `docs/context/`, without its header; `_meta` has owner, source, updated and stale |
+| `sdlc://spec/<capability>` | a living spec |
+| `sdlc://change/<id>/<artifact>` | an artifact of an active change: intent, proposal, design, plan, tasks, review, verification, release |
+| `sdlc://doc/<path>` | `REVIEW.md`, `AGENTS.md`, `CLAUDE.md` and the AI-ready documents |
+
+With several projects, the URI starts with the project's name: `sdlc://claims/spec/auth`.
+
+*What you get:* the agent finds the domain rule, the requirement or the plan where the team keeps it, and sees which knowledge is stale. State, configuration, the log, the inbox, the agents' own folders and anything outside the project are never offered.
 
 ### A reviewer's assistant prepares the review
 
@@ -137,6 +160,8 @@ It then merges the answers. `sdlc dashboard` builds the HTML page per repository
 - a test-management tool: "the regression suite passed";
 - a change-management system: "change CHG-123 is approved".
 
+For the release gate, the same checks go under `release.mcp` (since 0.10.0). `sdlc approve release` is refused while a required release check fails (`release_checks_failed`, with the reason), and the results are kept with the approval. `sdlc release check --change <id>` runs them beforehand, writes nothing, and the agent may run it while preparing the release.
+
 ### Night runs and the inbox
 
 *Who:* CI, or a person running `sdlc verify` outside an agent session.
@@ -179,7 +204,33 @@ Give each stage its skills and subagents in `stages.<stage>`. The workflows list
 - `sdlc next` names who acts;
 - the project log (`openspec/.sdlc/log.jsonl`) records when a gate starts waiting for a person (`gate.<g>.awaiting`), every approval, verification and rework. A job that reads the log can notify a channel.
 
-*What you get:* problems and waits surface by themselves inside the agent's session and in the log. sdlc does not yet push events to an outside server: see the limits.
+*What you get:* problems and waits surface by themselves inside the agent's session and in the log.
+
+### Pushing events to a central server
+
+*Who:* a team lead, a PMO, a chat bot that pings people.
+
+*How* (since 0.10.0): describe the receiver once.
+
+```yaml
+project: { name: claims }
+events:
+  - server: central                  # a server of mcp.servers
+    tool: report_event
+    on: ["gate.*", "verify.*", "change.archived"]
+    args: { team: payments }
+gates:
+  plan: { overdue_hours: 24 }        # optional: a plan approval waiting longer raises gate.plan.overdue
+```
+
+- After a command, sdlc calls the tool with `event: { id, project, event, change, gate, at, sdlc, by, waitingFor }` and the static `args`.
+- `waitingFor` names the people from `roles.yaml` who may take a waiting gate, so the receiver can ping them.
+- `id` is stable, so a receiver can drop repeats.
+- A gate waiting past its `overdue_hours` raises `gate.<g>.overdue` once.
+- Delivery takes at most 5 seconds and never fails a command. An event that could not be sent waits in `.git/sdlc/outbox/` (never committed) and goes with the next command or `sdlc events flush`, which a CI job or a scheduler can run. `sdlc events list` shows what waits.
+- An event never carries an email, the text of a command, its output or a note. Hook decisions are sent only when a pattern names them.
+
+*What you get:* the central picture updates within minutes, and the people who must act are told.
 
 ## 11.4. Security model in short
 
@@ -191,9 +242,7 @@ Give each stage its skills and subagents in `stages.<stage>`. The workflows list
 ## 11.5. Limits today
 
 - **Local servers only.** `sdlc mcp serve` speaks stdio; there is no HTTP endpoint to reach from another machine. Central reporting reads the repository instead (11.3).
-- **No project option.** `sdlc mcp serve` serves the folder it starts in, so clients outside the project need the `cd` wrapper (11.2).
 - **One CLI process per tool call.** That costs about half a second, which matters only for scripts that make many calls.
-- **No push of events** to an outside system. The log and the inbox are the integration points.
-- **MCP checks run in the verify gate only.** The release gate cannot yet rest on an external approval answered over MCP.
-- **Tools only.** The server offers tools; it does not offer MCP resources or prompts.
+- **Overdue is noticed by the next command,** session start or `sdlc events flush`; there is no daemon. Run `sdlc events flush` on a schedule if you need it on time.
+- **Tools and resources only.** The server does not offer MCP prompts.
 - **The inbox travels by git.** Results produced in CI reach the agent only after they are committed.

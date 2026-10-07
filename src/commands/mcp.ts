@@ -6,12 +6,13 @@ import { checkServers, type ServerReport } from '../mcp/server-check.js';
 import { serveStdio } from '../mcp/server.js';
 
 /**
- * `sdlc mcp serve`: the MCP server over stdio (B13). Read-only; any actor may start it. A failure to start is
- * reported on stderr only, because stdout belongs to the protocol.
+ * `sdlc mcp serve [--project <path>]...`: the MCP server over stdio (B13, B46). Read-only; any actor may start it.
+ * A failure to start (a path that is not an sdlc project, two projects with one name) is reported on stderr only,
+ * because stdout belongs to the protocol, and the exit code is not 0.
  */
-export async function mcpServeCommand(): Promise<void> {
+export async function mcpServeCommand(opts: { project?: string[] } = {}): Promise<void> {
   try {
-    await serveStdio();
+    await serveStdio(process.cwd(), opts.project ?? []);
   } catch (error) {
     reportFailure(error, false);
   }

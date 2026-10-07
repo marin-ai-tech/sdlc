@@ -12,6 +12,11 @@ sdlc works with MCP in both directions. Nothing over MCP makes a decision.
 systems — an orchestrator, a chat client, an IDE assistant — then read the process with the tools `status`, `next`,
 `instructions`, `trace`, `audit`, `help` and `guide`. Each answers what the CLI prints with `--json`.
 
+- Outside the project (Claude Desktop): `sdlc mcp serve --project <path>`, repeatable; with several projects every
+  tool takes `project` (`project.name` in `sdlc.yaml`, else the folder name).
+- Resources, read-only: `sdlc://context/<file>`, `sdlc://spec/<capability>`, `sdlc://change/<id>/<artifact>`,
+  `sdlc://doc/<path>`. State and configuration are never offered.
+
 ## The team's servers
 
 ```yaml
@@ -28,7 +33,10 @@ mcp:
 ## Checks and results
 
 - `verify.mcp` checks are called by the CLI during `sdlc verify` and recorded as evidence (`sdlc guide verify`).
+- `release.mcp` checks run when a person approves the release; a failing one refuses it. `sdlc release check` runs
+  them beforehand.
 - Results of runs outside an agent session wait in `sdlc inbox list`.
+- `events` push gate and verification events to a team server; undelivered ones wait for `sdlc events flush`.
 
 ## Per stage
 

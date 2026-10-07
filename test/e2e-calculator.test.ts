@@ -265,6 +265,7 @@ describe('demo: a team builds a calculator with sdlc (every command)', { timeout
   });
 
   it('9. release, signatures, archive; the backlog moves on', () => {
+    step('release-check', 'release', 'bob', ['release', 'check', '--change', 'basic-arithmetic'], 'Before Alice decides, Bob runs the release checks; none are configured here.');
     step('approve-release', 'release', 'alice', ['approve', 'release', '--change', 'basic-arithmetic'], 'Alice authorizes the release.');
     commit('alice', 'Release approvals for basic arithmetic');
     step('approvals-verify', 'release', 'bob', ['approvals', 'verify'], "Signed approvals check (warn mode): Alice and Carol sign; Bob's plan approval is unsigned, reported but not blocking.");
@@ -319,6 +320,8 @@ describe('demo: a team builds a calculator with sdlc (every command)', { timeout
     step('statusline', 'visibility', 'bob', ['statusline'], 'Claude Code status line.', { input: JSON.stringify({ cwd: root }) });
     step('hook', 'visibility', 'agent', ['hook', 'session-start'], 'What the agent learns when a session starts.', { input: JSON.stringify({ cwd: root, source: 'startup' }) });
     step('inbox-done', 'visibility', 'agent', ['inbox', 'done', JSON.parse(inbox.stdout).items[0].id], 'Read: the agent marks the item done.');
+    step('events-list', 'visibility', 'agent', ['events', 'list'], 'Process events waiting for the team\'s servers; no receivers are configured here.');
+    step('events-flush', 'visibility', 'bob', ['events', 'flush'], 'Bob sends the waiting events now; nothing waits.');
     step('mcp', 'visibility', 'agent', ['mcp', 'serve'], 'Other AI systems read the process over MCP.', { input: MCP_LIST });
     step('plugin', 'visibility', 'bob', ['plugin', 'build', path.join(tempDir('sdlc-demo-plugin-'), 'plugin')], 'The same workflows as a Claude Code plugin.');
     step('uninstall', 'visibility', 'alice', ['uninstall', '--dry-run'], 'Uninstall keeps every planning file.');

@@ -213,6 +213,7 @@ export const SLIDES = [
       ru: 'Алиса разрешает релиз. Каждое утверждение сверяется с коммитом, который его принёс: подписан ли он тем, кто утвердил.',
     },
     steps: ['approve-release', 'approvals-verify'],
+    more: ['release-check'],
     notes: {
       en: 'Signing modes: off (no signatures), warn (report), required (CI fails). A commit signed by Bob with Alice\'s email is reported as wrong-signer.',
       ru: 'Режимы подписи: off (без подписей), warn (предупреждать), required (CI падает). Коммит, подписанный Бобом с почтой Алисы, помечается как wrong-signer.',
@@ -277,7 +278,7 @@ export const SLIDES = [
       ru: 'Другие системы читают процесс по MCP, а sdlc сам вызывает их серверы. Статус CI — доказательство для гейта, результаты ждут агента во входящих.',
     },
     steps: ['mcp-check', 'verify-mcp', 'inbox-list'],
-    more: ['inbox-done', 'mcp'],
+    more: ['inbox-done', 'events-list', 'events-flush', 'mcp'],
     notes: {
       en: 'No decision is offered over MCP. The registry lives in openspec/sdlc.yaml with secrets as ${VAR} references; the hook allows each server only at its stages. Chapter 10 of the docs has the user cases.',
       ru: 'Решений через MCP нет. Реестр — в openspec/sdlc.yaml, секреты только ссылками ${VAR}; хук разрешает каждый сервер только на его стадиях. Пользовательские сценарии — в главе 17 документации.',
@@ -368,6 +369,7 @@ export const STEP_NOTE_RU = {
   'roles-who': 'Кто может утвердить ревью: не Боб, код писал он.',
   'approve-review-bob': 'Боб — автор: отказ.',
   'approve-review': 'Кэрол утверждает ревью.',
+  'release-check': 'Перед решением Алисы Боб запускает проверки релиза; здесь они не настроены.',
   'approve-release': 'Алиса разрешает релиз.',
   'approvals-verify': 'Проверка подписей (режим warn): Алиса и Кэрол подписывают; утверждение плана Бобом без подписи — предупреждение, не блокировка.',
   archive: 'Дельта вливается в живую спецификацию; B1 закрывается.',
@@ -404,6 +406,8 @@ export const STEP_NOTE_RU = {
   'verify-mcp': 'Боб сам запускает verify: CLI вызывает CI-сервер по MCP и сохраняет результат для агента.',
   'inbox-list': 'Агент находит результат во входящих.',
   'inbox-done': 'Прочитано: агент отмечает пункт выполненным.',
+  'events-list': 'События процесса, ждущие серверов команды; получатели здесь не настроены.',
+  'events-flush': 'Боб отправляет ждущие события сейчас; ничего не ждёт.',
   plugin: 'Те же процессы как плагин Claude Code.',
   uninstall: 'Удаление сохраняет все файлы планирования.',
 };

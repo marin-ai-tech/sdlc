@@ -39,6 +39,15 @@ export function provenance(stamp: HarnessStamp | undefined): Provenance {
   return stamp ? { sdlc: stamp.version, license: stamp.license } : {};
 }
 
+/** A release check (B47) the CLI ran before this approval: the call and its outcome; never the server's answer. */
+export interface ReleaseCheckRecord {
+  name: string;
+  server: string;
+  tool: string;
+  ok: boolean;
+  at: string;
+}
+
 export interface ApprovalRecord extends Provenance {
   role: string;
   by: string;
@@ -50,6 +59,12 @@ export interface ApprovalRecord extends Provenance {
   note?: string;
   /** Digest of each main spec the change modifies, at approval time (spec gate). */
   base?: Record<string, string>;
+  /**
+   * The release checks that passed before a release approval (B47); absent without `release.mcp`. The record stays
+   * version 1: gates and approvals are read and written whole (no field list), so an older CLI keeps the field
+   * through its own writes and only ignores it, and an approval without it still means what it meant.
+   */
+  checks?: ReleaseCheckRecord[];
 }
 
 export interface RejectionRecord extends Provenance {

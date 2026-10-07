@@ -118,11 +118,11 @@ function parseCheck(value: unknown, where: string, index: number): McpCheck {
   };
 }
 
-/** `verify.mcp`: the checks `sdlc verify` calls; absent = none. */
-export function parseMcpChecks(value: unknown, where: (key: string) => string): McpCheck[] {
+/** `verify.mcp` (or `release.mcp`, B47, the same format): the checks the CLI calls; absent = none. */
+export function parseMcpChecks(value: unknown, where: (key: string) => string, key = 'verify.mcp'): McpCheck[] {
   if (value === undefined || value === null) return [];
-  if (!Array.isArray(value)) throw invalid('error.x_must_be_a_list', where('verify.mcp'));
-  return value.map((item, index) => parseCheck(item, where(`verify.mcp[${index}]`), index));
+  if (!Array.isArray(value)) throw invalid('error.x_must_be_a_list', where(key));
+  return value.map((item, index) => parseCheck(item, where(`${key}[${index}]`), index));
 }
 
 /** The values a server is given through its configuration: `env` (stdio) or `headers` (http). */

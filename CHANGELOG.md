@@ -2,6 +2,14 @@
 
 All notable changes to sdlc. Versions follow [Semantic Versioning](https://semver.org/); while the major version is 0, a minor version may change behavior.
 
+## 0.10.0 — 2026-10-07
+
+### Added
+- **Events to other systems.** `events` in `openspec/sdlc.yaml` names MCP servers that receive process events (gates waiting for a person, approvals, verification results, archives) after each command, with a stable id, the project name and the people a waiting gate waits for (from `roles.yaml`, never emails). Delivery never fails or noticeably slows a command; undelivered events wait in `.git/sdlc/outbox/` for the next command or `sdlc events flush`. `gates.<gate>.overdue_hours` raises `gate.<gate>.overdue` once when a gate waits too long.
+- **One MCP server for several projects.** `sdlc mcp serve --project <path>` (repeatable) serves projects from outside their folders; with several, tools take the project's name (`project.name`, else the folder name).
+- **MCP resources.** The sdlc server offers the team's knowledge read-only: context packs (with owner, date and a stale mark), living specs, change artifacts and documents for agents. State, configuration and anything outside the project are never offered.
+- **MCP checks in the release gate.** `release.mcp` checks (for example an approved change ticket) are called when a person approves the release; a failing one refuses the approval, and the results are kept with it. `sdlc release check` runs them beforehand.
+
 ## 0.9.1 — 2026-10-07
 
 ### Added

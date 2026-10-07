@@ -9,7 +9,8 @@ import { expandRefs, mapValues, type McpServer } from './registry.js';
  * The CLI as an MCP client (B11, B12): it reaches a registry server itself, so what a check answers comes from the
  * server, not from an agent. stdio: the server is spawned with the CLI's environment plus its `env` (references
  * expanded from that environment); its stderr is dropped, since it may print what it was given. http: Streamable
- * HTTP with its `headers` (expanded likewise). Every session is closed when the work ends or its time runs out.
+ * HTTP with its `headers` (expanded likewise). Every session is closed when the work ends or its time runs out; a
+ * stdio server that runs out of time is ended at once.
  */
 export class McpTimeout extends Error {
   constructor(readonly ms: number) {
@@ -50,6 +51,20 @@ async function withTimeout<T>(work: Promise<T>, ms: number, onTimeout: () => voi
   }
 }
 
+/**
+ * Ends a stdio server at once. A server that did not answer in time may ignore its closed stdin too, and a polite
+ * close waits for it up to 4 s, which would keep the CLI alive past its time limit.
+ */
+function killServer(transport: Transport): void {
+  const pid = transport instanceof StdioClientTransport ? transport.pid : null;
+  if (!pid) return;
+  try {
+    process.kill(pid, 'SIGKILL');
+  } catch {
+    // It has exited already.
+  }
+}
+
 /** Connects to `server`, runs `fn` with the client, closes; all of it within `ms`. */
 export async function withServer<T>(
   server: McpServer,
@@ -58,15 +73,20 @@ export async function withServer<T>(
   env: NodeJS.ProcessEnv = process.env,
 ): Promise<T> {
   const client = new Client({ name: 'sdlc', version: harnessVersion() });
+  const transport = transportFor(server, env);
   const close = () => {
     client.close().catch(() => undefined);
   };
+  const timedOut = () => {
+    killServer(transport);
+    close();
+  };
   const session = async () => {
-    await client.connect(transportFor(server, env), { timeout: ms });
+    await client.connect(transport, { timeout: ms });
     return fn(client);
   };
   try {
-    return await withTimeout(session(), ms, close);
+    return await withTimeout(session(), ms, timedOut);
   } finally {
     close();
   }

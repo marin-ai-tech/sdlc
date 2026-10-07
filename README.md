@@ -147,6 +147,8 @@ Everything sdlc writes records the sdlc version and the license the project uses
 | `sdlc layout check [--json]` / `scaffold [--dry-run] [--json]` / `adapt [--dry-run] [--json]` / `convert [--apply] [--json]` | check layout readiness, create missing documents, map existing paths, or plan and apply conversion |
 | `sdlc rework <gate> --change <id> --reason <r> --note <t> [--reset]` | send a change back to a gate's stage with a reason; later approvals stop counting; `--reset` restores the planned files from the gate checkpoint (human-only) |
 | `sdlc takeover` / `release-control --change <id> --note <t>` | take a change from the agent and hand it back with a note (human-only) |
+| `sdlc events list \| flush [--json]` | process events waiting for delivery to the team's server; deliver them now |
+| `sdlc release check --change <id> [--json]` | run the release gate's MCP checks without approving |
 | `sdlc mcp serve` / `sdlc mcp check [--json]` | sdlc as a read-only MCP server (`init --mcp` registers it); connect to the registry servers and list their tools |
 | `sdlc inbox list [--json]` / `inbox done <id>` | MCP check results from runs outside an agent session, for the agent |
 | `sdlc review suggest --change <id> [--json]` | propose a reviewer: roles, CODEOWNERS owners first, fewer open reviews, never an author |

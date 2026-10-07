@@ -11,7 +11,10 @@ summary: Основные ключи openspec/sdlc.yaml и кто может и�
 |---|---|
 | `gates.<gate>` | `required`, `approvers` (роли), `high_risk_approvers`, `min_approvals` |
 | `verify.commands` | проверки проекта: `{ name, run, required }` |
-| `verify.mcp` | проверки, которые CLI вызывает на MCP-сервере |
+| `verify.mcp`, `release.mcp` | проверки, которые CLI вызывает на MCP-сервере, для гейтов проверки и релиза |
+| `project.name` | имя проекта в MCP и событиях (по умолчанию — имя папки) |
+| `events` | получатели событий процесса: `{ server, tool, on, args }` |
+| `gates.<gate>.overdue_hours` | через сколько часов ожидающий гейт даёт событие просрочки |
 | `review` | `policy` (REVIEW.md), `passes`, `lenses`, `base`, `block_on` |
 | `release.commands` | регулярные выражения продакшен-команд, которые агенту нельзя до утверждения релиза |
 | `enforcement.mode` | `off`, `warn` (напоминать), `block` (запрещать по правилам процесса); жёсткие правила действуют и в warn |

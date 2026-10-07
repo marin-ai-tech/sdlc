@@ -192,6 +192,22 @@ export function readContextPack(
   return pack;
 }
 
+/**
+ * Every source with a valid header, whatever its stages, sorted by path: the context resources of `sdlc mcp serve`
+ * (B48). A file without a valid header is left out; no `docs/context` folder means none.
+ */
+export function readContextSources(root: string, now: Date = new Date()): ContextSource[] {
+  const dir = path.join(root, CONTEXT_DIR);
+  if (!isDirectory(dir)) return [];
+  const realRoot = fs.realpathSync(root);
+  const sources: ContextSource[] = [];
+  for (const name of contextFiles(dir)) {
+    const loaded = loadFile(realRoot, path.join(dir, name));
+    if (typeof loaded !== 'string') sources.push(toSource(`${CONTEXT_DIR}/${name}`, loaded, now));
+  }
+  return sources;
+}
+
 /** JSON keys for `sdlc instructions --json`: none without a pack, `contextSkipped` only when a file was skipped. */
 export function contextPackJson(pack: ContextPack | undefined): Record<string, unknown> {
   if (!pack) return {};
