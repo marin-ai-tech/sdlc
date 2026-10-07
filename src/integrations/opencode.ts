@@ -1,6 +1,7 @@
 import { generatedNotice } from '../core/license.js';
 import { AGENT_IDS, loadAgent, loadWorkflow, readAsset, WORKFLOW_IDS } from './assets.js';
 import { appendNotice, renderBody, yamlString } from './render.js';
+import { stageResources, stageSection } from './stage-resources.js';
 import type { GeneratedFile, RenderContext, ToolAdapter } from './types.js';
 
 /**
@@ -32,12 +33,13 @@ export const opencodeAdapter: ToolAdapter = {
       // With skills-only delivery OpenCode exposes each skill as `/sdlc-<id>` itself.
       for (const id of WORKFLOW_IDS) {
         const wf = loadWorkflow(id);
+        const section = stageSection(stageResources(ctx.config, id));
         const content = appendNotice([
           '---',
           `description: ${yamlString(wf.commandDescription)}`,
           '---',
           '',
-          renderBody(wf.body, { surface: 'opencode-command', cli: ctx.cli }),
+          renderBody(wf.body, { surface: 'opencode-command', cli: ctx.cli }) + section,
         ].join('\n'), notice);
         files.push({ path: `.opencode/commands/sdlc-${id}.md`, content, tool: 'opencode', kind: 'command' });
       }

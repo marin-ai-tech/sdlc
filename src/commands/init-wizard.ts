@@ -10,7 +10,8 @@
  * - `askInitChoices(prompter, defaults)`: shows the welcome text, asks in this order — tools (checkbox,
  *   `defaults.tools` preselected), enforcement mode (select, `defaults.mode` first), status line (confirm,
  *   only when Claude Code is chosen), /opsx workflows (confirm), artifact language (input, may be empty),
- *   roles.yaml (confirm, default no) — then shows the summary and asks to confirm (default yes).
+ *   roles.yaml (confirm, default no), the MCP server (confirm, `defaults.mcp`, B13; only when the defaults carry
+ *   `mcp`) — then shows the summary and asks to confirm (default yes).
  *   Resolves to the choices, or `undefined` when the summary is declined.
  * - `initDefaults(root, detected)`: defaults for the questions; on an initialized project they are the current
  *   settings from openspec/sdlc.yaml, otherwise the detected tools (or both) and `warn`.
@@ -65,6 +66,8 @@ export interface InitChoices extends Partial<LayoutChoices> {
   install: DependencyId[];
   /** Run `codegraph init` in the project. */
   index: boolean;
+  /** Register `sdlc mcp serve` (B13); absent when the question was not asked. */
+  mcp?: boolean;
 }
 
 /** Where the questions come from; the default implementation uses @inquirer/prompts. */
@@ -97,6 +100,8 @@ export interface InitDefaults {
   dependencies?: DependencyStatus[];
   /** The folder init runs in; absent = no git or layout questions. */
   folder?: FolderDescription;
+  /** Current `mcp.serve` (default no); absent = no MCP question. */
+  mcp?: boolean;
 }
 
 function modeChoiceList(): Array<{ value: EnforcementMode; name: string }> {
@@ -139,6 +144,7 @@ export function shouldPrompt(opts: InitOptions, io: TerminalState): boolean {
   if (opts.force) return false;
   if (opts.json) return false;
   if (opts.layout !== undefined || opts.worktree !== undefined || opts.gitInit) return false;
+  if (opts.mcp) return false;
   return true;
 }
 
@@ -176,8 +182,15 @@ function formatSummary(choices: InitChoices): string {
     t('init.summary.roles', { value: yn(choices.roles) }),
     t('init.summary.install', { value: install }),
     t('init.summary.index', { value: yn(choices.index) }),
+    ...(choices.mcp === undefined ? [] : [t('init.summary.mcp', { value: yn(choices.mcp) })]),
     ...layoutSummaryLines(choices),
   ].join('\n');
+}
+
+/** The MCP question (default: the current setting), asked only when the defaults carry one. */
+async function askMcp(prompter: Prompter, defaults: InitDefaults): Promise<{ mcp?: boolean }> {
+  if (defaults.mcp === undefined) return {};
+  return { mcp: await prompter.confirm(t('init.mcp'), defaults.mcp) };
 }
 
 async function askDependencyChoices(
@@ -232,6 +245,7 @@ export async function askInitChoices(
       install: depChoices.install,
       index: depChoices.index,
       ...layout,
+      ...(await askMcp(prompter, defaults)),
     };
     prompter.say(formatSummary(choices));
     const ok = await prompter.confirm(t('init.write'), true);
@@ -254,6 +268,7 @@ export function initDefaults(root: string, detected: ToolId[], probe?: Probe): I
       statusline: config.statusline,
       opsx: false,
       language: '',
+      mcp: config.mcp?.serve ?? false,
     };
   } else {
     base = {
@@ -262,6 +277,7 @@ export function initDefaults(root: string, detected: ToolId[], probe?: Probe): I
       statusline: false,
       opsx: false,
       language: '',
+      mcp: false,
     };
   }
   if (probe) base.dependencies = detectDependencies(root, probe);

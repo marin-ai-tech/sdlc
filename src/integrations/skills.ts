@@ -1,6 +1,7 @@
 import { generatedNotice, LICENSE_SUMMARY, LICENSOR } from '../core/license.js';
 import { loadWorkflow, WORKFLOW_IDS } from './assets.js';
 import { appendNotice, renderBody, yamlString } from './render.js';
+import { stageAllowedTools, stageResources, stageSection } from './stage-resources.js';
 import type { GeneratedFile, RenderContext, ToolId } from './types.js';
 
 /**
@@ -29,6 +30,7 @@ export function renderSkills(ctx: RenderContext): GeneratedFile[] {
   return WORKFLOW_IDS.map((id) => {
     const wf = loadWorkflow(id);
     const name = `sdlc-${id}`;
+    const resources = stageResources(ctx.config, id);
     const content = appendNotice([
       '---',
       `name: ${name}`,
@@ -36,14 +38,14 @@ export function renderSkills(ctx: RenderContext): GeneratedFile[] {
       ...(wf.whenToUse ? [`when_to_use: ${yamlString(wf.whenToUse)}`] : []),
       `license: ${yamlString(LICENSE_SUMMARY)}`,
       `compatibility: ${yamlString(`Requires the sdlc CLI (${ctx.cli}) from the sdlc package; works in Claude Code and OpenCode.`)}`,
-      `allowed-tools: ${allowedToolsFor(ctx.cli)}`,
+      `allowed-tools: ${stageAllowedTools(allowedToolsFor(ctx.cli), resources)}`,
       'metadata:',
       `  author: ${yamlString(LICENSOR)}`,
       '  version: "1"',
       `  generatedBy: "sdlc ${ctx.version}"`,
       '---',
       '',
-      renderBody(wf.body, { surface: 'skill', cli: ctx.cli }),
+      renderBody(wf.body, { surface: 'skill', cli: ctx.cli }) + stageSection(resources),
     ].join('\n'), generatedNotice(ctx.stamp, 'markdown'));
     return { path: `${root}/${name}/SKILL.md`, content, tool: 'shared' as const, kind: 'skill' as const };
   });

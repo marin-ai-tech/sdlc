@@ -1,5 +1,5 @@
 import * as path from 'node:path';
-import { loadProject, recordChangeEvent } from '../cli/context.js';
+import { loadProject, recordChangeEvent, type ProjectContext } from '../cli/context.js';
 import { c, line, printJson, reportFailure } from '../cli/output.js';
 import { emitNextHint, resolveNext } from '../cli/next-hint.js';
 import { readChangeState } from '../core/change-state.js';
@@ -11,9 +11,12 @@ import { isFile, readText } from '../core/fs-utils.js';
 import { defaultBaseRef, formatIdentity, gitIdentity, headCommit } from '../core/git.js';
 import { computePlanDrift } from '../core/plan-drift.js';
 import { checkCoverage, parseCoverage, parseFindings, summarizeFindings } from '../core/review.js';
-import { applyVerifyToState, runVerification, writeEvidence } from '../core/verify.js';
+import { applyVerifyToState, runVerification, writeEvidence, type VerificationRun } from '../core/verify.js';
+import { runMcpChecks, selectedChecks, withMcpChecks } from '../mcp/checks.js';
+import { keepForAgent } from '../mcp/inbox.js';
 import { readAsset } from '../integrations/assets.js';
 import { readManifest } from '../integrations/manifest.js';
+import { reviewSuggest } from './review-suggest.js';
 import { t } from '../core/i18n.js';
 
 export interface VerifyOptions {
@@ -32,6 +35,38 @@ function uncoveredScenarios(changeDir: string): { scenarios: string[]; missing: 
   const behavioral = verification.split('## behavioral verification')[1] ?? '';
   const missing = scenarios.filter((s) => !behavioral.includes(s.toLowerCase()));
   return { scenarios, missing };
+}
+
+/** The MCP checks (B12) after the commands: the CLI calls them itself, with `${HEAD}` and `${CHANGE}` expanded. */
+async function withMcp(
+  ctx: ProjectContext,
+  change: string,
+  run: VerificationRun,
+  opts: { only?: string[]; json?: boolean },
+): Promise<VerificationRun> {
+  if ((ctx.config.verify.mcp ?? []).length === 0) return run;
+  const checks = selectedChecks(ctx.config, opts.only);
+  for (const { name, server, tool } of opts.json ? [] : checks) {
+    process.stderr.write(c.dim(`${t('verify.runningMcp', { name, server, tool })}\n`));
+  }
+  const mcp = await runMcpChecks(ctx.config, checks, { head: run.commit, change });
+  return withMcpChecks(run, ctx.config, mcp);
+}
+
+/** The JSON answer's `mcp`: each check with the server's answer. */
+function mcpJson(run: VerificationRun): Record<string, unknown> {
+  if (!run.mcp) return {};
+  const shape = run.mcp.map(({ name, server, tool, ok, reason, result }) =>
+    ({ name, server, tool, ok, ...(reason === undefined ? {} : { reason }), result }));
+  return { mcp: shape };
+}
+
+function printMcpChecks(run: VerificationRun): void {
+  for (const check of run.mcp ?? []) {
+    const call = c.dim(`(${check.server}/${check.tool}, ${(check.duration_ms / 1000).toFixed(1)}s)`);
+    line(`${check.ok ? c.green('✓') : c.red('✗')} ${check.name} ${call}`);
+    if (check.reason) line(c.dim(`    ${check.reason}`));
+  }
 }
 
 export async function verifyCommand(opts: VerifyOptions): Promise<void> {
@@ -65,7 +100,7 @@ export async function verifyCommand(opts: VerifyOptions): Promise<void> {
       if (opts.strict && coverage.missing.length > 0) process.exitCode = 1;
       return;
     }
-    if (ctx.config.verify.commands.length === 0) {
+    if (ctx.config.verify.commands.length === 0 && (ctx.config.verify.mcp ?? []).length === 0) {
       throw new SdlcError(
       'no_verify_commands',
       { key: 'error.no_verification_commands_are_configured' },
@@ -73,21 +108,25 @@ export async function verifyCommand(opts: VerifyOptions): Promise<void> {
     );
     }
     const only = opts.only ? opts.only.split(',').map((s) => s.trim()).filter(Boolean) : undefined;
-    const run = await runVerification(ctx.root, ctx.config, {
+    const commands = await runVerification(ctx.root, ctx.config, {
       only,
       onCheck: (check) => {
         if (!opts.json) process.stderr.write(c.dim(`${t('verify.running', { name: check.name, run: check.run })}\n`));
       },
     });
+    const run = await withMcp(ctx, ref.id, commands, { only, json: opts.json });
     const file = writeEvidence(ref.dir, run, ref.id, readAsset('records', 'verification.md'), ctx.stamp);
     const state = readChangeState(ref.dir);
     applyVerifyToState(state, run, ctx.stamp);
+    const mcpDetail = (run.mcp ?? []).map((m) => `${m.name}=${m.ok ? 'ok' : 'failed'}`);
     recordChangeEvent(ctx, ref, state, `verify.${run.status}`, formatIdentity(gitIdentity(ctx.root)),
-      run.checks.map((ch) => `${ch.name}=${ch.exit_code ?? 'timeout'}`).join(' '));
+      [...run.checks.map((ch) => `${ch.name}=${ch.exit_code ?? 'timeout'}`), ...mcpDetail].join(' '));
+    // Outside an agent session the MCP results are also kept for the agent (the inbox).
+    keepForAgent(ctx.root, ref.id, run);
     const next = resolveNext(ctx, ref.id);
     if (opts.json) {
       printJson({ change: ref.id, status: run.status, at: run.at, commit: run.commit, dirty: run.dirty, checks: run.checks,
-        evidence: file, harness: ctx.stamp, ...(next ? { next } : {}) });
+        ...mcpJson(run), evidence: file, harness: ctx.stamp, ...(next ? { next } : {}) });
     } else {
       for (const check of run.checks) {
         const ok = check.exit_code === 0;
@@ -95,6 +134,7 @@ export async function verifyCommand(opts: VerifyOptions): Promise<void> {
         line(`${ok ? c.green('✓') : c.red('✗')} ${check.name} ${c.dim(`(${(check.duration_ms / 1000).toFixed(1)}s)`)}${timeout}`);
         if (!ok && check.output) line(c.dim(check.output.split('\n').map((l) => `    ${l}`).join('\n')));
       }
+      printMcpChecks(run);
       line(run.status === 'passed'
         ? c.green(t('verify.passed', { file: path.relative(process.cwd(), file) }))
         : c.red(t('verify.failed')));
@@ -109,6 +149,7 @@ export async function verifyCommand(opts: VerifyOptions): Promise<void> {
 
 export async function reviewCommand(action: string, opts: { change?: string; base?: string; json?: boolean }): Promise<void> {
   try {
+    if (action === 'suggest') return reviewSuggest(opts);
     if (action !== 'context' && action !== 'check') {
       throw new SdlcError('invalid_action', { key: 'error.use_sdlc_review_context_or_sdlc_review_check' });
     }

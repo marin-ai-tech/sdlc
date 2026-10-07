@@ -2,6 +2,23 @@
 
 All notable changes to sdlc. Versions follow [Semantic Versioning](https://semver.org/); while the major version is 0, a minor version may change behavior.
 
+## 0.9.0 — 2026-10-06
+
+### Added
+- **sdlc as an MCP server.** `sdlc mcp serve` (stdio) lets other AI systems read the process: `status`, `next`, `instructions`, `trace`, `audit`, `help`, each answering exactly what the CLI's `--json` prints. It offers no decisions. `sdlc init --mcp` (or the wizard's question) registers it in `.mcp.json` and `opencode.json`, keeping other servers.
+- **The team's MCP servers, described once.** `mcp.servers` in `openspec/sdlc.yaml` is laid out into `.mcp.json` (Claude Code) and `opencode.json` (OpenCode). Secrets are only `${VAR}` references; a literal secret is refused (`mcp_secret_literal`). `sdlc mcp check` connects to each server, lists its tools and warns about servers that can write files.
+- **MCP checks as gate evidence.** `verify.mcp` checks are called by the CLI itself during `sdlc verify` (`${HEAD}`, `${CHANGE}` in the arguments, `expect` as a subset); a mismatch or an unreachable server fails the verification with the reason.
+- **The inbox.** MCP check results from runs outside an agent session (a person's terminal, CI) wait in `openspec/.sdlc/inbox/`; the next agent session sees them, and the agent marks them read with `sdlc inbox done <id>`.
+- **Skills, subagents and MCP servers per stage.** `stages.<stage>.skills` and `.agents` in `openspec/sdlc.yaml`, with the registry's `stages` for servers: each generated workflow lists only its stage's resources, and the Claude Code skill pre-allows that stage's MCP tools.
+- **MCP servers by stage.** The Claude Code hook also sees MCP tools; a call to a registry server outside its `stages` is denied in `block` and reminded in `warn` (rule `mcp-stage`).
+- **No secrets in agent edits.** An agent's edit or shell write that adds an AWS key, a GitHub, GitLab or Slack token, a Google API key, a private key, a password in a URL or a long assigned password is denied, also in `warn` (rule `secret-in-edit`). The reason names the kind and the file, never the value; `enforcement.secret_allow` exempts test data.
+- **`sdlc review suggest`** proposes a reviewer: the people who may approve the review gate, owners of the changed paths by CODEOWNERS first, then fewer open reviews; the code's authors never.
+- **Context packs.** Files in `docs/context/` with a header (owner, source, updated, fresh_days, stages) reach the agent through `sdlc instructions` at their stage; stale ones are marked.
+- **Documentation:** a new chapter with user cases, [Integrations: MCP, context, secrets and reviewers](docs/en/10-integrations.md).
+
+### Changed
+- New dependency: `@modelcontextprotocol/sdk` (the official MCP SDK).
+
 ## 0.8.2 — 2026-10-06
 
 ### Fixed

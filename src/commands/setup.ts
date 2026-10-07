@@ -71,6 +71,8 @@ export interface InitOptions {
   /** Folder of the AI-ready worktree (with `layout: worktree`). */
   worktree?: string;
   gitInit?: boolean;
+  /** Register `sdlc mcp serve` for the configured tools (`mcp.serve` in sdlc.yaml, B13). */
+  mcp?: boolean;
 }
 
 function assertDelivery(value: string | undefined): Delivery | undefined {
@@ -174,6 +176,7 @@ function printInstall(result: InstallResult, config: SdlcConfig): void {
     if (result.claudeHooks !== 'absent' && result.claudeHooks !== 'unchanged') {
     line(t('init.claudeHooks', { state: stateLabel(result.claudeHooks) }));
   }
+  printMcp(result);
   if (result.tools.length > 0) {
     line();
     line(c.bold(t('init.startChange')));
@@ -265,6 +268,7 @@ function optsFromChoices(opts: InitOptions, choices: InitChoices): InitOptions {
     statusline: choices.statusline,
     opsx: choices.opsx,
     ...(choices.language ? { language: choices.language } : {}),
+    ...(choices.mcp === undefined ? {} : { mcp: choices.mcp }),
     ...layoutOptions(choices),
   };
 }
@@ -369,6 +373,7 @@ function writeSettings(root: string, opts: InitOptions): Settings {
   config.cli = opts.cli ?? config.cli;
   config.statusline = opts.statusline || config.statusline;
   config.enforcement.mode = assertMode(opts.mode) ?? config.enforcement.mode;
+  config.mcp = mcpSetting(config, opts.mcp);
   let detectedCommands: string[] = [];
   if (!hadConfig && config.verify.commands.length === 0) {
     const found = detectVerifyCommands(root);
@@ -377,6 +382,31 @@ function writeSettings(root: string, opts: InitOptions): Settings {
   }
   saveConfig(paths.sdlcConfig, config);
   return { paths, openspecCreated: openspec.created, hadConfig, config, tools, detectedCommands };
+}
+
+/** `--mcp` (or the wizard's yes) turns `mcp.serve` on; the wizard's no turns it off only where it was set. */
+function mcpSetting(config: SdlcConfig, wanted: boolean | undefined): SdlcConfig['mcp'] {
+  if (wanted === undefined || (!wanted && !config.mcp)) return config.mcp;
+  return { ...config.mcp, serve: wanted };
+}
+
+/** The `mcp` part of a JSON answer: only when an MCP file was looked at; the registry's servers (B10) likewise. */
+function mcpJson(result: InstallResult): Record<string, unknown> {
+  const servers = Object.keys(result.servers).length > 0 ? { mcpServers: result.servers } : {};
+  return { ...(Object.keys(result.mcp).length > 0 ? { mcp: result.mcp } : {}), ...servers };
+}
+
+/** One line per MCP file whose `sdlc` entry changed, and one per file whose registry entries changed. */
+function printMcp(result: InstallResult): void {
+  for (const [file, state] of Object.entries(result.mcp)) {
+    if (state !== 'absent' && state !== 'unchanged') line(t('init.mcpServer', { file, state: stateLabel(state) }));
+  }
+  for (const [file, changes] of Object.entries(result.servers)) {
+    const list = (names: string[]) => names.join(', ') || '-';
+    const params = { file, added: list(changes.added), updated: list(changes.updated), removed: list(changes.removed) };
+    line(t('init.mcpRegistry', params));
+    if (changes.kept.length > 0) warn(t('init.mcpRegistryKept', { file, names: changes.kept.join(', ') }));
+  }
 }
 
 /** The whole init in one folder: settings, integrations, review policy, log, chosen installs. */
@@ -426,6 +456,7 @@ function initJson(o: InitOutcome): Record<string, unknown> {
     files: result.files,
     claudeHooks: result.claudeHooks,
     statusLine: result.statusLine,
+    ...mcpJson(result),
     reviewPolicy: o.reviewCreated ? config.review.policy : undefined,
     ...(o.opsx ? { opsx: o.opsx } : {}),
     ...(o.rolesNote ? { roles: o.rolesNote } : {}),
@@ -496,7 +527,8 @@ export async function updateCommand(target: string | undefined, opts: UpdateOpti
     if (!opts.dryRun) logSetup(root, config, 'harness.updated', tools);
     const stamp = harnessStamp(config);
     if (opts.json) {
-      printJson({ root, tools, dryRun: !!opts.dryRun, files: result.files, claudeHooks: result.claudeHooks, harness: stamp });
+      const { files, claudeHooks } = result;
+      printJson({ root, tools, dryRun: !!opts.dryRun, files, claudeHooks, ...mcpJson(result), harness: stamp });
       return;
     }
     line(c.bold(t(opts.dryRun ? 'update.would' : 'update.done', { root })) + c.dim(` (${stampTextLocalized(stamp)})`));
@@ -531,11 +563,13 @@ export async function uninstallCommand(target: string | undefined, opts: { force
       }
     }
     if (opts.json) {
-      printJson({ root, dryRun: !!opts.dryRun, files: result.files, claudeHooks: result.claudeHooks });
+      const { files, claudeHooks } = result;
+      printJson({ root, dryRun: !!opts.dryRun, files, claudeHooks, ...mcpJson(result) });
       return;
     }
     line(c.bold(t(opts.dryRun ? 'uninstall.would' : 'uninstall.done', { root })));
     line(t('uninstall.filesRemoved', { removed: result.files.removed.length, hooks: stateLabel(result.claudeHooks) }));
+    printMcp(result);
     for (const kept of result.files.kept) warn(t('uninstall.keptEdited', { path: kept }));
     line(c.dim(t('uninstall.leftUntouched')));
   } catch (error) {

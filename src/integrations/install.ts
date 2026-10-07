@@ -8,6 +8,9 @@ import { harnessVersion } from '../core/version.js';
 import { claudeAdapter } from './claude.js';
 import { applyFiles, type ApplyReport } from './manifest.js';
 import { opencodeAdapter } from './opencode.js';
+import { applyMcpRegistration, removeMcpRegistration, type McpChange } from './mcp-config.js';
+import { applyRegistryServers, removeRegistryServers, type ServerChanges } from './mcp-servers.js';
+import { assertNoSecretLiterals } from '../mcp/registry.js';
 import { mergeClaudeHooks, mergeClaudeStatusLine, type SettingsChange } from './settings.js';
 import { renderSkills } from './skills.js';
 import { TOOL_IDS, type GeneratedFile, type RenderContext, type ToolAdapter, type ToolId } from './types.js';
@@ -71,6 +74,10 @@ export interface InstallResult {
   files: ApplyReport;
   claudeHooks: SettingsChange;
   statusLine: string;
+  /** The `sdlc` MCP server entry per file (B13); empty when nothing MCP-related was touched. */
+  mcp: Record<string, McpChange>;
+  /** The registry's servers (B10) per file; only files where an entry was added, updated, removed or kept. */
+  servers: Record<string, ServerChanges>;
 }
 
 export function installIntegrations(
@@ -79,6 +86,8 @@ export function installIntegrations(
   tools: ToolId[],
   options: { force?: boolean; dryRun?: boolean; hooks?: boolean } = {}
 ): InstallResult {
+  // A literal secret in the registry is refused before anything is written (`mcp_secret_literal`).
+  assertNoSecretLiterals(config.mcp?.servers ?? []);
   const ctx = renderContext(config, tools);
   const files = renderAll(ctx);
   const report = applyFiles(root, files, {
@@ -94,7 +103,9 @@ export function installIntegrations(
   const statusLine = tools.includes('claude') || fs.existsSync(path.join(root, '.claude', 'settings.json'))
     ? mergeClaudeStatusLine(root, config.cli, tools.includes('claude') && config.statusline, options.dryRun)
     : 'absent';
-  return { tools, files: report, claudeHooks, statusLine };
+  const mcp = applyMcpRegistration(root, config, tools, options.dryRun);
+  const servers = applyRegistryServers(root, config.mcp?.servers ?? [], tools, options.dryRun);
+  return { tools, files: report, claudeHooks, statusLine, mcp, servers };
 }
 
 /**
@@ -120,5 +131,7 @@ export function uninstallIntegrations(root: string, options: { force?: boolean; 
   const statusLine = fs.existsSync(path.join(root, '.claude', 'settings.json'))
     ? mergeClaudeStatusLine(root, 'sdlc', false, options.dryRun)
     : 'absent';
-  return { tools: [], files: report, claudeHooks, statusLine };
+  const mcp = removeMcpRegistration(root, options.dryRun);
+  const servers = removeRegistryServers(root, options.dryRun);
+  return { tools: [], files: report, claudeHooks, statusLine, mcp, servers };
 }

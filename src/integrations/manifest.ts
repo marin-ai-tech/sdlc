@@ -24,6 +24,8 @@ export interface Manifest {
   /** License the project used sdlc under when the files were generated. */
   license?: string;
   files: Record<string, ManifestEntry>;
+  /** The registry's MCP servers (B10) sdlc wrote, by file (`.mcp.json`, `opencode.json`): only these are its own. */
+  mcpServers?: Record<string, string[]>;
 }
 
 export const MANIFEST_PATH = 'openspec/.sdlc/manifest.json';
@@ -42,6 +44,7 @@ export function readManifest(root: string): Manifest {
       harness: parsed.harness ?? '0.0.0',
       ...(typeof parsed.license === 'string' ? { license: parsed.license } : {}),
       files: parsed.files ?? {},
+      ...(parsed.mcpServers && typeof parsed.mcpServers === 'object' ? { mcpServers: parsed.mcpServers } : {}),
     };
   } catch {
     return { version: 1, harness: '0.0.0', files: {} };

@@ -207,6 +207,8 @@ verify:
     - { name: build, run: npm run build }
     - { name: test,  run: npm test }
     - { name: lint,  run: npm run lint, required: false }
+  mcp:                        # gate checks the CLI calls on an MCP server (chapter 10.3)
+    - { name: ci-green, server: build, tool: pipeline_status, args: { ref: "${HEAD}" }, expect: { status: success } }
   timeout_seconds: 900
   output_lines: 40
 review:
@@ -223,6 +225,7 @@ enforcement:
   require_approved_plan: true
   exempt_paths: ['openspec/**', '**/*.md', '.claude/**', '.opencode/**']
   protected_paths: ['src/generated/**', 'db/migrations/**']
+  secret_allow: ['test/fixtures/**']   # paths where test data may hold real-looking keys (chapter 10.6)
   test_paths: ['**/*.test.*', '**/tests/**']
   forbid_agent_approvals: true
   session_context: true
@@ -231,6 +234,14 @@ license:
   type: community             # community | commercial (changed with sdlc license set)
   # agreement: ACME-2026-001  # for commercial
   # licensee: Acme Corp
+stages:                       # what each stage uses (chapter 10.5); MCP servers come from mcp.servers.*.stages
+  design: { skills: [architecture-review], agents: [sdlc-researcher] }
+  build:  { skills: [test-driven-development], agents: [sdlc-simplifier] }
+mcp:                          # chapter 10
+  serve: true                 # register `sdlc mcp serve` for the tools (sdlc init --mcp)
+  servers:                    # the team's MCP servers, laid out into .mcp.json and opencode.json
+    build: { type: stdio, command: [npx, -y, corp-build-mcp], env: { CI_TOKEN: "${CI_TOKEN}" }, stages: [build, test] }
+    jira:  { type: http, url: https://mcp.corp.example/jira, headers: { Authorization: "Bearer ${JIRA_TOKEN}" }, stages: [plan, deploy] }
 log:
   enabled: true               # log in openspec/.sdlc/log.jsonl
   hook_decisions: true        # write hook denials and warnings to the log

@@ -83,12 +83,25 @@ export interface VerifyCommandRecord {
   timed_out?: boolean;
 }
 
+/** An MCP check of `sdlc verify` (B12): the CLI called the tool itself; the answer stays in the evidence. */
+export interface VerifyMcpRecord {
+  name: string;
+  server: string;
+  tool: string;
+  required: boolean;
+  ok: boolean;
+  reason?: string;
+  duration_ms: number;
+}
+
 export interface VerifyRecord extends Provenance {
   status: 'passed' | 'failed';
   at: string;
   commit?: string;
   fingerprint?: string;
   results: VerifyCommandRecord[];
+  /** The MCP checks of the run; absent when the project has none. */
+  mcp?: VerifyMcpRecord[];
 }
 
 export interface WaiverRecord extends Provenance {

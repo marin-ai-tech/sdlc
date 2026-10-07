@@ -25,6 +25,7 @@ const EXAMPLES: Record<string, string> = {
   uninstall: 'sdlc uninstall --dry-run',
   adopt: 'sdlc adopt --json',
   'adopt --apply': 'sdlc adopt --apply',
+  'review suggest': 'sdlc review suggest --change add-export',
   'backlog epic add': 'sdlc backlog epic add "Checkout" --goal "Customers pay without calling support" --json',
   'backlog epic edit': 'sdlc backlog epic edit E1 --title "0.8.0 Checkout" --json',
   'defer add': 'sdlc defer add "Retry failed payments" --why "Out of scope for this change" --json',
@@ -34,6 +35,9 @@ const EXAMPLES: Record<string, string> = {
   trace: 'sdlc trace add-export --json',
   archive: 'sdlc archive add-export --yes --json',
   openspec: 'sdlc openspec list --specs',
+  'mcp check': 'sdlc mcp check --json',
+  'inbox list': 'sdlc inbox list --json',
+  'inbox done': 'sdlc inbox done 20261006T184222020Z-ci-green-3f9a1c --json',
 };
 
 /** A real value per argument name, so a generated example can be run as it is. */
@@ -91,11 +95,20 @@ const ACTION_VARIANTS: Record<string, string> = {
   'adopt --apply': 'sdlc adopt --apply',
 };
 
+/** Read-only actions any actor may run, listed on their own so an agent finds them: name -> usage. */
+const ANY_ACTIONS: Record<string, string> = {
+  'review suggest': 'sdlc review suggest --change <id> [--base <ref>] [--json]',
+};
+
 function actionVariants(commands: CatalogCommand[]): CatalogCommand[] {
-  return Object.entries(ACTION_VARIANTS).map(([name, usage]) => {
+  const variants = [
+    ...Object.entries(ACTION_VARIANTS).map(([name, usage]) => ({ name, usage, actor: 'human' as const })),
+    ...Object.entries(ANY_ACTIONS).map(([name, usage]) => ({ name, usage, actor: 'any' as const })),
+  ];
+  return variants.map(({ name, usage, actor }) => {
     const parent = commands.find((item) => item.name === name.split(' ')[0])!;
     const description = catalog('en')[`cmd.${name.replace(/ /g, '.')}`] ?? parent.description;
-    return { ...parent, name, usage, description, actor: 'human', example: EXAMPLES[name] };
+    return { ...parent, name, usage, description, actor, example: EXAMPLES[name] };
   });
 }
 

@@ -88,13 +88,15 @@ One engine (`src/core/policy.ts`) and one dispatcher (`sdlc hook pre-tool | sess
 | Tests locked (`sdlc tests lock` during a bug fix) | hard | deny edits to `test_paths` |
 | Agent approves a gate / edits `.sdlc.yaml`, `openspec/roles.yaml` or the project log | hard | deny |
 | Agent edits the guard's own configuration (`openspec/sdlc.yaml`, `.claude/settings*.json`, `.opencode/plugins/sdlc.js`, `.mcp.json`, `opencode.json(c)`, the manifest; user-level `~/.claude/settings.json`, `$CLAUDE_CONFIG_DIR/settings.json`, `~/.config/opencode/opencode.json(c)`, `$OPENCODE_CONFIG`), by edit or shell; runs `sdlc uninstall`, or `sdlc init`/`update` with flags that weaken the guard (lower mode, fewer tools, `--no-hooks`, another `--cli`) | hard | deny (rule `guard-config`; the CLI refuses with `agent_cannot_weaken_guard`); `init`/`update` without such flags still restore the files |
+| Agent adds a key, token or password in an edit or a shell write (`secret_allow` exempts test data) | hard | deny (rule `secret-in-edit`; the reason names the kind and the file, never the value) |
+| Agent calls a registry MCP server outside its `stages` (`mcp.servers`) | process | `warn`: a reminder; `block`: deny (rule `mcp-stage`) |
 | Production release without authorization (`release.commands`) | hard | deny until there is a `release` approval or `SDLC_RELEASE_APPROVAL` |
 | Stopping without fresh verification (`verify_before_stop`) | optional | Claude Code: `Stop → decision: block` |
 | Session context | — | Claude: `SessionStart.additionalContext`; OpenCode: `experimental.chat.system.transform` |
 
 `enforcement.mode: off | warn | block`. In `warn`, the hard rules still apply. If the CLI is not installed, hooks allow the action and `sdlc doctor` shows the problem: a missing guardrail must not block every edit. A check that **fails** is different: the OpenCode plugin (since 0.7.1) and the Claude Code hook command (since 0.8.0) run it once more and then block the call with the reason (OpenCode on Windows sometimes kills the check after a few milliseconds, and a failed check used to let the call through). Inside the CLI, an uninitialized project or an internal error still answers "allow".
 
-**Claude Code:** `SessionStart`, `PreToolUse` (`Edit|Write|MultiEdit|NotebookEdit|Bash|PowerShell`; PowerShell since 0.8.2) and `Stop` are merged into `.claude/settings.json`. The response uses the `hookSpecificOutput.permissionDecision/additionalContext` format. Other hooks are left untouched. The harness recognizes its own handlers by the `sdlc hook` command.
+**Claude Code:** `SessionStart`, `PreToolUse` (`Edit|Write|MultiEdit|NotebookEdit|Bash|PowerShell|mcp__.*`; PowerShell since 0.8.2, MCP tools since 0.9.0) and `Stop` are merged into `.claude/settings.json`. The response uses the `hookSpecificOutput.permissionDecision/additionalContext` format. Other hooks are left untouched. The harness recognizes its own handlers by the `sdlc hook` command.
 
 **OpenCode:** `.opencode/plugins/sdlc.js` is loaded automatically:
 - `tool.execute.before` calls `sdlc hook pre-tool --agent opencode`; a denial is thrown as an exception;
@@ -102,6 +104,14 @@ One engine (`src/core/policy.ts`) and one dispatcher (`sdlc hook pre-tool | sess
 - `shell.env` marks the agent's shell (`SDLC_AGENT`).
 
 OpenCode has no Stop hook, so `verify_before_stop` does not apply there.
+
+### MCP in both directions (0.9.0)
+
+- **Server** (`sdlc mcp serve`, `src/mcp/server.ts`): stdio, low-level SDK `Server`, six read-only tools (`status`, `next`, `instructions`, `trace`, `audit`, `help`). Each runs the CLI with `--json` in a child process, never in-process, because stdout is the protocol channel. No decision is a tool.
+- **Client** (`src/mcp/`): the CLI connects to the registry servers for `sdlc mcp check` and for `verify.mcp` checks. The result is evidence written by the CLI, so an agent cannot forge it. Outside an agent session, results are also written to `openspec/.sdlc/inbox/` for the next agent session.
+- **Registry** (`mcp.servers` in `openspec/sdlc.yaml`): laid out into `.mcp.json` and `opencode.json`. Entries written by sdlc are tracked in the manifest. Secrets are only `${VAR}` references, checked with the patterns of the `secret-in-edit` rule.
+
+See chapter 10 for the user's view.
 
 ## 4.6. Agent integration
 
@@ -122,11 +132,11 @@ Templates are written once (`assets/workflows/*.md`) and rendered for each surfa
 
 An answer in chat is never an approval: gate approvals, `track set`, `backlog move`/`drop`, `license set` and other human decisions are commands the person runs in their own terminal. Offer the choice, explain the consequences, and give the exact command.
 
-`HUMAN_COMMANDS` in `src/core/help-catalog.ts` is the one list that drives both `sdlc help` (actor: human) and the hook denials. It includes `approve`, `reject`, `waive`, `tests unlock`, `track set`, `backlog move`, `backlog drop`, `license set` and `roles migrate`.
+`HUMAN_COMMANDS` in `src/core/help-catalog.ts` is the one list that drives both `sdlc help` (actor: human) and the hook denials. It includes `approve`, `reject`, `rework`, `waive`, `tests unlock`, `track set`, `backlog move`, `backlog drop`, `license set`, `roles migrate`, `takeover`, `release-control` and `uninstall`.
 
 ## 4.7. CLI commands
 
-`init [--statusline]`, `update`, `uninstall`, `new`, `status [--markdown]`, `help [topic]`, `statusline`, `next`, `instructions`, `approve|reject|waive`, `roles check|who|migrate`, `approvals verify`, `tests lock|unlock`, `verify [--list|--check]`, `review context|check`, `validate`, `archive`, `audit`, `log`, `layout check|scaffold|adapt|convert`, `report`, `dashboard`, `license [set]`, `doctor`, `hook`, `plugin build`, `openspec …` (pass-through call to the bundled OpenSpec). Every command except `statusline`, `dashboard`, `hook` and `openspec` has `--json` with `{severity, code, message, fix}` diagnostics, as in OpenSpec.
+`init [--statusline]`, `update`, `uninstall`, `new`, `status [--markdown]`, `help [topic]`, `statusline`, `next`, `instructions`, `approve|reject|waive`, `roles check|who|migrate`, `approvals verify`, `tests lock|unlock`, `verify [--list|--check]`, `review context|check`, `validate`, `archive`, `audit`, `log`, `layout check|scaffold|adapt|convert`, `report`, `dashboard`, `license [set]`, `doctor`, `hook`, `plugin build`, `mcp serve|check`, `inbox list|done`, `review suggest`, `openspec …` (pass-through call to the bundled OpenSpec). Every command except `statusline`, `dashboard`, `hook` and `openspec` has `--json` with `{severity, code, message, fix}` diagnostics, as in OpenSpec.
 
 Planning commands include `sdlc explore <slug> | list`, `sdlc track set <full|lite> --change <id>`, `sdlc defer add | list | close`, `sdlc backlog add | epic add | list | next | start | move | drop | done`, and `sdlc import bmad <path> (--change <id> | --to-backlog) [--dry-run]`. BMAD PRD, SPEC and architecture spine map to intent, proposal, specs, design and deferred work; with `--to-backlog`, BMAD epics/tickets (or a PRD/SPEC) become backlog epics and items. Imported change artifacts start without approvals and require `sdlc validate`.
 
@@ -147,6 +157,5 @@ Planning commands include `sdlc explore <slug> | list`, `sdlc track set <full|li
 - OpenCode has no equivalent of the Stop hook; the plugin also has no `ask` decisions (only allow/deny).
 - OpenSpec stores/multi-repository setups are not supported yet (pass-through commands work; gates are evaluated against the local root).
 - Continuous evals (Stage 4) and monitoring control bands (Stage 6) are described in the `archive`/`triage` workflows, but there are no separate `eval`/`bands` commands yet.
-- Linking to Jira/ServiceNow works through `--source-ref`/`--source-url` and the agent's MCP connectors; there is no two-way sync.
-- Next version: the `Next:` hint and the workflows name the people from `roles.yaml` who can take a human decision ("approve review: Carol Hughes").
+- Linking to Jira/ServiceNow works through `--source-ref`/`--source-url`, the team's MCP registry and `verify.mcp` checks; there is no two-way sync of tickets.
 - Possible next steps: `sdlc eval`, checking code against living specs, a PR bot that uses `status --markdown`.

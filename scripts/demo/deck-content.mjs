@@ -270,6 +270,20 @@ export const SLIDES = [
     },
   },
   {
+    id: 'integrations', layout: 'steps',
+    title: { en: 'Other AI systems, over MCP', ru: 'Другие AI-системы — по MCP' },
+    lead: {
+      en: 'Other systems read the process over MCP; sdlc calls their servers itself. CI status becomes gate evidence, and results wait in the agent inbox.',
+      ru: 'Другие системы читают процесс по MCP, а sdlc сам вызывает их серверы. Статус CI — доказательство для гейта, результаты ждут агента во входящих.',
+    },
+    steps: ['mcp-check', 'verify-mcp', 'inbox-list'],
+    more: ['inbox-done', 'mcp'],
+    notes: {
+      en: 'No decision is offered over MCP. The registry lives in openspec/sdlc.yaml with secrets as ${VAR} references; the hook allows each server only at its stages. Chapter 10 of the docs has the user cases.',
+      ru: 'Решений через MCP нет. Реестр — в openspec/sdlc.yaml, секреты только ссылками ${VAR}; хук разрешает каждый сервер только на его стадиях. Пользовательские сценарии — в главе 17 документации.',
+    },
+  },
+  {
     id: 'coverage', layout: 'coverage',
     title: { en: 'Every command, one scenario', ru: 'Все команды в одном сценарии' },
     lead: {
@@ -384,6 +398,11 @@ export const STEP_NOTE_RU = {
   log: 'Кто что сделал, с версией sdlc и лицензией.',
   statusline: 'Строка статуса Claude Code.',
   hook: 'Что агент узнаёт при старте сессии.',
+  mcp: 'Другие AI-системы читают процесс по MCP.',
+  'mcp-check': 'MCP-серверы команды: доступны ли, какие у них инструменты, кто из них пишет файлы.',
+  'verify-mcp': 'Боб сам запускает verify: CLI вызывает CI-сервер по MCP и сохраняет результат для агента.',
+  'inbox-list': 'Агент находит результат во входящих.',
+  'inbox-done': 'Прочитано: агент отмечает пункт выполненным.',
   plugin: 'Те же процессы как плагин Claude Code.',
   uninstall: 'Удаление сохраняет все файлы планирования.',
 };

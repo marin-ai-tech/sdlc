@@ -2,6 +2,8 @@ import { parseMinApprovals } from './approval-quorum.js';
 import { SdlcError } from './errors.js';
 import { isFile } from './fs-utils.js';
 import { LAYOUT_ROLE_IDS, type LayoutMapping, type LayoutRoleId } from './layout.js';
+import { parseMcpChecks, parseMcpServers, type McpCheck, type McpServer } from '../mcp/registry.js';
+import { parseStages, type StagesConfig } from './stage-config.js';
 import { readYamlObject } from './yaml-io.js';
 import { updateYamlFile } from './yaml-update.js';
 
@@ -62,6 +64,8 @@ export interface SdlcConfig {
     commands: VerifyCommand[];
     timeoutSeconds: number;
     outputLines: number;
+    /** MCP checks the CLI calls during `sdlc verify` (B12); absent when sdlc.yaml has none. */
+    mcp?: McpCheck[];
   };
   review: {
     policy: string;
@@ -80,6 +84,8 @@ export interface SdlcConfig {
     requireApprovedPlan: boolean;
     exemptPaths: string[];
     protectedPaths: string[];
+    /** Globs (root-relative) where the secret rule allows keys and tokens: test data (B16). */
+    secretAllow: string[];
     testPaths: string[];
     forbidAgentApprovals: boolean;
     sessionContext: boolean;
@@ -108,6 +114,14 @@ export interface SdlcConfig {
   rework: { reasons: string[] };
   /** UI locale (en, ru). Optional; absent means resolve from flag/env/system. */
   locale?: string;
+  /**
+   * MCP (B13): `serve` registers `sdlc mcp serve` for the configured tools. Absent when sdlc.yaml has no `mcp`
+   * block. `servers` is the team's registry (B10), laid out for the tools; it is never written back, so the file
+   * keeps it as people wrote it.
+   */
+  mcp?: { serve: boolean; servers?: McpServer[] };
+  /** Skills and subagents per stage (B14); never written back, so the file keeps it as people wrote it. */
+  stages: StagesConfig;
 }
 
 export const DEFAULT_TEST_PATHS = [
@@ -166,6 +180,7 @@ export function defaultConfig(): SdlcConfig {
       requireApprovedPlan: true,
       exemptPaths: [...DEFAULT_EXEMPT_PATHS],
       protectedPaths: [],
+      secretAllow: [],
       testPaths: [...DEFAULT_TEST_PATHS],
       forbidAgentApprovals: true,
       sessionContext: true,
@@ -175,6 +190,7 @@ export function defaultConfig(): SdlcConfig {
     log: { enabled: true, hookDecisions: true },
     layout: {},
     rework: { reasons: [...DEFAULT_REWORK_REASONS] },
+    stages: {},
   };
 }
 
@@ -235,6 +251,12 @@ export function parseConfig(raw: Raw, file = 'openspec/sdlc.yaml'): SdlcConfig {
   config.schema = asString(raw.schema, where('schema')) ?? config.schema;
   config.cli = asString(raw.cli, where('cli')) ?? config.cli;
   config.statusline = asBool(raw.statusline, where('statusline')) ?? config.statusline;
+  config.stages = parseStages(raw.stages, where);
+  const mcp = asObject(raw.mcp, where('mcp'));
+  if (mcp) {
+    const serve = asBool(mcp.serve, where('mcp.serve')) ?? false;
+    config.mcp = { serve, servers: parseMcpServers(mcp.servers, where) };
+  }
   if (!/^[A-Za-z0-9@._/ -]+$/.test(config.cli)) {
     throw new SdlcError(
       'invalid_config',
@@ -294,6 +316,8 @@ export function parseConfig(raw: Raw, file = 'openspec/sdlc.yaml'): SdlcConfig {
       asNumber(verify.timeout_seconds, where('verify.timeout_seconds')) ?? config.verify.timeoutSeconds;
     config.verify.outputLines =
       asNumber(verify.output_lines, where('verify.output_lines')) ?? config.verify.outputLines;
+    const checks = parseMcpChecks(verify.mcp, where);
+    if (checks.length > 0) config.verify.mcp = checks;
     if (verify.commands !== undefined && verify.commands !== null) {
       if (!Array.isArray(verify.commands)) {
         throw new SdlcError(
@@ -378,6 +402,7 @@ export function parseConfig(raw: Raw, file = 'openspec/sdlc.yaml'): SdlcConfig {
     e.exemptPaths = asStringArray(enforcement.exempt_paths, where('enforcement.exempt_paths')) ?? e.exemptPaths;
     e.protectedPaths =
       asStringArray(enforcement.protected_paths, where('enforcement.protected_paths')) ?? e.protectedPaths;
+    e.secretAllow = asStringArray(enforcement.secret_allow, where('enforcement.secret_allow')) ?? e.secretAllow;
     e.testPaths = asStringArray(enforcement.test_paths, where('enforcement.test_paths')) ?? e.testPaths;
     e.forbidAgentApprovals =
       asBool(enforcement.forbid_agent_approvals, where('enforcement.forbid_agent_approvals')) ??
@@ -497,6 +522,7 @@ export function serializeConfig(config: SdlcConfig): Record<string, unknown> {
       require_approved_plan: config.enforcement.requireApprovedPlan,
       exempt_paths: config.enforcement.exemptPaths,
       protected_paths: config.enforcement.protectedPaths,
+      secret_allow: config.enforcement.secretAllow,
       test_paths: config.enforcement.testPaths,
       forbid_agent_approvals: config.enforcement.forbidAgentApprovals,
       session_context: config.enforcement.sessionContext,
@@ -511,6 +537,7 @@ export function serializeConfig(config: SdlcConfig): Record<string, unknown> {
     ...(Object.keys(config.layout).length ? { layout: config.layout } : {}),
     ...(config.rework.reasons.join() === DEFAULT_REWORK_REASONS.join() ? {} : { rework: config.rework }),
     ...(config.locale ? { locale: config.locale } : {}),
+    ...(config.mcp ? { mcp: { serve: config.mcp.serve } } : {}),
   };
 }
 

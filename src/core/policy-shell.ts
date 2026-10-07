@@ -2,6 +2,7 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import picomatch from 'picomatch';
 import { isWithin, toPosix } from './fs-utils.js';
+import { INBOX_DIR } from '../mcp/inbox.js';
 
 /**
  * Which state files a tool call writes, beyond the path text `policy.ts` matches (rule `state-integrity`):
@@ -18,11 +19,16 @@ import { isWithin, toPosix } from './fs-utils.js';
  * The same machinery serves the guard's own configuration (B41, `policy-guard.ts`) through `shellWrites`.
  */
 
-/** Harness records only the CLI writes: per-change `.sdlc.yaml`, the project log, roles and the backlog. */
+/**
+ * Harness records only the CLI writes: per-change `.sdlc.yaml`, the project log, roles, the backlog and the inbox
+ * of MCP results kept for the agent (`openspec/.sdlc/inbox/<id>.json`).
+ */
 // Case-insensitive: Windows and macOS file systems ignore case, so `OPENSPEC/Backlog.md` is the same file.
-export const STATE_FILE_WRITE = /\.sdlc\.yaml|\.sdlc\/log\.jsonl|openspec\/(?:roles\.yaml|backlog\.md)/i;
+export const STATE_FILE_WRITE =
+  /\.sdlc\.yaml|\.sdlc\/log\.jsonl|\.sdlc\/inbox(?:\/|\b)|openspec\/(?:roles\.yaml|backlog\.md)/i;
 export const STATE_FILE = new RegExp(
-  '(^|/)\\.sdlc\\.yaml$|^openspec/\\.sdlc/log\\.jsonl$|^openspec/(?:roles\\.yaml|backlog\\.md)$',
+  '(^|/)\\.sdlc\\.yaml$|^openspec/\\.sdlc/log\\.jsonl$|^openspec/\\.sdlc/inbox/[^/]+$' +
+    '|^openspec/(?:roles\\.yaml|backlog\\.md)$',
   'i'
 );
 /** The backlog's order and removal are a person's decision; agents change the file through `sdlc backlog`. */
@@ -53,8 +59,8 @@ function anyOf(patterns: RegExp[]): RegExp {
 export const WRITE_OPS = anyOf([...REDIRECT_OPS, ...FILE_OPS]);
 /** Write ops that can replace, delete or fill a whole folder. */
 const FOLDER_OPS = anyOf(FILE_OPS);
-/** Folders that hold state files: openspec/, the change folders (active and archived) and openspec/.sdlc. */
-const STATE_FOLDER = /^openspec(?:\/changes(?:\/archive)?(?:\/[^/]+)?|\/\.sdlc)?$/i;
+/** Folders that hold state files: openspec/, the change folders (active and archived), openspec/.sdlc, the inbox. */
+const STATE_FOLDER = /^openspec(?:\/changes(?:\/archive)?(?:\/[^/]+)?|\/\.sdlc(?:\/inbox)?)?$/i;
 
 /** The state files at fixed places; a `.sdlc.yaml` may sit in any change directory. */
 const FIXED_STATE_FILES = ['openspec/backlog.md', 'openspec/roles.yaml', 'openspec/.sdlc/log.jsonl', '.sdlc.yaml'];
@@ -181,6 +187,15 @@ function moveTo(state: DirState, verb: string, args: string[]): void {
   state.dir = absolute(state.dir, args.find((arg) => !arg.startsWith('-')));
 }
 
+/** The inbox files on disk, root-relative. */
+export function inboxFiles(root: string): string[] {
+  try {
+    return fs.readdirSync(path.join(root, INBOX_DIR)).map((name) => `${INBOX_DIR}/${name}`);
+  } catch {
+    return [];
+  }
+}
+
 /** Directories that may hold a change's `.sdlc.yaml`: the change directories on disk, active and archived. */
 export function changeDirs(root: string): string[] {
   const dirs: string[] = [];
@@ -206,9 +221,9 @@ function stateCandidates(root: string, glob: string, folders: boolean): string[]
   const dirs = new Set(changeDirs(root));
   const literal = literalDir(glob);
   if (literal === 'openspec' || literal.startsWith('openspec/')) dirs.add(literal);
-  const files = [...FIXED_STATE_FILES, ...[...dirs].map((dir) => `${dir}/.sdlc.yaml`)];
+  const files = [...FIXED_STATE_FILES, ...[...dirs].map((dir) => `${dir}/.sdlc.yaml`), ...inboxFiles(root)];
   if (!folders) return files;
-  return [...files, 'openspec', 'openspec/changes', 'openspec/.sdlc', ...dirs];
+  return [...files, 'openspec', 'openspec/changes', 'openspec/.sdlc', INBOX_DIR, ...dirs];
 }
 
 /** The state files and the folders that hold them. */

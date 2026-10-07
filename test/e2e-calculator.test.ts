@@ -3,6 +3,7 @@ import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { parseDocument } from 'yaml';
 import { buildProgram } from '../src/cli/index.js';
 import { BIN, git, humanEnv, initGitRepo, read, REPO_ROOT, runCli, tempDir, write } from './helpers.js';
 
@@ -51,6 +52,14 @@ const COVERAGE = [
 const REVIEW = `# Review: basic-arithmetic\n\n## Findings\n\n### F1 [important][bugs] sub() argument order in the till adapter\n- **Where**: src/calc.js:2\n- **Status**: fixed (order documented and tested)\n\n### F2 [nit][compliance] Division by zero returns Infinity\n- **Where**: src/calc.js:4\n- **Status**: deferred (D1)\n\n${COVERAGE}\n`;
 const TICKETS = '[[entry]]\nid = 1\ntype = "story"\ntitle = "Square root"\ndescription = "The cashier takes the square root of a number."\nverify = "sqrt(9) shows 3; sqrt(-1) shows an error."\nafter = []\nrisk = "low"\n\n[[entry]]\nid = 2\ntype = "story"\ntitle = "Power"\ndescription = "The cashier raises a number to a power."\nverify = "2 ^ 10 shows 1024."\nafter = [1]\nrisk = "low"\n';
 const EPIC = '---\ntype: epic\ntitle: "Scientific mode"\n---\n\n# Scientific mode\n\n## Outcome\n\nEngineers can use the till calculator for quick technical sums.\n';
+
+/** An MCP client's first messages: initialize, then list the tools; the server answers and ends with stdin. */
+const MCP_LIST = [
+  { jsonrpc: '2.0', id: 0, method: 'initialize',
+    params: { protocolVersion: '2025-06-18', capabilities: {}, clientInfo: { name: 'demo', version: '0' } } },
+  { jsonrpc: '2.0', method: 'notifications/initialized' },
+  { jsonrpc: '2.0', id: 1, method: 'tools/list' },
+].map((message) => JSON.stringify(message)).join('\n');
 
 /** Every leaf command of the CLI, e.g. `backlog add`, `approvals verify`. */
 function cliCommands(): string[] {
@@ -296,8 +305,20 @@ describe('demo: a team builds a calculator with sdlc (every command)', { timeout
     step('dashboard', 'visibility', 'alice', ['dashboard', '--out', 'reports/dashboard.html'], 'The dashboard, one offline HTML page.');
     step('audit', 'visibility', 'alice', ['audit'], 'Lead times and first-pass rate.');
     step('log', 'visibility', 'alice', ['log', '--limit', '15'], 'Who did what, with the sdlc version and license.');
+    // The team's MCP registry: a CI server (the test fixture) for the build and test stages, and a check on it.
+    const ci = path.join(REPO_ROOT, 'test/fixtures/mcp/fake-server.mjs').replace(/\\/g, '/');
+    const config = parseDocument(read(path.join(root, 'openspec/sdlc.yaml')));
+    config.setIn(['mcp', 'servers', 'ci'], { type: 'stdio', command: ['node', ci], stages: ['build', 'test'] });
+    const green = { status: 'success' };
+    config.setIn(['verify', 'mcp'], [{ name: 'ci-green', server: 'ci', tool: 'pipeline_status', args: { ref: '${HEAD}' }, expect: green }]);
+    write(path.join(root, 'openspec/sdlc.yaml'), config.toString());
+    step('mcp-check', 'visibility', 'bob', ['mcp', 'check'], 'The team\'s MCP servers: reachable, tools listed, file writers flagged.');
+    step('verify-mcp', 'visibility', 'bob', ['verify', '--change', 'fix-rounding'], 'Bob verifies himself: the CLI calls the CI server over MCP and keeps the result for the agent.');
+    const inbox = step('inbox-list', 'visibility', 'agent', ['inbox', 'list', '--json'], 'The agent finds the result in its inbox.');
     step('statusline', 'visibility', 'bob', ['statusline'], 'Claude Code status line.', { input: JSON.stringify({ cwd: root }) });
     step('hook', 'visibility', 'agent', ['hook', 'session-start'], 'What the agent learns when a session starts.', { input: JSON.stringify({ cwd: root, source: 'startup' }) });
+    step('inbox-done', 'visibility', 'agent', ['inbox', 'done', JSON.parse(inbox.stdout).items[0].id], 'Read: the agent marks the item done.');
+    step('mcp', 'visibility', 'agent', ['mcp', 'serve'], 'Other AI systems read the process over MCP.', { input: MCP_LIST });
     step('plugin', 'visibility', 'bob', ['plugin', 'build', path.join(tempDir('sdlc-demo-plugin-'), 'plugin')], 'The same workflows as a Claude Code plugin.');
     step('uninstall', 'visibility', 'alice', ['uninstall', '--dry-run'], 'Uninstall keeps every planning file.');
   });

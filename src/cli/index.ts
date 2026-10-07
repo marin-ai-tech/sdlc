@@ -29,6 +29,8 @@ import {
 import { rolesCheck, rolesMigrate, rolesWho } from '../commands/roles.js';
 import { adoptCommand } from '../commands/adopt.js';
 import { traceCommand } from '../commands/trace.js';
+import { mcpCheckCommand, mcpServeCommand } from '../commands/mcp.js';
+import { inboxDoneCommand, inboxListCommand } from '../commands/inbox.js';
 import { resolveLocale, setLocale, systemLocale, t } from '../core/i18n.js';
 import { applyCommanderLocale, localizeDescriptions, peekLocaleFlag } from './commander-i18n.js';
 import { loadConfig } from '../core/config.js';
@@ -206,6 +208,7 @@ export function buildProgram(): Command {
     .option('--no-hooks', 'do not install Claude Code hooks')
     .option('--opsx', "also install OpenSpec's own /opsx workflows for the same tools")
     .option('--statusline', 'install the Claude Code status line')
+    .option('--mcp', 'register sdlc as an MCP server for the chosen tools (mcp.serve in openspec/sdlc.yaml)')
     .option('--language <language>', 'artifact language for a new OpenSpec config')
     .option('--force', 'overwrite generated files even if edited locally')
     .option('--layout <action>', 'AI-ready documents: scaffold | adapt | worktree | none (default: none)')
@@ -277,6 +280,19 @@ export function buildProgram(): Command {
     .option('--json', 'output JSON').action((topic, opts) => helpCommand(topic, opts));
   program.command('statusline').description(cmdDesc('cmd.statusline'))
     .action(() => statuslineCommand());
+  const mcp = program.command('mcp').description(cmdDesc('cmd.mcp'));
+  mcp.command('serve').description(cmdDesc('cmd.mcp.serve'))
+    .action(() => mcpServeCommand());
+  mcp.command('check').description(cmdDesc('cmd.mcp.check'))
+    .option('--json', 'output JSON')
+    .action((opts) => mcpCheckCommand(opts));
+  const inbox = program.command('inbox').description(cmdDesc('cmd.inbox'));
+  inbox.command('list').description(cmdDesc('cmd.inbox.list'))
+    .option('--json', 'output JSON')
+    .action((opts) => inboxListCommand(opts));
+  inbox.command('done <id>').description(cmdDesc('cmd.inbox.done'))
+    .option('--json', 'output JSON')
+    .action((id, opts) => inboxDoneCommand(id, opts));
 
   program.command('track').description(cmdDesc('cmd.track'))
     .command('set <track>')

@@ -2,6 +2,7 @@ import { generatedNotice } from '../core/license.js';
 import { AGENT_IDS, loadAgent, loadWorkflow, WORKFLOW_IDS } from './assets.js';
 import { appendNotice, renderBody, yamlString } from './render.js';
 import { allowedToolsFor } from './skills.js';
+import { stageAllowedTools, stageResources, stageSection } from './stage-resources.js';
 import type { GeneratedFile, RenderContext, ToolAdapter } from './types.js';
 
 const CLAUDE_TOOL_NAMES: Record<string, string> = {
@@ -36,14 +37,15 @@ export const claudeAdapter: ToolAdapter = {
     if (ctx.delivery !== 'skills') {
       for (const id of WORKFLOW_IDS) {
         const wf = loadWorkflow(id);
+        const resources = stageResources(ctx.config, id);
         const content = appendNotice([
           '---',
           `description: ${yamlString(wf.commandDescription)}`,
           ...(wf.argumentHint ? [`argument-hint: ${yamlString(wf.argumentHint)}`] : []),
-          `allowed-tools: ${allowedToolsFor(ctx.cli)}`,
+          `allowed-tools: ${stageAllowedTools(allowedToolsFor(ctx.cli), resources)}`,
           '---',
           '',
-          renderBody(wf.body, { surface: 'claude-command', cli: ctx.cli }),
+          renderBody(wf.body, { surface: 'claude-command', cli: ctx.cli }) + stageSection(resources),
         ].join('\n'), notice);
         files.push({ path: `.claude/commands/sdlc/${id}.md`, content, tool: 'claude', kind: 'command' });
       }

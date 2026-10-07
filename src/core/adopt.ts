@@ -138,6 +138,11 @@ function ownerRows(root: string, files: string[]): { pattern: string; owners: st
   return rows;
 }
 
+/** CODEOWNERS rules in file order (`CODEOWNERS`, `.github/CODEOWNERS`, `docs/CODEOWNERS`): pattern and owners. */
+export function codeOwnerRules(root: string): { pattern: string; owners: string[] }[] {
+  return ownerRows(root, CODEOWNERS.filter((file) => safeFile(root, file)));
+}
+
 function noteOwner(people: Map<string, AdoptPerson>, email: string): void {
   if (isBot('', email)) return;
   const person = people.get(email);

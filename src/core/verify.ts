@@ -1,7 +1,9 @@
 import { spawn } from 'node:child_process';
 import * as path from 'node:path';
 import type { SdlcConfig, VerifyCommand } from './config.js';
-import { provenance, type ChangeState, type VerifyCommandRecord, type VerifyRecord } from './change-state.js';
+import {
+  provenance, type ChangeState, type VerifyCommandRecord, type VerifyMcpRecord, type VerifyRecord,
+} from './change-state.js';
 import { exists, isFile, readText, writeTextAtomic } from './fs-utils.js';
 import { headCommit, isDirty, worktreeFingerprint } from './git.js';
 import { stampText, stripProvenance, withProvenance, type HarnessStamp } from './license.js';
@@ -18,6 +20,11 @@ export interface CheckOutcome extends VerifyCommandRecord {
   output: string;
 }
 
+/** An MCP check's outcome (B12) with the answer the server gave (`result`). */
+export interface McpCheckOutcome extends VerifyMcpRecord {
+  result: unknown;
+}
+
 export interface VerificationRun {
   status: 'passed' | 'failed';
   at: string;
@@ -25,6 +32,8 @@ export interface VerificationRun {
   dirty: boolean;
   fingerprint?: string;
   checks: CheckOutcome[];
+  /** MCP checks the CLI called after the commands (src/mcp/checks.ts); absent when there are none. */
+  mcp?: McpCheckOutcome[];
 }
 
 function tail(text: string, lines: number): string {
@@ -114,6 +123,7 @@ export function toVerifyRecord(run: VerificationRun): VerifyRecord {
     ...(run.commit ? { commit: run.commit } : {}),
     ...(run.fingerprint ? { fingerprint: run.fingerprint } : {}),
     results: run.checks.map(({ output: _output, ...rest }) => rest),
+    ...(run.mcp && run.mcp.length > 0 ? { mcp: run.mcp.map(({ result: _result, ...rest }) => rest) } : {}),
   };
 }
 
@@ -126,9 +136,33 @@ function fence(text: string): string {
   return `${ticks}text\n${text}\n${ticks}`;
 }
 
-export function renderEvidence(run: VerificationRun, changeId: string, stamp?: HarnessStamp): string {
+/** The MCP checks' table rows and answers, next to the commands'. */
+function mcpEvidence(run: VerificationRun): { rows: string[]; outputs: string[] } {
+  const checks = run.mcp ?? [];
+  const rows = checks.map((m) => {
+    const result = m.ok ? '✅ ok' : `❌ ${(m.reason ?? 'failed').replace(/\|/g, '\\|').replace(/\r?\n/g, ' ')}`;
+    const call = `mcp ${m.server}/${m.tool}`.replace(/\|/g, '\\|');
+    const seconds = (m.duration_ms / 1000).toFixed(1);
+    return `| ${m.name}${m.required ? '' : ' (optional)'} | \`${call}\` | ${result} | ${seconds}s |`;
+  });
+  const outputs = checks.map((m) => {
+    const answer = m.result === undefined ? '(no answer)' : JSON.stringify(m.result, null, 2);
+    return `<details><summary>${m.name} answer</summary>\n\n${fence(answer)}\n\n</details>`;
+  });
+  return { rows, outputs };
+}
+
+/** Required checks, commands and MCP checks together: how many passed out of how many. */
+function requiredCounts(run: VerificationRun): { passedRequired: number; total: number } {
+  const requiredMcp = (run.mcp ?? []).filter((m) => m.required);
   const required = run.checks.filter((c) => c.required);
-  const passedRequired = required.filter((c) => c.exit_code === 0).length;
+  const passedRequired = required.filter((c) => c.exit_code === 0).length + requiredMcp.filter((m) => m.ok).length;
+  return { passedRequired, total: required.length + requiredMcp.length };
+}
+
+export function renderEvidence(run: VerificationRun, changeId: string, stamp?: HarnessStamp): string {
+  const mcp = mcpEvidence(run);
+  const { passedRequired, total } = requiredCounts(run);
   const rows = run.checks.map((c) => {
     const result = c.timed_out ? '⏱ timed out' : c.exit_code === 0 ? '✅ exit 0' : `❌ exit ${c.exit_code ?? '?'}`;
     return `| ${c.name}${c.required ? '' : ' (optional)'} | \`${c.command.replace(/\|/g, '\\|')}\` | ${result} | ${(c.duration_ms / 1000).toFixed(1)}s |`;
@@ -142,7 +176,7 @@ export function renderEvidence(run: VerificationRun, changeId: string, stamp?: H
     '',
     `Recorded by \`sdlc verify --change ${changeId}\`. Regenerated on every run; do not edit by hand.`,
     '',
-    `- **Result**: ${run.status === 'passed' ? 'PASSED' : 'FAILED'} (${passedRequired}/${required.length} required checks)`,
+    `- **Result**: ${run.status === 'passed' ? 'PASSED' : 'FAILED'} (${passedRequired}/${total} required checks)`,
     `- **Run at**: ${run.at}`,
     `- **Commit**: ${run.commit ? run.commit.slice(0, 12) : 'n/a'}${run.dirty ? ' + uncommitted changes' : ''}`,
     ...(stamp ? [`- **Harness**: ${stampText(stamp)}`] : []),
@@ -150,8 +184,10 @@ export function renderEvidence(run: VerificationRun, changeId: string, stamp?: H
     '| Check | Command | Result | Duration |',
     '|---|---|---|---|',
     ...rows,
+    ...mcp.rows,
     '',
     ...outputs,
+    ...mcp.outputs,
     EVIDENCE_END,
   ].join('\n');
 }

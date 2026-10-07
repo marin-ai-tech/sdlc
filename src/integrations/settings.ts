@@ -78,7 +78,8 @@ export function harnessHooks(cli: string): HooksConfig {
     PreToolUse: [
       {
         // PowerShell: Claude Code's Windows shell tool writes files too, so its calls reach the same rules (B41).
-        matcher: 'Edit|Write|MultiEdit|NotebookEdit|Bash|PowerShell',
+        // mcp__.*: MCP tool calls, so the stage rule sees them (B43); Read, Grep and Glob stay unmatched.
+        matcher: 'Edit|Write|MultiEdit|NotebookEdit|Bash|PowerShell|mcp__.*',
         hooks: [
           { type: 'command', command: hookCommand(cli, 'pre-tool'), timeout: 30, statusMessage: 'SDLC gate check' },
         ],

@@ -16,7 +16,20 @@ import {
   type SourceType,
   type Track,
 } from '../core/change-state.js';
-import { assertValidChangeId, listActiveChanges, listArchivedChanges, resolveChange } from '../core/changes.js';
+import {
+  assertValidChangeId,
+  listActiveChanges,
+  listArchivedChanges,
+  resolveChange,
+  type ChangeRef,
+} from '../core/changes.js';
+import {
+  artifactStage,
+  contextPackJson,
+  contextPackLines,
+  readContextPack,
+  type ContextPack,
+} from '../core/context-packs.js';
 import { changedBases, findOverlaps, readChangeDeltas, type Overlap } from '../core/deltas.js';
 import { SdlcError } from '../core/errors.js';
 import { isFile, isWithin } from '../core/fs-utils.js';
@@ -351,40 +364,50 @@ function projectContextText(ctx: ProjectContext): string | undefined {
   }
 }
 
+function printContextPack(pack: ContextPack | undefined): void {
+  const lines = contextPackLines(pack);
+  if (lines.length > 0) line(`\n${lines.join('\n')}`);
+}
+
+function recordInstructions(ctx: ProjectContext, ref: ChangeRef, artifact: string, json?: boolean): void {
+  const outputPath = path.join(ref.dir, `${artifact}.md`);
+  const template = readAsset('records', `${artifact}.md`).replace(/<change>/g, ref.id);
+  const context = projectContextText(ctx);
+  const pack = readContextPack(ctx.root, artifactStage(artifact, []));
+  const payload = {
+    changeName: ref.id,
+    artifactId: artifact,
+    changeDir: ref.dir,
+    outputPath: `${artifact}.md`,
+    resolvedOutputPath: outputPath,
+    exists: isFile(outputPath),
+    instruction: RECORD_INSTRUCTIONS[artifact],
+    ...(context ? { context } : {}),
+    template,
+    source: 'sdlc',
+    root: { path: ctx.root },
+    ...contextPackJson(pack),
+  };
+  if (json) return printJson(payload);
+  line(`<artifact id="${artifact}" change="${ref.id}" source="sdlc">`);
+  line(`Write to: ${outputPath}${payload.exists ? ' (exists - update it)' : ''}`);
+  line();
+  line(RECORD_INSTRUCTIONS[artifact]);
+  if (context) line(`\n<context>\n${context}\n</context>`);
+  printContextPack(pack);
+  line(`\n<template>\n${template}</template>\n</artifact>`);
+}
+
 export async function instructionsCommand(artifact: string, opts: { change?: string; json?: boolean }): Promise<void> {
   try {
     const ctx = loadProject();
     const ref = resolveChange(ctx.paths, opts.change);
-    if (artifact in RECORD_INSTRUCTIONS) {
-      const outputPath = path.join(ref.dir, `${artifact}.md`);
-      const template = readAsset('records', `${artifact}.md`).replace(/<change>/g, ref.id);
-      const context = projectContextText(ctx);
-      const payload = {
-        changeName: ref.id,
-        artifactId: artifact,
-        changeDir: ref.dir,
-        outputPath: `${artifact}.md`,
-        resolvedOutputPath: outputPath,
-        exists: isFile(outputPath),
-        instruction: RECORD_INSTRUCTIONS[artifact],
-        ...(context ? { context } : {}),
-        template,
-        source: 'sdlc',
-        root: { path: ctx.root },
-      };
-      if (opts.json) return printJson(payload);
-      line(`<artifact id="${artifact}" change="${ref.id}" source="sdlc">`);
-      line(`Write to: ${outputPath}${payload.exists ? ' (exists - update it)' : ''}`);
-      line();
-      line(RECORD_INSTRUCTIONS[artifact]);
-      if (context) line(`\n<context>\n${context}\n</context>`);
-      line(`\n<template>\n${template}</template>\n</artifact>`);
-      return;
-    }
+    if (artifact in RECORD_INSTRUCTIONS) return recordInstructions(ctx, ref, artifact, opts.json);
     // Planning artifacts and `apply` are OpenSpec's: delegate, then add the lifecycle view.
     if (!opts.json) {
       const r = runOpenSpec(['instructions', artifact, '--change', ref.id], { cwd: ctx.root, inherit: true });
       const view = evaluateChange(ctx.root, ref, ctx.config, { skipFingerprint: true });
+      printContextPack(readContextPack(ctx.root, artifactStage(artifact, view.gates)));
       line(c.dim(`\n[sdlc] stage: ${view.stageTitle}; next: ${view.next.message}`));
       if (!r.ok) process.exitCode = r.exitCode ?? 1;
       return;
@@ -396,6 +419,7 @@ export async function instructionsCommand(artifact: string, opts: { change?: str
     );
     const view = evaluateChange(ctx.root, ref, ctx.config, { skipFingerprint: true });
     const gate = view.gates.find((g) => g.artifacts.includes(artifact));
+    const pack = readContextPack(ctx.root, artifactStage(artifact, view.gates));
     printJson({
       ...result.data,
       sdlc: {
@@ -408,6 +432,7 @@ export async function instructionsCommand(artifact: string, opts: { change?: str
           ? `The ${gate.id} gate is ${gate.status}: editing ${artifact} invalidates that approval and needs re-approval.`
           : undefined,
       },
+      ...contextPackJson(pack),
     });
     if (!result.ok) process.exitCode = 1;
   } catch (error) {

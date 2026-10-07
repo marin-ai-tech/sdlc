@@ -15,6 +15,10 @@ import { handBackLine, shellTakeoverDenial, takeoverDenial } from './takeover.js
 import { hardLinkedStateFiles } from './policy-hardlink.js';
 import { guardDenial, guardEditHits, shellGuardWrites } from './policy-guard.js';
 import { userGuardEditHits, userShellGuardWrites } from './user-guard.js';
+import { editWrites, type EditWrite } from './edit-texts.js';
+import { secretEditDenial, shellSecretDenial } from './policy-secrets.js';
+import { mcpStageDecision } from './policy-mcp.js';
+import { inboxSessionLines } from '../mcp/inbox.js';
 import {
   BACKLOG_FILE,
   linkedStateFiles,
@@ -47,6 +51,8 @@ export interface ToolCall {
   files: string[];
   command?: string;
   cwd: string;
+  /** Edit tools: the text each target file gains and loses (rule `secret-in-edit`, B16). */
+  writes?: EditWrite[];
 }
 
 export interface Decision {
@@ -96,7 +102,15 @@ export function normalizeToolCall(tool: string, input: Record<string, unknown>, 
     : EDIT_TOOLS.has(lower) || (files.length > 0 && !READ_TOOLS.has(lower))
       ? 'edit'
       : READ_TOOLS.has(lower) ? 'read' : 'other';
-  return { tool, kind, files: [...new Set(files)], ...(command ? { command } : {}), cwd };
+  const writes = kind === 'edit' ? editWrites(input) : [];
+  return {
+    tool,
+    kind,
+    files: [...new Set(files)],
+    ...(command ? { command } : {}),
+    cwd,
+    ...(writes.length > 0 ? { writes } : {}),
+  };
 }
 
 function matcher(globs: string[]): (p: string) => boolean {
@@ -217,6 +231,9 @@ function evaluateCommand(command: string, ctx: PolicyContext, env: NodeJS.Proces
   const guardHits = [...shellGuardWrites(spelled, ctx.paths.root, cwd), ...userShellGuardWrites(spelled, cwd, env)];
   const guard = guardDenial(guardHits);
   if (guard) return guard;
+  // A key or token the command writes (B16): a shell write has no reliable target, so no exemption applies.
+  const secret = shellSecretDenial(cmd);
+  if (secret) return secret;
   // A change a person holds: no shell writes to its paths, no sdlc steps on it but the read-only ones.
   const held = shellTakeoverDenial(ctx.paths, spelled, cwd, CLI_PREFIX);
   if (held) return held;
@@ -231,7 +248,15 @@ function evaluateCommand(command: string, ctx: PolicyContext, env: NodeJS.Proces
   };
 }
 
+/** Every rule; a call the other rules allow may still be a registry MCP server out of stage (B43). */
 export function evaluateToolCall(call: ToolCall, ctx: PolicyContext): Decision {
+  const decision = evaluateRules(call, ctx);
+  if (decision.decision !== 'allow') return decision;
+  const stages = () => snapshots(ctx).flatMap((change) => (change.view ? [change.view.stage] : []));
+  return mcpStageDecision(call.tool, ctx.config, stages) ?? decision;
+}
+
+function evaluateRules(call: ToolCall, ctx: PolicyContext): Decision {
   const { config, paths } = ctx;
   const env = ctx.env ?? process.env;
   const mode = config.enforcement.mode;
@@ -279,6 +304,9 @@ export function evaluateToolCall(call: ToolCall, ctx: PolicyContext): Decision {
   // A change a person holds: no agent edits in its folder and planned files (in the project, without a plan).
   const held = takeoverDenial(paths, rels);
   if (held) return held;
+  // A key, token or password the edit adds (B16): a hard rule, like the ones above.
+  const secret = secretEditDenial(call.writes, paths.root, call.cwd, config.enforcement.secretAllow);
+  if (secret) return secret;
 
   const isTest = matcher(config.enforcement.testPaths);
   const isExempt = matcher(config.enforcement.exemptPaths);
@@ -316,18 +344,23 @@ export function evaluateToolCall(call: ToolCall, ctx: PolicyContext): Decision {
   return { decision: 'allow' };
 }
 
+/** Session start with no active change: the next backlog item, then the open inbox items. */
+function idleSummary(ctx: PolicyContext, inbox: string[]): string | undefined {
+  const item = nextBacklogItem(readBacklog(ctx.paths.root));
+  if (!item) return inbox.length > 0 ? inbox.join('\n') : undefined;
+  const start = `${ctx.config.cli} backlog start ${item.id}`;
+  return [t('session.backlogNext', { id: item.id, title: item.title, start }), ...inbox].join('\n');
+}
+
 /**
  * Short lifecycle summary injected at session start (Claude SessionStart / OpenCode session). `observe` sees every
  * evaluated view, so the hook can record the gates that wait for a person without evaluating twice.
  */
 export function sessionSummary(ctx: PolicyContext, observe?: (view: LifecycleView) => void): string | undefined {
   const changes = listActiveChanges(ctx.paths);
-  if (changes.length === 0) {
-    const item = nextBacklogItem(readBacklog(ctx.paths.root));
-    if (!item) return undefined;
-    const start = `${ctx.config.cli} backlog start ${item.id}`;
-    return t('session.backlogNext', { id: item.id, title: item.title, start });
-  }
+  // MCP results kept for the agent from outside its session (the inbox): one line per open item.
+  const inbox = inboxSessionLines(ctx.paths.root, ctx.config.cli);
+  if (changes.length === 0) return idleSummary(ctx, inbox);
   const stamp = stampText(harnessStamp(ctx.config));
   const lines = [t('session.header', { stamp })];
   for (const ref of changes.slice(0, 8)) {
@@ -347,6 +380,7 @@ export function sessionSummary(ctx: PolicyContext, observe?: (view: LifecycleVie
     }
   }
   if (changes.length > 8) lines.push(t('session.more', { count: changes.length - 8 }));
+  lines.push(...inbox);
   lines.push(t('session.enforcement', { mode: ctx.config.enforcement.mode }));
   return lines.join('\n');
 }

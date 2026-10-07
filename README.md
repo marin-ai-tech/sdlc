@@ -17,7 +17,9 @@ On top of OpenSpec, `sdlc` adds the process parts the playbook asks for:
 - **Separation of duties.** An agent cannot approve its own work: the CLI refuses inside agent sessions, and hooks block attempts. Between people, optional `openspec/roles.yaml` (in git) names who holds which role: the author of a change's code cannot approve its review or release, paired gates need different people, and `sdlc approvals verify` checks that each approval arrived in a commit signed by the approver.
 - **Verification evidence.** `sdlc verify` runs your real checks, stores their literal output, and ties the result to a content-addressed fingerprint of the worktree. Committing the code keeps the result valid; changing the code makes it stale.
 - **Review** follows `REVIEW.md` passes (bugs, security, compliance). Findings are graded by severity. A human code owner approves once no important finding is open, and **plan drift** is computed against `plan.md`.
-- **Deterministic guardrails.** Claude Code hooks and an OpenCode plugin enforce the gates: no code before an approved plan, locked tests during bug fixes, protected paths, and no production release without authorization.
+- **Deterministic guardrails.** Claude Code hooks and an OpenCode plugin enforce the gates: no code before an approved plan, locked tests during bug fixes, protected paths, no production release without authorization, no keys or tokens added in agent edits, and no agent edits of the guard's own configuration.
+- **MCP in both directions.** `sdlc mcp serve` lets other AI systems read the process (status, next step, instructions, trace, audit); it offers no decisions. The team's MCP servers are described once in `openspec/sdlc.yaml` and laid out for Claude Code and OpenCode. `verify.mcp` checks are called by the CLI itself as gate evidence, and results from runs outside an agent session wait in `sdlc inbox` for the agent. The hook allows each server only at its stages, and each stage's workflows list the skills, subagents and servers configured for it. See [docs/en/10-integrations.md](docs/en/10-integrations.md).
+- **Reviewer suggestion and context packs.** `sdlc review suggest` proposes a reviewer from roles, CODEOWNERS and open reviews, never the code's author; `docs/context/` sources reach the agent at their stage, and stale ones are marked.
 - **Checks OpenSpec lacks.** Before a merge, delta targets are checked. Overlapping edits across open changes are flagged. So are base-spec drift and spec scenarios with no verification evidence.
 - **Right-sized process.** A `lite` track skips intent and spec for small, bounded work.
 - **Exploration before intent.** `/sdlc:explore` pressure-tests an idea in `openspec/explorations/`; a later change can cite the note.
@@ -129,7 +131,7 @@ Everything sdlc writes records the sdlc version and the license the project uses
 
 | Command | Purpose |
 |---|---|
-| `sdlc init [path] [--statusline] [--layout <mode>] [--worktree <path>] [--git-init]` / `update` / `uninstall` | set up, regenerate, remove integrations (planning data is never touched); `--statusline` opts in the Claude Code status line; `--layout` makes the project AI-ready (in place or in a new worktree); in an agent session they never weaken the guard, and `uninstall` is human-only |
+| `sdlc init [path] [--statusline] [--mcp] [--layout <mode>] [--worktree <path>] [--git-init]` / `update` / `uninstall` | set up, regenerate, remove integrations (planning data is never touched); `--statusline` opts in the Claude Code status line; `--mcp` registers sdlc as an MCP server; `--layout` makes the project AI-ready (in place or in a new worktree); in an agent session they never weaken the guard, and `uninstall` is human-only |
 | `sdlc new <id> [--kind --risk --track --source-type --source-ref --skip-specs]` | start a change (an OpenSpec change folder + `.sdlc.yaml`) |
 | `sdlc explore <slug> \| list` | create or list optional research notes before intent |
 | `sdlc track set <full\|lite> --change <id> [--note <text>]` | human confirmation of the suggested track before plan approval |
@@ -142,6 +144,9 @@ Everything sdlc writes records the sdlc version and the license the project uses
 | `sdlc layout check [--json]` / `scaffold [--dry-run] [--json]` / `adapt [--dry-run] [--json]` / `convert [--apply] [--json]` | check layout readiness, create missing documents, map existing paths, or plan and apply conversion |
 | `sdlc rework <gate> --change <id> --reason <r> --note <t> [--reset]` | send a change back to a gate's stage with a reason; later approvals stop counting; `--reset` restores the planned files from the gate checkpoint (human-only) |
 | `sdlc takeover` / `release-control --change <id> --note <t>` | take a change from the agent and hand it back with a note (human-only) |
+| `sdlc mcp serve` / `sdlc mcp check [--json]` | sdlc as a read-only MCP server (`init --mcp` registers it); connect to the registry servers and list their tools |
+| `sdlc inbox list [--json]` / `inbox done <id>` | MCP check results from runs outside an agent session, for the agent |
+| `sdlc review suggest --change <id> [--json]` | propose a reviewer: roles, CODEOWNERS owners first, fewer open reviews, never an author |
 | `sdlc trace <change> [--json]` | from intent to evidence: requirements, scenarios, tasks, commits (trailers `SDLC-Change`, `SDLC-Task`), verification and review findings, with the gaps |
 | `sdlc adopt [--apply] [--json]` | draft verify commands, protected paths and `roles.yaml` for an existing project; `--apply` writes them (human-only) |
 | `sdlc report [--format md\|json\|html] [--since] [--change] [--out]` / `sdlc dashboard [--since] [--change] [--out]` | progress report and self-contained HTML dashboard |
