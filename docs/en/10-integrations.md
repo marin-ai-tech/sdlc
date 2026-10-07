@@ -5,7 +5,7 @@ Since 0.9.0, sdlc connects to other AI systems through MCP in both directions:
 - it runs **its own MCP server**, so another system can read the process;
 - it **calls other MCP servers** itself, so a gate can rest on what they answer.
 
-The same release keeps secrets out of agent edits, proposes a reviewer, and gives the agent the team's knowledge at the right stage. Each section below starts from a situation a team runs into.
+The same release keeps secrets out of agent edits, proposes a reviewer, and gives the agent the team's knowledge at the right stage. Each section below starts from a situation a team runs into. Chapter 11 shows how to put the MCP features to work: connecting clients, orchestrators, reports and their limits.
 
 One rule holds for everything in this chapter: **nothing here makes a decision.** Over MCP, through the inbox, or in a reviewer suggestion, no one can approve, reject, waive, rework, take over, unlock tests, set the license or uninstall. Those stay with a person at their own terminal.
 
