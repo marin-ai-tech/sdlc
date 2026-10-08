@@ -19,6 +19,10 @@ sdlc rework plan --change add-export --reason design-flaw --note "Use the queue"
 - `--reset` restores the planned files and the change folder from the checkpoint recorded at the gate's approval. It
   refuses when files are dirty or a path goes through a link.
 - The agent sees the reason and the note in `sdlc next` and continues from that stage.
+- Approving the gate again with nothing changed since the approval before the rework needs `--note` (why nothing had
+  to change).
+- After `rework.max_cycles` reworks of one gate (default 3), `sdlc next` asks a person to take over or review the
+  scope instead of another agent round.
 
 ## Takeover
 

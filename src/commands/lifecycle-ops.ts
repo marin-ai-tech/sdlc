@@ -286,6 +286,7 @@ export async function auditCommand(opts: { change?: string; json?: boolean }): P
         : metrics.verifyFirstPass ? t('audit.firstPassed') : t('audit.firstFailed');
       line(`  ${t('audit.verifyRuns', {
         runs: metrics.verifyRuns, first, rejections: metrics.rejections, waivers: metrics.waivers,
+        policy: metrics.policyWaivers,
       })}`);
       printChangeFlow(metrics);
       return;
@@ -322,7 +323,7 @@ export async function auditCommand(opts: { change?: string; json?: boolean }): P
     })}`);
     line(`  ${t('audit.firstPassRate', {
       rate: aggregate.verifyFirstPassRate ?? '-',
-      rejections: aggregate.rejections, waivers: aggregate.waivers,
+      rejections: aggregate.rejections, waivers: aggregate.waivers, policy: aggregate.policyWaivers,
     })}`);
     printProjectFlow(aggregate);
     if (versions.size > 0) {

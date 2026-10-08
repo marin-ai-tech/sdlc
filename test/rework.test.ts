@@ -71,7 +71,8 @@ describe('sdlc rework', () => {
   it('after a new spec approval the plan still needs its own new approval', () => {
     const p = project();
     expect(p.cli([...REWORK, '--json']).code).toBe(0);
-    expect(p.cli(['approve', 'spec', '--change', 'add-farewell', '--json']).code).toBe(0);
+    // 0.11.2 (B56): nothing changed since the rework, so the re-approval carries a note.
+    expect(p.cli(['approve', 'spec', '--change', 'add-farewell', '--note', 'n', '--json']).code).toBe(0);
     expect(p.gate('spec').status).toBe('approved');
     expect(p.gate('plan').status).not.toBe('approved');
     expect(p.cli(['approve', 'plan', '--change', 'add-farewell', '--json']).code).toBe(0);

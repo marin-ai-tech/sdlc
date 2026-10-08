@@ -12,6 +12,7 @@ import {
   SIGNING_MODES, type RolesFile, type SigningMode,
 } from '../core/roles.js';
 import { t } from '../core/i18n.js';
+import { approvalTrailer, approvalTrailers } from '../core/approval-hygiene.js';
 
 type Status = 'valid' | 'unsigned' | 'wrong-signer' | 'bad-signature' | 'not-committed' | 'not-maintainer';
 interface Result { status: Status; commit?: string; signer?: string }
@@ -26,10 +27,13 @@ function signature(root: string, sha: string, signers: string): { status: Status
 }
 
 function approvalResult(
-  root: string, roles: RolesFile, signers: string, file: string,
-  change: string, gate: string, record: { at: string; by: string; person?: string; role: string },
+  root: string, roles: RolesFile, signers: string, trailers: Set<string>, file: string,
+  change: string, gate: string, record: { at: string; by: string; person?: string; role: string; digest?: string },
 ) {
-  const base = { change, gate, role: record.role, by: record.by, person: record.person };
+  // B60: whether the commit the approval proposed (its trailer) is reachable; informational only.
+  const found = record.digest !== undefined && trailers.has(approvalTrailer(change, gate, record.digest));
+  const trailer = found ? 'found' : 'missing';
+  const base = { change, gate, role: record.role, by: record.by, person: record.person, trailer };
   const history = git(root, ['log', '--reverse', '--format=%H', `-S${record.at}`, '--',
     'openspec/changes']);
   const sha = history.ok ? history.stdout.split('\n')[0] : '';
@@ -70,12 +74,13 @@ function rolesResults(root: string, roles: RolesFile, signers: string) {
 function verify(root: string, roles: RolesFile, signers: string) {
   const ctx = loadProject();
   const results: Array<Record<string, unknown> & Result> = [];
+  const trailers = approvalTrailers(root);
   for (const ref of [...listActiveChanges(ctx.paths), ...listArchivedChanges(ctx.paths)]) {
     const file = path.relative(root, path.join(ref.dir, '.sdlc.yaml')).replaceAll('\\', '/');
     const state = readChangeState(ref.dir);
     for (const [gate, value] of Object.entries(state.gates)) {
       for (const record of value?.approvals ?? []) {
-        results.push(approvalResult(root, roles, signers, file, ref.id, gate, record));
+        results.push(approvalResult(root, roles, signers, trailers, file, ref.id, gate, record));
       }
     }
   }

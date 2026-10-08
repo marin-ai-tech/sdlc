@@ -21,6 +21,8 @@ sdlc approve review --change add-export --as code-owner
 - С `openspec/roles.yaml` ваша git-идентичность должна принадлежать человеку с ролью гейта, и действуют правила
   разделения (например, автор кода не может утвердить его ревью).
 - `min_approvals: 2` у гейта ждёт двух разных людей.
+- `sdlc approve` предлагает сообщение коммита с трейлером `SDLC-Approval: <change>:<gate>:<digest>`; закоммитьте
+  запись с ним, и `sdlc approvals verify` найдёт коммит по нему.
 
 ## Другие решения
 

@@ -200,6 +200,7 @@ gates:
   spec:    { required: true,  approvers: [product-owner], high_risk_approvers: [tech-lead] }
   plan:    { required: true,  approvers: [engineer],      high_risk_approvers: [tech-lead] }
   review:  { required: true,  approvers: [code-owner], min_approvals: 2 }   # two different people (default 1)
+  # spec:  { auto_waive: { kinds: [docs], tracks: [lite] } }   # waive for matching changes, logged as policy (intent, spec, plan only; not a kind an agent chose)
   release: { required: false, approvers: [release-manager] }
   verify:  { required: true }
 roles:                        # optional: who may approve for a role (openspec/roles.yaml replaces this)

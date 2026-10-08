@@ -1,5 +1,6 @@
 import type { ChangeState, HistoryEvent } from './change-state.js';
 import { AWAITING_EVENT } from './awaiting.js';
+import { AUTO_WAIVED_EVENT } from './auto-waive.js';
 import type { LogEntry } from './log.js';
 
 interface Milestones {
@@ -26,6 +27,8 @@ export interface ChangeMetrics {
   verifyFirstPass?: boolean;
   rejections: number;
   waivers: number;
+  /** Gates an auto_waive policy waived (B59; `gate.<g>.auto_waived` in the project log), apart from people's. */
+  policyWaivers: number;
   /** Per approval gate: seconds from the first `awaiting` with the approved digest to the latest approval. */
   waits: Record<string, { seconds: number }>;
   /** Every rework (`gate.<g>.rework`) with its reason category, oldest first. */
@@ -123,6 +126,7 @@ export function changeMetrics(state: ChangeState, log: LogEntry[] = []): ChangeM
     verifyFirstPass: firstRun === undefined ? undefined : firstRun === 'verify.passed',
     rejections: state.history.filter((h) => /^gate\.\w+\.rejected$/.test(h.event)).length,
     waivers: state.history.filter((h) => /^gate\.\w+\.waived$/.test(h.event)).length,
+    policyWaivers: log.filter((e) => AUTO_WAIVED_EVENT.test(e.event)).length,
     waits: waitsOf(state, log),
     reworks: reworksOf(state.history),
     approvals: approvalsOf(state.history),
@@ -163,6 +167,7 @@ export function aggregateMetrics(rows: ChangeMetrics[]): FlowAggregate & {
   verifyFirstPassRate?: number;
   rejections: number;
   waivers: number;
+  policyWaivers: number;
 } {
   const pick = (key: keyof ChangeMetrics['leadTimeHours']) =>
     median(rows.map((row) => row.leadTimeHours[key]).filter((value): value is number => value !== undefined));
@@ -180,6 +185,7 @@ export function aggregateMetrics(rows: ChangeMetrics[]): FlowAggregate & {
       : undefined,
     rejections: rows.reduce((total, row) => total + row.rejections, 0),
     waivers: rows.reduce((total, row) => total + row.waivers, 0),
+    policyWaivers: rows.reduce((total, row) => total + (row.policyWaivers ?? 0), 0),
     medianWaitSeconds: medianWaits(rows),
     reworkReasons: reworkReasons(rows),
   };

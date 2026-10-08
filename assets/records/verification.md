@@ -9,6 +9,11 @@
 | Scenario / proof item | What was run | What was seen | Result |
 |---|---|---|---|
 
+## Not run / limits
+
+<!-- What was not exercised and why: environments, data, devices, scenarios left to a person. Say "None" if all ran. -->
+
 ## Notes
 
-<!-- Anything not exercised and why; follow-ups. -->
+<!-- Follow-ups and anything else worth knowing. Screenshots and browser results go in this change's folder, under
+     verification, and are listed in the evidence above. -->

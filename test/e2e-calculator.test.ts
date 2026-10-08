@@ -225,7 +225,10 @@ describe('demo: a team builds a calculator with sdlc (every command)', { timeout
     step('approve-plan', 'gates', 'bob', ['approve', 'plan', '--change', 'basic-arithmetic'], 'Bob, the engineer, approves the plan.');
     commit('bob', 'Plan for basic arithmetic'); // each approver commits their own approval
     step('rework', 'gates', 'alice', ['rework', 'spec', '--change', 'basic-arithmetic', '--reason', 'missing-requirement', '--note', 'Say what 10 / 0 shows on the till'], 'Alice sends the change back to the spec with a reason; the plan approval stops counting.');
-    step('approve-spec-again', 'gates', 'alice', ['approve', 'spec', '--change', 'basic-arithmetic'], 'The spec is approved again.');
+    // 0.11.2 (B56): the rework is answered by a change; re-approving the same spec would need a note.
+    const division = '\n## Division by zero\n\nThe till shows "Error" for 10 / 0.\n';
+    write(path.join(change('basic-arithmetic'), 'design.md'), `${DESIGN}${division}`);
+    step('approve-spec-again', 'gates', 'alice', ['approve', 'spec', '--change', 'basic-arithmetic'], 'The design now says what 10 / 0 shows; the spec is approved again.');
     step('approve-plan-again', 'gates', 'bob', ['approve', 'plan', '--change', 'basic-arithmetic'], 'The plan needs its own new approval.');
     commit('alice', 'Rework of the spec, approvals renewed');
   });

@@ -1,3 +1,4 @@
+import { recordAutoWaived } from './auto-waive.js';
 import type { HarnessStamp } from './license.js';
 import type { LifecycleView } from './lifecycle.js';
 import { appendLog, readLog, type LogEntry } from './log.js';
@@ -65,8 +66,11 @@ export function recordAwaiting(
   stamp?: HarnessStamp,
 ): void {
   if (!config.log.enabled) return;
+  const list = Array.isArray(views) ? views : [views];
+  // The same call sites record the gates an auto_waive policy waived (B59).
+  recordAutoWaived(root, config, list, stamp);
   try {
-    const waiting = (Array.isArray(views) ? views : [views]).map(awaitedGate);
+    const waiting = list.map(awaitedGate);
     const pending = waiting.filter((w): w is AwaitedGate => w !== undefined);
     if (pending.length === 0) return;
     const entries = readLog(root);

@@ -20,6 +20,7 @@ import { recordAwaiting } from '../core/awaiting.js';
 import { changeMarkdown, tryStampArtifacts } from '../core/stamp.js';
 import { recordCheckpoint } from '../core/checkpoint.js';
 import { approvalChecks } from '../mcp/release-checks.js';
+import { approvalCommitMessage, assertChangedSinceRework } from '../core/approval-hygiene.js';
 
 /**
  * Gate decisions: approve, reject, waive, and the test lock. These record
@@ -210,6 +211,7 @@ export async function approveCommand(gateArg: string, opts: DecisionOptions): Pr
     );
     const identity = approvalIdentity(ctx.root, roles, opts.by);
     if (!roles) assertRoleMember(ctx.config, role, identity);
+    assertChangedSinceRework(state, gate, evaluation.digest, opts.note);
     // B47: the release checks run after every other check and before anything is written.
     const checks = gate === 'release' ? await approvalChecks(ctx.config, ctx.root, ref.id) : undefined;
 
@@ -232,10 +234,11 @@ export async function approveCommand(gateArg: string, opts: DecisionOptions): Pr
     const after = evaluateChange(ctx.root, ref, ctx.config);
     const status = after.gates.find((g) => g.id === gate)!;
     const next = resolveNext(ctx, ref.id);
+    const commitMessage = approvalCommitMessage(ref.id, gate, evaluation.digest);
     if (opts.json) {
       printJson({
         change: ref.id, gate, role, by: identity, status: status.status,
-        missingRoles: status.missingRoles, ...(checks ? { checks } : {}), ...(next ? { next } : {}),
+        missingRoles: status.missingRoles, ...(checks ? { checks } : {}), commitMessage, ...(next ? { next } : {}),
       });
       return;
     }
@@ -244,6 +247,9 @@ export async function approveCommand(gateArg: string, opts: DecisionOptions): Pr
     if (status.status !== 'approved') {
       line(`  ${t('gate.stillNeeded', { roles: stillNeeded(status) })}`);
     }
+    const [subject, , trailer] = commitMessage.split('\n');
+    line(c.dim(t('gate.commitMessage')));
+    line(c.dim(`  $ git commit -m "${subject}" -m "${trailer}"`));
     emitNextHint(ctx, ref.id);
   } catch (error) {
     reportFailure(error, opts.json);

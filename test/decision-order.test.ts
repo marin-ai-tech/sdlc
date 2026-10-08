@@ -53,7 +53,8 @@ describe('the order of decisions does not depend on the clocks', () => {
     p.run(['approve', 'intent']);
     p.run(REWORK);
     p.edit((s) => { s.gates.intent.rework.at = FUTURE; });
-    p.run(['approve', 'intent']);
+    // 0.11.2 (B56): nothing changed since the rework, so the re-approval carries a note.
+    p.run(['approve', 'intent', '--note', 'n']);
     expect(p.intent()).toBe('approved');
   }, 120000);
 

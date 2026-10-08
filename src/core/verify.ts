@@ -7,6 +7,7 @@ import {
 import { exists, isFile, readText, writeTextAtomic } from './fs-utils.js';
 import { headCommit, isDirty, worktreeFingerprint } from './git.js';
 import { stampText, stripProvenance, withProvenance, type HarnessStamp } from './license.js';
+import { renderExtras, type EvidenceExtras } from './verify-extras.js';
 import { FINGERPRINT_EXCLUDES } from './lifecycle.js';
 
 /**
@@ -160,7 +161,12 @@ function requiredCounts(run: VerificationRun): { passedRequired: number; total: 
   return { passedRequired, total: required.length + requiredMcp.length };
 }
 
-export function renderEvidence(run: VerificationRun, changeId: string, stamp?: HarnessStamp): string {
+export function renderEvidence(
+  run: VerificationRun,
+  changeId: string,
+  stamp?: HarnessStamp,
+  extras?: EvidenceExtras
+): string {
   const mcp = mcpEvidence(run);
   const { passedRequired, total } = requiredCounts(run);
   const rows = run.checks.map((c) => {
@@ -186,6 +192,7 @@ export function renderEvidence(run: VerificationRun, changeId: string, stamp?: H
     ...rows,
     ...mcp.rows,
     '',
+    ...renderExtras(extras),
     ...outputs,
     ...mcp.outputs,
     EVIDENCE_END,
@@ -202,10 +209,11 @@ export function writeEvidence(
   run: VerificationRun,
   changeId: string,
   template: string,
-  stamp?: HarnessStamp
+  stamp?: HarnessStamp,
+  extras?: EvidenceExtras
 ): string {
   const file = path.join(changeDir, 'verification.md');
-  const block = renderEvidence(run, changeId, stamp);
+  const block = renderEvidence(run, changeId, stamp, extras);
   let content = isFile(file) ? readText(file) ?? '' : template.replace(/<change>/g, changeId);
   const start = content.indexOf(EVIDENCE_START);
   const end = content.indexOf(EVIDENCE_END);

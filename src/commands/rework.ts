@@ -14,6 +14,7 @@ import { t } from '../core/i18n.js';
 import { stripProvenance } from '../core/license.js';
 import { evaluateChange } from '../core/lifecycle.js';
 import { assertReworkReason, filesThatChange, gateReached, REWORK_GATES, type ReworkGateId } from '../core/rework.js';
+import { nextCycle } from '../core/rework-limit.js';
 import { readRolesFile } from '../core/roles.js';
 import { approvalIdentity, assertHuman, parseGate, roleDecision } from './gates.js';
 
@@ -69,6 +70,7 @@ function resetScope(ctx: ProjectContext, ref: ChangeRef, gate: ReworkGateId): Ch
 }
 
 function recordRework(ctx: ProjectContext, ref: ChangeRef, state: ChangeState, rework: Rework): void {
+  const previous = state.gates[rework.gate]?.rework;
   state.gates[rework.gate] = {
     ...(state.gates[rework.gate] ?? {}),
     rework: {
@@ -79,6 +81,7 @@ function recordRework(ctx: ProjectContext, ref: ChangeRef, state: ChangeState, r
       reason: rework.reason,
       note: rework.note,
       from: rework.from,
+      cycle: nextCycle(previous),
       ...provenance(ctx.stamp),
     },
   };

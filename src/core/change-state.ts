@@ -87,6 +87,8 @@ export interface ReworkRecord extends Provenance {
   note: string;
   /** The change's stage before the rework. */
   from: string;
+  /** How many times this gate was sent back, this rework included (B61); absent before sdlc 0.11.2 (counts as 1). */
+  cycle?: number;
 }
 
 export interface VerifyCommandRecord {
@@ -167,6 +169,8 @@ export interface ChangeState {
   source?: { type: SourceType; ref?: string; url?: string };
   links?: Record<string, string>;
   tests_locked?: boolean;
+  /** The kind was chosen inside an agent session (`sdlc new --kind`): an auto_waive policy by kind ignores it. */
+  kind_by_agent?: boolean;
   takeover?: TakeoverRecord;
   /** The last decision order number the CLI gave in this record (B39); see `decision-order.ts`. */
   seq?: number;
@@ -269,6 +273,7 @@ export function readChangeState(changeDir: string): ChangeState {
       : {}),
     ...(raw.links && typeof raw.links === 'object' ? { links: raw.links as Record<string, string> } : {}),
     ...(raw.tests_locked === true ? { tests_locked: true } : {}),
+    ...(raw.kind_by_agent === true ? { kind_by_agent: true } : {}),
     ...takeoverOf(raw.takeover),
     ...(isSeq(raw.seq) ? { seq: raw.seq } : {}),
     gates,
@@ -298,6 +303,7 @@ export function writeChangeState(changeDir: string, state: ChangeState, stamp?: 
     ...(state.source ? { source: state.source } : {}),
     ...(state.links && Object.keys(state.links).length > 0 ? { links: state.links } : {}),
     ...(state.tests_locked ? { tests_locked: true } : {}),
+    ...(state.kind_by_agent ? { kind_by_agent: true } : {}),
     ...(state.takeover ? { takeover: state.takeover } : {}),
     ...(state.seq !== undefined ? { seq: state.seq } : {}),
     gates: state.gates,

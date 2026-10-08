@@ -28,6 +28,8 @@ import { parseTasks, type TaskProgress } from './tasks.js';
 import { awaitedRoles, awaitingReason, quorum } from './approval-quorum.js';
 import { nameApprovers, type NamedApprover } from './named-approvers.js';
 import { effectiveGates, markReworks } from './rework.js';
+import { markAutoWaived, withAutoWaive } from './auto-waive.js';
+import { reworkLimitNext } from './rework-limit.js';
 
 /**
  * The six stages of Anthropic's AI-native SDLC playbook, plus the two terminal
@@ -112,6 +114,8 @@ export interface NextAction {
     | 'start-backlog-item'
     /** A person took the change over (`sdlc takeover`); it is theirs until `sdlc release-control`. */
     | 'taken-over'
+    /** A gate reached `rework.max_cycles` (B61): a person takes the change over or reviews its scope. */
+    | 'review-scope'
     | 'none';
   /** Workflow id of the skill/command that performs the action (e.g. `spec`). */
   workflow?: string;
@@ -292,7 +296,7 @@ export function evaluateChange(
 ): LifecycleView {
   const warnings: string[] = [];
   const state = readChangeState(ref.dir);
-  const decided = effectiveGates(state);
+  const decided = withAutoWaive(effectiveGates(state), state, config);
   const schemaName = resolveChangeSchemaName(ref.dir, root);
   const schema = loadSchemaInfo(schemaName, root);
   const artifacts = computeArtifactStates(schema, ref.dir);
@@ -458,7 +462,7 @@ export function evaluateChange(
     warnings.push('not a git repository: verification and review freshness cannot be checked');
   }
 
-  const evaluated = markReworks(gates, state);
+  const evaluated = markAutoWaived(markReworks(gates, state), state, config);
   const stage = deriveStage(ref, evaluated, tasks);
   const view: LifecycleView = {
     change: ref.id,
@@ -488,7 +492,8 @@ export function evaluateChange(
   };
   // A change a person has taken over waits for them; otherwise the next step names the people who may act.
   const held = ref.archived ? undefined : takeoverNext(state, ref.id);
-  const next = held ?? nextAction(view, config, mapping);
+  const limit = held ? undefined : reworkLimitNext(root, config, view, state, options.skipPeople);
+  const next = held ?? limit ?? nextAction(view, config, mapping);
   view.next = held || options.skipPeople ? next : nameApprovers(root, config, view, state, next);
   return view;
 }

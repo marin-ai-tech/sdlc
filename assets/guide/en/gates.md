@@ -21,6 +21,8 @@ sdlc approve review --change add-export --as code-owner
 - With `openspec/roles.yaml`, your git identity must be a person holding the gate's role, and the separation rules
   apply (for example, the author of the code may not approve its review).
 - `min_approvals: 2` on a gate waits for two different people.
+- `sdlc approve` proposes a commit message with the trailer `SDLC-Approval: <change>:<gate>:<digest>`; commit the
+  record with it, and `sdlc approvals verify` finds the commit by it.
 
 ## Other decisions
 

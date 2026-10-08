@@ -114,6 +114,8 @@ export function createChange(name: string, opts: NewOptions): { ctx: ProjectCont
     ? { track: 'lite' as const, reasons: ['An agent requested the lite track.', ...suggested.reasons] }
     : !requestedTrack && suggested.track === 'lite' ? suggested : undefined;
   if (suggestion) state.track_suggestion = suggestion;
+  // B59: an agent picks the kind freely, so an auto_waive policy by kind does not apply to its choice.
+  if (opts.kind && agentEnvironment()) state.kind_by_agent = true;
   recordChangeEvent(ctx, { id: name, dir }, state, 'change.created', formatIdentity(gitIdentity(root)),
     `schema ${schema}, ${track} track`);
   return { ctx, dir };

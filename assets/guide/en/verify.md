@@ -20,6 +20,12 @@ sdlc verify --check --change add-export   # spec scenarios with no behavioural e
 - MCP checks (`verify.mcp`): the CLI itself calls a tool of the team's MCP server (for example "is CI green for this
   commit?") and records the answer.
 
+## What else the evidence says
+
+- Files the plan lists under "Files that change" that nobody touched are reported as a warning.
+- `## Not run / limits` in `verification.md`: what was not exercised and why (the tester fills it).
+- Files in the change's `verification/` folder (screenshots, browser results) are listed as links.
+
 ## When a check fails
 
 Fix the code, not the test, and run `sdlc verify` again. A required failing check fails the gate. In a bug fix the tests

@@ -1,4 +1,5 @@
 import { parseMinApprovals } from './approval-quorum.js';
+import { parseAutoWaive, type AutoWaive } from './auto-waive.js';
 import { SdlcError } from './errors.js';
 import { isFile } from './fs-utils.js';
 import { LAYOUT_ROLE_IDS, type LayoutMapping, type LayoutRoleId } from './layout.js';
@@ -43,6 +44,8 @@ export interface GateConfig {
   minApprovals?: number;
   /** Hours a person may keep the gate waiting before `gate.<g>.overdue` is logged (B55). Unset = never overdue. */
   overdueHours?: number;
+  /** Kinds or tracks of change this gate is waived for by policy (B59); never on verify or review. */
+  autoWaive?: AutoWaive;
 }
 
 export interface VerifyCommand {
@@ -118,7 +121,7 @@ export interface SdlcConfig {
    */
   layout: LayoutMapping;
   /** Reason categories `sdlc rework --reason` accepts. */
-  rework: { reasons: string[] };
+  rework: { reasons: string[]; maxCycles: number };
   /** UI locale (en, ru). Optional; absent means resolve from flag/env/system. */
   locale?: string;
   /**
@@ -177,6 +180,8 @@ export const DEFAULT_RELEASE_COMMANDS = [
   '\\bhelm\\s+(upgrade|install)\\b.*\\bprod(uction)?\\b',
 ];
 
+/** Reworks of one gate after which the next step proposes a takeover or a scope review (B61). */
+export const DEFAULT_MAX_CYCLES = 3;
 export const DEFAULT_REWORK_REASONS = [
   'missing-requirement', 'wrong-assumption', 'design-flaw', 'implementation-bug', 'test-gap', 'scope-change',
   'other',
@@ -216,7 +221,7 @@ export function defaultConfig(): SdlcConfig {
     license: { type: 'community' },
     log: { enabled: true, hookDecisions: true },
     layout: {},
-    rework: { reasons: [...DEFAULT_REWORK_REASONS] },
+    rework: { reasons: [...DEFAULT_REWORK_REASONS], maxCycles: DEFAULT_MAX_CYCLES },
     stages: {},
   };
 }
@@ -318,6 +323,7 @@ export function parseConfig(raw: Raw, file = 'openspec/sdlc.yaml'): SdlcConfig {
       if (!gate) continue;
       if (id === 'verify') {
         config.gates.verify.required = asBool(gate.required, where('gates.verify.required')) ?? true;
+        parseAutoWaive(gate.auto_waive, 'verify', where('gates.verify.auto_waive'));
         continue;
       }
       if (!(APPROVAL_GATES as readonly string[]).includes(id)) {
@@ -338,6 +344,8 @@ export function parseConfig(raw: Raw, file = 'openspec/sdlc.yaml'): SdlcConfig {
       if (minApprovals) target.minApprovals = minApprovals;
       const overdueHours = asNumber(gate.overdue_hours, where(`gates.${id}.overdue_hours`));
       if (overdueHours) target.overdueHours = overdueHours;
+      const autoWaive = parseAutoWaive(gate.auto_waive, id, where(`gates.${id}.auto_waive`));
+      if (autoWaive) target.autoWaive = autoWaive;
     }
   }
 
@@ -485,6 +493,7 @@ export function parseConfig(raw: Raw, file = 'openspec/sdlc.yaml'): SdlcConfig {
 
   const rework = asObject(raw.rework, where('rework'));
   config.rework.reasons = asStringArray(rework?.reasons, where('rework.reasons')) ?? config.rework.reasons;
+  config.rework.maxCycles = parseMinApprovals(rework?.max_cycles, where('rework.max_cycles')) ?? DEFAULT_MAX_CYCLES;
 
   const locale = asString(raw.locale, where('locale'));
   if (locale !== undefined) config.locale = locale;
@@ -515,6 +524,12 @@ export function loadConfig(file: string): SdlcConfig {
   return parseConfig(readYamlObject(file) ?? {}, file);
 }
 
+function serializeRework(rework: SdlcConfig['rework']): Record<string, unknown> {
+  const reasons = rework.reasons.join() === DEFAULT_REWORK_REASONS.join() ? {} : { reasons: rework.reasons };
+  const cycles = rework.maxCycles === DEFAULT_MAX_CYCLES ? {} : { max_cycles: rework.maxCycles };
+  return Object.keys({ ...reasons, ...cycles }).length > 0 ? { rework: { ...reasons, ...cycles } } : {};
+}
+
 /** Serializes back to the snake_case on-disk form. */
 export function serializeConfig(config: SdlcConfig): Record<string, unknown> {
   const gates: Record<string, unknown> = {};
@@ -527,6 +542,7 @@ export function serializeConfig(config: SdlcConfig): Record<string, unknown> {
       ...(gate.artifacts ? { artifacts: gate.artifacts } : {}),
       ...(gate.minApprovals ? { min_approvals: gate.minApprovals } : {}),
       ...(gate.overdueHours ? { overdue_hours: gate.overdueHours } : {}),
+      ...(gate.autoWaive ? { auto_waive: gate.autoWaive } : {}),
     };
   }
   gates.verify = { required: config.gates.verify.required };
@@ -576,7 +592,7 @@ export function serializeConfig(config: SdlcConfig): Record<string, unknown> {
     },
     log: { enabled: config.log.enabled, hook_decisions: config.log.hookDecisions },
     ...(Object.keys(config.layout).length ? { layout: config.layout } : {}),
-    ...(config.rework.reasons.join() === DEFAULT_REWORK_REASONS.join() ? {} : { rework: config.rework }),
+    ...serializeRework(config.rework),
     ...(config.locale ? { locale: config.locale } : {}),
     ...(config.mcp ? { mcp: { serve: config.mcp.serve } } : {}),
   };

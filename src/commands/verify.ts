@@ -12,6 +12,7 @@ import { defaultBaseRef, formatIdentity, gitIdentity, headCommit } from '../core
 import { computePlanDrift } from '../core/plan-drift.js';
 import { checkCoverage, parseCoverage, parseFindings, summarizeFindings } from '../core/review.js';
 import { applyVerifyToState, runVerification, writeEvidence, type VerificationRun } from '../core/verify.js';
+import { untouchedPlanned, verificationAttachments, type EvidenceExtras } from '../core/verify-extras.js';
 import { runMcpChecks, selectedChecks, withMcpChecks } from '../mcp/checks.js';
 import { keepForAgent } from '../mcp/inbox.js';
 import { readAsset } from '../integrations/assets.js';
@@ -51,6 +52,16 @@ async function withMcp(
   }
   const mcp = await runMcpChecks(ctx.config, checks, { head: run.commit, change });
   return withMcpChecks(run, ctx.config, mcp);
+}
+
+/** B57, B58: planned files nobody touched (base as for the review context) and the `verification/` attachments. */
+function evidenceExtras(ctx: ProjectContext, changeDir: string): EvidenceExtras {
+  const base = ctx.config.review.base ?? defaultBaseRef(ctx.root);
+  const ignore = Object.keys(readManifest(ctx.root).files);
+  return {
+    untouched: untouchedPlanned(ctx.root, changeDir, base, ignore),
+    attachments: verificationAttachments(changeDir),
+  };
 }
 
 /** The JSON answer's `mcp`: each check with the server's answer. */
@@ -115,7 +126,9 @@ export async function verifyCommand(opts: VerifyOptions): Promise<void> {
       },
     });
     const run = await withMcp(ctx, ref.id, commands, { only, json: opts.json });
-    const file = writeEvidence(ref.dir, run, ref.id, readAsset('records', 'verification.md'), ctx.stamp);
+    const extras = evidenceExtras(ctx, ref.dir);
+    const template = readAsset('records', 'verification.md');
+    const file = writeEvidence(ref.dir, run, ref.id, template, ctx.stamp, extras);
     const state = readChangeState(ref.dir);
     applyVerifyToState(state, run, ctx.stamp);
     const mcpDetail = (run.mcp ?? []).map((m) => `${m.name}=${m.ok ? 'ok' : 'failed'}`);
@@ -126,7 +139,8 @@ export async function verifyCommand(opts: VerifyOptions): Promise<void> {
     const next = resolveNext(ctx, ref.id);
     if (opts.json) {
       printJson({ change: ref.id, status: run.status, at: run.at, commit: run.commit, dirty: run.dirty, checks: run.checks,
-        ...mcpJson(run), evidence: file, harness: ctx.stamp, ...(next ? { next } : {}) });
+        ...mcpJson(run), planDrift: { untouched: extras.untouched }, attachments: extras.attachments,
+        evidence: file, harness: ctx.stamp, ...(next ? { next } : {}) });
     } else {
       for (const check of run.checks) {
         const ok = check.exit_code === 0;
@@ -135,6 +149,9 @@ export async function verifyCommand(opts: VerifyOptions): Promise<void> {
         if (!ok && check.output) line(c.dim(check.output.split('\n').map((l) => `    ${l}`).join('\n')));
       }
       printMcpChecks(run);
+      if (extras.untouched.length > 0) {
+        line(c.yellow(t('verify.untouchedPlanned', { list: extras.untouched.join(', ') })));
+      }
       line(run.status === 'passed'
         ? c.green(t('verify.passed', { file: path.relative(process.cwd(), file) }))
         : c.red(t('verify.failed')));

@@ -56,7 +56,8 @@ describe('waits, reworks and attempts in the log and the audit', () => {
     expect(p.cli(['approve', 'intent', '--change', 'demo', '--json']).code).toBe(0);
     const rework = p.cli(['rework', 'intent', '--change', 'demo', '--reason', 'wrong-assumption', '--note', 'n', '--json']);
     expect(rework.code, rework.stdout + rework.stderr).toBe(0);
-    expect(p.cli(['approve', 'intent', '--change', 'demo', '--json']).code).toBe(0);
+    // 0.11.2 (B56): re-approving an unchanged gate after its rework needs a note.
+    expect(p.cli(['approve', 'intent', '--change', 'demo', '--note', 'n', '--json']).code).toBe(0);
     const metrics = p.cli(['audit', '--change', 'demo', '--json']).json().metrics;
     expect(metrics.reworks).toEqual([expect.objectContaining({ gate: 'intent', reason: 'wrong-assumption' })]);
     expect(metrics.approvals.intent).toBe(2);

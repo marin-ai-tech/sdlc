@@ -2,6 +2,16 @@
 
 All notable changes to sdlc. Versions follow [Semantic Versioning](https://semver.org/); while the major version is 0, a minor version may change behavior.
 
+## 0.11.2 — 2026-10-08
+
+### Added
+- **Re-approval after a rework needs a change or a reason.** Approving a gate again with nothing changed since the approval before the rework is refused without `--note`; `approve --preview` shows it.
+- **Auto-waive policy.** `gates.<gate>.auto_waive: { kinds, tracks }` waives the intent, spec or plan gate for matching changes (never verify, review or release; a kind chosen by an agent does not count), logged as `gate.<gate>.auto_waived` and shown in the audit as a policy, not a person's decision.
+- **Approval trailer.** `sdlc approve` proposes a commit message with `SDLC-Approval: <change>:<gate>:<digest>`; `sdlc approvals verify` reports whether that commit exists.
+- **Rework cycle limit.** After `rework.max_cycles` reworks of one gate (default 3), `sdlc next` asks a person to take over or review the scope.
+- **Planned files that did not change** (listed under "Files that change" in plan.md) are reported by `sdlc verify` and in the evidence (a warning, not a failure).
+- **Verification limits and attachments.** `verification.md` has a "Not run / limits" section, and the files in the change's `verification/` folder are listed as links.
+
 ## 0.11.1 — 2026-10-07
 
 ### Fixed

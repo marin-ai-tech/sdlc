@@ -8,6 +8,7 @@
 import { spawnSync } from 'node:child_process';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import { unchangedSinceRework } from './approval-hygiene.js';
 import { approverKey, assertByAllowed } from './approval-quorum.js';
 import { readChangeState, type ChangeState } from './change-state.js';
 import type { ChangeRef } from './changes.js';
@@ -46,6 +47,8 @@ export interface ApprovePreview {
   needed: number;
   artifacts: PreviewArtifact[];
   changedSinceApproval: string[];
+  /** After a rework of the gate, the digest is the one approved before it (B56): approving needs `--note`. */
+  unchangedSinceRework: boolean;
   openFindings?: Array<{ id?: string; title: string; severity: string }>;
   verification?: { status: string; at?: string; fresh: boolean };
 }
@@ -79,6 +82,7 @@ export function previewApproval(input: PreviewInput): ApprovePreview {
     needed: evaluation.minApprovals ?? input.config.gates[input.gate].minApprovals ?? 1,
     artifacts,
     changedSinceApproval: approvedBefore ? changedSinceCheckpoint(input, artifacts) : [],
+    unchangedSinceRework: unchangedSinceRework(state, input.gate, evaluation.digest),
     ...codeGateFacts(view, input.gate),
   };
 }
