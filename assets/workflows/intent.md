@@ -30,4 +30,5 @@ If the input is empty, stop and ask the user in plain text for the idea or probl
 **Guardrails**
 - Planning only: do not edit project code in this workflow, even if the request asks for implementation.
 - One page. Record assumptions as Open questions rather than guessing.
+- Open questions are the person's to answer. Never write an answer yourself (an `Answer` line you add does not count); keep them as list items under the `## Open questions` heading. When you stop at the gate, name them in your message (read them from the file: `sdlc answer` is a person's command, never run it) and give the command for each: `sdlc answer <n> --change <name> --text "<answer>"`. The intent cannot be approved while one is unanswered.
 - If a change with that name already exists, ask whether to continue it or start a new one.

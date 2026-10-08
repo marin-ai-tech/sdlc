@@ -1,5 +1,5 @@
-import type { ChangeState, ReworkRecord } from './change-state.js';
-import type { SdlcConfig } from './config.js';
+import type { ChangeState } from './change-state.js';
+import type { GateId, SdlcConfig } from './config.js';
 import { t } from './i18n.js';
 import type { LifecycleView, NextAction } from './lifecycle.js';
 import { openGateDeciders } from './named-approvers.js';
@@ -9,15 +9,25 @@ import { openGateDeciders } from './named-approvers.js';
  * of a change waiting on that rework is a person's, not another round of the agent: take the change over or review
  * its scope. A hint, not a ban: approving the gate again moves the change on as before.
  */
-/** How many reworks the gate had: the record's counter; a rework written before 0.11.2 counts as one. */
-export function reworkCycles(rework: ReworkRecord | undefined): number {
+function isCounter(value: unknown): value is number {
+  return typeof value === 'number' && Number.isSafeInteger(value) && value > 0;
+}
+
+/**
+ * How many reworks the gate had: the record's counter; for a record written before 0.11.2 (no counter), the
+ * `gate.<g>.rework` events of the change history (B79), at least one.
+ */
+export function reworkCycles(state: Pick<ChangeState, 'gates' | 'history'>, gate: GateId): number {
+  const rework = state.gates[gate]?.rework;
   if (!rework) return 0;
-  return typeof rework.cycle === 'number' && Number.isSafeInteger(rework.cycle) && rework.cycle > 0 ? rework.cycle : 1;
+  if (isCounter(rework.cycle)) return rework.cycle;
+  const events = state.history.filter((event) => event.event === `gate.${gate}.rework`).length;
+  return Math.max(events, 1);
 }
 
 /** The counter the next rework of a gate records. */
-export function nextCycle(previous: ReworkRecord | undefined): number {
-  return reworkCycles(previous) + 1;
+export function nextCycle(state: Pick<ChangeState, 'gates' | 'history'>, gate: GateId): number {
+  return reworkCycles(state, gate) + 1;
 }
 
 function peopleNames(root: string, config: SdlcConfig, view: LifecycleView, state: ChangeState): string {
@@ -31,7 +41,7 @@ export function reworkLimitNext(root: string, config: SdlcConfig, view: Lifecycl
   if (view.archived) return undefined;
   const gate = view.gates.find((item) => !item.satisfied);
   if (!gate || gate.status !== 'rejected' || !gate.rework) return undefined;
-  const cycles = reworkCycles(state.gates[gate.id]?.rework);
+  const cycles = reworkCycles(state, gate.id);
   if (cycles < config.rework.maxCycles) return undefined;
   const people = skipPeople ? '' : peopleNames(root, config, view, state);
   const key = people ? 'next.reviewScopePeople' : 'next.reviewScope';

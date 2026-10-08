@@ -28,3 +28,4 @@ Write the requirements and design spec - Stage 2 (Design): `proposal.md`, delta 
 - Planning only: no code edits.
 - Ask about ambiguity that changes scope, externally visible behavior, compatibility or acceptance criteria; record minor assumptions in the artifacts.
 - Specs describe behavior; implementation detail goes to design.md and plan.md.
+- Open questions in proposal.md or design.md are the person's to answer. Never write an answer yourself (an `Answer` line you add does not count); keep them as list items under the `## Open questions` heading, and at the gate give the command for each (never run it yourself): `sdlc answer <n> --change <id> --artifact <proposal|design> --text "<answer>"`. The spec cannot be approved while one is unanswered.

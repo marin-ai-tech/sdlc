@@ -34,7 +34,9 @@ artifacts:
       - **Success measures**: leading and lagging signals.
       - **Out of scope**.
       - **Open questions**: unknowns the product owner or design stage must
-        answer.
+        answer, one per list item under the `## Open questions` heading (or
+        "None"). A person answers each with `sdlc answer`; never write the
+        answers yourself.
 
       Rules:
       - No technical design, file names, or task lists - those belong to
@@ -161,7 +163,9 @@ artifacts:
       - **Migration and rollback**: deploy steps and how to undo them, when
         relevant.
       - **Open questions**: only unknowns that cannot change the specs, the
-        approach, or the plan. Anything that could must be asked now.
+        approach, or the plan. Anything that could must be asked now. One per
+        list item under `## Open questions`; a person answers each with
+        `sdlc answer <n> --artifact design`.
 
       Keep it proportional: a small change gets a short design, but the
       Policy compliance and Areas of concern sections are always present

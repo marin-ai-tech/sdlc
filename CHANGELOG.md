@@ -2,6 +2,17 @@
 
 All notable changes to sdlc. Versions follow [Semantic Versioning](https://semver.org/); while the major version is 0, a minor version may change behavior.
 
+## 0.11.4 — 2026-10-08
+
+### Added
+- **People answer the open questions.** `sdlc answer <n> --change <id> --text "…"` records a person's answer to an open question of intent.md, proposal.md or design.md, in the artifact and in the change record; `sdlc answer --list` shows them. The intent and spec gates cannot be approved while a question has no recorded answer; an answer written into the file by hand or by an agent does not count, and a reworded question needs a new answer. `questions.required: false` turns it off; approvals given before are not touched. A change record with answers is format version 3, so an older sdlc refuses it instead of dropping the answers.
+- **Participation of people, planned vs actual.** `sdlc audit` and the dashboard compare, per change and for the project, the decisions the track plans (gates and approvals, counting `min_approvals`) with what happened: approvals, reworks, takeovers, waivers, answers and the hours gates waited for a person.
+- **A guided tour.** `sdlc guide tour [step]` walks a newcomer through the calculator demo in seven short steps, in English and Russian.
+
+### Fixed
+- **A policy waiver stays as it was.** The first evaluation by a person's command that applies an `auto_waive` policy records the waiver on the change (an agent's session never does), so removing the policy later does not un-waive it, and archived changes are never waived by a policy.
+- **Rework cycles of older records.** A rework recorded before 0.11.2 counted as one cycle; the count now comes from the change history, so the rework-limit hint appears when it should.
+
 ## 0.11.3 — 2026-10-08
 
 ### Added

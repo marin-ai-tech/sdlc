@@ -11,6 +11,7 @@ import { approvalsVerify } from '../commands/approvals.js';
 import { pluginBuildCommand } from '../commands/plugin.js';
 import { approveCommand, rejectCommand, testsCommand, waiveCommand } from '../commands/gates.js';
 import { releaseControlCommand, takeoverCommand } from '../commands/takeover.js';
+import { answerCommand } from '../commands/answer.js';
 import { reworkCommand } from '../commands/rework.js';
 import { initCommand, uninstallCommand, updateCommand } from '../commands/setup.js';
 import { reviewCommand, verifyCommand } from '../commands/verify.js';
@@ -304,8 +305,8 @@ export function buildProgram(): Command {
 
   program.command('help [topic]').description(cmdDesc('cmd.help'))
     .option('--json', 'output JSON').action((topic, opts) => helpCommand(topic, opts));
-  program.command('guide [topic]').description(cmdDesc('cmd.guide'))
-    .option('--json', 'output JSON').action((topic, opts) => guideCommand(topic, opts));
+  program.command('guide [topic] [step]').description(cmdDesc('cmd.guide'))
+    .option('--json', 'output JSON').action((topic, step, opts) => guideCommand(topic, step, opts));
   program.command('statusline').description(cmdDesc('cmd.statusline'))
     .action(() => statuslineCommand());
   const mcp = program.command('mcp').description(cmdDesc('cmd.mcp'));
@@ -378,6 +379,14 @@ export function buildProgram(): Command {
     decision.action((gate, opts) => (opts.preview ? approvePreviewCommand(gate, opts) : fn(gate, opts)));
   }
 
+  program.command('answer').description(cmdDesc('cmd.answer'))
+    .argument('[n]', 'number of the open question (see --list)')
+    .option('--change <id>', 'change id')
+    .option('--artifact <artifact>', 'artifact with the question: intent (default), proposal or design')
+    .option('--text <answer>', 'the answer, written under the question and into the change record')
+    .option('--list', 'list the open questions and their answers (writes nothing)')
+    .option('--json', 'output JSON')
+    .action((n, opts) => answerCommand(n, opts));
   program.command('takeover').description(cmdDesc('cmd.takeover'))
     .option('--change <id>', 'change id')
     .option('--note <text>', 'why you take the change over (required; the agent sees it)')

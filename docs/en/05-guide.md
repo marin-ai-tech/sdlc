@@ -169,6 +169,10 @@ Record postponed work with `sdlc defer add <title> --why <text> [--change <id>] 
 
 `sdlc takeover --change <id> --note "<why>"` takes a change from the agent: until `sdlc release-control --change <id> --note "<for the agent>"`, the hook denies agent edits in the change folder and in the plan's files (without plan.md, in the whole project), and `next` says to wait for you. The agent sees the hand-back note. Both commands, like rework, are a person's.
 
+### Open questions answered by a person
+
+Open questions under `## Open questions` in intent.md, proposal.md or design.md need a person's answer before the intent or spec gate can be approved. `sdlc answer --change <id> --list` shows them; `sdlc answer <n> --change <id> --text "…"` writes the answer under the question and records it in `.sdlc.yaml`. Only that record counts: an answer typed into the file by hand or by an agent does not, and a reworded question needs a new answer. Inside an agent session the command refuses, and the hook denies it; the intent and spec workflows leave the questions to you and give you the command. Turn the rule off with `questions: { required: false }` in `sdlc.yaml`.
+
 ### Approvals in commits, evidence limits, gates that do not apply
 
 `sdlc approve` prints a ready `git commit` with the trailer `SDLC-Approval: <change>:<gate>:<digest>` (JSON `commitMessage`); `sdlc approvals verify` reports `trailer: found | missing` for each approval. The evidence in `verification.md` warns about files listed under "Files that change" that the change did not touch (`planDrift.untouched`, never a failure), has a `## Not run / limits` section for the tester, and lists the files of the change's `verification/` folder (screenshots, browser results) as links. `gates.<gate>.auto_waive: { kinds, tracks }` waives the intent, spec or plan gate for matching changes, logged once as `gate.<gate>.auto_waived` and counted in the audit as a policy waiver; a kind chosen by an agent does not count. Use cases: [13. Process hygiene and project health](13-process-health.md).
@@ -176,6 +180,8 @@ Record postponed work with `sdlc defer add <title> --why <text> [--change <id>] 
 ### Project health and explaining a change
 
 `sdlc health [--json]` lists findings about the process and its practices: flow (long or overdue waits on people, changes with no activity, old deferred work), quality (first-pass verification, the most common rework reason, plan drift, open review findings, scenarios without a verification row), discipline (frequent waivers, the lite track on behaviour changes, forced archives, repeated approvals, repeated hook denials of one rule, long test locks) and configuration (no verification commands, enforcement off or warn, one person holding every role, signing off, stale context packs, `sdlc doctor` problems). Each finding has a level (`bad`, `warn`, `info`), the facts and a recommendation; there is no single score, and the command always exits 0. `/sdlc:health` explains the findings and drafts the improvements you choose as backlog items (`--source-type health`). While a `bad` finding exists, the agent's session start says so in one line; `health.degraded` and `health.recovered` go to the log and to event receivers; the dashboard has a health section.
+
+`sdlc audit` (and the dashboard page of a change) also compares the people's decisions the track planned — the required gates and their approvals, counting `min_approvals` — with what happened: approvals, reworks, takeovers, waivers, answers and the hours gates waited for a person. New to sdlc? `sdlc guide tour` walks through the calculator demo in seven steps.
 
 `sdlc explain --change <id> [--json]` says why a change is where it is: the stage, the open gate and its reason, what it waits for, the steps that unblock it and the latest decisions. It writes nothing.
 

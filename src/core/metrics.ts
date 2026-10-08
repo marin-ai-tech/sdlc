@@ -2,6 +2,8 @@ import type { ChangeState, HistoryEvent } from './change-state.js';
 import { AWAITING_EVENT } from './awaiting.js';
 import { AUTO_WAIVED_EVENT } from './auto-waive.js';
 import type { LogEntry } from './log.js';
+import { defaultConfig, type SdlcConfig } from './config.js';
+import { participationOf, sumParticipation, type Participation, type ParticipationTotals } from './participation.js';
 
 interface Milestones {
   created?: string;
@@ -37,6 +39,8 @@ export interface ChangeMetrics {
   approvals: Record<string, number>;
   /** Verify runs up to and including the first pass; undefined while none passed. */
   verifyAttemptsToPass?: number;
+  /** People's decisions the track plans against what happened (B63). */
+  participation: Participation;
 }
 
 export interface FlowAggregate {
@@ -108,11 +112,15 @@ function attemptsToPass(runs: HistoryEvent[]): number | undefined {
   return index < 0 ? undefined : index + 1;
 }
 
-/** Metrics of one change; `log` holds its project-log entries, where the waits for a person are recorded. */
-export function changeMetrics(state: ChangeState, log: LogEntry[] = []): ChangeMetrics {
+/**
+ * Metrics of one change; `log` holds its project-log entries, where the waits for a person are recorded, and
+ * `config` the gates the participation plan is read from.
+ */
+export function changeMetrics(state: ChangeState, log: LogEntry[] = [], config?: SdlcConfig): ChangeMetrics {
   const m = milestones(state.history, state.created);
   const verifyRuns = state.history.filter((h) => h.event.startsWith('verify.'));
   const firstRun = verifyRuns[0]?.event;
+  const waits = waitsOf(state, log);
   return {
     milestones: m,
     leadTimeHours: {
@@ -127,10 +135,11 @@ export function changeMetrics(state: ChangeState, log: LogEntry[] = []): ChangeM
     rejections: state.history.filter((h) => /^gate\.\w+\.rejected$/.test(h.event)).length,
     waivers: state.history.filter((h) => /^gate\.\w+\.waived$/.test(h.event)).length,
     policyWaivers: log.filter((e) => AUTO_WAIVED_EVENT.test(e.event)).length,
-    waits: waitsOf(state, log),
+    waits,
     reworks: reworksOf(state.history),
     approvals: approvalsOf(state.history),
     verifyAttemptsToPass: attemptsToPass(verifyRuns),
+    participation: participationOf(config ?? defaultConfig(), state, log, waits),
   };
 }
 
@@ -168,6 +177,7 @@ export function aggregateMetrics(rows: ChangeMetrics[]): FlowAggregate & {
   rejections: number;
   waivers: number;
   policyWaivers: number;
+  participation: ParticipationTotals;
 } {
   const pick = (key: keyof ChangeMetrics['leadTimeHours']) =>
     median(rows.map((row) => row.leadTimeHours[key]).filter((value): value is number => value !== undefined));
@@ -188,5 +198,6 @@ export function aggregateMetrics(rows: ChangeMetrics[]): FlowAggregate & {
     policyWaivers: rows.reduce((total, row) => total + (row.policyWaivers ?? 0), 0),
     medianWaitSeconds: medianWaits(rows),
     reworkReasons: reworkReasons(rows),
+    participation: sumParticipation(rows.map((row) => row.participation)),
   };
 }

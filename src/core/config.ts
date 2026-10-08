@@ -7,6 +7,7 @@ import { LAYOUT_ROLE_IDS, type LayoutMapping, type LayoutRoleId } from './layout
 import { parseEvents, type EventReceiver } from '../mcp/event-config.js';
 import { parseMcpChecks, parseMcpServers, type McpCheck, type McpServer } from '../mcp/registry.js';
 import { parsePacksConfig, type PackConfig } from '../team/pack-config.js';
+import { parseQuestionsConfig, type QuestionsConfig } from './questions-config.js';
 import { parseTeamConfig, type TeamConfig } from '../team/team-config.js';
 import { parseStages, type StagesConfig } from './stage-config.js';
 import { readYamlObject } from './yaml-io.js';
@@ -158,6 +159,11 @@ export interface SdlcConfig {
    * defaults apply). Written back with the values that differ from the defaults only.
    */
   health?: HealthThresholds;
+  /**
+   * Open questions (B62): `required` (default true) holds the intent and spec approvals until every open question
+   * has a person's recorded answer. Absent when sdlc.yaml has no `questions`; never written back.
+   */
+  questions?: QuestionsConfig;
 }
 
 export const DEFAULT_TEST_PATHS = [
@@ -503,6 +509,8 @@ export function parseConfig(raw: Raw, file = 'openspec/sdlc.yaml'): SdlcConfig {
 
   const health = parseHealth(raw.health, where('health'));
   if (health) config.health = health;
+  const questions = parseQuestionsConfig(raw.questions, where);
+  if (questions) config.questions = questions;
 
   const locale = asString(raw.locale, where('locale'));
   if (locale !== undefined) config.locale = locale;

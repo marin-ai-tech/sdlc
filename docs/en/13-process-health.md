@@ -4,7 +4,8 @@ A process with gates can still be passed by form alone: a rework closed by the s
 nobody touched, evidence that is silent about what was not run, small changes that drag gates they do not need, a
 change that bounces between the agent and a person forever. sdlc 0.11.2 closes these holes in the gates themselves;
 0.11.3 adds a look at the whole project — `sdlc health` — and one command that explains a single change, `sdlc
-explain`.
+explain`; 0.11.4 makes people answer the open questions themselves, shows how much people took part, and adds a tour
+for newcomers.
 
 ## 13.1. What the team gets
 
@@ -19,6 +20,9 @@ explain`.
 | Improvements reach the backlog | `/sdlc:health` drafts backlog items; a person orders them | 0.11.3 |
 | Someone notices when it gets bad | a line at the agent's session start, `health.degraded` to the event receivers, a dashboard section | 0.11.3 |
 | "Why is my change stuck?" has one answer | `sdlc explain --change <id>` | 0.11.3 |
+| Open questions are answered by people | `sdlc answer`; the intent and spec gates wait for the answers | 0.11.4 |
+| The team sees how much people took part | the audit and the dashboard: planned vs actual decisions per change | 0.11.4 |
+| A newcomer learns sdlc in an hour | `sdlc guide tour`: seven steps through the calculator demo | 0.11.4 |
 
 ## 13.2. Use cases
 
@@ -122,6 +126,49 @@ The answer: the stage, the open gate and its reason (here: sent back for rework,
 waits for (the agent, a person, a check, review findings, a takeover), the steps that unblock it with their commands,
 and the five latest decisions. It writes nothing, so an agent can ask it as often as it likes.
 
+### Open questions only a person can answer
+
+The agent drafts the intent of `add-export` and lists two open questions: "Which formats do accountants need?" and
+"Is the export limited to one month?". It does not answer them — the intent workflow tells it to leave them to people
+— and `sdlc next` names a person's step, `answer-questions`. Alice answers in her terminal:
+
+```bash
+sdlc answer --change add-export --list
+sdlc answer 1 --change add-export --text "CSV and XLSX"
+sdlc answer 2 --change add-export --text "Any period up to a year"
+sdlc approve intent --change add-export
+```
+
+Each answer lands under its question in intent.md and in the change record. Until both are recorded, `sdlc approve
+intent` refuses with `open_questions`. If the agent had typed "Answer: CSV" into the file, it would not count; if
+someone rewords a question, it needs a new answer. Open questions in proposal.md and design.md hold the spec gate the
+same way.
+
+### How much did people take part?
+
+At the end of the quarter the team lead looks at `sdlc audit`: for every change, what the track planned (full track:
+intent, spec, plan, review — four approvals, more with `min_approvals`) and what happened.
+
+```text
+add-export: gates intent, spec, plan, review; approvals 4 / 7; reworks 2, takeovers 1, waivers 0, answers 2; waits 31.5 h
+fix-rounding: gates plan, review; approvals 2 / 2; reworks 0, takeovers 0, waivers 0, answers 0; waits 2 h
+```
+
+Seven approvals where four were planned, two reworks and a takeover say that `add-export` was hard to pin down;
+`sdlc health` and the retrospective take it from there. The same lines are on each change's dashboard page.
+
+### A newcomer's first hour
+
+A new engineer joins. Instead of reading every article, they run:
+
+```bash
+sdlc guide tour          # the steps, and step 1
+sdlc guide tour 3        # intent, spec and plan
+```
+
+Seven short steps follow the calculator demo: setup, the backlog, the three planning gates, build and verify, review,
+release and archive, and keeping an eye on the process. Each names the real commands, in English or Russian.
+
 ## 13.3. What health looks at
 
 | Area | Findings |
@@ -141,14 +188,23 @@ plan drift, trace); `sdlc health` looks at everything.
 | `sdlc health [--json]` | anyone | findings; records `health.degraded` / `health.recovered` in the log |
 | `/sdlc:health` (`/sdlc-health`) | agent with a person | explains the findings, drafts backlog items |
 | `sdlc explain --change <id> [--json]` | anyone | why a change is where it is; writes nothing |
+| `sdlc answer <n> --change <id> --text "…"` | person | answers an open question; `--list` shows them |
+| `sdlc audit [--change <id>]` | anyone | includes the planned vs actual participation of people |
+| `sdlc guide tour [step]` | anyone | the tour for newcomers |
 | `sdlc approve <gate> --note "…"` | person | a re-approval after a rework with nothing changed |
 | `sdlc approvals verify` | anyone | signatures and approval trailers |
 | `sdlc backlog move` | person | orders the drafted improvements |
 
 ## 13.5. Limits we accept
 
-- The policy (`auto_waive`) and the thresholds are read from the current configuration: changing them changes what
-  past changes show, the same way `required` does.
-- Reworks recorded before 0.11.2 count as one cycle each gate: the rework-limit hint may come later, never too early.
+- A policy waiver is recorded on the change the first time it applies (0.11.4): removing the policy later does not
+  undo it, and archived changes are never waived by a policy. The health thresholds are read from the current
+  configuration.
+- An agent can still delete an open question from the artifact before anyone answers it; the approver sees the
+  artifact they approve, so the deletion is in plain view.
+- `sdlc waive` does not ask for answers: waiving a gate is itself a person's decision. Answering a question after the
+  gate was approved changes the artifact, so that approval goes stale and the gate needs approving again.
+- A change record with answers is format version 3: sdlc before 0.11.4 refuses it rather than drop the answers, so the
+  whole team updates together.
 - Health has no single score on purpose: a number hides what to do.
 - A tool that answers `--version` very slowly is still found, but its version may stay unknown in `sdlc doctor`.

@@ -11,8 +11,10 @@ import type { MessageParams } from '../core/i18n.js';
 import type { LifecycleView } from '../core/lifecycle.js';
 import type { ChangeMetrics } from '../core/metrics.js';
 import type { NamedApprover } from '../core/named-approvers.js';
+import type { Participation } from '../core/participation.js';
 import { t } from '../core/i18n.js';
 import { openGateDeciders } from '../core/named-approvers.js';
+import { participationParams } from '../core/participation.js';
 import { buildTrace, type TraceGap } from '../core/trace.js';
 
 export interface ChangePageEvent {
@@ -28,6 +30,8 @@ export interface ChangePage {
   /** Seconds each approval gate waited for a person (B6). */
   waits: Array<{ gate: string; seconds: number }>;
   reworks: ChangeMetrics['reworks'];
+  /** People's decisions the track plans against what happened (B63). */
+  participation: Participation;
   /** The gaps of `sdlc trace`. */
   gaps: TraceGap[];
   /** The next step; `people` names who may take it (with roles.yaml). Text is English, `key` localizes it. */
@@ -95,6 +99,7 @@ export function buildChangePage(input: ChangePageInput): ChangePage {
     history: input.state.history.map(pageEvent),
     waits,
     reworks: input.metrics.reworks,
+    participation: input.metrics.participation,
     gaps: traceGaps(input.root, input.ref),
     now: nowOf(input.view),
     ...decidersOf(input),
@@ -146,6 +151,16 @@ function reworksBlock(page: ChangePage): string {
   return block(t('report.html.pageReworks'), items, t('report.html.pageNoReworks'));
 }
 
+/** What the track planned for people and what they did: one line each. */
+function participationBlock(page: ChangePage): string {
+  const params = participationParams(page.participation);
+  const items = [
+    `<li>${e(t('report.html.pagePlanned', params))}</li>`,
+    `<li>${e(t('report.html.pageActual', params))}</li>`,
+  ];
+  return block(t('report.html.pageParticipation'), items, '');
+}
+
 function gapsBlock(page: ChangePage): string {
   const items = page.gaps.map((gap) => `<li>${e(t(`trace.gap.${gap.kind}`, { ref: gap.ref }))}</li>`);
   return block(t('report.html.pageGaps'), items, t('report.html.pageNoGaps'), 'warnings');
@@ -179,6 +194,7 @@ export function renderChangePage(change: { id: string; page: ChangePage }): stri
   return `<section id="${anchor}" class="change change-page" aria-labelledby="${anchor}-title">`
     + `<h3 id="${anchor}-title">${e(t('report.html.pageTitle', { change: change.id }))}</h3>`
     + `<div class="page-grid">${nowBlock(change.page)}${waitsBlock(change.page)}`
+    + `${participationBlock(change.page)}`
     + `${reworksBlock(change.page)}${gapsBlock(change.page)}${historyBlock(change.page)}</div>`
     + `</section>`;
 }

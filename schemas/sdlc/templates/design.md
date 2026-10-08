@@ -32,3 +32,7 @@
 ## Migration and rollback
 
 <!-- Deploy steps and how to undo them (omit when not applicable). -->
+
+## Open questions
+
+<!-- One question per list item, or "None". A person answers each with `sdlc answer <n> --artifact design`. -->

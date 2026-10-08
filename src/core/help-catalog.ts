@@ -9,6 +9,8 @@ export const HUMAN_COMMANDS = [
   'uninstall',
   // What a role of the agent team says is a person's decision (B72).
   'team accept',
+  // An answer to an open question is a person's decision (B62).
+  'answer',
 ] as const;
 
 const EXAMPLES: Record<string, string> = {
@@ -47,6 +49,7 @@ const EXAMPLES: Record<string, string> = {
   guide: 'sdlc guide denials#plan-gate --json',
   'team sync': 'sdlc team sync --json',
   'team accept': 'sdlc team accept tester',
+  answer: 'sdlc answer 1 --change add-export --text "Cashiers at the till"',
   'team list': 'sdlc team list --json',
   'team check': 'sdlc team check --json',
 };

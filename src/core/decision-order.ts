@@ -3,9 +3,9 @@ import type { ChangeState, GateState } from './change-state.js';
 /**
  * The order decisions were recorded in (B39). `.sdlc.yaml` travels through git between machines whose clocks
  * differ, so the time of a decision cannot tell whether it came before or after another one. Every decision the
- * CLI writes to a change record (approval, rejection, waiver, rework) carries `seq`, the record's next number, and
- * the record keeps the last number it gave in its top-level `seq`. Two decisions compare by `seq` when both carry
- * one; when either lacks it (records written by sdlc 0.8.0 and earlier) they compare by their `at` time.
+ * CLI writes to a change record (approval, rejection, waiver, rework, answer) carries `seq`, the record's next
+ * number, and the record keeps the last number it gave in its top-level `seq`. Two decisions compare by `seq` when
+ * both carry one; when either lacks it (records written by sdlc 0.8.0 and earlier) they compare by their `at` time.
  */
 export interface Ordered {
   at: string;
@@ -41,7 +41,8 @@ function gateSeqs(gate: GateState | undefined): unknown[] {
 
 /** The highest number given so far: the record's counter, or a decision's own `seq` (a counter lost on the way). */
 function highestSeq(state: ChangeState): number {
-  const values = [state.seq, ...Object.values(state.gates).flatMap(gateSeqs)];
+  const answers = (state.answers ?? []).map((answer) => answer.seq);
+  const values = [state.seq, ...Object.values(state.gates).flatMap(gateSeqs), ...answers];
   return values.filter(isSeq).reduce((highest, value) => Math.max(highest, value), 0);
 }
 

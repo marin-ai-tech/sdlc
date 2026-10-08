@@ -19,7 +19,9 @@ import { appendLog, readLog } from '../core/log.js';
 import { changeMarkdown, tryStampArtifacts } from '../core/stamp.js';
 import { aggregateMetrics, changeMetrics } from '../core/metrics.js';
 import { changeLog } from '../core/awaiting.js';
-import { printChangeFlow, printProjectFlow } from './audit-flow.js';
+import {
+  printChangeFlow, printChangeParticipation, printProjectFlow, printProjectParticipation,
+} from './audit-flow.js';
 import { readBacklog, setBacklogStatus } from '../core/backlog.js';
 import { closeDeferred, readDeferred } from '../core/deferred.js';
 
@@ -260,7 +262,7 @@ export async function auditCommand(opts: { change?: string; json?: boolean }): P
       const ref = resolveChange(ctx.paths, opts.change, { allowArchived: true });
       const state = readChangeState(ref.dir);
       const commits = commitsTouching(ctx.root, [path.relative(ctx.root, ref.dir)]);
-      const metrics = changeMetrics(state, changeLog(readLog(ctx.root), ref.id));
+      const metrics = changeMetrics(state, changeLog(readLog(ctx.root), ref.id), ctx.config);
       if (opts.json) {
         printJson({ change: ref.id, archived: ref.archived, kind: state.kind, risk: state.risk, track: state.track, source: state.source,
           ...(state.harness ? { recordedWith: state.harness } : {}), history: state.history, commits, metrics, harness: ctx.stamp });
@@ -289,6 +291,7 @@ export async function auditCommand(opts: { change?: string; json?: boolean }): P
         policy: metrics.policyWaivers,
       })}`);
       printChangeFlow(metrics);
+      printChangeParticipation(metrics.participation);
       return;
     }
     const refs = [...listActiveChanges(ctx.paths), ...listArchivedChanges(ctx.paths)];
@@ -301,7 +304,7 @@ export async function auditCommand(opts: { change?: string; json?: boolean }): P
         if (h.sdlc) versions.add(h.sdlc);
         if (h.license) licenses.add(h.license);
       }
-      const metrics = changeMetrics(state, changeLog(log, ref.id));
+      const metrics = changeMetrics(state, changeLog(log, ref.id), ctx.config);
       return { change: ref.id, archived: ref.archived, kind: state.kind, track: state.track, ...metrics };
     });
     const aggregate = {
@@ -326,6 +329,7 @@ export async function auditCommand(opts: { change?: string; json?: boolean }): P
       rejections: aggregate.rejections, waivers: aggregate.waivers, policy: aggregate.policyWaivers,
     })}`);
     printProjectFlow(aggregate);
+    printProjectParticipation(rows, aggregate.participation);
     if (versions.size > 0) {
       line(`  ${t('audit.recordedWith', {
         versions: [...versions].sort().join(', '),

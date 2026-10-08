@@ -30,6 +30,7 @@ import { nameApprovers, type NamedApprover } from './named-approvers.js';
 import { effectiveGates, markReworks } from './rework.js';
 import { markAutoWaived, withAutoWaive } from './auto-waive.js';
 import { reworkLimitNext } from './rework-limit.js';
+import { questionsNext } from './questions-next.js';
 
 /**
  * The six stages of Anthropic's AI-native SDLC playbook, plus the two terminal
@@ -116,6 +117,8 @@ export interface NextAction {
     | 'taken-over'
     /** A gate reached `rework.max_cycles` (B61): a person takes the change over or reviews its scope. */
     | 'review-scope'
+    /** Open questions of the intent or spec gate wait for a person's answer (B62): `sdlc answer`. */
+    | 'answer-questions'
     | 'none';
   /** Workflow id of the skill/command that performs the action (e.g. `spec`). */
   workflow?: string;
@@ -296,7 +299,7 @@ export function evaluateChange(
 ): LifecycleView {
   const warnings: string[] = [];
   const state = readChangeState(ref.dir);
-  const decided = withAutoWaive(effectiveGates(state), state, config);
+  const decided = ref.archived ? effectiveGates(state) : withAutoWaive(effectiveGates(state), state, config);
   const schemaName = resolveChangeSchemaName(ref.dir, root);
   const schema = loadSchemaInfo(schemaName, root);
   const artifacts = computeArtifactStates(schema, ref.dir);
@@ -493,7 +496,7 @@ export function evaluateChange(
   // A change a person has taken over waits for them; otherwise the next step names the people who may act.
   const held = ref.archived ? undefined : takeoverNext(state, ref.id);
   const limit = held ? undefined : reworkLimitNext(root, config, view, state, options.skipPeople);
-  const next = held ?? limit ?? nextAction(view, config, mapping);
+  const next = held ?? limit ?? questionsNext(view, config, state, nextAction(view, config, mapping));
   view.next = held || options.skipPeople ? next : nameApprovers(root, config, view, state, next);
   return view;
 }

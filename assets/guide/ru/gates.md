@@ -23,6 +23,9 @@ sdlc approve review --change add-export --as code-owner
 - `min_approvals: 2` у гейта ждёт двух разных людей.
 - `sdlc approve` предлагает сообщение коммита с трейлером `SDLC-Approval: <change>:<gate>:<digest>`; закоммитьте
   запись с ним, и `sdlc approvals verify` найдёт коммит по нему.
+- На открытые вопросы в `## Open questions` файлов intent.md, proposal.md или design.md нужно ответить до утверждения
+  гейта intent или spec: `sdlc answer --change <id> --list`, затем `sdlc answer 1 --change <id> --text "…"`. Отвечает
+  только человек; ответ, вписанный в файл руками, не считается. `questions.required: false` отключает правило.
 
 ## Другие решения
 

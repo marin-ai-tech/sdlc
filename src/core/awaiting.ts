@@ -65,10 +65,10 @@ export function recordAwaiting(
   views: LifecycleView | LifecycleView[],
   stamp?: HarnessStamp,
 ): void {
-  if (!config.log.enabled) return;
   const list = Array.isArray(views) ? views : [views];
-  // The same call sites record the gates an auto_waive policy waived (B59).
+  // The same call sites record the gates an auto_waive policy waived (B59), on the change too (B78).
   recordAutoWaived(root, config, list, stamp);
+  if (!config.log.enabled) return;
   try {
     const waiting = list.map(awaitedGate);
     const pending = waiting.filter((w): w is AwaitedGate => w !== undefined);

@@ -33,6 +33,7 @@ On top of OpenSpec, `sdlc` adds the process parts the playbook asks for:
 - **Reports and dashboard.** `sdlc report` (Markdown with Mermaid, JSON or HTML) and `sdlc dashboard` (one offline HTML page) show stages, gates, backlog, deferred work and metrics; an example background process keeps the page current.
 - **Audit and metrics.** `sdlc audit` builds a timeline of who approved what and when, plus the playbook's lead-time and first-pass metrics, how long each gate waited for a person, the reworks with their reasons, and verify attempts until the first pass.
 - **Process hygiene.** A rework must lead to a change (re-approving the same content needs a note), a gate sent back too often goes to a person (`rework.max_cycles`), approvals come with a commit trailer that `sdlc approvals verify` finds, the evidence says what was not run and lists screenshots, and `gates.<gate>.auto_waive` waives the intent, spec or plan gate for kinds or tracks a person chose.
+- **People in the process.** A person answers the open questions of an intent or a design with `sdlc answer` before the gate can be approved; the audit and the dashboard compare the people's decisions the track planned with what happened; newcomers take `sdlc guide tour`.
 - **Project health.** `sdlc health` lists findings on flow, quality, discipline and configuration, each with its facts and a recommended improvement (no single score; thresholds under `health` in `sdlc.yaml`); `/sdlc:health` drafts improvements into the backlog for a person to order, and a bad finding shows at the agent's session start and on the dashboard. `sdlc explain --change <id>` says why a change is where it is and what unblocks it. See [docs/en/13-process-health.md](docs/en/13-process-health.md).
 - **Native agent UX.** Workflows ask with each tool's question tool (Claude Code AskUserQuestion, OpenCode `question`), mirror `tasks.md` into the tool todo list during `/sdlc:build`, and inject live CLI output into `/sdlc:status`, `/sdlc:next` and `/sdlc:help`. An answer in chat is never an approval — people run human decisions in their own terminal.
 - **Ask the agent how sdlc works.** The guide workflow answers questions about working with sdlc for your project, from short articles that ship with sdlc in English and Russian (`sdlc guide [topic]`); every hook denial names the section that explains it. `sdlc next --me` lists what waits for you, and `sdlc approve --preview` shows what you are about to approve.
@@ -171,6 +172,8 @@ Everything sdlc writes records the sdlc version and the license the project uses
 | `sdlc audit [--change]` | audit trail and metrics |
 | `sdlc health` | project health findings with facts and recommendations |
 | `sdlc explain --change <id>` | why a change is where it is and what unblocks it |
+| `sdlc answer <n> --change <id> --text "…"` | a person answers an open question (human-only); `--list` shows them |
+| `sdlc guide tour [step]` | a walkthrough of the calculator demo for newcomers |
 | `sdlc log [--change] [--limit]` | project log, with the sdlc version and license of each entry |
 | `sdlc license` / `sdlc license set community \| commercial --agreement <id> [--licensee]` | show or record the license the project uses sdlc under (setting it is human-only) |
 | `sdlc doctor` | installation health, including whether the declared license fits the project |

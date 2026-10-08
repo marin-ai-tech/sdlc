@@ -23,6 +23,9 @@ sdlc approve review --change add-export --as code-owner
 - `min_approvals: 2` on a gate waits for two different people.
 - `sdlc approve` proposes a commit message with the trailer `SDLC-Approval: <change>:<gate>:<digest>`; commit the
   record with it, and `sdlc approvals verify` finds the commit by it.
+- Open questions under `## Open questions` in intent.md, proposal.md or design.md need your answer before the intent or
+  spec gate can be approved: `sdlc answer --change <id> --list`, then `sdlc answer 1 --change <id> --text "…"`. Only
+  a person answers; an answer typed into the file does not count. `questions.required: false` turns this off.
 
 ## Other decisions
 

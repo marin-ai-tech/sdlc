@@ -1,4 +1,8 @@
-import { CHANGE_KINDS, TRACKS, type ChangeState, type GateState } from './change-state.js';
+import {
+  CHANGE_KINDS, readChangeState, TRACKS, writeChangeState, type ChangeState, type GateState,
+} from './change-state.js';
+import { agentEnvironment } from './agent-env.js';
+import { nextSeq } from './decision-order.js';
 import { APPROVAL_GATES, type ApprovalGateId, type SdlcConfig } from './config.js';
 import { SdlcError } from './errors.js';
 import { t } from './i18n.js';
@@ -77,13 +81,38 @@ export function withAutoWaive(
 /** Gates waived by the policy say so in their reason (`gate.autoWaived`, with the policy). */
 export function markAutoWaived(gates: GateEvaluation[], state: ChangeState, config: SdlcConfig): GateEvaluation[] {
   return gates.map((gate) => {
-    const id = gate.id as ApprovalGateId;
-    const reason = (APPROVAL_GATES as readonly string[]).includes(id) ? autoWaiveReason(config, id, state) : undefined;
-    const own = effectiveGates(state)[id]?.waived;
-    if (!reason || gate.status !== 'waived' || own) return gate;
+    const reason = policyReason(gate.id, state, config);
+    if (!reason || gate.status !== 'waived') return gate;
     const params = { policy: reason };
     return { ...gate, reason: t('gate.autoWaived', params, 'en'), reasonKey: 'gate.autoWaived', reasonParams: params };
   });
+}
+
+const NOTE_PREFIX = 'auto_waive: ';
+
+/**
+ * Why the gate is waived by the policy: the reason of a policy waiver recorded on the change (B78), else of the policy
+ * in effect when the change has no waiver of its own.
+ */
+function policyReason(gate: string, state: ChangeState, config: SdlcConfig): string | undefined {
+  if (!(APPROVAL_GATES as readonly string[]).includes(gate)) return undefined;
+  const own = effectiveGates(state)[gate as ApprovalGateId]?.waived;
+  if (own?.by === POLICY_WAIVER && own.note.startsWith(NOTE_PREFIX)) return own.note.slice(NOTE_PREFIX.length);
+  return own ? undefined : autoWaiveReason(config, gate as ApprovalGateId, state);
+}
+
+/**
+ * Records the policy's waiver on the change (B78): from then on it is a waiver like a person's (removing the policy
+ * does not undo it), told apart by `by: policy`. No history event, so the audit never counts it as a person's.
+ */
+function recordOnChange(dir: string, gate: string, policy: string, stamp?: HarnessStamp): void {
+  const state = readChangeState(dir);
+  const id = gate as ApprovalGateId;
+  if (state.gates[id]?.waived) return;
+  const note = `${NOTE_PREFIX}${policy}`;
+  const waived = { by: POLICY_WAIVER, at: new Date().toISOString(), seq: nextSeq(state), note };
+  state.gates[id] = { ...(state.gates[id] ?? {}), waived };
+  writeChangeState(dir, state, stamp);
 }
 
 function logged(entries: LogEntry[], change: string, gate: string): boolean {
@@ -96,9 +125,16 @@ type LogConfig = Parameters<typeof appendLog>[1];
 export function recordAutoWaived(root: string, config: LogConfig, views: LifecycleView[], stamp?: HarnessStamp): void {
   const waived = views.flatMap((view) => view.gates
     .filter((gate) => gate.reasonKey === 'gate.autoWaived' && !view.archived)
-    .map((gate) => ({ change: view.change, gate: gate.id, policy: String(gate.reasonParams?.policy ?? '') })));
+    .map((gate) => ({
+      change: view.change, dir: view.dir, gate: gate.id, policy: String(gate.reasonParams?.policy ?? ''),
+    })));
   if (waived.length === 0) return;
   try {
+    // Recorded from a person's commands only: an agent's session (or its hook) must not make the policy permanent.
+    if (!agentEnvironment()) {
+      for (const item of waived) recordOnChange(item.dir, item.gate, item.policy, stamp);
+    }
+    if (!config.log.enabled) return;
     const entries = readLog(root);
     for (const item of waived.filter((w) => !logged(entries, w.change, w.gate))) {
       const event = `gate.${item.gate}.auto_waived`;

@@ -157,7 +157,7 @@ export const SLIDES = [
       en: 'The agent cannot approve. Bob is not the product owner. Alice approves the intent and the spec; Bob, the engineer, the plan.',
       ru: 'Агент утверждать не может. Боб не владелец продукта. Алиса утверждает замысел и спецификацию, инженер Боб — план.',
     },
-    steps: ['approve-intent-agent', 'approve-intent-bob', 'approve-intent'],
+    steps: ['approve-intent-agent', 'approve-intent-bob', 'answer', 'approve-intent'],
     more: ['approve-spec', 'approve-plan', 'rework', 'explain', 'approve-spec-again', 'approve-plan-again'],
   },
   {
@@ -359,6 +359,7 @@ export const STEP_NOTE_RU = {
   'approve-spec': 'Алиса утверждает спецификацию.',
   'approve-plan': 'Боб, инженер, утверждает план.',
   rework: 'Алиса возвращает изменение на спецификацию с причиной; утверждение плана перестаёт учитываться.',
+  answer: 'Алиса сама отвечает на открытый вопрос замысла: агенту это запрещено.',
   explain: 'Боб спрашивает, почему изменение снова на спецификации: возврат, его заметка и что его разблокирует.',
   'approve-spec-again': 'Спецификация утверждена заново.',
   'approve-plan-again': 'Плану нужно своё новое утверждение.',

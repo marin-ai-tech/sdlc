@@ -70,7 +70,7 @@ function resetScope(ctx: ProjectContext, ref: ChangeRef, gate: ReworkGateId): Ch
 }
 
 function recordRework(ctx: ProjectContext, ref: ChangeRef, state: ChangeState, rework: Rework): void {
-  const previous = state.gates[rework.gate]?.rework;
+  const cycle = nextCycle(state, rework.gate);
   state.gates[rework.gate] = {
     ...(state.gates[rework.gate] ?? {}),
     rework: {
@@ -81,7 +81,7 @@ function recordRework(ctx: ProjectContext, ref: ChangeRef, state: ChangeState, r
       reason: rework.reason,
       note: rework.note,
       from: rework.from,
-      cycle: nextCycle(previous),
+      cycle,
       ...provenance(ctx.stamp),
     },
   };

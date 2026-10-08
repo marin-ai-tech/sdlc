@@ -18,6 +18,7 @@ import { listActiveChanges, listArchivedChanges, resolveChange } from '../core/c
 import { readChangeState } from '../core/change-state.js';
 import { evaluateChange, sharedFingerprint, STAGES, STAGE_TITLES } from '../core/lifecycle.js';
 import { aggregateMetrics, changeMetrics } from '../core/metrics.js';
+import type { Participation, ParticipationTotals } from '../core/participation.js';
 import { changeLog } from '../core/awaiting.js';
 import { readLog } from '../core/log.js';
 import { detectLayout } from '../core/layout.js';
@@ -62,6 +63,8 @@ export interface ReportChange {
   ageHours?: number;
   /** The change had at least one history event inside the period. */
   movedInPeriod: boolean;
+  /** People's decisions the track plans against what happened (B63). */
+  participation: Participation;
   /** The dashboard page of the change: timeline, waits, reworks, trace gaps, who acts now. */
   page: ChangePage;
 }
@@ -92,6 +95,8 @@ export interface ReportModel {
     verifyFirstPassRate?: number;
     rejections: number;
     waivers: number;
+    /** Planned and actual participation of people, summed over the changes (B63). */
+    participation?: ParticipationTotals;
   };
   changes: ReportChange[];
   /** Project log entries inside the period, oldest first, at most 200 (newest kept). */
@@ -183,6 +188,7 @@ function toReportChange(ref: ChangeRef, view: LifecycleView, state: ChangeState,
     warnings: view.warnings,
     ...(ageHours !== undefined && Number.isFinite(ageHours) && ageHours >= 0 ? { ageHours } : {}),
     movedInPeriod: !since || state.history.some((event) => event.at >= since),
+    participation: page.participation,
     page,
   };
 }
@@ -231,7 +237,7 @@ export function buildReport(ctx: ProjectContext, opts: ReportOptions = {}): Repo
   const rows = refs.map((ref) => {
     const state = readChangeState(ref.dir);
     const view = evaluateChange(ctx.root, ref, ctx.config, { fingerprint });
-    const metrics = changeMetrics(state, changeLog(log, ref.id));
+    const metrics = changeMetrics(state, changeLog(log, ref.id), ctx.config);
     const page = buildChangePage({ root: ctx.root, config: ctx.config, ref, state, view, metrics });
     return {
       change: toReportChange(ref, view, state, since, now, page),

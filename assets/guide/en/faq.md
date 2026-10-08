@@ -40,4 +40,8 @@ Read the rule in brackets and `sdlc guide denials`. To relax the process rules f
 `sdlc doctor`.
 
 **Where is the history of decisions?**
-`sdlc audit --change <id>`, `sdlc log`, and `sdlc trace <id>` from intent to evidence.
+`sdlc audit --change <id>`, `sdlc log`, and `sdlc trace <id>` from intent to evidence. The audit also compares the
+people's decisions the track planned with what happened (approvals, reworks, takeovers, waivers, answers, waits).
+
+**I am new. Where do I start?**
+`sdlc guide tour`: seven short steps through the calculator demo.

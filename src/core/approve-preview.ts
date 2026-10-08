@@ -9,6 +9,7 @@ import { spawnSync } from 'node:child_process';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { unchangedSinceRework } from './approval-hygiene.js';
+import { assertQuestionsAnswered, unansweredQuestions, type UnansweredQuestion } from './answers.js';
 import { approverKey, assertByAllowed } from './approval-quorum.js';
 import { readChangeState, type ChangeState } from './change-state.js';
 import type { ChangeRef } from './changes.js';
@@ -49,6 +50,8 @@ export interface ApprovePreview {
   changedSinceApproval: string[];
   /** After a rework of the gate, the digest is the one approved before it (B56): approving needs `--note`. */
   unchangedSinceRework: boolean;
+  /** Intent and spec gates with questions that have no recorded answer (B62); absent when there are none. */
+  openQuestions?: UnansweredQuestion[];
   openFindings?: Array<{ id?: string; title: string; severity: string }>;
   verification?: { status: string; at?: string; fresh: boolean };
 }
@@ -83,6 +86,7 @@ export function previewApproval(input: PreviewInput): ApprovePreview {
     artifacts,
     changedSinceApproval: approvedBefore ? changedSinceCheckpoint(input, artifacts) : [],
     unchangedSinceRework: unchangedSinceRework(state, input.gate, evaluation.digest),
+    ...openQuestionsFact(input, state),
     ...codeGateFacts(view, input.gate),
   };
 }
@@ -94,6 +98,7 @@ function approvalRefusals(input: PreviewInput, evaluation: GateEvaluation, state
   attempt(found, () => assertByAllowed(input.config.gates[input.gate], roles !== undefined, input.by));
   attempt(found, () => assertReady(input.gate, evaluation));
   found.push(...(roles ? rolesRefusals(input, state, roles) : configRefusals(input, evaluation)));
+  attempt(found, () => assertQuestionsAnswered(input.config, input.ref.id, input.ref.dir, state, input.gate));
   return found.filter((item, index) => found.findIndex((other) => other.rule === item.rule) === index);
 }
 
@@ -193,6 +198,12 @@ function gateArtifacts(view: LifecycleView, gate: ApprovalGateId): PreviewArtifa
   const covered = view.gates.find((item) => item.id === gate)?.artifacts ?? [];
   return view.artifacts.filter((artifact) => covered.includes(artifact.id))
     .flatMap((artifact) => artifact.files.map((file) => ({ name: artifact.id, path: file.replace(/\\/g, '/') })));
+}
+
+/** For intent and spec: the questions without a recorded answer, when there are any. */
+function openQuestionsFact(input: PreviewInput, state: ChangeState): Partial<ApprovePreview> {
+  const open = unansweredQuestions(input.ref.dir, state, input.gate);
+  return open.length > 0 ? { openQuestions: open } : {};
 }
 
 /** For review and release: the open blocking findings and the verification evidence. */

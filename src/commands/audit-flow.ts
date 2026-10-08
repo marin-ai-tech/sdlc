@@ -1,6 +1,7 @@
 import { line } from '../cli/output.js';
 import { t } from '../core/i18n.js';
 import type { ChangeMetrics, FlowAggregate } from '../core/metrics.js';
+import { participationParams, type Participation, type ParticipationTotals } from '../core/participation.js';
 
 /**
  * Text lines of `sdlc audit` for the flow of work (B6): how long gates waited for a person, the reworks with their
@@ -26,4 +27,21 @@ export function printChangeFlow(metrics: ChangeMetrics): void {
 export function printProjectFlow(aggregate: FlowAggregate): void {
   const reasons = aggregate.reworkReasons.map((r) => `${r.reason} ${r.count}`).join(' · ');
   line(`  ${t('audit.medianWaits', { waits: pairs(aggregate.medianWaitSeconds), reasons: reasons || '-' })}`);
+}
+
+/** One line: the people's decisions the track plans against what happened (B63). */
+export function printChangeParticipation(participation: Participation): void {
+  line(`  ${t('audit.participation', participationParams(participation))}`);
+}
+
+/** The totals over the changes, then one line per change. */
+export function printProjectParticipation(
+  rows: Array<{ change: string; participation: Participation }>,
+  total: ParticipationTotals,
+): void {
+  line(`  ${t('audit.participationTotal', { changes: rows.length, ...participationParams(total) })}`);
+  for (const row of rows) {
+    const params = { change: row.change, ...participationParams(row.participation) };
+    line(`    ${t('audit.participationChange', params)}`);
+  }
 }
