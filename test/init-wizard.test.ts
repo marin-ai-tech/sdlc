@@ -43,6 +43,16 @@ function scripted(answers: { tools?: string[]; mode?: string; statusline?: boole
   return { prompter, asked, said, confirms: () => confirms };
 }
 
+/**
+ * The wizard deps of a test (B77): the terminal flow with a probe that finds nothing on PATH and an installer that
+ * runs nothing, so a test never installs or indexes anything on the machine and does not depend on what is there.
+ */
+function wizard(prompter: Prompter, io: { stdinTTY: boolean; stdoutTTY: boolean; agent?: string } = TTY) {
+  const probe = () => ({ ok: false, output: 'not found' });
+  const installer = async () => ({ ok: true, output: '' });
+  return { prompter, io, probe, installer };
+}
+
 function repo() {
   const root = tempDir('sdlc-wizard-');
   initGitRepo(root);
@@ -132,7 +142,7 @@ describe('interactive sdlc init', () => {
     const root = repo();
     const s = scripted({ tools: ['claude'], mode: 'block', statusline: true, opsx: false, language: '', roles: true, confirm: true });
     quiet();
-    await initCommand(root, { hooks: true }, { prompter: s.prompter, io: TTY });
+    await initCommand(root, { hooks: true }, wizard(s.prompter));
     const config = parse(read(path.join(root, 'openspec/sdlc.yaml')));
     expect(config.tools).toEqual(['claude']);
     expect(config.enforcement.mode).toBe('block');
@@ -147,7 +157,8 @@ describe('interactive sdlc init', () => {
     const out: string[] = [];
     vi.spyOn(process.stdout, 'write').mockImplementation((chunk) => (out.push(String(chunk)), true));
     vi.spyOn(process.stderr, 'write').mockImplementation(() => true);
-    await initCommand(root, { hooks: true }, { prompter: scripted({ confirm: false }).prompter, io: TTY });
+    const declined = scripted({ confirm: false });
+    await initCommand(root, { hooks: true }, wizard(declined.prompter));
     expect(fs.existsSync(path.join(root, 'openspec'))).toBe(false);
     expect(fs.existsSync(path.join(root, '.claude'))).toBe(false);
     expect(out.join('')).toMatch(/Nothing written/);
@@ -159,7 +170,8 @@ describe('interactive sdlc init', () => {
     await initCommand(root, { tools: 'none' }, { io: { ...TTY, agent: 'claude-code' } });
     const mine = 'version: 1\nsigning: warn\npeople:\n  kim: { name: Kim, emails: [kim@example.com] }\nroles:\n  maintainer: [kim]\n';
     write(path.join(root, 'openspec/roles.yaml'), mine);
-    await initCommand(root, { hooks: true }, { prompter: scripted({ tools: ['opencode'], roles: true, confirm: true }).prompter, io: TTY });
+    const again = scripted({ tools: ['opencode'], roles: true, confirm: true });
+    await initCommand(root, { hooks: true }, wizard(again.prompter));
     expect(read(path.join(root, 'openspec/roles.yaml'))).toBe(mine);
   }, 120000);
 
@@ -167,7 +179,7 @@ describe('interactive sdlc init', () => {
     const root = repo();
     const s = scripted({ confirm: false });
     quiet();
-    await initCommand(root, { hooks: true }, { prompter: s.prompter, io: { ...TTY, agent: 'claude-code' } });
+    await initCommand(root, { hooks: true }, wizard(s.prompter, { ...TTY, agent: 'claude-code' }));
     expect(s.asked).toEqual([]);
     expect(fs.existsSync(path.join(root, 'openspec/sdlc.yaml'))).toBe(true);
   }, 120000);

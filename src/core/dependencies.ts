@@ -63,7 +63,8 @@ const NAMES: Record<DependencyId, string> = {
   codegraph: 'codegraph',
 };
 
-const PROBE_TIMEOUT_MS = 5000;
+/** Long enough for a node-based CLI to print its version on a busy machine. */
+const PROBE_TIMEOUT_MS = 30000;
 
 /** The version of the OpenSpec sdlc ships; undefined when the bundled package cannot be read. */
 function bundledOpenSpecVersion(): string | undefined {
@@ -107,29 +108,61 @@ export function detectDependencies(root: string, probe: Probe = defaultProbe): D
   });
 }
 
-export function defaultProbe(command: string, args: string[], cwd: string): CommandResult {
+/** True when `command` is an executable file in a PATH folder (with a PATHEXT extension on Windows). */
+export function onSearchPath(command: string, env: NodeJS.ProcessEnv = process.env): boolean {
+  const extensions = process.platform === 'win32'
+    ? ['', ...(env.PATHEXT ?? '.COM;.EXE;.BAT;.CMD').split(';').filter(Boolean)]
+    : [''];
+  // A command given as a path (`./node_modules/.bin/sdlc`, an absolute path) is looked at directly.
+  if (/[\\/]/.test(command)) return extensions.some((ext) => isExecutable(path.resolve(`${command}${ext}`)));
+  const folders = (env.PATH ?? env.Path ?? '').split(path.delimiter).map(searchFolder).filter(Boolean);
+  return folders.some((folder) => extensions.some((ext) => isExecutable(path.join(folder, `${command}${ext}`))));
+}
+
+/** A PATH entry without the quotes Windows allows around it. */
+function searchFolder(entry: string): string {
+  return entry.trim().replace(/^"(.*)"$/, '$1');
+}
+
+function isExecutable(file: string): boolean {
   try {
-    const useShell = process.platform === 'win32';
-    const result = useShell
-      ? spawnSync([command, ...args].join(' '), {
-          cwd,
-          encoding: 'utf-8',
-          timeout: PROBE_TIMEOUT_MS,
-          shell: true,
-        })
-      : spawnSync(command, args, {
-          cwd,
-          encoding: 'utf-8',
-          timeout: PROBE_TIMEOUT_MS,
-        });
-    const output = `${result.stdout ?? ''}${result.stderr ?? ''}`;
-    if (result.error) return { ok: false, output: result.error.message };
-    if (result.status !== 0) return { ok: false, output };
-    return { ok: true, output };
-  } catch (error) {
-    return { ok: false, output: error instanceof Error ? error.message : String(error) };
+    if (!fs.statSync(file).isFile()) return false;
+    if (process.platform !== 'win32') fs.accessSync(file, fs.constants.X_OK);
+    return true;
+  } catch {
+    return false;
   }
 }
+
+function spawnProbe(command: string, args: string[], cwd: string, timeout: number) {
+  if (process.platform === 'win32') {
+    return spawnSync([command, ...args].join(' '), { cwd, encoding: 'utf-8', timeout, shell: true });
+  }
+  return spawnSync(command, args, { cwd, encoding: 'utf-8', timeout });
+}
+
+/**
+ * A probe that runs `<command> <args>` with a time limit. A command that does not answer in time is still found when
+ * it is on PATH (B44: node-based tools answered too slowly on a loaded machine and were reported missing); its
+ * output is then empty, so its version stays unknown.
+ */
+export function makeProbe(timeoutMs: number): Probe {
+  return (command, args, cwd) => {
+    try {
+      const result = spawnProbe(command, args, cwd, timeoutMs);
+      const output = `${result.stdout ?? ''}${result.stderr ?? ''}`;
+      const timedOut = (result.error as NodeJS.ErrnoException | undefined)?.code === 'ETIMEDOUT';
+      if (timedOut) return onSearchPath(command) ? { ok: true, output: '' } : { ok: false, output };
+      if (result.error) return { ok: false, output: result.error.message };
+      if (result.status !== 0) return { ok: false, output };
+      return { ok: true, output };
+    } catch (error) {
+      return { ok: false, output: error instanceof Error ? error.message : String(error) };
+    }
+  };
+}
+
+export const defaultProbe: Probe = makeProbe(PROBE_TIMEOUT_MS);
 
 export async function defaultInstaller(command: string[], cwd: string): Promise<CommandResult> {
   const shown = command.join(' ');

@@ -35,6 +35,8 @@ const EXAMPLES: Record<string, string> = {
   'import bmad': 'sdlc import bmad _bmad-output/epic-1 --to-backlog --dry-run --json',
   explore: 'sdlc explore checkout-flow --json',
   trace: 'sdlc trace add-export --json',
+  health: 'sdlc health --json',
+  explain: 'sdlc explain --change add-export --json',
   archive: 'sdlc archive add-export --yes --json',
   openspec: 'sdlc openspec list --specs',
   'mcp serve': 'sdlc mcp serve --project ../claims --project ../billing',

@@ -25,6 +25,7 @@ import { readText } from '../core/fs-utils.js';
 import { readDeferred, type DeferredItem } from '../core/deferred.js';
 import { epicProgress, readBacklog, type BacklogItem } from '../core/backlog.js';
 import { buildChangePage, type ChangePage } from './change-page.js';
+import { collectHealth, healthReport, type FindingDraft, type HealthReport } from '../core/health/index.js';
 
 export interface ReportOptions {
   /** ISO date (YYYY-MM-DD) or timestamp: events and "moved in period" start here. Unset = everything. */
@@ -97,6 +98,11 @@ export interface ReportModel {
   events: LogEntry[];
   layout: LayoutReport;
   deferred: { open: number; items: DeferredItem[] };
+  /**
+   * Project health (B67), light evaluation: the findings in English, and their drafts (catalog references) so the
+   * HTML page renders them in the reader's language. `sdlc health` has every finding.
+   */
+  health: HealthReport & { drafts: FindingDraft[] };
   backlog: {
     counts: { open: number; 'in-progress': number; done: number; dropped: number };
     epics: Array<{ id: string; title: string; goal?: string; total: number; open: number; inProgress: number; done: number; dropped: number }>;
@@ -206,6 +212,11 @@ function periodEvents(root: string, since?: string, change?: string): LogEntry[]
     .slice(-200);
 }
 
+function projectHealth(ctx: ProjectContext): ReportModel['health'] {
+  const drafts = collectHealth(ctx.root, ctx.paths, ctx.config, { light: true });
+  return { ...healthReport(drafts, 'en'), drafts };
+}
+
 /** Builds the model for a loaded project. Read-only. */
 export function buildReport(ctx: ProjectContext, opts: ReportOptions = {}): ReportModel {
   const since = parseSince(opts.since);
@@ -240,5 +251,6 @@ export function buildReport(ctx: ProjectContext, opts: ReportOptions = {}): Repo
     layout: detectLayout(ctx.root, ctx.config.layout),
     deferred: deferredWork(ctx.root),
     backlog: backlogWork(ctx.root),
+    health: projectHealth(ctx),
   };
 }

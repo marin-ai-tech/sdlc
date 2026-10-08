@@ -10,6 +10,7 @@ export const WORKFLOW_IDS = [
   'guide',
   'next',
   'status',
+  'health',
   'adopt',
   'team',
   'backlog',
@@ -26,7 +27,7 @@ export const WORKFLOW_IDS = [
 ] as const;
 export type WorkflowId = (typeof WORKFLOW_IDS)[number];
 
-export const AGENT_IDS = ['verifier', 'reviewer', 'researcher', 'simplifier'] as const;
+export const AGENT_IDS = ['verifier', 'reviewer', 'researcher', 'simplifier', 'health'] as const;
 export type AgentId = (typeof AGENT_IDS)[number];
 
 export interface WorkflowTemplate {

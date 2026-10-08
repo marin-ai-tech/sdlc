@@ -32,6 +32,7 @@ On top of OpenSpec, `sdlc` adds the process parts the playbook asks for:
 - **AI-ready project layout.** `sdlc layout check | scaffold | adapt | convert` checks and builds the documents agents rely on (`AGENTS.md`, `CLAUDE.md`, architecture, conventions, runbook…), maps existing paths, or plans a conversion. `sdlc adopt` drafts settings and roles for an existing project (stack, CI, CODEOWNERS, git authors); `/sdlc:adopt` (`/sdlc-adopt`) fills the documents from the code.
 - **Reports and dashboard.** `sdlc report` (Markdown with Mermaid, JSON or HTML) and `sdlc dashboard` (one offline HTML page) show stages, gates, backlog, deferred work and metrics; an example background process keeps the page current.
 - **Audit and metrics.** `sdlc audit` builds a timeline of who approved what and when, plus the playbook's lead-time and first-pass metrics, how long each gate waited for a person, the reworks with their reasons, and verify attempts until the first pass.
+- **Project health.** `sdlc health` lists findings on flow, quality, discipline and configuration, each with its facts and a recommended improvement (no single score; thresholds under `health` in `sdlc.yaml`); `/sdlc:health` drafts improvements into the backlog for a person to order, and a bad finding shows at the agent's session start and on the dashboard. `sdlc explain --change <id>` says why a change is where it is and what unblocks it.
 - **Native agent UX.** Workflows ask with each tool's question tool (Claude Code AskUserQuestion, OpenCode `question`), mirror `tasks.md` into the tool todo list during `/sdlc:build`, and inject live CLI output into `/sdlc:status`, `/sdlc:next` and `/sdlc:help`. An answer in chat is never an approval — people run human decisions in their own terminal.
 - **Ask the agent how sdlc works.** The guide workflow answers questions about working with sdlc for your project, from short articles that ship with sdlc in English and Russian (`sdlc guide [topic]`); every hook denial names the section that explains it. `sdlc next --me` lists what waits for you, and `sdlc approve --preview` shows what you are about to approve.
 - **Help and Next hints.** `sdlc help [topic]` and `/sdlc:help` catalog workflows and CLI commands with who runs them (agent or person). State-changing commands print a `Next:` hint (who acts next and how; the exact command when a person must act) and add `next` to JSON.
@@ -167,6 +168,8 @@ Everything sdlc writes records the sdlc version and the license the project uses
 | `sdlc validate [--all]` | `openspec validate --strict`, delta target checks, overlaps |
 | `sdlc archive <id> --yes` | re-check gates, then `openspec archive` (delta merge) |
 | `sdlc audit [--change]` | audit trail and metrics |
+| `sdlc health` | project health findings with facts and recommendations |
+| `sdlc explain --change <id>` | why a change is where it is and what unblocks it |
 | `sdlc log [--change] [--limit]` | project log, with the sdlc version and license of each entry |
 | `sdlc license` / `sdlc license set community \| commercial --agreement <id> [--licensee]` | show or record the license the project uses sdlc under (setting it is human-only) |
 | `sdlc doctor` | installation health, including whether the declared license fits the project |

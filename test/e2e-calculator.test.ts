@@ -148,6 +148,7 @@ describe('demo: a team builds a calculator with sdlc (every command)', { timeout
   it('1. setup: install for both tools, check health, get help, make the project AI-ready', () => {
     step('init', 'setup', 'alice', ['init', '--tools', 'claude,opencode', '--statusline'], 'Alice installs sdlc for Claude Code and OpenCode, with the status line.');
     step('doctor', 'setup', 'alice', ['doctor'], 'Installation health.');
+    step('health', 'setup', 'alice', ['health'], 'Process health: findings with facts and a recommendation, no score.');
     step('license', 'setup', 'alice', ['license'], 'Which license the project uses sdlc under.');
     step('help', 'setup', 'bob', ['help'], 'The catalog: workflows, commands, and the decisions only people take.');
     step('guide', 'setup', 'bob', ['guide', 'gates'], 'How sdlc works, from the guide the agent answers from.');
@@ -228,6 +229,7 @@ describe('demo: a team builds a calculator with sdlc (every command)', { timeout
     // 0.11.2 (B56): the rework is answered by a change; re-approving the same spec would need a note.
     const division = '\n## Division by zero\n\nThe till shows "Error" for 10 / 0.\n';
     write(path.join(change('basic-arithmetic'), 'design.md'), `${DESIGN}${division}`);
+    step('explain', 'gates', 'bob', ['explain', '--change', 'basic-arithmetic'], 'Bob asks why the change is back at the spec: the rework, its note and what unblocks it.');
     step('approve-spec-again', 'gates', 'alice', ['approve', 'spec', '--change', 'basic-arithmetic'], 'The design now says what 10 / 0 shows; the spec is approved again.');
     step('approve-plan-again', 'gates', 'bob', ['approve', 'plan', '--change', 'basic-arithmetic'], 'The plan needs its own new approval.');
     commit('alice', 'Rework of the spec, approvals renewed');

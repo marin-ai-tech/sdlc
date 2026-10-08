@@ -2,6 +2,19 @@
 
 All notable changes to sdlc. Versions follow [Semantic Versioning](https://semver.org/); while the major version is 0, a minor version may change behavior.
 
+## 0.11.3 — 2026-10-08
+
+### Added
+- **Project health.** `sdlc health` lists findings on flow, quality, discipline and configuration — long waits on people, stalled changes, old deferred work, first-pass verification, the most common rework reason, plan drift, open findings, trace gaps, frequent waivers, the lite track on behaviour changes, forced archives, repeated approvals, repeated hook denials of one rule, long test locks, missing verification commands, enforcement off or warn, one person holding every role, signing off, stale context packs and doctor problems — each with a level, the facts and a recommended improvement. No single score; thresholds under `health` in `openspec/sdlc.yaml`.
+- **The health workflow** (`/sdlc:health`) and a read-only `sdlc-health` subagent explain the findings and draft improvements as backlog items with source `health`; ordering them stays a person's decision.
+- **Health where people look.** A bad finding shows as one line at the agent's session start, `health.degraded` / `health.recovered` go to the log and to event receivers (both are among the default events), and the dashboard has a health section.
+- **`sdlc explain --change <id>`** says why a change is where it is: the stage, the open gate and its reason, what it waits for, the steps that unblock it and the latest decisions.
+- Guide topic `sdlc guide health`.
+
+### Fixed
+- **A slow tool is no longer reported missing.** `sdlc doctor` (and the init wizard) said "not on PATH" for codegraph or the OpenSpec CLI when they answered `--version` slowly on a busy machine; a tool that is on PATH is now found, and doctor's own PATH check no longer spawns a shell.
+- The init wizard tests no longer run the real dependency installer or the codegraph indexer.
+
 ## 0.11.2 — 2026-10-08
 
 ### Added

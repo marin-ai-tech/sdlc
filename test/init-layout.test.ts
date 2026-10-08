@@ -184,10 +184,14 @@ function scripted(answers: { git?: boolean; layout?: string; worktree?: string }
   return { prompter, asked, said };
 }
 
-/** The real terminal flow with installs answered no and the installer stubbed: a test never runs npm. */
+/**
+ * The real terminal flow with nothing found on PATH and the installer stubbed (B77): a test never runs npm or
+ * codegraph and does not depend on what the machine has installed.
+ */
 function wizardDeps(prompter: Prompter) {
+  const probe = () => ({ ok: false, output: 'not found' });
   const installer = async () => ({ ok: true, output: '' });
-  return { prompter, io: TTY, installer };
+  return { prompter, io: TTY, probe, installer };
 }
 
 function quiet(): void {

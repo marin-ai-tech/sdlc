@@ -8,6 +8,7 @@ import { resolveLocale, setLocale, systemLocale, t } from './core/i18n.js';
 import { appendLog } from './core/log.js';
 import { evaluateToolCall, normalizeToolCall, sessionSummary, stopCheck, type Decision, type ToolCall } from './core/policy.js';
 import { findProjectRoot, projectPaths } from './core/project.js';
+import { sessionHealthLine } from './core/health/signal.js';
 
 /**
  * `sdlc hook <event> [--agent claude|opencode]` - the single policy
@@ -154,8 +155,11 @@ export async function runHook(event: string, agentFlag: string | undefined): Pro
       }
       case 'session-start': {
         if (!config.enforcement.sessionContext) return;
-        const summary = sessionSummary(ctx, (view) => recordAwaiting(root, config, view));
-        if (!summary) return;
+        const overview = sessionSummary(ctx, (view) => recordAwaiting(root, config, view));
+        if (!overview) return;
+        // B67: one line only while a bad health finding exists (light evaluation; never fails the hook).
+        const health = sessionHealthLine(root, paths, config);
+        const summary = health ? `${overview}\n${health}` : overview;
         if (agent === 'opencode') write({ context: summary });
         else write({ hookSpecificOutput: { hookEventName: 'SessionStart', additionalContext: summary } });
         return;

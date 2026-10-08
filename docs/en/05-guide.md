@@ -169,6 +169,12 @@ Record postponed work with `sdlc defer add <title> --why <text> [--change <id>] 
 
 `sdlc takeover --change <id> --note "<why>"` takes a change from the agent: until `sdlc release-control --change <id> --note "<for the agent>"`, the hook denies agent edits in the change folder and in the plan's files (without plan.md, in the whole project), and `next` says to wait for you. The agent sees the hand-back note. Both commands, like rework, are a person's.
 
+### Project health and explaining a change
+
+`sdlc health [--json]` lists findings about the process and its practices: flow (long or overdue waits on people, changes with no activity, old deferred work), quality (first-pass verification, the most common rework reason, plan drift, open review findings, scenarios without a verification row), discipline (frequent waivers, the lite track on behaviour changes, forced archives, repeated approvals, repeated hook denials of one rule, long test locks) and configuration (no verification commands, enforcement off or warn, one person holding every role, signing off, stale context packs, `sdlc doctor` problems). Each finding has a level (`bad`, `warn`, `info`), the facts and a recommendation; there is no single score, and the command always exits 0. `/sdlc:health` explains the findings and drafts the improvements you choose as backlog items (`--source-type health`). While a `bad` finding exists, the agent's session start says so in one line; `health.degraded` and `health.recovered` go to the log and to event receivers; the dashboard has a health section.
+
+`sdlc explain --change <id> [--json]` says why a change is where it is: the stage, the open gate and its reason, what it waits for, the steps that unblock it and the latest decisions. It writes nothing.
+
 ### Trace a change
 
 `sdlc trace <change> [--json]` links the intent, the requirements and scenarios of the delta specs, the tasks, the commits, the verification evidence and the review findings, for an active or archived change, and lists the gaps: a requirement without a scenario, a scenario without evidence, a task without a commit, a finding without a status. A commit belongs to a task through the trailers `SDLC-Change: <id>` and `SDLC-Task: <n.m>`; `/sdlc:build` asks the agent to add them.
@@ -246,6 +252,9 @@ mcp:                          # chapter 10
   servers:                    # the team's MCP servers, laid out into .mcp.json and opencode.json
     build: { type: stdio, command: [npx, -y, corp-build-mcp], env: { CI_TOKEN: "${CI_TOKEN}" }, stages: [build, test] }
     jira:  { type: http, url: https://mcp.corp.example/jira, headers: { Authorization: "Bearer ${JIRA_TOKEN}" }, stages: [plan, deploy] }
+health:                       # thresholds of sdlc health; every key has a default
+  wait_hours: 48              # also: window_days 90, stalled_days 14, deferred_days 30, first_pass_rate 0.5,
+  rework_share: 0.5           #   waiver_share 0.3, reapprovals 3, denials 5, lock_days 7
 log:
   enabled: true               # log in openspec/.sdlc/log.jsonl
   hook_decisions: true        # write hook denials and warnings to the log

@@ -11,8 +11,8 @@ import { humanEnv, REPO_ROOT, runCli, tempDir } from './helpers.js';
  */
 
 const TOPICS = [
-  // 0.11.0 adds `team` (the agent team): a changed requirement.
-  'start', 'lifecycle', 'gates', 'roles', 'team', 'tracks', 'bugfix', 'backlog', 'rework', 'verify', 'review', 'mcp', 'config',
+  // 0.11.0 adds `team` (the agent team), 0.11.3 adds `health`: changed requirements.
+  'start', 'lifecycle', 'gates', 'roles', 'team', 'tracks', 'bugfix', 'backlog', 'rework', 'verify', 'review', 'health', 'mcp', 'config',
   'denials', 'faq',
 ];
 const RULES = [

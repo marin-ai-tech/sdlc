@@ -15,7 +15,7 @@ export const CHANGE_KINDS = ['feature', 'bugfix', 'refactor', 'chore', 'docs', '
 export type ChangeKind = (typeof CHANGE_KINDS)[number];
 export const RISK_LEVELS = ['low', 'medium', 'high'] as const;
 export type RiskLevel = (typeof RISK_LEVELS)[number];
-export const SOURCE_TYPES = ['idea', 'ticket', 'incident', 'alert', 'scan', 'review', 'exploration', 'bmad', 'backlog', 'deferred', 'other'] as const;
+export const SOURCE_TYPES = ['idea', 'ticket', 'incident', 'alert', 'scan', 'review', 'exploration', 'bmad', 'backlog', 'deferred', 'health', 'other'] as const;
 export type SourceType = (typeof SOURCE_TYPES)[number];
 /**
  * `full` runs every gate. `lite` is the fast path for bounded work (a small

@@ -6,6 +6,7 @@ import { archiveCommand, auditCommand, logCommand, validateCommand } from '../co
 import { licenseCommand } from '../commands/license.js';
 import { instructionsCommand, newCommand, nextCommand, statusCommand } from '../commands/changes.js';
 import { doctorCommand } from '../commands/doctor.js';
+import { healthCommand } from '../commands/health.js';
 import { approvalsVerify } from '../commands/approvals.js';
 import { pluginBuildCommand } from '../commands/plugin.js';
 import { approveCommand, rejectCommand, testsCommand, waiveCommand } from '../commands/gates.js';
@@ -38,6 +39,7 @@ import { deliverAfterCommand } from '../mcp/events.js';
 import { nextMeCommand } from '../commands/next-me.js';
 import { approvePreviewCommand } from '../commands/approve-preview.js';
 import { releaseCheckCommand } from '../commands/release.js';
+import { explainCommand } from '../commands/explain.js';
 import { resolveLocale, setLocale, systemLocale, t } from '../core/i18n.js';
 import { applyCommanderLocale, localizeDescriptions, peekLocaleFlag } from './commander-i18n.js';
 import { loadConfig } from '../core/config.js';
@@ -293,6 +295,13 @@ export function buildProgram(): Command {
     .option('--json', 'output JSON')
     .action((opts) => statusCommand(opts));
 
+  program
+    .command('explain')
+    .description(cmdDesc('cmd.explain'))
+    .option('--change <id>', 'change id (defaults to the only active change)')
+    .option('--json', 'output JSON')
+    .action((opts) => explainCommand(opts));
+
   program.command('help [topic]').description(cmdDesc('cmd.help'))
     .option('--json', 'output JSON').action((topic, opts) => helpCommand(topic, opts));
   program.command('guide [topic]').description(cmdDesc('cmd.guide'))
@@ -486,6 +495,12 @@ export function buildProgram(): Command {
     .description(cmdDesc('cmd.doctor'))
     .option('--json', 'output JSON')
     .action((opts) => doctorCommand(opts));
+
+  program
+    .command('health')
+    .description(cmdDesc('cmd.health'))
+    .option('--json', 'output JSON')
+    .action((opts) => healthCommand(opts));
 
   program
     .command('plugin')

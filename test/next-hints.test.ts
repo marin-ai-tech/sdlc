@@ -1,6 +1,7 @@
 import * as path from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { git, humanEnv, initGitRepo, runCli, tempDir, write } from './helpers.js';
+import { parse, stringify } from 'yaml';
+import { git, humanEnv, initGitRepo, read, runCli, tempDir, write } from './helpers.js';
 
 const INTENT = '# Intent: x\n\nAuthor: Pat. Status: draft. Source: idea\n\n## Problem\nP.\n\n## Proposed outcome\nO.\n\n## Affected users and systems\nAll.\n\n## Constraints\nNone\n\n## Success measures\nM.\n\n## Out of scope\nNone\n\n## Open questions\nNone\n';
 
@@ -74,6 +75,12 @@ describe('session start context', () => {
   // and an empty backlog that line is the whole summary.
   it('negative: with no change and an empty backlog it only offers the guide', () => {
     const { root, cli } = project();
+    // 0.11.3 (B67): a project without verification commands has a bad health finding, which adds its own line;
+    // this case is about a healthy idle project, so it gets a check.
+    const file = path.join(root, 'openspec/sdlc.yaml');
+    const config = parse(read(file));
+    config.verify.commands = [{ name: 'ok', run: 'node -e 0', required: true }];
+    write(file, stringify(config));
     const r = cli(['hook', 'session-start'], {}, JSON.stringify({ cwd: root, source: 'startup' }));
     const context = JSON.parse(r.stdout).hookSpecificOutput.additionalContext as string;
     expect(context.split(/\r?\n/)).toHaveLength(1);

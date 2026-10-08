@@ -2,6 +2,7 @@ import type { ReportModel, ReportChange } from './model.js';
 import { PROJECT_URL } from '../core/license.js';
 import { currentLocale, t } from '../core/i18n.js';
 import { STAGES } from '../core/lifecycle.js';
+import { renderFinding } from '../core/health/model.js';
 import { CHANGE_PAGE_CSS, changeAnchor, renderChangePages } from './change-page.js';
 
 const escapeHtml = (value: unknown): string => String(value ?? '').replace(/[&<>"']/g, (character) => ({
@@ -250,6 +251,18 @@ function timeline(model: ReportModel): string {
     + `<h2 id="timeline">${e(t('report.html.timeline'))}</h2>${body}</section>`;
 }
 
+/** The health section (B67): each finding in the reader's language, bad first; a note when there is none. */
+function health(model: ReportModel): string {
+  const findings = model.health.drafts.map((draft) => renderFinding(draft, currentLocale()));
+  const items = findings.map((finding) => `<li class="health-${finding.level}"><strong>`
+    + `${e(t(`health.level.${finding.level}`))}: ${e(finding.title)}</strong>`
+    + `<ul>${finding.facts.map((fact) => `<li>${e(fact)}</li>`).join('')}</ul>`
+    + `<p>${e(finding.recommendation)}</p></li>`).join('');
+  const body = findings.length > 0 ? `<ul class="health">${items}</ul>` : `<p>${e(t('health.none'))}</p>`;
+  return `<section aria-labelledby="health">`
+    + `<h2 id="health">${e(t('report.html.health'))}</h2>${body}</section>`;
+}
+
 function layout(model: ReportModel): string {
   const missing = new Set(model.layout.missingRequired);
   const ready = model.layout.ready ? t('report.html.ready') : t('report.html.notReady');
@@ -285,6 +298,7 @@ export function renderReportHtml(model: ReportModel): string {
     + backlog(model)
     + deferred(model)
     + leadTimes(model)
+    + health(model)
     + timeline(model)
     + layout(model);
   const footer = `${e(t('report.html.footerPrefix'))} `

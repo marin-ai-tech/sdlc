@@ -16,7 +16,9 @@ export interface EventReceiver {
 }
 
 /** The events a receiver gets when its `on` is absent. */
-export const DEFAULT_EVENT_PATTERNS = ['gate.*', 'verify.*', 'change.created', 'change.archived', 'backlog.*'];
+export const DEFAULT_EVENT_PATTERNS = [
+  'gate.*', 'verify.*', 'change.created', 'change.archived', 'backlog.*', 'health.degraded', 'health.recovered',
+];
 
 const HOOK_PREFIX = 'hook.';
 

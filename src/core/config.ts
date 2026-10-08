@@ -1,6 +1,7 @@
 import { parseMinApprovals } from './approval-quorum.js';
 import { parseAutoWaive, type AutoWaive } from './auto-waive.js';
 import { SdlcError } from './errors.js';
+import { parseHealth, serializeHealth, type HealthThresholds } from './health/thresholds.js';
 import { isFile } from './fs-utils.js';
 import { LAYOUT_ROLE_IDS, type LayoutMapping, type LayoutRoleId } from './layout.js';
 import { parseEvents, type EventReceiver } from '../mcp/event-config.js';
@@ -152,6 +153,11 @@ export interface SdlcConfig {
    * skills, read by `sdlc team sync` after the registry. Absent when sdlc.yaml has none; never written back.
    */
   packs?: PackConfig[];
+  /**
+   * Thresholds of `sdlc health` (B65, B68), every one filled in; absent when sdlc.yaml has no `health` block (the
+   * defaults apply). Written back with the values that differ from the defaults only.
+   */
+  health?: HealthThresholds;
 }
 
 export const DEFAULT_TEST_PATHS = [
@@ -495,6 +501,9 @@ export function parseConfig(raw: Raw, file = 'openspec/sdlc.yaml'): SdlcConfig {
   config.rework.reasons = asStringArray(rework?.reasons, where('rework.reasons')) ?? config.rework.reasons;
   config.rework.maxCycles = parseMinApprovals(rework?.max_cycles, where('rework.max_cycles')) ?? DEFAULT_MAX_CYCLES;
 
+  const health = parseHealth(raw.health, where('health'));
+  if (health) config.health = health;
+
   const locale = asString(raw.locale, where('locale'));
   if (locale !== undefined) config.locale = locale;
 
@@ -593,6 +602,7 @@ export function serializeConfig(config: SdlcConfig): Record<string, unknown> {
     log: { enabled: config.log.enabled, hook_decisions: config.log.hookDecisions },
     ...(Object.keys(config.layout).length ? { layout: config.layout } : {}),
     ...serializeRework(config.rework),
+    ...serializeHealth(config.health),
     ...(config.locale ? { locale: config.locale } : {}),
     ...(config.mcp ? { mcp: { serve: config.mcp.serve } } : {}),
   };

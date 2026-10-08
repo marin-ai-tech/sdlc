@@ -119,7 +119,7 @@ export const SLIDES = [
       ru: 'Алиса ставит sdlc для Claude Code и OpenCode; агент готовит репозиторий к работе с ИИ.',
     },
     steps: ['init', 'layout-check', 'layout-scaffold'],
-    more: ['doctor', 'license', 'help', 'guide', 'layout-adapt', 'layout-convert', 'adopt', 'adopt-apply-agent', 'update'],
+    more: ['doctor', 'health', 'license', 'help', 'guide', 'layout-adapt', 'layout-convert', 'adopt', 'adopt-apply-agent', 'update'],
   },
   {
     id: 'explore', layout: 'steps',
@@ -158,7 +158,7 @@ export const SLIDES = [
       ru: 'Агент утверждать не может. Боб не владелец продукта. Алиса утверждает замысел и спецификацию, инженер Боб — план.',
     },
     steps: ['approve-intent-agent', 'approve-intent-bob', 'approve-intent'],
-    more: ['approve-spec', 'approve-plan', 'rework', 'approve-spec-again', 'approve-plan-again'],
+    more: ['approve-spec', 'approve-plan', 'rework', 'explain', 'approve-spec-again', 'approve-plan-again'],
   },
   {
     id: 'openspec-change', layout: 'steps',
@@ -318,6 +318,7 @@ export const SLIDES = [
 export const STEP_NOTE_RU = {
   init: 'Алиса ставит sdlc для Claude Code и OpenCode, со строкой статуса.',
   doctor: 'Проверка установки.',
+  health: 'Здоровье процесса: находки с фактами и рекомендацией, без общей оценки.',
   license: 'Под какой лицензией проект использует sdlc.',
   help: 'Каталог: процессы, команды и решения, которые принимают только люди.',
   guide: 'Как работает sdlc — из справочника, по которому отвечает агент.',
@@ -358,6 +359,7 @@ export const STEP_NOTE_RU = {
   'approve-spec': 'Алиса утверждает спецификацию.',
   'approve-plan': 'Боб, инженер, утверждает план.',
   rework: 'Алиса возвращает изменение на спецификацию с причиной; утверждение плана перестаёт учитываться.',
+  explain: 'Боб спрашивает, почему изменение снова на спецификации: возврат, его заметка и что его разблокирует.',
   'approve-spec-again': 'Спецификация утверждена заново.',
   'approve-plan-again': 'Плану нужно своё новое утверждение.',
   verify: 'Настоящие проверки, записанные доказательства.',
