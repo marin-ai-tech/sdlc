@@ -43,6 +43,16 @@ const GENERATED_NAMES = [
 /** Folders that hold generated files; with them, their parents in the tools' folders. */
 const GENERATED_DIRS = ['.claude/agents', '.claude/skills', '.claude/commands', '.claude/commands/sdlc',
   '.opencode/agents', '.opencode/skills', '.opencode/commands'];
+/**
+ * What a review checks and what an artifact must contain (B75): the review policy in its usual places, the sdlc
+ * schema and OpenSpec's artifact rules. The policy may also live at the path set in `review.policy`, which the
+ * callers pass as an extra guard path.
+ */
+const POLICY_NAMES = [
+  String.raw`(?:docs/|\.github/)?REVIEW\.md`,
+  String.raw`openspec/schemas/sdlc/[^\s'"]+`,
+  String.raw`openspec/config\.yaml`,
+];
 const GUARD_NAMES = [
   String.raw`openspec/sdlc\.yaml`,
   String.raw`openspec/\.sdlc/manifest\.json`,
@@ -52,6 +62,7 @@ const GUARD_NAMES = [
   String.raw`(?:\.opencode/)?opencode\.jsonc?`,
   ROLE_NAME,
   ...GENERATED_NAMES,
+  ...POLICY_NAMES,
 ].join('|');
 
 export const GUARD_FILE = new RegExp(`^(?:${GUARD_NAMES})$`, 'i');
@@ -60,16 +71,22 @@ const TOOL_FOLDERS = [
   String.raw`\.opencode(?:/(?:plugins|agents|skills|commands))?`,
 ].join('|');
 /** Folders whose removal, move or replacement takes guard files with it. */
-const GUARD_FOLDER = new RegExp(`^(?:${TOOL_FOLDERS}|openspec(?:/\\.sdlc)?)$`, 'i');
+const OPENSPEC_FOLDERS = String.raw`openspec(?:/\.sdlc|/schemas(?:/sdlc)?)?`;
+const GUARD_FOLDER = new RegExp(`^(?:${TOOL_FOLDERS}|${OPENSPEC_FOLDERS})$`, 'i');
 /** The same, while accepted roles are on disk: their folders too. */
-const GUARD_ROLE_FOLDER = new RegExp(`^(?:${TOOL_FOLDERS}|openspec(?:/\\.sdlc)?|docs(?:/agents)?)$`, 'i');
+const GUARD_ROLE_FOLDER = new RegExp(`^(?:${TOOL_FOLDERS}|${OPENSPEC_FOLDERS}|docs(?:/agents)?)$`, 'i');
 /** The guard files at fixed places; `.claude/settings.<name>.json` files are also read from disk. */
 const FIXED_GUARD_FILES = [
   'openspec/sdlc.yaml', 'openspec/.sdlc/manifest.json', '.claude/settings.json', '.claude/settings.local.json',
   '.opencode/plugins/sdlc.js', '.mcp.json', 'opencode.json', 'opencode.jsonc', '.opencode/opencode.json',
-  '.opencode/opencode.jsonc',
+  '.opencode/opencode.jsonc', 'REVIEW.md', 'docs/REVIEW.md', '.github/REVIEW.md', 'openspec/config.yaml',
+  'openspec/schemas/sdlc/schema.yaml',
 ];
-const GUARD_FOLDERS = ['.claude', '.opencode', '.opencode/plugins', 'openspec', 'openspec/.sdlc', ...GENERATED_DIRS];
+const GUARD_FOLDERS = [
+  '.claude', '.opencode', '.opencode/plugins', 'openspec', 'openspec/.sdlc',
+  'openspec/schemas', 'openspec/schemas/sdlc',
+  ...GENERATED_DIRS,
+];
 /** A guard path as a word of its own: after a space, a quote, `=`, `(`, `,` or `>`, optionally after `./`. */
 const PATH_START = String.raw`(?:^|[\s'"=(,>])(?:\./)?`;
 const PATH_END = String.raw`(?=$|[\s'";&|),<>])`;
@@ -190,13 +207,38 @@ function guardSet(root: string): ProtectedSet {
   return { file: patterns.file, folder: withSkillDirs(folder, patterns.skillDirs), candidates: guardCandidates };
 }
 
-/** Guard files an edit writes: by path (root-relative `rels`), through a symbolic link or a hard link. */
-export function guardEditHits(files: string[], rels: string[], root: string, cwd: string): string[] {
+/** Root-relative paths set in the configuration (e.g. `review.policy`), as one exact, case-insensitive pattern. */
+function extraPattern(extra: readonly string[]): RegExp | undefined {
+  const rels = extra.map((rel) => rel.replace(/\\/g, '/').replace(/^\.\//, '')).filter((rel) => rel !== '');
+  if (rels.length === 0) return undefined;
+  const escaped = rels.map((rel) => rel.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
+  return new RegExp(`^(?:${escaped.join('|')})$`, 'i');
+}
+
+/** The configured guard paths a write hits: by path, through a link, or (shell) by a write op on them. */
+function extraEditHits(files: string[], rels: string[], root: string, cwd: string, extra: readonly string[]) {
+  const pattern = extraPattern(extra);
+  if (!pattern) return [];
+  return [...rels.filter((rel) => pattern.test(rel)), ...linkedFiles(files, root, cwd, pattern)];
+}
+
+/**
+ * Guard files an edit writes: by path (root-relative `rels`), through a symbolic link or a hard link; `extra` adds the
+ * root-relative paths the configuration names (the review policy).
+ */
+export function guardEditHits(
+  files: string[],
+  rels: string[],
+  root: string,
+  cwd: string,
+  extra: readonly string[] = [],
+): string[] {
   const file = patternsFor(root).file;
   return [
     ...rels.filter((rel) => file.test(rel)),
     ...linkedFiles(files, root, cwd, file),
     ...hardLinkedFiles(files, root, cwd, guardFiles),
+    ...extraEditHits(files, rels, root, cwd, extra),
   ];
 }
 
@@ -211,9 +253,21 @@ function textHits(command: string, cwd: string, patterns: GuardPatterns): string
   return hits;
 }
 
-/** Guard files and folders a shell command writes, deletes, moves or replaces. */
-export function shellGuardWrites(command: string, root: string, cwd: string): string[] {
-  return [...shellWrites(command, root, cwd, guardSet(root)), ...textHits(command, cwd, patternsFor(root))];
+/** The configured guard paths a shell command writes (`extra`, e.g. the review policy). */
+function extraShellHits(command: string, root: string, cwd: string, extra: readonly string[]): string[] {
+  const pattern = extraPattern(extra);
+  if (!pattern) return [];
+  const set: ProtectedSet = { file: pattern, folder: /^$/, candidates: () => [...extra] };
+  return shellWrites(command, root, cwd, set);
+}
+
+/** Guard files and folders a shell command writes, deletes, moves or replaces; `extra` as for `guardEditHits`. */
+export function shellGuardWrites(command: string, root: string, cwd: string, extra: readonly string[] = []): string[] {
+  return [
+    ...shellWrites(command, root, cwd, guardSet(root)),
+    ...textHits(command, cwd, patternsFor(root)),
+    ...extraShellHits(command, root, cwd, extra),
+  ];
 }
 
 /** A path in a team skill's folder (not a generated `sdlc-*` skill). */

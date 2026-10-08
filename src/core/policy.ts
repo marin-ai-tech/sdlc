@@ -228,7 +228,12 @@ function evaluateCommand(command: string, ctx: PolicyContext, env: NodeJS.Proces
   const stateDenial = stateWriteDenial(spelled, ctx, cwd);
   if (stateDenial) return stateDenial;
   // The guard's own configuration (B41): the files that switch the rules on; also the user-level ones (B42).
-  const guardHits = [...shellGuardWrites(spelled, ctx.paths.root, cwd), ...userShellGuardWrites(spelled, cwd, env)];
+  // The review policy may live where `review.policy` says (B75).
+  const policy = [ctx.config.review.policy];
+  const guardHits = [
+    ...shellGuardWrites(spelled, ctx.paths.root, cwd, policy),
+    ...userShellGuardWrites(spelled, cwd, env),
+  ];
   const guard = guardDenial(guardHits);
   if (guard) return guard;
   // A key or token the command writes (B16): a shell write has no reliable target, so no exemption applies.
@@ -287,7 +292,8 @@ function evaluateRules(call: ToolCall, ctx: PolicyContext): Decision {
   }
   // User-level agent settings (B42) lie outside the project: checked on the absolute paths, before `rels` alone.
   const userHits = userGuardEditHits(call.files, call.cwd, env);
-  const guard = guardDenial([...guardEditHits(call.files, rels, paths.root, call.cwd), ...userHits]);
+  const policy = [config.review.policy];
+  const guard = guardDenial([...guardEditHits(call.files, rels, paths.root, call.cwd, policy), ...userHits]);
   if (guard) return guard;
   if (rels.length === 0) return { decision: 'allow' };
 

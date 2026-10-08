@@ -32,8 +32,9 @@ writes.
 ## guard-config
 
 Hard rule. The file configures the guard itself: `openspec/sdlc.yaml`, `.claude/settings*.json`, the OpenCode plugin,
-`.mcp.json`, `opencode.json`, the manifest, the user's agent settings, the accepted team roles in `docs/agents/`, and
-the files sdlc generates for the agents (`sdlc-*` subagents, workflow skills and commands). **Do:** ask a person to make the change;
+`.mcp.json`, `opencode.json`, the manifest, the user's agent settings, the accepted team roles in `docs/agents/`,
+the files sdlc generates for the agents (`sdlc-*` subagents, workflow skills and commands), the review policy
+(`REVIEW.md` or `review.policy`), the sdlc schema and `openspec/config.yaml`. **Do:** ask a person to make the change;
 `sdlc update` restores generated files.
 
 ## separation-of-duties

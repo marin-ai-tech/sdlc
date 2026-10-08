@@ -98,8 +98,10 @@ describe('the guard configuration', () => {
 
   it('negative: reading it, other files and files of the same name elsewhere stay allowed', () => {
     const p = project('warn');
+    // openspec/config.yaml (OpenSpec's artifact rules) became a guard file in 0.11.1 (B75), a changed requirement;
+    // test/policy-review-guard.test.ts covers it.
     for (const file of ['src/app.js', 'src/opencode.json', 'docs/sdlc.yaml', '.claude/agents/reviewer.md',
-      '.opencode/plugins/other.js', 'openspec/config.yaml']) {
+      '.opencode/plugins/other.js']) {
       expect(p.edit(file).decision, file).toBe('allow');
     }
     for (const command of ['cat openspec/sdlc.yaml', 'grep mode openspec/sdlc.yaml', 'ls .claude',

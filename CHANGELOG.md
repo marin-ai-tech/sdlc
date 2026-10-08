@@ -2,6 +2,11 @@
 
 All notable changes to sdlc. Versions follow [Semantic Versioning](https://semver.org/); while the major version is 0, a minor version may change behavior.
 
+## 0.11.1 — 2026-10-07
+
+### Fixed
+- **Agents cannot weaken the review policy or the artifact rules.** The review policy (`REVIEW.md`, its usual places, or the path in `review.policy`), the sdlc schema in `openspec/schemas/sdlc/` and OpenSpec's `openspec/config.yaml` are guard files: an agent's edits and shell writes are denied, also in `warn` mode; `sdlc init` and `sdlc layout scaffold` still write them. The adopt workflow proposes policy changes to the person instead of editing.
+
 ## 0.11.0 — 2026-10-07
 
 ### Added

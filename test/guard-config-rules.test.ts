@@ -18,7 +18,8 @@ describe('guard files', () => {
     for (const rel of guard) {
       expect(GUARD_FILE.test(rel), rel).toBe(true);
     }
-    for (const rel of ['src/opencode.json', 'docs/sdlc.yaml', '.claude/agents/x.md', 'openspec/config.yaml']) {
+    // openspec/config.yaml became a guard file in 0.11.1 (B75), a changed requirement.
+    for (const rel of ['src/opencode.json', 'docs/sdlc.yaml', '.claude/agents/x.md']) {
       expect(GUARD_FILE.test(rel), rel).toBe(false);
     }
   });
