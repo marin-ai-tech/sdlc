@@ -2,15 +2,18 @@ import type { SdlcConfig } from '../core/config.js';
 import type { HarnessStamp } from '../core/license.js';
 import type { RoleFile } from '../team/role-file.js';
 
-export const TOOL_IDS = ['claude', 'opencode'] as const;
+/** The agent tools sdlc integrates with; `cursor` since 0.13.0 (B80). */
+export const TOOL_IDS = ['claude', 'opencode', 'cursor'] as const;
 export type ToolId = (typeof TOOL_IDS)[number];
+/** The tools of a new project where none is detected: Cursor is chosen, never assumed (0.13.0 keeps the default). */
+export const DEFAULT_TOOLS: readonly ToolId[] = ['claude', 'opencode'];
 
 export interface GeneratedFile {
   /** Posix path relative to the project root. */
   path: string;
   content: string;
   tool: ToolId | 'shared';
-  kind: 'skill' | 'command' | 'agent' | 'plugin' | 'schema' | 'team-skill';
+  kind: 'skill' | 'command' | 'agent' | 'plugin' | 'schema' | 'team-skill' | 'rule';
   /** Unix mode for executable files. */
   mode?: number;
 }

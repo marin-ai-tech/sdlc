@@ -3,7 +3,8 @@
  * `CLAUDECODE=1`; the OpenCode CLI exports `OPENCODE=1` and `AGENT=1` to its
  * process tree (OpenCode desktop was seen without them, 2026-10), and the
  * harness's OpenCode plugin adds `SDLC_AGENT` to agent shells (`shell.env`) —
- * the marker that does not depend on the OpenCode client.
+ * the marker that does not depend on the OpenCode client. Cursor's agent terminals export `CURSOR_AGENT=1`
+ * (documented for the Cursor CLI, not confirmed for the IDE; B80): separation of duties in Cursor rests on it.
  * Used to keep human-only decisions (gate approvals) out of agent sessions.
  *
  * Keep in sync: the prepare-commit-msg git hook (src/integrations/git-hook.ts, B24) checks the same markers in the
@@ -14,6 +15,7 @@ export function agentEnvironment(env: NodeJS.ProcessEnv = process.env): string |
   if (env.CLAUDECODE === '1') return 'claude-code';
   if (env.OPENCODE === '1') return 'opencode';
   if (env.AGENT === '1') return 'agent';
+  if (env.CURSOR_AGENT === '1') return 'cursor';
   return undefined;
 }
 

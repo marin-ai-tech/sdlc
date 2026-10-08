@@ -43,6 +43,8 @@ const SCRIPT_LINES = [
   '  agent="opencode"',
   'elif [ "${AGENT:-}" = "1" ]; then',
   '  agent="agent"',
+  'elif [ "${CURSOR_AGENT:-}" = "1" ]; then',
+  '  agent="cursor"',
   'fi',
   '[ -n "$agent" ] || exit 0',
   '# Only a plain name goes into the trailer (the same rule as agent-env.ts).',

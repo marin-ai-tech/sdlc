@@ -28,7 +28,7 @@ import {
   uninstallIntegrations,
   type InstallResult,
 } from '../integrations/install.js';
-import type { ToolId } from '../integrations/types.js';
+import { DEFAULT_TOOLS, type ToolId } from '../integrations/types.js';
 import { installGitHook, removeGitHook, type GitHookResult } from '../integrations/git-hook.js';
 import { gitHookJson, printGitHookInstall, printGitHookRemoval } from './git-hook-output.js';
 import { agentEnvironment } from '../core/agent-env.js';
@@ -178,6 +178,7 @@ function printInstall(result: InstallResult, config: SdlcConfig): void {
     if (result.claudeHooks !== 'absent' && result.claudeHooks !== 'unchanged') {
     line(t('init.claudeHooks', { state: stateLabel(result.claudeHooks) }));
   }
+  printCursorHooks(result);
   printMcp(result);
   if (result.tools.length > 0) {
     line();
@@ -370,7 +371,7 @@ function writeSettings(root: string, opts: InitOptions): Settings {
   const detected = detectTools(root);
   const fallback: ToolId[] = config.tools.length > 0
     ? (config.tools.filter((t) => t in ADAPTERS) as ToolId[])
-    : detected.length > 0 ? detected : ['claude', 'opencode'];
+    : detected.length > 0 ? detected : [...DEFAULT_TOOLS];
   const tools = parseTools(opts.tools, fallback);
   config.tools = tools;
   config.delivery = assertDelivery(opts.delivery) ?? config.delivery;
@@ -398,6 +399,17 @@ function mcpSetting(config: SdlcConfig, wanted: boolean | undefined): SdlcConfig
 function mcpJson(result: InstallResult): Record<string, unknown> {
   const servers = Object.keys(result.servers).length > 0 ? { mcpServers: result.servers } : {};
   return { ...(Object.keys(result.mcp).length > 0 ? { mcp: result.mcp } : {}), ...servers };
+}
+
+/** Cursor's hooks (B80), when they changed. */
+function printCursorHooks(result: InstallResult): void {
+  if (result.cursorHooks === 'absent' || result.cursorHooks === 'unchanged') return;
+  line(t('init.cursorHooks', { state: stateLabel(result.cursorHooks) }));
+}
+
+/** The `cursorHooks` part of a JSON answer: only when the Cursor hooks file was looked at (B80). */
+function cursorHooksJson(result: InstallResult): Record<string, unknown> {
+  return result.cursorHooks === 'absent' ? {} : { cursorHooks: result.cursorHooks };
 }
 
 /** One line per MCP file whose `sdlc` entry changed, and one per file whose registry entries changed. */
@@ -461,6 +473,7 @@ function initJson(o: InitOutcome): Record<string, unknown> {
     tools: o.tools,
     files: result.files,
     claudeHooks: result.claudeHooks,
+    ...cursorHooksJson(result),
     statusLine: result.statusLine,
     ...mcpJson(result),
     ...gitHookJson(o.root, o.gitHook),
@@ -539,7 +552,8 @@ export async function updateCommand(target: string | undefined, opts: UpdateOpti
       const { files, claudeHooks } = result;
       const hook = gitHookJson(root, gitHook);
       const dryRun = !!opts.dryRun;
-      printJson({ root, tools, dryRun, files, claudeHooks, ...mcpJson(result), ...hook, harness: stamp });
+      const cursor = cursorHooksJson(result);
+      printJson({ root, tools, dryRun, files, claudeHooks, ...cursor, ...mcpJson(result), ...hook, harness: stamp });
       return;
     }
     line(c.bold(t(opts.dryRun ? 'update.would' : 'update.done', { root })) + c.dim(` (${stampTextLocalized(stamp)})`));
@@ -578,11 +592,14 @@ export async function uninstallCommand(target: string | undefined, opts: { force
     }
     if (opts.json) {
       const { files, claudeHooks } = result;
-      printJson({ root, dryRun: !!opts.dryRun, files, claudeHooks, ...mcpJson(result), ...gitHookJson(root, gitHook) });
+      const cursor = cursorHooksJson(result);
+      const hook = gitHookJson(root, gitHook);
+      printJson({ root, dryRun: !!opts.dryRun, files, claudeHooks, ...cursor, ...mcpJson(result), ...hook });
       return;
     }
     line(c.bold(t(opts.dryRun ? 'uninstall.would' : 'uninstall.done', { root })));
     line(t('uninstall.filesRemoved', { removed: result.files.removed.length, hooks: stateLabel(result.claudeHooks) }));
+    printCursorHooks(result);
     printMcp(result);
     printGitHookRemoval(root, gitHook);
     for (const kept of result.files.kept) warn(t('uninstall.keptEdited', { path: kept }));

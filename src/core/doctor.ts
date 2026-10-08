@@ -17,6 +17,7 @@ import { harnessVersion } from './version.js';
 import { readYamlObject } from './yaml-io.js';
 import { readManifest, sha256 } from '../integrations/manifest.js';
 import { SETTINGS_PATH } from '../integrations/settings.js';
+import { CURSOR_HOOKS_PATH, cursorHooksInstalled } from '../integrations/cursor-hooks.js';
 import { CHAIN_LINE, CHAIN_SUFFIX, inspectGitHook } from '../integrations/git-hook.js';
 
 /**
@@ -174,10 +175,26 @@ function integrationChecks(out: Checks, root: string, config: SdlcConfig): void 
     const plugin = isFile(path.join(root, '.opencode', 'plugins', 'sdlc.js')) ? 'ok' : 'warn';
     out.add('opencode plugin', plugin, '.opencode/plugins/sdlc.js', tt('doctor.fix.update'));
   }
+  if (config.tools.includes('cursor')) cursorCheck(out, root);
   const cliBin = config.cli.split(/\s+/)[0];
   const on = onPath(cliBin);
   const message = tt(on ? 'doctor.cliOnPath' : 'doctor.cliNotOnPath', { bin: cliBin, cli: config.cli });
   out.add('cli on PATH', on ? 'ok' : 'warn', message, tt('doctor.fix.cli', { install: INSTALL_COMMAND }));
+}
+
+/**
+ * Cursor (B80): sdlc's hooks in `.cursor/hooks.json`, and always a warning: separation of duties in Cursor rests on
+ * `CURSOR_AGENT` (an agent's terminal without it runs person-only commands as a person); on Windows Cursor runs the
+ * hooks through PowerShell.
+ */
+function cursorCheck(out: Checks, root: string): void {
+  const { tt } = out;
+  const installed = cursorHooksInstalled(root);
+  const key = installed ? 'doctor.cursorHooksInstalled' : 'doctor.cursorHooksMissing';
+  const parts = [tt(key, { path: CURSOR_HOOKS_PATH }), tt('doctor.cursorAgent')];
+  if (process.platform === 'win32') parts.push(tt('doctor.cursorWindows'));
+  const fix = installed ? tt('doctor.fix.cursorAgent') : tt('doctor.fix.update');
+  out.add('cursor', 'warn', parts.join('; '), fix);
 }
 
 function projectConfigChecks(out: Checks, root: string, paths: ProjectPaths, config: SdlcConfig): void {

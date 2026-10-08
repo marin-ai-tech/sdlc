@@ -1,4 +1,4 @@
-# sdlc — AI-native SDLC harness for Claude Code and OpenCode, built on OpenSpec
+# sdlc — AI-native SDLC harness for Claude Code, OpenCode and Cursor, built on OpenSpec
 
 `sdlc` runs the lifecycle from Anthropic's [AI-Native SDLC playbook](https://claude.com/blog/the-ai-native-sdlc-playbook) inside your coding agent:
 
@@ -33,6 +33,7 @@ On top of OpenSpec, `sdlc` adds the process parts the playbook asks for:
 - **Reports and dashboard.** `sdlc report` (Markdown with Mermaid, JSON or HTML) and `sdlc dashboard` (one offline HTML page) show stages, gates, backlog, deferred work and metrics; an example background process keeps the page current.
 - **Audit and metrics.** `sdlc audit` builds a timeline of who approved what and when, plus the playbook's lead-time and first-pass metrics, how long each gate waited for a person, the reworks with their reasons, and verify attempts until the first pass.
 - **Process hygiene.** A rework must lead to a change (re-approving the same content needs a note), a gate sent back too often goes to a person (`rework.max_cycles`), approvals come with a commit trailer that `sdlc approvals verify` finds, the evidence says what was not run and lists screenshots, and `gates.<gate>.auto_waive` waives the intent, spec or plan gate for kinds or tracks a person chose.
+- **Cursor IDE.** `sdlc init --tools cursor` sets up skills, commands, subagents, a rule, the MCP server and Cursor's own hooks, which deny edits before the plan and a person's decisions in the agent's shell. See [docs/en/15-cursor.md](docs/en/15-cursor.md).
 - **Traceability and audit.** `sdlc audit --export` bundles the evidence for auditors, `sdlc changelog` writes release notes from the delta specs, commits made in agent sessions carry `SDLC-Agent` and the audit shows their share, an optional debate lens records both sides of a key design decision, and an example writes a daily summary file. See [docs/en/14-traceability.md](docs/en/14-traceability.md).
 - **People in the process.** A person answers the open questions of an intent or a design with `sdlc answer` before the gate can be approved; the audit and the dashboard compare the people's decisions the track planned with what happened; newcomers take `sdlc guide tour`.
 - **Project health.** `sdlc health` lists findings on flow, quality, discipline and configuration, each with its facts and a recommended improvement (no single score; thresholds under `health` in `sdlc.yaml`); `/sdlc:health` drafts improvements into the backlog for a person to order, and a bad finding shows at the agent's session start and on the dashboard. `sdlc explain --change <id>` says why a change is where it is and what unblocks it. See [docs/en/13-process-health.md](docs/en/13-process-health.md).
@@ -47,7 +48,7 @@ On top of OpenSpec, `sdlc` adds the process parts the playbook asks for:
 ```bash
 npm install -g https://github.com/marin-ai-tech/sdlc/releases/latest/download/sdlc.tgz   # the latest release: `sdlc` and the OpenSpec it drives
 cd your-project && git init               # a git repository is expected
-sdlc init --tools claude,opencode         # or: --tools claude | --tools opencode
+sdlc init --tools claude,opencode         # or: --tools claude | opencode | cursor
 sdlc doctor
 ```
 

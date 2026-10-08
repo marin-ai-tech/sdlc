@@ -7,7 +7,9 @@
  * to disk and run later) is not followed. A marker set to anything but `1` counts as cleared, because the CLI then
  * no longer sees an agent; `SDLC_AGENT` counts only when it becomes empty.
  */
-const NAME = String.raw`(?:CLAUDECODE|OPENCODE|SDLC_AGENT|AGENT)`;
+const NAME = String.raw`(?:CLAUDECODE|OPENCODE|SDLC_AGENT|CURSOR_AGENT|AGENT)`;
+/** The markers agent-env.ts reads; test/git-hook-sync.test.ts keeps the three lists (here, agent-env, git hook) equal. */
+export const AGENT_MARKERS = ['CLAUDECODE', 'OPENCODE', 'SDLC_AGENT', 'CURSOR_AGENT', 'AGENT'];
 const END = String.raw`(?!\w)`;
 const VALUE = String.raw`(?<value>"[^"]*"|'[^']*'|[^\s;&|)]*)`;
 /** Options of `env` before the one that drops the whole environment (`env -i`, `env -`). */
@@ -84,7 +86,7 @@ function coversMarker(name: string): boolean {
   const source = name.replace(/[.+^${}()|\\]/g, '\\$&').replace(/\*/g, '.*').replace(/\?/g, '.');
   try {
     const pattern = new RegExp(`^${source}$`, 'i');
-    return ['CLAUDECODE', 'OPENCODE', 'SDLC_AGENT', 'AGENT'].some((marker) => pattern.test(marker));
+    return AGENT_MARKERS.some((marker) => pattern.test(marker));
   } catch {
     return true;
   }
@@ -99,7 +101,7 @@ function removesEnvItems(command: string): boolean {
   return false;
 }
 
-/** True when a shell command (sh or PowerShell) unsets or blanks CLAUDECODE, OPENCODE, AGENT or SDLC_AGENT. */
+/** True when a shell command (sh or PowerShell) unsets or blanks an agent marker (see AGENT_MARKERS). */
 export function clearsAgentMarker(command: string): boolean {
   if (CLEARS.some((pattern) => pattern.test(command)) || removesEnvItems(command)) {
     return true;

@@ -16,5 +16,6 @@ Research and design of the SDLC harness for Claude Code and OpenCode, built on O
 12. [The agent team](12-agent-team.md)
 13. [Process hygiene and project health: capabilities and use cases](13-process-health.md)
 14. [Traceability and audit: use cases](14-traceability.md)
+15. [Cursor IDE: setup, what is enforced, use cases](15-cursor.md)
 
 In short: **OpenSpec is the specification subsystem** (deltas, living specs, validation, archive), and **`sdlc` is the process layer** that follows the Anthropic playbook. It adds stages, gates with human approvals, verification evidence, review, release gates, an audit trail, and deterministic enforcement through hooks (Claude Code) and a plugin (OpenCode).

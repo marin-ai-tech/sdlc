@@ -10,6 +10,7 @@ import { linkedFiles, shellWrites, writeSegments, type ProtectedSet } from './po
  * hooks, the OpenCode plugin, the MCP servers, the ownership manifest) are protected like the state files: an agent
  * that could edit them could switch every rule off. Rule `guard-config` is a hard rule (it denies in `warn` too;
  * only `off`, a person's choice, allows); the sdlc CLI still writes these files (`sdlc init`, `sdlc update`).
+ * Cursor (B80): `.cursor/hooks.json` and `.cursor/mcp.json`, and the generated `.cursor` files, are guard files too.
  *
  * Covered: an edit by path, through a symbolic link or through a hard link; a shell write by the same machinery as
  * the state files (path, bare name after `cd`, glob, link, `git -C`), a folder op on the folders that hold them,
@@ -35,14 +36,17 @@ const ROLE_DIR = 'docs/agents';
  * The team's own agents and skills (names without the `sdlc` prefix) stay open.
  */
 const GENERATED_NAMES = [
-  String.raw`\.(?:claude|opencode)/agents/sdlc-[^/\s'"]+\.md`,
-  String.raw`\.(?:claude|opencode)/skills/sdlc-[^/\s'"]+/[^\s'"]+`,
+  String.raw`\.(?:claude|opencode|cursor)/agents/sdlc-[^/\s'"]+\.md`,
+  String.raw`\.(?:claude|opencode|cursor)/skills/sdlc-[^/\s'"]+/[^\s'"]+`,
   String.raw`\.claude/commands/sdlc/[^\s'"]+`,
-  String.raw`\.opencode/commands/sdlc-[^/\s'"]+\.md`,
+  String.raw`\.(?:opencode|cursor)/commands/sdlc-[^/\s'"]+\.md`,
+  // Cursor (B80): the rule every agent reads.
+  String.raw`\.cursor/rules/sdlc\.mdc`,
 ];
 /** Folders that hold generated files; with them, their parents in the tools' folders. */
 const GENERATED_DIRS = ['.claude/agents', '.claude/skills', '.claude/commands', '.claude/commands/sdlc',
-  '.opencode/agents', '.opencode/skills', '.opencode/commands'];
+  '.opencode/agents', '.opencode/skills', '.opencode/commands',
+  '.cursor/agents', '.cursor/skills', '.cursor/commands', '.cursor/rules'];
 /**
  * What a review checks and what an artifact must contain (B75): the review policy in its usual places, the sdlc
  * schema and OpenSpec's artifact rules. The policy may also live at the path set in `review.policy`, which the
@@ -60,6 +64,9 @@ const GUARD_NAMES = [
   String.raw`\.opencode/plugins/sdlc\.js`,
   String.raw`\.mcp\.json`,
   String.raw`(?:\.opencode/)?opencode\.jsonc?`,
+  // Cursor (B80): its hooks and its MCP servers.
+  String.raw`\.cursor/hooks\.json`,
+  String.raw`\.cursor/mcp\.json`,
   ROLE_NAME,
   ...GENERATED_NAMES,
   ...POLICY_NAMES,
@@ -69,6 +76,7 @@ export const GUARD_FILE = new RegExp(`^(?:${GUARD_NAMES})$`, 'i');
 const TOOL_FOLDERS = [
   String.raw`\.claude(?:/(?:agents|skills|commands(?:/sdlc)?))?`,
   String.raw`\.opencode(?:/(?:plugins|agents|skills|commands))?`,
+  String.raw`\.cursor(?:/(?:agents|skills|commands|rules))?`,
 ].join('|');
 /** Folders whose removal, move or replacement takes guard files with it. */
 const OPENSPEC_FOLDERS = String.raw`openspec(?:/\.sdlc|/schemas(?:/sdlc)?)?`;
@@ -80,10 +88,10 @@ const FIXED_GUARD_FILES = [
   'openspec/sdlc.yaml', 'openspec/.sdlc/manifest.json', '.claude/settings.json', '.claude/settings.local.json',
   '.opencode/plugins/sdlc.js', '.mcp.json', 'opencode.json', 'opencode.jsonc', '.opencode/opencode.json',
   '.opencode/opencode.jsonc', 'REVIEW.md', 'docs/REVIEW.md', '.github/REVIEW.md', 'openspec/config.yaml',
-  'openspec/schemas/sdlc/schema.yaml',
+  'openspec/schemas/sdlc/schema.yaml', '.cursor/hooks.json', '.cursor/mcp.json',
 ];
 const GUARD_FOLDERS = [
-  '.claude', '.opencode', '.opencode/plugins', 'openspec', 'openspec/.sdlc',
+  '.claude', '.opencode', '.opencode/plugins', '.cursor', 'openspec', 'openspec/.sdlc',
   'openspec/schemas', 'openspec/schemas/sdlc',
   ...GENERATED_DIRS,
 ];

@@ -5,7 +5,16 @@ import { readAsset } from './assets.js';
  * `.claude/skills/`), so a skill body only uses references that work in both
  * tools; command bodies can use the slash syntax of their own tool.
  */
-export type Surface = 'skill' | 'plugin-skill' | 'claude-command' | 'opencode-command' | 'claude-agent' | 'opencode-agent';
+export type Surface = 'skill' | 'plugin-skill' | 'claude-command' | 'opencode-command' | 'claude-agent'
+  | 'opencode-agent' | CursorSurface;
+
+/** Cursor (B80, 0.13.0): its own skills, commands and subagents under `.cursor/`. */
+export type CursorSurface = 'cursor-skill' | 'cursor-command' | 'cursor-agent';
+
+/** Cursor's commands and skills cannot inject a command's output into the prompt (`!\`cmd\``). */
+function isCursor(surface: Surface): surface is CursorSurface {
+  return surface.startsWith('cursor-');
+}
 
 export interface RenderOptions {
   surface: Surface;
@@ -25,6 +34,9 @@ export function commandRef(id: string, surface: Surface): string {
   return `\`/sdlc-${id}\``;
 }
 
+const CURSOR_PLAN_MODE = 'In Cursor, prefer Plan mode: explore read-only and present the plan for acceptance '
+  + 'before writing plan.md. Otherwise edit only plan.md and tasks.md in this workflow.';
+
 const PLAN_MODE: Record<Surface, string> = {
   'skill':
     'In Claude Code, prefer plan mode: explore read-only and present the plan for acceptance before writing plan.md. In OpenCode, use the plan agent or stay read-only until plan.md is written.',
@@ -36,6 +48,9 @@ const PLAN_MODE: Record<Surface, string> = {
     'Use the plan agent for exploration (or stay read-only); write only plan.md and tasks.md in this workflow.',
   'claude-agent': '',
   'opencode-agent': '',
+  'cursor-skill': CURSOR_PLAN_MODE,
+  'cursor-command': CURSOR_PLAN_MODE,
+  'cursor-agent': '',
 };
 
 const ASK: Record<Surface, string> = {
@@ -45,6 +60,9 @@ const ASK: Record<Surface, string> = {
   'opencode-command': 'the `question` tool',
   'claude-agent': 'ask the user, offering choices',
   'opencode-agent': 'ask the user, offering choices',
+  'cursor-skill': 'a question to the user in the chat, offering numbered choices',
+  'cursor-command': 'a question to the user in the chat, offering numbered choices',
+  'cursor-agent': 'ask the user, offering choices',
 };
 
 const TODO: Record<Surface, string> = {
@@ -54,6 +72,9 @@ const TODO: Record<Surface, string> = {
   'opencode-command': '`todowrite`',
   'claude-agent': 'a task list',
   'opencode-agent': 'a task list',
+  'cursor-skill': "the agent's to-do list",
+  'cursor-command': "the agent's to-do list",
+  'cursor-agent': 'a task list',
 };
 
 /** Rewrites `sdlc ` invocations to the configured CLI prefix (for `npx --no-install sdlc` pins). */
@@ -65,12 +86,15 @@ export function applyCliPrefix(text: string, cli: string): string {
 export function renderBody(body: string, options: RenderOptions): string {
   const { surface } = options;
   const isCommand = surface === 'claude-command' || surface === 'opencode-command';
+  const input = surface === 'cursor-command'
+    ? 'the text after the command (a change id, or a description of the work)'
+    : "the user's request (a change id, or a description of the work)";
   let out = body;
   if (out.includes('{{contract}}')) {
     out = out.replace('{{contract}}', readAsset('workflows', '_contract.md').trim());
   }
   out = out
-    .replace(/\{\{input\}\}/g, isCommand ? '$ARGUMENTS' : "the user's request (a change id, or a description of the work)")
+    .replace(/\{\{input\}\}/g, isCommand ? '$ARGUMENTS' : input)
     .replace(/\{\{cmd:<workflow>\}\}/g, surface === 'claude-command' || surface === 'plugin-skill' ? '`/sdlc:<workflow>`' : '`/sdlc-<workflow>`')
     .replace(/\{\{cmd:([a-z-]+)\}\}/g, (_m, id: string) => commandRef(id, surface))
     .replace(/\{\{skill:<workflow>\}\}/g, surface === 'plugin-skill' ? '`sdlc:<workflow>`' : '`sdlc-<workflow>`')
@@ -79,7 +103,7 @@ export function renderBody(body: string, options: RenderOptions): string {
     .replace(/\{\{tool:todo\}\}/g, TODO[surface])
     .replace(/\{\{inject:([^}]+)\}\}/g, (_m, args: string) => {
       const command = `${options.cli} ${args}`;
-      if (surface.endsWith('-agent')) return `Run \`${command}\`.`;
+      if (surface.endsWith('-agent') || isCursor(surface)) return `Run \`${command}\`.`;
       return `!\`${command}\`\nIf the output above is missing, run \`${command}\`.`;
     })
     .replace(/\{\{plan-mode\}\}/g, PLAN_MODE[surface])

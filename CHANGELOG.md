@@ -2,6 +2,11 @@
 
 All notable changes to sdlc. Versions follow [Semantic Versioning](https://semver.org/); while the major version is 0, a minor version may change behavior.
 
+## 0.13.0 — 2026-10-08
+
+### Added
+- **Cursor IDE as a tool.** `sdlc init --tools cursor` writes the workflows as skills (`.cursor/skills/sdlc-*`) with thin commands, the subagents, an always-applied rule about the process, the sdlc MCP server (`--mcp`) and Cursor's own hooks (`.cursor/hooks.json`): edits before the plan is approved and a person's decisions in the agent's shell are denied, protected files stay protected, the session starts with the change and who acts next. `CURSOR_AGENT=1` marks the agent's terminal, so `sdlc approve` refuses there, and commits from it carry `SDLC-Agent: cursor`. `sdlc doctor` checks the hooks and says that separation of duties in Cursor rests on that marker, and on Windows that Git Bash terminals can break Cursor's hooks. See [Cursor IDE](docs/en/15-cursor.md).
+
 ## 0.12.0 — 2026-10-08
 
 ### Added

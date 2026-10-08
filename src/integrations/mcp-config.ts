@@ -11,7 +11,8 @@ import type { ToolId } from './types.js';
  * Registers `sdlc mcp serve` (B13) in the agents' MCP configuration, merged like the Claude Code hooks: other
  * servers and keys stay, a missing file is created, invalid JSON is an error naming the file (never overwritten).
  * - claude: `.mcp.json` -> `mcpServers.sdlc = { type: "stdio", command, args }`;
- * - opencode: `opencode.json` -> `mcp.sdlc = { type: "local", command: [command, ...args], enabled: true }`.
+ * - opencode: `opencode.json` -> `mcp.sdlc = { type: "local", command: [command, ...args], enabled: true }`;
+ * - cursor (B80): `.cursor/mcp.json` -> `mcpServers.sdlc = { command, args }`.
  * Only the `sdlc` entry is ever written or removed, and only while `mcp.serve` is true (uninstall removes it).
  */
 
@@ -22,6 +23,8 @@ interface McpTarget {
   /** The key holding the servers in that file. */
   key: string;
   entry: (launch: McpLaunch) => Record<string, unknown>;
+  /** Reported only when something happened to it (Cursor, 0.13.0: the other tools' answers stay as they were). */
+  quiet?: boolean;
 }
 
 export interface McpLaunch {
@@ -41,6 +44,12 @@ const TARGETS: Record<ToolId, McpTarget> = {
     file: 'opencode.json',
     key: 'mcp',
     entry: (l) => ({ type: 'local', command: [l.command, ...l.args], enabled: true }),
+  },
+  cursor: {
+    file: '.cursor/mcp.json',
+    key: 'mcpServers',
+    entry: (l) => ({ command: l.command, args: l.args }),
+    quiet: true,
   },
 };
 
@@ -126,6 +135,12 @@ function unregister(root: string, target: McpTarget, dryRun: boolean): McpChange
   return 'removed';
 }
 
+/** Records a file's change; a quiet target's `absent` is left out. */
+function report(changes: Record<string, McpChange>, target: McpTarget, change: McpChange): void {
+  if (target.quiet && change === 'absent') return;
+  changes[target.file] = change;
+}
+
 /**
  * While `mcp.serve` is true: registers the server for each configured tool and removes our entry for a tool that
  * is no longer configured. `serve: false` removes our entries; without an `mcp` block nothing is read or written.
@@ -143,7 +158,8 @@ export function applyMcpRegistration(
   const changes: Record<string, McpChange> = {};
   for (const [tool, target] of Object.entries(TARGETS) as Array<[ToolId, McpTarget]>) {
     const wanted = tools.includes(tool);
-    changes[target.file] = wanted ? register(root, target, launch, dryRun) : unregister(root, target, dryRun);
+    const change = wanted ? register(root, target, launch, dryRun) : unregister(root, target, dryRun);
+    report(changes, target, change);
   }
   return changes;
 }
@@ -151,6 +167,6 @@ export function applyMcpRegistration(
 /** `sdlc uninstall`: removes only the `sdlc` entries, whatever sdlc.yaml says. Keyed by file. */
 export function removeMcpRegistration(root: string, dryRun = false): Record<string, McpChange> {
   const changes: Record<string, McpChange> = {};
-  for (const target of Object.values(TARGETS)) changes[target.file] = unregister(root, target, dryRun);
+  for (const target of Object.values(TARGETS)) report(changes, target, unregister(root, target, dryRun));
   return changes;
 }

@@ -6,6 +6,8 @@ import { generatedNotice, harnessStamp, type HarnessStamp } from '../core/licens
 import { harnessPackageDir } from '../core/openspec-schema.js';
 import { harnessVersion } from '../core/version.js';
 import { claudeAdapter } from './claude.js';
+import { cursorAdapter } from './cursor.js';
+import { CURSOR_HOOKS_PATH, mergeCursorHooks } from './cursor-hooks.js';
 import { applyFiles, type ApplyReport } from './manifest.js';
 import { opencodeAdapter } from './opencode.js';
 import { applyMcpRegistration, removeMcpRegistration, type McpChange } from './mcp-config.js';
@@ -20,6 +22,7 @@ import { TOOL_IDS, type GeneratedFile, type RenderContext, type ToolAdapter, typ
 export const ADAPTERS: Record<ToolId, ToolAdapter> = {
   claude: claudeAdapter,
   opencode: opencodeAdapter,
+  cursor: cursorAdapter,
 };
 
 export function parseTools(value: string | undefined, fallback: ToolId[]): ToolId[] {
@@ -77,6 +80,8 @@ export interface InstallResult {
   tools: ToolId[];
   files: ApplyReport;
   claudeHooks: SettingsChange;
+  /** sdlc's entries in `.cursor/hooks.json` (B80); `absent` when Cursor is not a tool and the file has none. */
+  cursorHooks: SettingsChange;
   statusLine: string;
   /** The `sdlc` MCP server entry per file (B13); empty when nothing MCP-related was touched. */
   mcp: Record<string, McpChange>;
@@ -107,9 +112,33 @@ export function installIntegrations(
   const statusLine = tools.includes('claude') || fs.existsSync(path.join(root, '.claude', 'settings.json'))
     ? mergeClaudeStatusLine(root, config.cli, tools.includes('claude') && config.statusline, options.dryRun)
     : 'absent';
+  const cursorHooks = applyCursorHooks(root, config.cli, tools, options);
   const mcp = applyMcpRegistration(root, config, tools, options.dryRun);
   const servers = applyRegistryServers(root, config.mcp?.servers ?? [], tools, options.dryRun);
-  return { tools, files: report, claudeHooks, statusLine, mcp, servers };
+  return { tools, files: report, claudeHooks, cursorHooks, statusLine, mcp, servers };
+}
+
+/** Cursor's hooks while Cursor is a tool (and hooks are wanted); sdlc's entries go when it no longer is. */
+function applyCursorHooks(
+  root: string,
+  cli: string,
+  tools: ToolId[],
+  options: { dryRun?: boolean; hooks?: boolean },
+): SettingsChange {
+  const wanted = tools.includes('cursor') && options.hooks !== false;
+  if (!tools.includes('cursor') && !fs.existsSync(path.join(root, CURSOR_HOOKS_PATH))) return 'absent';
+  return mergeCursorHooks(root, cli, wanted, options.dryRun);
+}
+
+/** The `.cursor` folder once sdlc's files are gone from it, if nothing of the person's own is left. */
+function pruneCursorFolder(root: string, dryRun: boolean | undefined): void {
+  const dir = path.join(root, '.cursor');
+  if (dryRun || !isDirectory(dir)) return;
+  try {
+    if (fs.readdirSync(dir).length === 0) fs.rmdirSync(dir);
+  } catch {
+    // Best effort: a folder that cannot be read or removed stays.
+  }
 }
 
 /**
@@ -121,7 +150,7 @@ export function refreshGeneratedFiles(root: string, config: SdlcConfig): ApplyRe
   return applyFiles(root, renderAll(ctx), { version: ctx.version, license: ctx.stamp.license });
 }
 
-/** Removes every generated file (unless edited) and the Claude hooks. Planning data is never touched. */
+/** Removes every generated file (unless edited), the Claude and Cursor hooks. Planning data is never touched. */
 export function uninstallIntegrations(root: string, options: { force?: boolean; dryRun?: boolean } = {}): InstallResult {
   const report = applyFiles(root, [], {
     force: options.force,
@@ -135,7 +164,11 @@ export function uninstallIntegrations(root: string, options: { force?: boolean; 
   const statusLine = fs.existsSync(path.join(root, '.claude', 'settings.json'))
     ? mergeClaudeStatusLine(root, 'sdlc', false, options.dryRun)
     : 'absent';
+  const cursorHooks = fs.existsSync(path.join(root, CURSOR_HOOKS_PATH))
+    ? mergeCursorHooks(root, 'sdlc', false, options.dryRun)
+    : 'absent';
   const mcp = removeMcpRegistration(root, options.dryRun);
   const servers = removeRegistryServers(root, options.dryRun);
-  return { tools: [], files: report, claudeHooks, statusLine, mcp, servers };
+  pruneCursorFolder(root, options.dryRun);
+  return { tools: [], files: report, claudeHooks, cursorHooks, statusLine, mcp, servers };
 }

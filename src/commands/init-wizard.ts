@@ -49,7 +49,7 @@ import { isFile } from '../core/fs-utils.js';
 import type { GitIdentity } from '../core/git.js';
 import { projectPaths } from '../core/project.js';
 import { ADAPTERS } from '../integrations/install.js';
-import { TOOL_IDS, type ToolId } from '../integrations/types.js';
+import { DEFAULT_TOOLS, TOOL_IDS, type ToolId } from '../integrations/types.js';
 import type { InitOptions } from './setup.js';
 import { t } from '../core/i18n.js';
 import { askLayoutChoices, layoutSummaryLines, type LayoutChoices } from './init-layout.js';
@@ -272,7 +272,7 @@ export function initDefaults(root: string, detected: ToolId[], probe?: Probe): I
     };
   } else {
     base = {
-      tools: detected.length > 0 ? detected : [...TOOL_IDS],
+      tools: detected.length > 0 ? detected : [...DEFAULT_TOOLS],
       mode: 'warn',
       statusline: false,
       opsx: false,

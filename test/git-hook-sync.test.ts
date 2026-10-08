@@ -3,6 +3,7 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { agentEnvironment } from '../src/core/agent-env.js';
+import { AGENT_MARKERS } from '../src/core/policy-markers.js';
 import { installGitHook, renderGitHook } from '../src/integrations/git-hook.js';
 import { humanEnv, initGitRepo, REPO_ROOT, tempDir, write } from './helpers.js';
 
@@ -45,8 +46,16 @@ describe('B24: the git hook and agent-env.ts check the same markers', () => {
     const source = fs.readFileSync(path.join(REPO_ROOT, 'src', 'core', 'agent-env.ts'), 'utf-8');
     const fromSource = firstSeen(source, /\benv\.([A-Z_]+)/g);
     const fromHook = firstSeen(renderGitHook(), /\$\{([A-Z_]+):-\}/g);
-    expect(fromSource).toEqual(['SDLC_AGENT', 'CLAUDECODE', 'OPENCODE', 'AGENT']);
+    // 0.13.0 adds cursor: CURSOR_AGENT is checked last (B80).
+    expect(fromSource).toEqual(['SDLC_AGENT', 'CLAUDECODE', 'OPENCODE', 'AGENT', 'CURSOR_AGENT']);
     expect(fromHook).toEqual(fromSource);
+  });
+
+  // Review of 0.13.0: the agent-marker rule must know every marker agent-env.ts reads, or clearing one passes.
+  it('the agent-marker rule covers the same markers', () => {
+    const source = fs.readFileSync(path.join(REPO_ROOT, 'src', 'core', 'agent-env.ts'), 'utf-8');
+    const fromSource = firstSeen(source, /\benv\.([A-Z_]+)/g);
+    expect([...AGENT_MARKERS].sort()).toEqual([...fromSource].sort());
   });
 
   it('the hook names the agent agentEnvironment() names, and none where it names none', () => {

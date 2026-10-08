@@ -9,10 +9,12 @@ import { appendLog } from './core/log.js';
 import { evaluateToolCall, normalizeToolCall, sessionSummary, stopCheck, type Decision, type ToolCall } from './core/policy.js';
 import { findProjectRoot, projectPaths } from './core/project.js';
 import { sessionHealthLine } from './core/health/signal.js';
+import { cursorAllow, cursorDefault, cursorDeny, fromCursor, type CursorInput } from './hook-cursor.js';
 
 /**
- * `sdlc hook <event> [--agent claude|opencode]` - the single policy
- * dispatcher behind Claude Code hooks and the OpenCode plugin.
+ * `sdlc hook <event> [--agent claude|opencode|cursor]` - the single policy
+ * dispatcher behind Claude Code hooks, the OpenCode plugin and Cursor's
+ * `.cursor/hooks.json` (B80; its input and answers in hook-cursor.ts).
  *
  * Reads the tool call JSON on stdin and answers in the caller's format. It
  * fails open: a missing project, a harness that is not initialized, or any
@@ -26,7 +28,7 @@ import { sessionHealthLine } from './core/health/signal.js';
  * lets the call through there.
  */
 type HookEvent = 'pre-tool' | 'session-start' | 'stop';
-type Agent = 'claude' | 'opencode';
+type Agent = 'claude' | 'opencode' | 'cursor';
 
 interface HookInput {
   session_id?: string;
@@ -44,7 +46,11 @@ async function readStdin(): Promise<string> {
   return Buffer.concat(chunks).toString('utf-8');
 }
 
+/** Whether this run already answered (Cursor gets a default answer otherwise). */
+let answered = false;
+
 function write(obj: unknown): void {
+  answered = true;
   process.stdout.write(`${JSON.stringify(obj)}\n`);
 }
 
@@ -75,8 +81,25 @@ function hookReason(decision: Decision): string {
   return `${text} ${t('hook.guideHint', { section })}`;
 }
 
+/** Cursor's answer: deny, or allow with the warning once per conversation (like the Claude Code reminder). */
+function respondCursor(decision: Decision, sessionId: string | undefined): boolean {
+  if (decision.decision === 'allow') {
+    write(cursorAllow());
+    return false;
+  }
+  const reason = hookReason(decision);
+  if (decision.decision === 'deny') {
+    write(cursorDeny(reason));
+    return true;
+  }
+  const first = firstTimeThisSession(sessionId, decision.rule ?? 'warn');
+  write(cursorAllow(first ? reason : undefined));
+  return first;
+}
+
 /** Answers the agent; returns true when a denial or a (first) warning was delivered. */
 function respondPreTool(agent: Agent, decision: Decision, sessionId: string | undefined): boolean {
+  if (agent === 'cursor') return respondCursor(decision, sessionId);
   if (decision.decision === 'allow') {
     if (agent === 'opencode') write({ decision: 'allow' });
     return false;
@@ -121,60 +144,99 @@ function applyHookLocale(configLocale: string | undefined): void {
   }));
 }
 
+function agentOf(flag: string | undefined): Agent {
+  return flag === 'opencode' || flag === 'cursor' ? flag : 'claude';
+}
+
+/** The session-start context in the agent's format. */
+function writeContext(agent: Agent, summary: string): void {
+  if (agent === 'opencode') write({ context: summary });
+  else if (agent === 'cursor') write({ additional_context: summary });
+  else write({ hookSpecificOutput: { hookEventName: 'SessionStart', additionalContext: summary } });
+}
+
+/** The stop reminder in the agent's format; Cursor sends a follow-up message to the agent. */
+function writeStop(agent: Agent, message: string): void {
+  if (agent === 'opencode') write({ decision: 'warn', reason: message });
+  else if (agent === 'cursor') write({ followup_message: `[sdlc] ${message}` });
+  else write({ decision: 'block', reason: `[sdlc] ${message}` });
+}
+
 export async function runHook(event: string, agentFlag: string | undefined): Promise<void> {
-  const agent: Agent = agentFlag === 'opencode' ? 'opencode' : 'claude';
-  let input: HookInput = {};
+  const agent = agentOf(agentFlag);
+  answered = false;
+  await dispatch(event, agent);
+  if (agent === 'cursor' && !answered) write(cursorDefault(event));
+}
+
+async function readInput(agent: Agent): Promise<HookInput | undefined> {
   try {
     const raw = await readStdin();
-    input = raw.trim() ? (JSON.parse(raw) as HookInput) : {};
+    const parsed = raw.trim() ? (JSON.parse(raw) as HookInput) : {};
+    return agent === 'cursor' ? fromCursor(parsed as CursorInput) : parsed;
   } catch {
-    return;
+    return undefined;
   }
-  try {
-    const cwd = input.cwd ?? process.env.CLAUDE_PROJECT_DIR ?? process.cwd();
-    const root = findProjectRoot(cwd);
-    if (!root) return;
-    const paths = projectPaths(root);
-    if (!isFile(paths.sdlcConfig)) return;
-    const config = loadConfig(paths.sdlcConfig);
-    applyHookLocale(config.locale);
-    const ctx = { paths, config };
+}
 
-    switch (event as HookEvent) {
-      case 'pre-tool': {
-        const call = normalizeToolCall(String(input.tool_name ?? ''), input.tool_input ?? {}, cwd);
-        const decision = evaluateToolCall(call, ctx);
-        if (respondPreTool(agent, decision, input.session_id) && config.log.hookDecisions) {
-          appendLog(root, config, {
-            event: decision.decision === 'deny' ? 'hook.denied' : 'hook.warned',
-            agent,
-            detail: decisionDetail(root, call, decision),
-          });
-        }
-        return;
-      }
-      case 'session-start': {
-        if (!config.enforcement.sessionContext) return;
-        const overview = sessionSummary(ctx, (view) => recordAwaiting(root, config, view));
-        if (!overview) return;
-        // B67: one line only while a bad health finding exists (light evaluation; never fails the hook).
-        const health = sessionHealthLine(root, paths, config);
-        const summary = health ? `${overview}\n${health}` : overview;
-        if (agent === 'opencode') write({ context: summary });
-        else write({ hookSpecificOutput: { hookEventName: 'SessionStart', additionalContext: summary } });
-        return;
-      }
-      case 'stop': {
-        if (input.stop_hook_active) return;
-        const message = stopCheck(ctx);
-        if (!message) return;
-        if (agent === 'opencode') write({ decision: 'warn', reason: message });
-        else write({ decision: 'block', reason: `[sdlc] ${message}` });
-        return;
-      }
-      default:
-        return;
-    }
+/** The project the hook runs for, with its configuration; undefined outside an initialized project (fail open). */
+interface HookProject {
+  cwd: string;
+  root: string;
+  paths: ReturnType<typeof projectPaths>;
+  config: ReturnType<typeof loadConfig>;
+}
+
+function hookProject(input: HookInput): HookProject | undefined {
+  const cwd = input.cwd ?? process.env.CLAUDE_PROJECT_DIR ?? process.cwd();
+  const root = findProjectRoot(cwd);
+  if (!root) return undefined;
+  const paths = projectPaths(root);
+  if (!isFile(paths.sdlcConfig)) return undefined;
+  const config = loadConfig(paths.sdlcConfig);
+  applyHookLocale(config.locale);
+  return { cwd, root, paths, config };
+}
+
+function preTool(agent: Agent, input: HookInput, project: HookProject): void {
+  const { root, config } = project;
+  const call = normalizeToolCall(String(input.tool_name ?? ''), input.tool_input ?? {}, project.cwd);
+  const decision = evaluateToolCall(call, { paths: project.paths, config });
+  const logged = !(input as { skip_log?: boolean }).skip_log;
+  if (respondPreTool(agent, decision, input.session_id) && config.log.hookDecisions && logged) {
+    appendLog(root, config, {
+      event: decision.decision === 'deny' ? 'hook.denied' : 'hook.warned',
+      agent,
+      detail: decisionDetail(root, call, decision),
+    });
+  }
+}
+
+function sessionStart(agent: Agent, project: HookProject): void {
+  const { root, paths, config } = project;
+  if (!config.enforcement.sessionContext) return;
+  const overview = sessionSummary({ paths, config }, (view) => recordAwaiting(root, config, view));
+  if (!overview) return;
+  // B67: one line only while a bad health finding exists (light evaluation; never fails the hook).
+  const health = sessionHealthLine(root, paths, config);
+  writeContext(agent, health ? `${overview}\n${health}` : overview);
+}
+
+function stop(agent: Agent, input: HookInput, project: HookProject): void {
+  if (input.stop_hook_active) return;
+  const message = stopCheck({ paths: project.paths, config: project.config });
+  if (message) writeStop(agent, message);
+}
+
+async function dispatch(event: string, agent: Agent): Promise<void> {
+  const input = await readInput(agent);
+  if (!input) return;
+  try {
+    const project = hookProject(input);
+    if (!project) return;
+    if ((event as HookEvent) === 'pre-tool') preTool(agent, input, project);
+    else if ((event as HookEvent) === 'session-start') sessionStart(agent, project);
+    else if ((event as HookEvent) === 'stop') stop(agent, input, project);
   } catch (error) {
     if (process.env.SDLC_HOOK_DEBUG) {
       process.stderr.write(`sdlc hook error: ${error instanceof Error ? error.stack : String(error)}\n`);
