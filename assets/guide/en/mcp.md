@@ -8,7 +8,7 @@ sdlc works with MCP in both directions. Nothing over MCP makes a decision.
 
 ## sdlc as a server
 
-`sdlc init --mcp` registers `sdlc mcp serve` for Claude Code (`.mcp.json`) and OpenCode (`opencode.json`). Other
+`sdlc init --mcp` registers `sdlc mcp serve` for Claude Code (`.mcp.json`), OpenCode (`opencode.json`) and Cursor (`.cursor/mcp.json`). Other
 systems — an orchestrator, a chat client, an IDE assistant — then read the process with the tools `status`, `next`,
 `instructions`, `trace`, `audit`, `help` and `guide`. Each answers what the CLI prints with `--json`.
 
@@ -26,7 +26,7 @@ mcp:
     jira:  { type: http, url: https://mcp.corp.example/jira, headers: { Authorization: "Bearer ${JIRA_TOKEN}" }, stages: [plan, deploy] }
 ```
 
-- `sdlc update` writes them into `.mcp.json` and `opencode.json`; secrets only as `${VAR}`.
+- `sdlc update` writes them into `.mcp.json` and `opencode.json` (not yet into Cursor's); secrets only as `${VAR}`.
 - `sdlc mcp check` lists each server's tools and warns about servers that can write files.
 - `stages` say when the agent may call a server; outside them the hook denies (block) or reminds (warn).
 

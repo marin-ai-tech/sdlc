@@ -1,6 +1,6 @@
 # Documentation (English)
 
-Research and design of the SDLC harness for Claude Code and OpenCode, built on OpenSpec. 
+Research and design of the SDLC harness for Claude Code, OpenCode and Cursor, built on OpenSpec. 
 
 1. [OpenSpec: principles, internals, integration with Claude Code and OpenCode](01-openspec-analysis.md)
 2. [The Anthropic AI-Native SDLC playbook, mapped to OpenSpec](02-sdlc-playbook.md)

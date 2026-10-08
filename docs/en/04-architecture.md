@@ -2,7 +2,7 @@
 
 ## 4.1. The idea in one paragraph
 
-**OpenSpec is the specification subsystem, and SDLC is the process layer around it.** All spec operations (creating a change, artifact instructions, validation, delta merge) are performed by unmodified OpenSpec (the `@fission-ai/openspec` dependency, ≥ 1.13.2) through its documented JSON contract. On top of this, the harness adds the stages of the Anthropic playbook, gates with human approvals, verification evidence, review, release gates, audit and deterministic enforcement, identically for Claude Code and OpenCode.
+**OpenSpec is the specification subsystem, and SDLC is the process layer around it.** All spec operations (creating a change, artifact instructions, validation, delta merge) are performed by unmodified OpenSpec (the `@fission-ai/openspec` dependency, ≥ 1.13.2) through its documented JSON contract. On top of this, the harness adds the stages of the Anthropic playbook, gates with human approvals, verification evidence, review, release gates, audit and deterministic enforcement, identically for Claude Code, OpenCode and Cursor.
 
 ```
 ┌──────────────────────────── agents ─────────────────────────────┐
@@ -35,7 +35,7 @@
 | File | Owner | Contents |
 |---|---|---|
 | `openspec/config.yaml` | OpenSpec | default schema, `context`, `rules`; the harness respects them and passes them into the instructions |
-| `openspec/sdlc.yaml` | harness | gates (with `min_approvals`), `rework.reasons`, roles, verification commands, review policy, release commands, enforcement, `cli`, `tools` |
+| `openspec/sdlc.yaml` | harness | gates (with `min_approvals`, `auto_waive`), `rework.reasons` and `max_cycles`, roles, verification commands, review policy, release commands, enforcement, `questions`, `design` (debate lens), `health` thresholds, `cli`, `tools` (claude, opencode, cursor) |
 | `openspec/explorations/<slug>.md` | agent + people | optional research and pressure test before intent; a change cites it with `--source-type exploration --source-ref openspec/explorations/<slug>.md` |
 | `openspec/deferred-work.md` | team | registry of deferred decisions and findings (`D<n>`) |
 | `openspec/roles.yaml` | people (maintainers) | optional: people (emails, SSH signing keys), roles, separation rules, signing mode; agents cannot edit it |
@@ -43,7 +43,7 @@
 | `openspec/changes/<id>/sources/bmad/` | importer | retained BMAD source artifacts for an imported change |
 | `openspec/schemas/sdlc/**` | harness → OpenSpec | schema and artifact templates |
 | `openspec/changes/<id>/{intent,proposal,design,plan,tasks}.md`, `specs/**` | agent + people | artifacts (OpenSpec format) |
-| `openspec/changes/<id>/.sdlc.yaml` | **CLI only** | `version` (2 when the record holds a rework or a takeover, else 1), kind, risk, track, `track_suggestion`, source, approvals with digests (and `person` when `roles.yaml` exists; each decision carries `seq`, its order in the record), reworks (`gates.<g>.rework`), `takeover` while a person holds the change, verify result, event history |
+| `openspec/changes/<id>/.sdlc.yaml` | **CLI only** | `version` (3 when the record holds answers to open questions, 2 when it holds a rework or a takeover, else 1), kind (with `kind_by_agent` when an agent chose it), risk, track, `track_suggestion`, source, approvals with digests (and `person` when `roles.yaml` exists; each decision carries `seq`, its order in the record), reworks (`gates.<g>.rework` with its `cycle`), policy waivers (`waived.by: policy`), `answers` (a person's answers with the exact question text), `takeover` while a person holds the change, verify result, event history |
 | `refs/sdlc/<change>/<gate>` (git) | **CLI only** | checkpoint: a snapshot commit of the working tree when the gate was approved, for `rework --reset`; branches and HEAD are never moved |
 | `…/verification.md` | CLI + verifier | automatic evidence block (generated) + behavioral table by scenario |
 | `…/review.md` | reviewer | findings `### F<n> [severity][pass] …` with statuses and `## Coverage` for passes and lenses |
@@ -121,14 +121,16 @@ See chapter 10 for the user's view.
 |---|---|---|
 | Workflows | skills `.claude/skills/sdlc-<id>/SKILL.md` (`/sdlc-<id>`) + commands `.claude/commands/sdlc/<id>.md` (`/sdlc:<id>`) | commands `.opencode/commands/sdlc-<id>.md` (`/sdlc-<id>`), `$ARGUMENTS`, no `agent:` |
 | Skills | `.claude/skills/` | **the same files**: OpenCode reads `.claude/skills/`. `.opencode/skills/` is used only if Claude is not selected (otherwise: duplicate names and a random winner) |
-| Subagents | `.claude/agents/sdlc-{verifier,reviewer,researcher,simplifier}.md` (`tools: Read, Grep, Glob, Bash`) | `.opencode/agents/sdlc-*.md` (`mode: subagent`, a `permission` map; a Claude-style `tools:` line would break OpenCode startup) |
+| Subagents | `.claude/agents/sdlc-{verifier,reviewer,researcher,simplifier,health,advocate}.md` (`tools: Read, Grep, Glob, Bash`) | `.opencode/agents/sdlc-*.md` (`mode: subagent`, a `permission` map; a Claude-style `tools:` line would break OpenCode startup) |
 | Rules | hooks in `.claude/settings.json` | plugin `.opencode/plugins/sdlc.js` |
 | Distribution | project-level install **or** the Claude Code plugin from this repository's marketplace (`/plugin install sdlc@sdlc`) | project-level install |
 | Question tool | AskUserQuestion (2–4 choices) | `question` (choices + free text) |
 | Todo list | TodoWrite mirrors `tasks.md` during `/sdlc:build` (`tasks.md` stays the source of truth) | `todowrite` mirrors `tasks.md` during `/sdlc-build` |
 | Live CLI injection | inline live output of `sdlc … --json` in `/sdlc:status`, `/sdlc:next`, `/sdlc:help` via the tool `!` injection (fallback: run the same command) | same `!` injection form |
 
-Fifteen workflows: `help`, `guide`, `team`, `next`, `status`, `explore`, `intent`, `spec`, `plan`, `build`, `verify`, `review`, `release`, `archive`, `triage`. The bodies are intentionally short (3–5 KB versus 10–22 KB in OpenSpec). The agent gets state, templates and instructions from the CLI at run time (`sdlc status/next/instructions --json`).
+**Cursor (0.13.0).** Workflows as skills `.cursor/skills/sdlc-<id>/SKILL.md` with thin commands `.cursor/commands/sdlc-<id>.md` (`/sdlc-<id>`), subagents `.cursor/agents/sdlc-*.md` (`readonly`), an always-applied rule `.cursor/rules/sdlc.mdc`, the MCP server in `.cursor/mcp.json`, and hooks in `.cursor/hooks.json` (sessionStart, preToolUse without a matcher and `failClosed`, beforeShellExecution, stop) that call `sdlc hook <event> --agent cursor`; `src/hook-cursor.ts` maps Cursor's payloads (the project from `workspace_roots`; a Delete checked as `rm -r`) and answers in Cursor's format, always with JSON. `CURSOR_AGENT=1` marks the agent's terminal. See [15. Cursor IDE](15-cursor.md).
+
+Eighteen workflows: `help`, `guide`, `next`, `status`, `health`, `adopt`, `team`, `backlog`, `explore`, `intent`, `spec`, `plan`, `build`, `verify`, `review`, `release`, `archive`, `triage`. The bodies are intentionally short (3–5 KB versus 10–22 KB in OpenSpec). The agent gets state, templates and instructions from the CLI at run time (`sdlc status/next/instructions --json`).
 
 Templates are written once (`assets/workflows/*.md`) and rendered for each surface. `{{cmd:x}}` references become `/sdlc:x` or `/sdlc-x`, `{{input}}` becomes `$ARGUMENTS` or a description, and `sdlc` becomes the configured prefix (`npx --no-install sdlc` for a local install).
 

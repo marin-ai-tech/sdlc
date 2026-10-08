@@ -21,6 +21,7 @@ sdlc init --mcp            # or answer "yes" to the MCP question in the init wiz
 
 - `.mcp.json` (Claude Code): `mcpServers.sdlc = { "type": "stdio", "command": "sdlc", "args": ["mcp", "serve"] }`
 - `opencode.json` (OpenCode): `mcp.sdlc = { "type": "local", "command": ["sdlc", "mcp", "serve"], "enabled": true }`
+- `.cursor/mcp.json` (Cursor): `mcpServers.sdlc = { "command": "sdlc", "args": ["mcp", "serve"] }`
 
 Other servers in those files are kept. `sdlc update` keeps the entry; `sdlc uninstall` removes only the `sdlc` entry. With `cli: npx --no-install sdlc`, the command becomes `npx` and the arguments `--no-install sdlc mcp serve`.
 
@@ -67,6 +68,8 @@ mcp:
 | `type: stdio`, `command`, `env` | `type: stdio`, `command`, `args`, `env` | `type: local`, `command` (array), `environment` |
 | `type: http`, `url`, `headers` | `type: http`, `url`, `headers` | `type: remote`, `url`, `headers` |
 | `${VAR}` | `${VAR}` | `{env:VAR}` |
+
+Cursor gets the sdlc server in `.cursor/mcp.json`; the team's registry is not laid out for Cursor yet (planned), so add those servers to `.cursor/mcp.json` by hand for now.
 
 sdlc remembers which entries it wrote. A server removed from the registry disappears on the next `update`, and a server someone added by hand is never touched.
 
@@ -229,7 +232,7 @@ Everything above depends on the agent not being able to switch the guard off. Si
 - `openspec/sdlc.yaml`;
 - `.claude/settings*.json`;
 - `.opencode/plugins/sdlc.js`;
-- `.mcp.json` and `opencode.json(c)`;
+- `.mcp.json`, `opencode.json(c)`, `.cursor/mcp.json` and `.cursor/hooks.json`;
 - the manifest;
 - the user-level agent settings that can disable every hook.
 

@@ -8,9 +8,11 @@ npm install -g https://github.com/marin-ai-tech/sdlc/releases/latest/download/sd
 sdlc --version
 
 # in the project root (a git repository)
-sdlc init --tools claude,opencode      # or --tools claude / --tools opencode
+sdlc init --tools claude,opencode      # or --tools claude | opencode | cursor (any combination)
 sdlc doctor                            # check the installation
 ```
+
+For Cursor, see [15. Cursor IDE](15-cursor.md): `sdlc init --tools cursor --mcp` sets up skills, commands, subagents, a rule, the MCP server and Cursor's own hooks.
 
 From git, install the `release` branch, which carries the built code: `npm install -g github:marin-ai-tech/sdlc#release`. Never `npm install -g sdlc`: the registry package of that name is unrelated.
 
@@ -214,7 +216,7 @@ version: 1
 schema: sdlc                  # schema for sdlc new
 cli: sdlc                     # or "npx --no-install sdlc"
 locale: ru                    # optional: language for people (default: the system locale, else en)
-tools: [claude, opencode]
+tools: [claude, opencode]   # also: cursor
 gates:
   intent:  { required: true,  approvers: [product-owner] }
   spec:    { required: true,  approvers: [product-owner], high_risk_approvers: [tech-lead] }
@@ -266,6 +268,8 @@ mcp:                          # chapter 10
   servers:                    # the team's MCP servers, laid out into .mcp.json and opencode.json
     build: { type: stdio, command: [npx, -y, corp-build-mcp], env: { CI_TOKEN: "${CI_TOKEN}" }, stages: [build, test] }
     jira:  { type: http, url: https://mcp.corp.example/jira, headers: { Authorization: "Bearer ${JIRA_TOKEN}" }, stages: [plan, deploy] }
+questions: { required: true } # a person answers open questions before intent/spec approval (sdlc answer)
+design: { debate: false }     # the debate lens; debate_sides: [simplicity and speed, robustness and safety]
 health:                       # thresholds of sdlc health; every key has a default
   wait_hours: 48              # also: window_days 90, stalled_days 14, deferred_days 30, first_pass_rate 0.5,
   rework_share: 0.5           #   waiver_share 0.3, reapprovals 3, denials 5, lock_days 7
