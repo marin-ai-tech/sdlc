@@ -11,6 +11,7 @@ also controls the guard itself.
 |---|---|
 | `gates.<gate>` | `required`, `approvers` (roles), `high_risk_approvers`, `min_approvals`, `auto_waive` (kinds, tracks; intent, spec, plan only; a kind an agent chose does not count) |
 | `rework.max_cycles` | reworks of one gate before `next` asks a person (default 3) |
+| `design.debate` | the debate lens: two advocates argue the key design decision before the spec gate (default off; `debate_sides`) |
 | `verify.commands` | the project's checks: `{ name, run, required }` |
 | `verify.mcp`, `release.mcp` | checks the CLI calls on an MCP server, for the verify and the release gate |
 | `project.name` | the project's name in MCP and events (default: the folder name) |

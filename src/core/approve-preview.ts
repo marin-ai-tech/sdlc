@@ -10,6 +10,7 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { unchangedSinceRework } from './approval-hygiene.js';
 import { assertQuestionsAnswered, unansweredQuestions, type UnansweredQuestion } from './answers.js';
+import { assertDebateRecorded } from './debate.js';
 import { approverKey, assertByAllowed } from './approval-quorum.js';
 import { readChangeState, type ChangeState } from './change-state.js';
 import type { ChangeRef } from './changes.js';
@@ -99,6 +100,7 @@ function approvalRefusals(input: PreviewInput, evaluation: GateEvaluation, state
   attempt(found, () => assertReady(input.gate, evaluation));
   found.push(...(roles ? rolesRefusals(input, state, roles) : configRefusals(input, evaluation)));
   attempt(found, () => assertQuestionsAnswered(input.config, input.ref.id, input.ref.dir, state, input.gate));
+  attempt(found, () => assertDebateRecorded(input.config, input.ref.dir, input.gate));
   return found.filter((item, index) => found.findIndex((other) => other.rule === item.rule) === index);
 }
 

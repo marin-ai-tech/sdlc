@@ -38,6 +38,7 @@ const EXAMPLES: Record<string, string> = {
   explore: 'sdlc explore checkout-flow --json',
   trace: 'sdlc trace add-export --json',
   health: 'sdlc health --json',
+  changelog: 'sdlc changelog --change add-export',
   explain: 'sdlc explain --change add-export --json',
   archive: 'sdlc archive add-export --yes --json',
   openspec: 'sdlc openspec list --specs',

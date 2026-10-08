@@ -8,6 +8,7 @@ import { parseEvents, type EventReceiver } from '../mcp/event-config.js';
 import { parseMcpChecks, parseMcpServers, type McpCheck, type McpServer } from '../mcp/registry.js';
 import { parsePacksConfig, type PackConfig } from '../team/pack-config.js';
 import { parseQuestionsConfig, type QuestionsConfig } from './questions-config.js';
+import { parseDesignConfig, type DesignConfig } from './debate.js';
 import { parseTeamConfig, type TeamConfig } from '../team/team-config.js';
 import { parseStages, type StagesConfig } from './stage-config.js';
 import { readYamlObject } from './yaml-io.js';
@@ -164,6 +165,8 @@ export interface SdlcConfig {
    * has a person's recorded answer. Absent when sdlc.yaml has no `questions`; never written back.
    */
   questions?: QuestionsConfig;
+  /** The debate lens (B20): off unless `design.debate: true`. Absent when sdlc.yaml has no `design`; never written. */
+  design?: DesignConfig;
 }
 
 export const DEFAULT_TEST_PATHS = [
@@ -511,6 +514,8 @@ export function parseConfig(raw: Raw, file = 'openspec/sdlc.yaml'): SdlcConfig {
   if (health) config.health = health;
   const questions = parseQuestionsConfig(raw.questions, where);
   if (questions) config.questions = questions;
+  const design = parseDesignConfig(raw.design, where);
+  if (design) config.design = design;
 
   const locale = asString(raw.locale, where('locale'));
   if (locale !== undefined) config.locale = locale;

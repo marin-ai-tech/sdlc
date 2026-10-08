@@ -18,6 +18,7 @@ import { listActiveChanges, listArchivedChanges, resolveChange } from '../core/c
 import { readChangeState } from '../core/change-state.js';
 import { evaluateChange, sharedFingerprint, STAGES, STAGE_TITLES } from '../core/lifecycle.js';
 import { aggregateMetrics, changeMetrics } from '../core/metrics.js';
+import { agentCommits, type AgentCommits } from '../core/agent-commits.js';
 import type { Participation, ParticipationTotals } from '../core/participation.js';
 import { changeLog } from '../core/awaiting.js';
 import { readLog } from '../core/log.js';
@@ -97,6 +98,8 @@ export interface ReportModel {
     waivers: number;
     /** Planned and actual participation of people, summed over the changes (B63). */
     participation?: ParticipationTotals;
+    /** Commits reachable from HEAD in the period and those made in agent sessions (B24). */
+    agentCommits?: AgentCommits;
   };
   changes: ReportChange[];
   /** Project log entries inside the period, oldest first, at most 200 (newest kept). */
@@ -146,7 +149,7 @@ function backlogWork(root: string): ReportModel['backlog'] {
   return { counts, epics, next, blocked };
 }
 
-function parseSince(value?: string): string | undefined {
+export function parseSince(value?: string): string | undefined {
   if (value === undefined) return undefined;
   const iso = /^\d{4}-\d{2}-\d{2}(?:T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2}))?$/;
   if (!iso.test(value) || !Number.isFinite(Date.parse(value))) {
@@ -155,7 +158,7 @@ function parseSince(value?: string): string | undefined {
   return new Date(value).toISOString();
 }
 
-function projectName(root: string): string {
+export function projectName(root: string): string {
   const content = readText(path.join(root, 'package.json'));
   if (!content) return path.basename(root);
   try {
@@ -251,7 +254,7 @@ export function buildReport(ctx: ProjectContext, opts: ReportOptions = {}): Repo
     project: { name: projectName(ctx.root), root: ctx.root.replace(/\\/g, '/') },
     harness: ctx.stamp,
     summary: summarize(changes),
-    metrics: aggregateMetrics(rows.map((row) => row.metrics)),
+    metrics: { ...aggregateMetrics(rows.map((row) => row.metrics)), agentCommits: agentCommits(ctx.root, since) },
     changes,
     events: periodEvents(ctx.root, since, opts.change),
     layout: detectLayout(ctx.root, ctx.config.layout),

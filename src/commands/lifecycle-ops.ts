@@ -18,11 +18,13 @@ import { stampText, stampTextLocalized } from '../core/license.js';
 import { appendLog, readLog } from '../core/log.js';
 import { changeMarkdown, tryStampArtifacts } from '../core/stamp.js';
 import { aggregateMetrics, changeMetrics } from '../core/metrics.js';
+import { agentCommits } from '../core/agent-commits.js';
 import { changeLog } from '../core/awaiting.js';
 import {
   printChangeFlow, printChangeParticipation, printProjectFlow, printProjectParticipation,
 } from './audit-flow.js';
 import { readBacklog, setBacklogStatus } from '../core/backlog.js';
+import { auditExportCommand, type AuditExportOptions } from './audit-export.js';
 import { closeDeferred, readDeferred } from '../core/deferred.js';
 
 interface ValidationIssue {
@@ -255,7 +257,9 @@ function stampSuffix(event: HistoryEvent): string {
 }
 
 
-export async function auditCommand(opts: { change?: string; json?: boolean }): Promise<void> {
+export async function auditCommand(opts: { change?: string; json?: boolean } & AuditExportOptions): Promise<void> {
+  // B21: --export (and --since, which only works with it) writes the evidence bundle instead of the audit.
+  if (opts.export !== undefined || opts.since !== undefined) return auditExportCommand(opts);
   try {
     const ctx = loadProject();
     if (opts.change) {
@@ -311,6 +315,8 @@ export async function auditCommand(opts: { change?: string; json?: boolean }): P
       changes: rows.length,
       archived: rows.filter((r) => r.archived).length,
       ...aggregateMetrics(rows),
+      /** Commits reachable from HEAD and those made in agent sessions (`SDLC-Agent:` trailer, B24). */
+      agentCommits: agentCommits(ctx.root, opts.since),
       /** sdlc versions and licenses recorded in the change histories. */
       recordedWith: { versions: [...versions].sort(), licenses: [...licenses].sort() },
     };
@@ -328,6 +334,8 @@ export async function auditCommand(opts: { change?: string; json?: boolean }): P
       rate: aggregate.verifyFirstPassRate ?? '-',
       rejections: aggregate.rejections, waivers: aggregate.waivers, policy: aggregate.policyWaivers,
     })}`);
+    const commits = aggregate.agentCommits;
+    line(`  ${t('audit.agentCommits', { agent: commits.agent, total: commits.total })}`);
     printProjectFlow(aggregate);
     printProjectParticipation(rows, aggregate.participation);
     if (versions.size > 0) {

@@ -272,6 +272,8 @@ describe('demo: a team builds a calculator with sdlc (every command)', { timeout
   });
 
   it('9. release, signatures, archive; the backlog moves on', () => {
+    // 0.12.0 (B22): the changelog of the release comes from the change's delta specs.
+    step('changelog', 'release', 'agent', ['changelog', '--change', 'basic-arithmetic'], 'The agent puts the changelog from the delta specs into release.md.');
     step('release-check', 'release', 'bob', ['release', 'check', '--change', 'basic-arithmetic'], 'Before Alice decides, Bob runs the release checks; none are configured here.');
     step('approve-release', 'release', 'alice', ['approve', 'release', '--change', 'basic-arithmetic'], 'Alice authorizes the release.');
     commit('alice', 'Release approvals for basic arithmetic');

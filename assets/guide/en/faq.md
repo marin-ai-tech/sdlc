@@ -43,5 +43,12 @@ Read the rule in brackets and `sdlc guide denials`. To relax the process rules f
 `sdlc audit --change <id>`, `sdlc log`, and `sdlc trace <id>` from intent to evidence. The audit also compares the
 people's decisions the track planned with what happened (approvals, reworks, takeovers, waivers, answers, waits).
 
+**An auditor asks for evidence.**
+`sdlc audit --export <folder> [--since <date>]`: every approval with its signature and trailer status, the change
+folders and the log, nothing from outside openspec/. The release notes come from the specs: `sdlc changelog`.
+
+**How much of the code did agents commit?**
+Commits made in an agent session carry `SDLC-Agent: <agent>` (a git hook sdlc installs); `sdlc audit` counts them.
+
 **I am new. Where do I start?**
 `sdlc guide tour`: seven short steps through the calculator demo.

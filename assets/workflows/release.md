@@ -14,7 +14,7 @@ Prepare the release - Stage 5 (Deploy). The agent does everything up to the prod
 **Steps**
 
 1. **Check the gate.** `sdlc status --change <id> --json`: the `review` gate must be `approved`.
-2. **Write `release.md`** from `sdlc instructions release --change <id> --json`: version and changelog entry (derived from proposal.md and the spec deltas), rollout steps per environment with the autonomy tier of each, monitoring signals and control bands to watch, the exact rollback command, and how rollback was rehearsed.
+2. **Write `release.md`** from `sdlc instructions release --change <id> --json`: version and changelog entry (derived from proposal.md and the spec deltas), rollout steps per environment with the autonomy tier of each, monitoring signals and control bands to watch, the exact rollback command, and how rollback was rehearsed. For the changelog section run `sdlc changelog --change <id>` and put its Markdown output into release.md's changelog section (edit the wording, keep every entry).
 3. **Lower environments.** Deploy to development/staging only where the project allows the agent to, and record the result in release.md.
 4. **Production is gated.** The harness blocks production release commands until a release manager reviews release.md and runs `sdlc approve release --change <id>`. Ask for that; never work around the block.
 5. **After release**: record the outcome in release.md and watch the listed signals. If a control band is breached, run the rollback and open a triaged intent with {{cmd:triage}}.

@@ -17,6 +17,7 @@ import { harnessVersion } from './version.js';
 import { readYamlObject } from './yaml-io.js';
 import { readManifest, sha256 } from '../integrations/manifest.js';
 import { SETTINGS_PATH } from '../integrations/settings.js';
+import { CHAIN_LINE, CHAIN_SUFFIX, inspectGitHook } from '../integrations/git-hook.js';
 
 /**
  * The checks of `sdlc doctor`, as a function `sdlc health` reuses (config.doctor). Same checks in the same order,
@@ -220,6 +221,26 @@ function gitCheck(out: Checks, root: string): void {
     ? tt('doctor.gitIdentity', { name: id.name ?? '', email: id.email })
     : tt('doctor.gitNoEmail');
   out.add('git', id.email ? 'ok' : 'warn', message, tt('doctor.fix.gitEmail'));
+  gitHookCheck(out, root);
+}
+
+/** sdlc's prepare-commit-msg hook (B24); a hook of the project's own is a warning with how to chain sdlc's. */
+function gitHookCheck(out: Checks, root: string): void {
+  const { tt } = out;
+  const hook = inspectGitHook(root);
+  if (hook.status === 'no-git' || hook.path === undefined) return;
+  const shown = path.relative(root, hook.path).split(path.sep).join('/');
+  if (hook.status === 'current' || hook.status === 'chained') {
+    out.add('git hook', 'ok', tt(`doctor.gitHook.${hook.status}`, { path: shown }));
+    return;
+  }
+  if (hook.status === 'foreign') {
+    const fix = tt('doctor.fix.gitHookChain', { line: CHAIN_LINE, copy: `${shown}${CHAIN_SUFFIX}` });
+    out.add('git hook', 'warn', tt('doctor.gitHook.foreign', { path: shown }), fix);
+    return;
+  }
+  const fix = hook.status === 'shared' ? tt('doctor.fix.gitHookShared') : tt('doctor.fix.update');
+  out.add('git hook', 'warn', tt(`doctor.gitHook.${hook.status}`, { path: shown }), fix);
 }
 
 function projectChecks(out: Checks, root: string): void {

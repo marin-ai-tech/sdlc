@@ -213,7 +213,7 @@ export const SLIDES = [
       ru: 'Алиса разрешает релиз. Каждое утверждение сверяется с коммитом, который его принёс: подписан ли он тем, кто утвердил.',
     },
     steps: ['approve-release', 'approvals-verify'],
-    more: ['release-check'],
+    more: ['changelog', 'release-check'],
     notes: {
       en: 'Signing modes: off (no signatures), warn (report), required (CI fails). A commit signed by Bob with Alice\'s email is reported as wrong-signer.',
       ru: 'Режимы подписи: off (без подписей), warn (предупреждать), required (CI падает). Коммит, подписанный Бобом с почтой Алисы, помечается как wrong-signer.',
@@ -360,6 +360,7 @@ export const STEP_NOTE_RU = {
   'approve-plan': 'Боб, инженер, утверждает план.',
   rework: 'Алиса возвращает изменение на спецификацию с причиной; утверждение плана перестаёт учитываться.',
   answer: 'Алиса сама отвечает на открытый вопрос замысла: агенту это запрещено.',
+  changelog: 'Агент кладёт в release.md список изменений, собранный из дельт спецификаций.',
   explain: 'Боб спрашивает, почему изменение снова на спецификации: возврат, его заметка и что его разблокирует.',
   'approve-spec-again': 'Спецификация утверждена заново.',
   'approve-plan-again': 'Плану нужно своё новое утверждение.',

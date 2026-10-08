@@ -2,6 +2,15 @@
 
 All notable changes to sdlc. Versions follow [Semantic Versioning](https://semver.org/); while the major version is 0, a minor version may change behavior.
 
+## 0.12.0 — 2026-10-08
+
+### Added
+- **Evidence export for auditors.** `sdlc audit --export <folder> [--since <date>] [--change <id>]` writes one folder with every approval and its signature and trailer status (`index.json`, `index.md`), the change folders and the project log of the period. Only files inside openspec/ go in; links are skipped; an existing non-empty folder is refused.
+- **Changelog from the specs.** `sdlc changelog [--change <id> | --since <date>]` lists the requirements added, changed and removed by the delta specs; the release workflow puts it into release.md.
+- **Commits made by agents are marked.** sdlc installs a `prepare-commit-msg` git hook that adds `SDLC-Agent: <agent>` to commits made in an agent session (also with `--no-verify`) and never to a person's; `sdlc audit` and the dashboard show the agents' share. A hook the project already has is kept (doctor shows how to chain it), and a hooks folder outside the project is never written.
+- **The debate lens.** With `design.debate: true`, two read-only `sdlc-advocate` subagents argue the key design decision from opposite priorities, and the spec gate waits for the `## Debate` section in design.md with both positions and the decision. Off by default.
+- **A daily summary example.** `assets/examples/daily-summary.mjs` writes done, next, blocked and waiting on people to a file from `sdlc report`; run it from a scheduler. It publishes nothing by itself.
+
 ## 0.11.4 — 2026-10-08
 
 ### Added

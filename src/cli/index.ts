@@ -3,6 +3,7 @@ import { helpCommand } from '../commands/help.js';
 import { guideCommand } from '../commands/guide.js';
 import { statuslineCommand } from '../commands/statusline.js';
 import { archiveCommand, auditCommand, logCommand, validateCommand } from '../commands/lifecycle-ops.js';
+import { changelogCommand } from '../commands/changelog.js';
 import { licenseCommand } from '../commands/license.js';
 import { instructionsCommand, newCommand, nextCommand, statusCommand } from '../commands/changes.js';
 import { doctorCommand } from '../commands/doctor.js';
@@ -462,8 +463,18 @@ export function buildProgram(): Command {
     .command('audit')
     .description(cmdDesc('cmd.audit'))
     .option('--change <id>', 'one change (active or archived)')
+    .option('--export <dir>', 'write the evidence bundle for auditors into this new or empty folder')
+    .option('--since <date>', 'period start')
     .option('--json', 'output JSON')
     .action((opts) => auditCommand(opts));
+
+  program
+    .command('changelog')
+    .description(cmdDesc('cmd.changelog'))
+    .option('--change <id>', 'one change (active or archived)')
+    .option('--since <date>', 'archived changes from this date on (YYYY-MM-DD)')
+    .option('--json', 'output JSON')
+    .action((opts) => changelogCommand(opts));
 
   program
     .command('report')

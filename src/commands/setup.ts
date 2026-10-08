@@ -29,6 +29,8 @@ import {
   type InstallResult,
 } from '../integrations/install.js';
 import type { ToolId } from '../integrations/types.js';
+import { installGitHook, removeGitHook, type GitHookResult } from '../integrations/git-hook.js';
+import { gitHookJson, printGitHookInstall, printGitHookRemoval } from './git-hook-output.js';
 import { agentEnvironment } from '../core/agent-env.js';
 import { assertKeepsGuard } from '../core/guard-setup.js';
 import { humanCommandFix } from '../core/human-command.js';
@@ -298,6 +300,8 @@ interface InitOutcome {
   tools: ToolId[];
   detectedCommands: string[];
   result: InstallResult;
+  /** sdlc's prepare-commit-msg hook (B24). */
+  gitHook: GitHookResult;
   reviewCreated: boolean;
   opsx?: 'installed' | 'failed';
   rolesNote?: string;
@@ -422,6 +426,8 @@ async function setupProject(
   // workflows produce SDLC changes too; existing roots keep their default.
   const schemaDefaulted = openspecCreated ? setDefaultSchema(paths, config.schema) : false;
   const result = installIntegrations(root, config, tools, { force: opts.force, hooks: opts.hooks });
+  // Not a project file: outside a git repository nothing happens, and a failure only warns.
+  const gitHook = installGitHook(root);
   const reviewCreated = ensureReviewPolicy(root, config);
   let opsx: 'installed' | 'failed' | undefined;
   if (opts.opsx && tools.length > 0) {
@@ -435,7 +441,7 @@ async function setupProject(
     await runChosenInstalls(root, resolved.install, { wanted: resolved.index, tools }, installer);
   }
   return {
-    root, config, hadConfig, openspecCreated, schemaDefaulted, tools, detectedCommands, result, reviewCreated,
+    root, config, hadConfig, openspecCreated, schemaDefaulted, tools, detectedCommands, result, gitHook, reviewCreated,
     opsx, rolesNote, license,
   };
 }
@@ -457,6 +463,7 @@ function initJson(o: InitOutcome): Record<string, unknown> {
     claudeHooks: result.claudeHooks,
     statusLine: result.statusLine,
     ...mcpJson(result),
+    ...gitHookJson(o.root, o.gitHook),
     reviewPolicy: o.reviewCreated ? config.review.policy : undefined,
     ...(o.opsx ? { opsx: o.opsx } : {}),
     ...(o.rolesNote ? { roles: o.rolesNote } : {}),
@@ -480,6 +487,7 @@ function printInitText(o: InitOutcome): void {
   if (o.rolesNote) line(`  ${o.rolesNote}`);
   if (o.opsx) line(t('init.opsxLine', { opsx: stateLabel(o.opsx) }));
   line(`  ${stampTextLocalized(harnessStamp(config))}`);
+  printGitHookInstall(o.root, o.gitHook);
   if (license.status !== 'ok') warn(`${license.message}. ${license.fix ?? ''}`.trim());
   printInstall(result, config);
   if (result.statusLine === 'kept (user-defined)') warn(t('init.keptStatusline'));
@@ -524,14 +532,18 @@ export async function updateCommand(target: string | undefined, opts: UpdateOpti
       saveConfig(paths.sdlcConfig, config);
     }
     const result = installIntegrations(root, config, tools, { force: opts.force, dryRun: opts.dryRun });
+    const gitHook = installGitHook(root, { dryRun: opts.dryRun });
     if (!opts.dryRun) logSetup(root, config, 'harness.updated', tools);
     const stamp = harnessStamp(config);
     if (opts.json) {
       const { files, claudeHooks } = result;
-      printJson({ root, tools, dryRun: !!opts.dryRun, files, claudeHooks, ...mcpJson(result), harness: stamp });
+      const hook = gitHookJson(root, gitHook);
+      const dryRun = !!opts.dryRun;
+      printJson({ root, tools, dryRun, files, claudeHooks, ...mcpJson(result), ...hook, harness: stamp });
       return;
     }
     line(c.bold(t(opts.dryRun ? 'update.would' : 'update.done', { root })) + c.dim(` (${stampTextLocalized(stamp)})`));
+    printGitHookInstall(root, gitHook);
     printInstall(result, config);
   } catch (error) {
     reportFailure(error, opts.json);
@@ -554,6 +566,8 @@ export async function uninstallCommand(target: string | undefined, opts: { force
     // Removing the harness switches the guard off: a person's decision (B41).
     assertHuman(configOrDefault(projectPaths(root)), 'uninstall');
     const result = uninstallIntegrations(root, { force: opts.force, dryRun: opts.dryRun });
+    // Only sdlc's own hook goes; a hook of the project's own stays.
+    const gitHook = removeGitHook(root, { dryRun: opts.dryRun });
     const paths = projectPaths(root);
     if (!opts.dryRun && isFile(paths.sdlcConfig)) {
       try {
@@ -564,12 +578,13 @@ export async function uninstallCommand(target: string | undefined, opts: { force
     }
     if (opts.json) {
       const { files, claudeHooks } = result;
-      printJson({ root, dryRun: !!opts.dryRun, files, claudeHooks, ...mcpJson(result) });
+      printJson({ root, dryRun: !!opts.dryRun, files, claudeHooks, ...mcpJson(result), ...gitHookJson(root, gitHook) });
       return;
     }
     line(c.bold(t(opts.dryRun ? 'uninstall.would' : 'uninstall.done', { root })));
     line(t('uninstall.filesRemoved', { removed: result.files.removed.length, hooks: stateLabel(result.claudeHooks) }));
     printMcp(result);
+    printGitHookRemoval(root, gitHook);
     for (const kept of result.files.kept) warn(t('uninstall.keptEdited', { path: kept }));
     line(c.dim(t('uninstall.leftUntouched')));
   } catch (error) {

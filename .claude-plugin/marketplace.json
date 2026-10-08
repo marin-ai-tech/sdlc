@@ -10,7 +10,7 @@
       "name": "sdlc",
       "source": "./plugin",
       "description": "AI-native SDLC workflows with human gates, verification evidence and review, built on OpenSpec",
-      "version": "0.11.4",
+      "version": "0.12.0",
       "category": "development",
       "tags": [
         "sdlc",

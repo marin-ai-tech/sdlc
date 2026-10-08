@@ -35,6 +35,13 @@ function header(model: ReportModel): string {
     + `<p class="small">${e(generated)}</p></header>`;
 }
 
+/** The share of agent-session commits: `40% (2/5)`; a dash without commits. */
+function agentShare(commits: ReportModel['metrics']['agentCommits']): string {
+  if (commits === undefined || commits.total === 0) return '—';
+  const percent = Math.round(commits.agent / commits.total * 100);
+  return `${percent}% (${commits.agent}/${commits.total})`;
+}
+
 function overview(model: ReportModel): string {
   const rate = model.metrics.verifyFirstPassRate;
   const firstPass = number(rate === undefined ? undefined : rate * 100, '%');
@@ -46,6 +53,7 @@ function overview(model: ReportModel): string {
     [t('report.html.awaiting'), model.summary.awaitingHuman],
     [t('report.html.verifyFirstPass'), firstPass],
     [t('report.html.medianCreated'), median],
+    [t('report.html.agentCommits'), agentShare(model.metrics.agentCommits)],
   ];
   const kpis = values.map(([label, value]) =>
     `<div class="kpi"><span>${e(label)}</span><strong>${e(value)}</strong></div>`).join('');

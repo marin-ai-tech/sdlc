@@ -1,90 +1,27 @@
-import * as fs from 'node:fs';
-import * as os from 'node:os';
-import * as path from 'node:path';
 import { loadProject } from '../cli/context.js';
 import { line, printJson, reportFailure } from '../cli/output.js';
-import { readChangeState } from '../core/change-state.js';
-import { listActiveChanges, listArchivedChanges } from '../core/changes.js';
-import { SdlcError } from '../core/errors.js';
-import { git } from '../core/git.js';
+import { approvalTrailers } from '../core/approval-hygiene.js';
 import {
-  allowedSigners, parseRolesFile, personByEmail, readRolesFile, ROLES_PATH,
-  SIGNING_MODES, type RolesFile, type SigningMode,
-} from '../core/roles.js';
+  allChanges, approvalSignature, approvalSites, rolesSignatures, trailerStatus, withAllowedSigners,
+  type SignatureStatus,
+} from '../core/approval-signatures.js';
+import { SdlcError } from '../core/errors.js';
+import type { ProjectPaths } from '../core/project.js';
+import { readRolesFile, SIGNING_MODES, type RolesFile, type SigningMode } from '../core/roles.js';
 import { t } from '../core/i18n.js';
-import { approvalTrailer, approvalTrailers } from '../core/approval-hygiene.js';
 
-type Status = 'valid' | 'unsigned' | 'wrong-signer' | 'bad-signature' | 'not-committed' | 'not-maintainer';
-interface Result { status: Status; commit?: string; signer?: string }
+interface Result { status: SignatureStatus; commit?: string; signer?: string }
 
-function signature(root: string, sha: string, signers: string): { status: Status; signer?: string } {
-  const result = git(root, ['-c', `gpg.ssh.allowedSignersFile=${signers}`, 'log', '-1', '--format=%G?%x1f%GS', sha]);
-  const [code, principal] = result.stdout.split('\x1f');
-  if (!result.ok || !code) return { status: 'bad-signature' };
-  if (code === 'N') return { status: 'unsigned' };
-  if (!['G', 'U'].includes(code) || !principal) return { status: 'bad-signature' };
-  return { status: 'valid', signer: principal.trim() };
-}
-
-function approvalResult(
-  root: string, roles: RolesFile, signers: string, trailers: Set<string>, file: string,
-  change: string, gate: string, record: { at: string; by: string; person?: string; role: string; digest?: string },
-) {
-  // B60: whether the commit the approval proposed (its trailer) is reachable; informational only.
-  const found = record.digest !== undefined && trailers.has(approvalTrailer(change, gate, record.digest));
-  const trailer = found ? 'found' : 'missing';
-  const base = { change, gate, role: record.role, by: record.by, person: record.person, trailer };
-  const history = git(root, ['log', '--reverse', '--format=%H', `-S${record.at}`, '--',
-    'openspec/changes']);
-  const sha = history.ok ? history.stdout.split('\n')[0] : '';
-  const committed = git(root, ['show', `HEAD:${file}`]);
-  if (!sha || !committed.ok || !committed.stdout.includes(record.at)) {
-    return { ...base, commit: sha || undefined, signer: undefined, status: 'not-committed' as Status };
-  }
-  const checked = signature(root, sha, signers);
-  if (checked.status !== 'valid') return { ...base, commit: sha, ...checked };
-  const signer = personByEmail(roles, checked.signer!);
-  const approver = record.person
-    ? roles.people.find((person) => person.id === record.person)
-    : personByEmail(roles, /<([^>]+)>/.exec(record.by)?.[1] ?? record.by);
-  const status: Status = !signer ? 'bad-signature' : signer.id === approver?.id ? 'valid' : 'wrong-signer';
-  return { ...base, commit: sha, signer: checked.signer, status };
-}
-
-function rolesResults(root: string, roles: RolesFile, signers: string) {
-  const history = git(root, ['log', '--format=%H', '--', ROLES_PATH]);
-  if (!history.ok || !history.stdout) return [];
-  return history.stdout.split('\n').map((sha) => {
-    const author = git(root, ['show', '-s', '--format=%ae', sha]).stdout;
-    const parent = git(root, ['rev-parse', `${sha}^`]);
-    const old = parent.ok
-      ? git(root, ['show', `${parent.stdout}:${ROLES_PATH}`])
-      : git(root, ['show', `${sha}:${ROLES_PATH}`]);
-    const prior = old.ok ? parseRolesFile(old.stdout) : roles;
-    fs.writeFileSync(signers, allowedSigners(prior), 'utf8');
-    const checked = signature(root, sha, signers);
-    const signer = checked.signer ? personByEmail(prior, checked.signer) : undefined;
-    const status: Status = checked.status !== 'valid' ? checked.status
-      : !signer ? 'bad-signature'
-        : prior.roles.maintainer?.includes(signer.id) ? 'valid' : 'not-maintainer';
-    return { file: ROLES_PATH, commit: sha, by: author, signer: checked.signer, status };
-  });
-}
-
-function verify(root: string, roles: RolesFile, signers: string) {
-  const ctx = loadProject();
+function verify(root: string, paths: ProjectPaths, roles: RolesFile, signers: string) {
   const results: Array<Record<string, unknown> & Result> = [];
   const trailers = approvalTrailers(root);
-  for (const ref of [...listActiveChanges(ctx.paths), ...listArchivedChanges(ctx.paths)]) {
-    const file = path.relative(root, path.join(ref.dir, '.sdlc.yaml')).replaceAll('\\', '/');
-    const state = readChangeState(ref.dir);
-    for (const [gate, value] of Object.entries(state.gates)) {
-      for (const record of value?.approvals ?? []) {
-        results.push(approvalResult(root, roles, signers, trailers, file, ref.id, gate, record));
-      }
-    }
+  for (const site of approvalSites(root, allChanges(paths))) {
+    const { ref, gate, record } = site;
+    const trailer = trailerStatus(trailers, ref.id, gate, record.digest);
+    const base = { change: ref.id, gate, role: record.role, by: record.by, person: record.person, trailer };
+    results.push({ ...base, ...approvalSignature(root, roles, signers, site) });
   }
-  results.push(...rolesResults(root, roles, signers));
+  results.push(...rolesSignatures(root, roles, signers));
   return results;
 }
 
@@ -115,15 +52,7 @@ export function approvalsVerify(opts: { mode?: string; json?: boolean }): void {
       else line(t('approvals.off'));
       return;
     }
-    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'sdlc-signers-'));
-    const signers = path.join(dir, 'allowed_signers');
-    let results: ReturnType<typeof verify>;
-    try {
-      fs.writeFileSync(signers, allowedSigners(roles), 'utf8');
-      results = verify(ctx.root, roles, signers);
-    } finally {
-      fs.rmSync(dir, { recursive: true, force: true });
-    }
+    const results = withAllowedSigners(roles, (signers) => verify(ctx.root, ctx.paths, roles, signers));
     const ok = results.every((result) => result.status === 'valid');
     if (opts.json) printJson({ mode, ok, results });
     else printResults(results, mode);
