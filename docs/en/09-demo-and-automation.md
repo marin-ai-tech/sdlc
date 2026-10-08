@@ -10,11 +10,11 @@
 
 The scenario covers every step of the product:
 
-- **Setup**: `init` for both tools, `doctor`, `license`, `help`, the `layout` commands, `update`.
+- **Setup**: `init` for both tools, `doctor`, `health`, `license`, `help`, the `layout` commands, `update`.
 - **Roles**: `roles.yaml` with signing in `warn` mode.
 - **Planning**: exploration; a backlog with an epic, dependencies and priorities.
 - **OpenSpec underneath**: the change is a plain OpenSpec change (`openspec list`, `status`, `show`); a delta requirement without a scenario is refused by strict validation, then fixed; the `sdlc` schema validates as an OpenSpec schema; after the archive the requirement lives in the spec (`openspec list --specs`, `openspec show calculator`).
-- **The change**: a change started from a backlog item, then the gates with the right people. Bob is refused as product owner and as the author of the code he would review. Next come verification with evidence, a review with lenses and a deferred finding, the release, `approvals verify` and the archive.
+- **The change**: a change started from a backlog item, then the gates with the right people (`explain` says why the change is back at the spec after a rework). Bob is refused as product owner and as the author of the code he would review. Next come verification with evidence, a review with lenses and a deferred finding, the release, `approvals verify` and the archive.
 - **Other flows**: a bug fix with locked tests, a rejected idea, a waiver, closing deferred work and a backlog item, and a BMAD import.
 - **Visibility**: `status`, `report`, `dashboard`, `audit`, `log`, `statusline`, the session hook, the plugin and `uninstall`.
 
