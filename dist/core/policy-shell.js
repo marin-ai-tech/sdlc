@@ -1,0 +1,332 @@
+import * as fs from 'node:fs';
+import * as path from 'node:path';
+import picomatch from 'picomatch';
+import { isWithin, toPosix } from './fs-utils.js';
+import { INBOX_DIR } from '../mcp/inbox.js';
+import { scanShell } from './policy-shell-scanner.js';
+/**
+ * Which state files a tool call writes, beyond the path text `policy.ts` matches (rule `state-integrity`):
+ * - a bare file name after `cd`/`pushd` (and PowerShell `Set-Location`/`Push-Location`) into a directory;
+ * - a glob that can match a state file (`openspec/backlog.m?`, `openspec/backl*`, `openspec/roles.y[a]ml`);
+ * - a link: the real path of the target, or of its parent directory for a new file, is a state file;
+ * - a folder that holds state files (openspec/, openspec/changes, a change folder, openspec/.sdlc) as the target of
+ *   a command that deletes, restores, moves or copies (not a redirection, which cannot replace a folder);
+ * - `git -C <dir>`: the paths after it are read from that directory.
+ *
+ * Heuristics on the command text: a computed directory (`cd "$DIR"`, `cd ~`) is not followed, so bare names after
+ * it are not resolved; a glob is read with bash rules (`*` does not match a leading dot); a `.sdlc.yaml` reached
+ * through a glob is found in the glob's own directory under openspec/ and in the change directories on disk.
+ * The same machinery serves the guard's own configuration (B41, `policy-guard.ts`) through `shellWrites`.
+ */
+/**
+ * Harness records only the CLI writes: per-change `.sdlc.yaml`, the project log, roles, the backlog, the inbox
+ * of MCP results kept for the agent (`openspec/.sdlc/inbox/<id>.json`) and the record of the accepted roles of the
+ * agent team (`openspec/.sdlc/team.json`, B72).
+ */
+// Case-insensitive: Windows and macOS file systems ignore case, so `OPENSPEC/Backlog.md` is the same file.
+export const STATE_FILE_WRITE = /\.sdlc\.yaml|\.sdlc\/log\.jsonl|\.sdlc\/team\.json|\.sdlc\/inbox(?:\/|\b)|openspec\/(?:roles\.yaml|backlog\.md)/i;
+export const STATE_FILE = new RegExp('(^|/)\\.sdlc\\.yaml$|^openspec/\\.sdlc/(?:log\\.jsonl|team\\.json)$|^openspec/\\.sdlc/inbox/[^/]+$' +
+    '|^openspec/(?:roles\\.yaml|backlog\\.md)$', 'i');
+/** The backlog's order and removal are a person's decision; agents change the file through `sdlc backlog`. */
+export const BACKLOG_FILE = 'openspec/backlog.md';
+/** Redirections write the file they name; they cannot replace a folder. */
+const REDIRECT_OPS = [/>>?/, /\btee\b/];
+/** Commands that write, move, delete or link the paths among their arguments (files or whole folders). */
+const FILE_OPS = [
+    /\bmv\b/, /\bcp\b/, /\brm\b/, /\btruncate\b/, /\bpython[0-9.]*\b/, /\bnode\b\s+-e/, /\bdd\b/,
+    // `-i` anywhere among the options (`sed -E -i`), or in a cluster (`perl -pi`).
+    /\bsed\b[^;&|\n]*\s(?:-[A-Za-z]*i|--in-place)/, /\bperl\b[^;&|\n]*\s-[A-Za-z]*i/, /\bfind\b[^;&|\n]*\s-delete\b/,
+    // cmd.exe and .NET spellings.
+    /\b(?:del|erase|copy|move|ren|rmdir|rd)\b/,
+    /\[(?:System\.)?IO\.File\]::(?:Write|Append|Delete|Copy|Move|Replace)/, /\[(?:System\.)?IO\.Directory\]::Delete/,
+    // A link is a write by proxy: the next write to the link lands in the state file.
+    /\bln\b/, /\b(?:link|mklink)\b/, /\bfsutil\s+hardlink\s+create\b/,
+    // git can put an older copy back, also with options before the subcommand (`git -C <dir> checkout`).
+    /\bgit(?:\s+-[Cc]\s*\S+|\s+--[\w-]+(?:=\S+)?)*\s+(?:checkout|restore|apply|mv|rm)\b/,
+    // PowerShell writes through cmdlets rather than redirection.
+    /\b(?:Set|Add|Clear)-Content\b/, /\bOut-File\b/, /\b(?:Copy|Move|Remove|Rename|New)-Item\b/,
+];
+function anyOf(patterns) {
+    return new RegExp(patterns.map((pattern) => pattern.source).join('|'), 'i');
+}
+export const WRITE_OPS = anyOf([...REDIRECT_OPS, ...FILE_OPS]);
+/** Write ops that can replace, delete or fill a whole folder. */
+const FOLDER_OPS = anyOf(FILE_OPS);
+/** Folders that hold state files: openspec/, the change folders (active and archived), openspec/.sdlc, the inbox. */
+const STATE_FOLDER = /^openspec(?:\/changes(?:\/archive)?(?:\/[^/]+)?|\/\.sdlc(?:\/inbox)?)?$/i;
+/** The state files at fixed places; a `.sdlc.yaml` may sit in any change directory. */
+const FIXED_STATE_FILES = [
+    'openspec/backlog.md', 'openspec/roles.yaml', 'openspec/.sdlc/log.jsonl', 'openspec/.sdlc/team.json', '.sdlc.yaml',
+];
+const GLOB_CHARS = /[*?[{]/;
+const DIR_COMMAND = /^(?:cd|chdir|pushd|Set-Location|sl|Push-Location)$/i;
+const POP_COMMAND = /^(?:popd|Pop-Location)$/i;
+/** Words that cannot be resolved from the text: variables, command substitution, the home directory. */
+const UNRESOLVED = /[$`~%]/;
+export function relToRoot(root, cwd, file) {
+    const abs = path.isAbsolute(file) ? file : path.resolve(cwd, file);
+    if (!isWithin(root, abs))
+        return undefined;
+    return toPosix(path.relative(root, abs));
+}
+/** The root-relative path of `abs` when it matches `pattern`, or undefined. */
+function relMatching(root, abs, pattern) {
+    if (abs === undefined)
+        return undefined;
+    const rel = relToRoot(root, root, abs);
+    return rel !== undefined && pattern.test(rel) ? rel : undefined;
+}
+function realOrSelf(target) {
+    try {
+        return fs.realpathSync(target);
+    }
+    catch {
+        return target;
+    }
+}
+/**
+ * The real path of a file; for a file that does not exist yet, the real path of its parent directory plus the name;
+ * for a dangling link, the same for the path it points to (a write through it creates that file).
+ */
+export function realTarget(abs) {
+    try {
+        return fs.realpathSync(abs);
+    }
+    catch {
+        return realParent(linkTarget(abs) ?? abs);
+    }
+}
+function realParent(abs) {
+    try {
+        return path.join(fs.realpathSync(path.dirname(abs)), path.basename(abs));
+    }
+    catch {
+        return undefined;
+    }
+}
+/** Where a symbolic link points, absolute; undefined for anything that is not a link. */
+function linkTarget(abs) {
+    try {
+        return path.resolve(path.dirname(abs), fs.readlinkSync(abs));
+    }
+    catch {
+        return undefined;
+    }
+}
+/** Edit targets that resolve, through links, to a file matching `pattern`; root-relative. */
+export function linkedFiles(files, root, cwd, pattern) {
+    const realRoot = realOrSelf(root);
+    const hits = [];
+    for (const file of files) {
+        const real = realTarget(path.resolve(cwd, file));
+        const rel = relMatching(realRoot, real, pattern);
+        if (rel !== undefined)
+            hits.push(rel);
+    }
+    return hits;
+}
+/** Edit targets that resolve, through links, to a state file; root-relative. */
+export function linkedStateFiles(files, root, cwd) {
+    return linkedFiles(files, root, cwd, STATE_FILE);
+}
+/** Splits at shell operators outside quotes and PowerShell here-strings. */
+export function simpleCommands(command) {
+    const out = [];
+    let start = 0;
+    scanShell(command, (ch, i, quoted) => {
+        if (quoted || i < start) {
+            return;
+        }
+        if (ch === '>' && command[i - 1] === '&') {
+            return;
+        }
+        if (!/[;&|{}\r\n]/.test(ch)) {
+            return;
+        }
+        if (ch === '&' && (command[i - 1] === '>' || command[i + 1] === '>' || command[i + 1] === '{')) {
+            return;
+        }
+        out.push(command.slice(start, i));
+        start = i + (command[i + 1] === ch && /[&|]/.test(ch) ? 2 : 1);
+    });
+    out.push(command.slice(start));
+    return out;
+}
+/**
+ * The words of a simple command without quotes, redirections, grouping and `name=` prefixes (`dd of=`); .NET call
+ * arguments (`[IO.Directory]::Delete('dir', $true)`) are words of their own.
+ */
+function words(segment) {
+    return segment.replace(/\*>>?/g, '>')
+        .split(/[\s(),]+|[<>]+/)
+        .map((word) => word.replace(/['"]/g, ''))
+        .map((word) => word.replace(/^\(+|\)+$/g, ''))
+        .map((word) => word.replace(/^-{0,2}[A-Za-z_][\w-]*=/, ''))
+        .filter((word) => word !== '');
+}
+/** A word as an absolute path from the current directory, or undefined when it cannot be told. */
+export function absolute(dir, word) {
+    if (word === undefined || word.startsWith('-') || UNRESOLVED.test(word))
+        return undefined;
+    if (path.isAbsolute(word))
+        return path.resolve(word);
+    return dir === undefined ? undefined : path.resolve(dir, word);
+}
+export function moveTo(state, verb, args) {
+    if (POP_COMMAND.test(verb)) {
+        state.dir = state.stack.pop();
+        return;
+    }
+    if (/^push/i.test(verb))
+        state.stack.push(state.dir);
+    state.dir = absolute(state.dir, args.find((arg) => !arg.startsWith('-')));
+}
+export function isDirCommand(verb) {
+    return DIR_COMMAND.test(verb) || POP_COMMAND.test(verb);
+}
+/** The inbox files on disk, root-relative. */
+export function inboxFiles(root) {
+    try {
+        return fs.readdirSync(path.join(root, INBOX_DIR)).map((name) => `${INBOX_DIR}/${name}`);
+    }
+    catch {
+        return [];
+    }
+}
+/** Directories that may hold a change's `.sdlc.yaml`: the change directories on disk, active and archived. */
+export function changeDirs(root) {
+    const dirs = [];
+    for (const parent of ['openspec/changes', 'openspec/changes/archive']) {
+        try {
+            const entries = fs.readdirSync(path.join(root, parent), { withFileTypes: true });
+            dirs.push(...entries.filter((entry) => entry.isDirectory()).map((entry) => `${parent}/${entry.name}`));
+        }
+        catch {
+            // No such directory: nothing to add.
+        }
+    }
+    return dirs;
+}
+/** The literal directory a glob starts from (`openspec/changes/x` for `openspec/changes/x/.sdlc.y*`). */
+function literalDir(glob) {
+    const parts = glob.split('/');
+    const first = parts.findIndex((part) => GLOB_CHARS.test(part));
+    return parts.slice(0, Math.min(first, parts.length - 1)).join('/');
+}
+function stateCandidates(root, glob, folders) {
+    const dirs = new Set(changeDirs(root));
+    const literal = literalDir(glob);
+    if (literal === 'openspec' || literal.startsWith('openspec/'))
+        dirs.add(literal);
+    const files = [...FIXED_STATE_FILES, ...[...dirs].map((dir) => `${dir}/.sdlc.yaml`), ...inboxFiles(root)];
+    if (!folders)
+        return files;
+    return [...files, 'openspec', 'openspec/changes', 'openspec/.sdlc', INBOX_DIR, ...dirs];
+}
+/** The state files and the folders that hold them. */
+const STATE_SET = { file: STATE_FILE, folder: STATE_FOLDER, candidates: stateCandidates };
+/** The protected file (or, for a folder write, folder) a glob word can match, read with bash rules. */
+function globHit(root, dir, word, folders, set) {
+    const abs = absolute(dir, word);
+    const rel = abs === undefined ? undefined : relToRoot(root, root, abs);
+    if (rel === undefined)
+        return undefined;
+    try {
+        const matches = picomatch(rel, { nocase: true });
+        return set.candidates(root, rel, folders).find((candidate) => matches(candidate));
+    }
+    catch {
+        return undefined;
+    }
+}
+/** The protected file (or folder) a word names, by its path or through a link; root-relative. */
+function wordHit(root, dir, word, folders, set) {
+    if (GLOB_CHARS.test(word))
+        return globHit(root, dir, word, folders, set);
+    const abs = absolute(dir, word);
+    if (abs === undefined)
+        return undefined;
+    const realRoot = realOrSelf(root);
+    const file = relMatching(root, abs, set.file) ?? relMatching(realRoot, realTarget(abs), set.file);
+    if (file !== undefined || !folders)
+        return file;
+    return relMatching(root, abs, set.folder) ?? relMatching(realRoot, realTarget(abs), set.folder);
+}
+/** `git -C <dir> …`: the paths after it are relative to that directory; the option itself names no target. */
+function gitDir(dir, list) {
+    if (!/^git$/i.test(list[0] ?? ''))
+        return { dir, words: list };
+    const rest = [];
+    let at = dir;
+    for (let i = 0; i < list.length; i += 1) {
+        if (list[i] === '-C' && i + 1 < list.length) {
+            at = absolute(at, list[i + 1]);
+            i += 1;
+            continue;
+        }
+        rest.push(list[i]);
+    }
+    return { dir: at, words: rest };
+}
+/** The simple commands of a shell command that write, following `cd`/`pushd`/`popd` and `git -C`. */
+export function writeSegments(command, cwd) {
+    const state = { dir: path.resolve(cwd), stack: [] };
+    const out = [];
+    for (const segment of simpleCommands(command)) {
+        const list = words(segment);
+        if (list.length === 0)
+            continue;
+        if (DIR_COMMAND.test(list[0]) || POP_COMMAND.test(list[0])) {
+            moveTo(state, list[0], list.slice(1));
+            continue;
+        }
+        if (!WRITE_OPS.test(segment))
+            continue;
+        out.push({ text: segment, ...gitDir(state.dir, list) });
+    }
+    return out;
+}
+/**
+ * State files a shell command writes by a bare name after `cd`, by a glob or through a link, and state folders
+ * (openspec/, a change folder, openspec/.sdlc) it deletes, restores, moves or copies into; root-relative.
+ */
+export function shellStateWrites(command, root, cwd) {
+    return shellWrites(command, root, cwd, STATE_SET);
+}
+/**
+ * Files of a protected set a shell command writes by path, by a bare name after `cd`, by a glob or through a link,
+ * and folders of the set it deletes, restores, moves or copies into; root-relative.
+ */
+export function shellWrites(command, root, cwd, set) {
+    const hits = [];
+    for (const segment of writeSegments(command, cwd)) {
+        const folders = FOLDER_OPS.test(segment.text);
+        for (const word of segment.words) {
+            const hit = wordHit(root, segment.dir, word, folders, set);
+            if (hit !== undefined)
+                hits.push(hit);
+        }
+    }
+    return hits;
+}
+const REDIRECT_TARGET = /\d*>>?\s*(?:"([^"]+)"|'([^']+)'|([^\s;&|<>()]+))/g;
+/** The words a write segment writes to: redirection targets, and every argument of a writing command. */
+function segmentTargets(segment) {
+    const targets = [...segment.text.matchAll(REDIRECT_TARGET)].map((m) => m[1] ?? m[2] ?? m[3]);
+    if (FOLDER_OPS.test(segment.text))
+        targets.push(...segment.words.slice(1));
+    return targets;
+}
+/** Project files and folders (root-relative, posix) a shell command may write; used by the takeover rule. */
+export function shellWriteTargets(command, root, cwd) {
+    const rels = new Set();
+    for (const segment of writeSegments(command, cwd)) {
+        for (const word of segmentTargets(segment)) {
+            const abs = absolute(segment.dir, word);
+            const rel = abs === undefined ? undefined : relToRoot(root, root, abs);
+            if (rel !== undefined && rel !== '')
+                rels.add(rel);
+        }
+    }
+    return [...rels];
+}
