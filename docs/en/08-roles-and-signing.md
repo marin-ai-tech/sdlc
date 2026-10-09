@@ -33,7 +33,8 @@ separation:
   - `distinct_approvers`: pairs of gates that need two different people.
   - `max_gates_per_person`: how many gates of one change one person may approve (0 = no limit).
 
-Agents cannot edit the file: the Claude Code hook and the OpenCode plugin deny writes to it, like `.sdlc.yaml`.
+Agents cannot edit the file: the guard of every supported tool (the hooks, or the OpenCode plugin) denies writes to it,
+like `.sdlc.yaml`.
 
 ## 8.2. What `sdlc approve` checks
 

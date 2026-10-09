@@ -1,4 +1,4 @@
-import { HUMAN_COMMANDS } from '../core/help-catalog.js';
+import { HUMAN_COMMANDS } from '../core/human-commands.js';
 
 /**
  * What the second layer refuses (B84, 0.14.2): Codex's command rules and Qwen's `permissions.deny`.

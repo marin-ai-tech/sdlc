@@ -11,7 +11,7 @@ One rule holds for everything in this chapter: **nothing here makes a decision.*
 
 ## 10.1. Another AI system reads the process
 
-*Situation.* The team runs an orchestrator, an IDE assistant or a chat client next to Claude Code and OpenCode. It needs to know what stage each change is in, what is next and who acts. It should not scrape text output, and it must not be able to approve anything.
+*Situation.* The team runs an orchestrator, an IDE assistant or a chat client next to its agent tools. It needs to know what stage each change is in, what is next and who acts. It should not scrape text output, and it must not be able to approve anything.
 
 ```bash
 sdlc init --mcp            # or answer "yes" to the MCP question in the init wizard
@@ -44,7 +44,7 @@ Each tool runs the CLI command as a separate process and returns its JSON both a
 
 ## 10.2. The team's MCP servers, described once
 
-*Situation.* Every developer configures the same Jira and CI servers by hand, in two tools, with tokens pasted into config files.
+*Situation.* Every developer configures the same Jira and CI servers by hand, in every tool the team uses, with tokens pasted into config files.
 
 ```yaml
 # openspec/sdlc.yaml
@@ -152,7 +152,7 @@ A workflow ends with a short **Stage resources** section listing its stage's ski
 
 The list is guidance for the agent. The servers are also enforced:
 
-`stages` in the registry say when a server may be used. The Claude Code hook now also sees MCP tools (`mcp__<server>__<tool>`), and the OpenCode plugin sees `<server>_<tool>`. A call to a registry server is checked against the stages of the active changes. If its `stages` include none of them, rule `mcp-stage` applies: the call is denied in `block` mode and the agent is reminded in `warn` mode.
+`stages` in the registry say when a server may be used. The Claude Code hook now also sees MCP tools (`mcp__<server>__<tool>`), and the OpenCode plugin sees `<server>_<tool>`. The hooks of Cursor, Codex CLI, Qwen Code and GigaCode check a tool by the same names; Cursor's tool name does not always say the server, and then the call is not checked by stage (see [15.4](15-cursor.md#154-limits-we-accept)). A call to a registry server is checked against the stages of the active changes. If its `stages` include none of them, rule `mcp-stage` applies: the call is denied in `block` mode and the agent is reminded in `warn` mode.
 
 These are not checked:
 

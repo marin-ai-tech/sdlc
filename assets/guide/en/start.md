@@ -9,7 +9,9 @@ artifacts and the code. **People make the decisions**: approvals, waivers, sendi
 
 ## First steps
 
-1. `sdlc init` in the project, then `sdlc doctor` to check the setup.
+1. `sdlc init` in the project, then `sdlc doctor` to check the setup. Choose the tools with `--tools`: claude,
+   opencode, cursor, codex, qwen, gigacode (experimental). A workflow is called `/sdlc:next` in Claude Code,
+   `$sdlc-next` in Codex CLI and `/sdlc-next` in the others.
 2. Start a change: describe the work to the agent (it runs the intent workflow), or `sdlc new <name>`. With a backlog,
    `sdlc backlog start <B-id>`.
 3. Ask `sdlc next` at any time: it names the next step and who takes it (the agent or a person, by name with

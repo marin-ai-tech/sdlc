@@ -10,7 +10,7 @@
 
 The scenario covers every step of the product:
 
-- **Setup**: `init` for both tools, `doctor`, `health`, `license`, `help`, the `layout` commands, `update`.
+- **Setup**: `init` for Claude Code and OpenCode (the demo's two tools), `doctor`, `health`, `license`, `help`, the `layout` commands, `update`.
 - **Roles**: `roles.yaml` with signing in `warn` mode.
 - **Planning**: exploration; a backlog with an epic, dependencies and priorities.
 - **OpenSpec underneath**: the change is a plain OpenSpec change (`openspec list`, `status`, `show`); a delta requirement without a scenario is refused by strict validation, then fixed; the `sdlc` schema validates as an OpenSpec schema; after the archive the requirement lives in the spec (`openspec list --specs`, `openspec show calculator`).

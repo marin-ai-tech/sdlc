@@ -2,7 +2,7 @@
 
 ## 7.1. Why a layout
 
-An agent needs a stable map of the system, its rules, and the commands that prove a change works. The AI-ready layout gives people, Claude Code, and OpenCode the same entry points. OpenSpec keeps change artifacts and living specifications; these project documents provide the context around them. Run `sdlc init` before any layout or reporting command.
+An agent needs a stable map of the system, its rules, and the commands that prove a change works. The AI-ready layout gives people and every agent tool the same entry points. OpenSpec keeps change artifacts and living specifications; these project documents provide the context around them. Run `sdlc init` before any layout or reporting command.
 
 ## 7.2. Target structure
 
@@ -35,7 +35,7 @@ openspec/
 
 ## 7.3. AGENTS.md and CLAUDE.md
 
-`AGENTS.md` is the main agent file, with links to the actual project documents. OpenCode reads it directly. `CLAUDE.md` is a thin Claude Code wrapper: its first line is `@AGENTS.md`, followed only by Claude-specific notes. Keep shared rules in the main guide so the two agents follow the same project policy.
+`AGENTS.md` is the main agent file, with links to the actual project documents. OpenCode reads it directly. `CLAUDE.md` is a thin Claude Code wrapper: its first line is `@AGENTS.md`, followed only by Claude-specific notes. Keep shared rules in the main guide so every agent follows the same project policy.
 
 ## 7.4. OpenSpec and the lifecycle
 
@@ -95,7 +95,7 @@ Conversion never moves pinned `README.md`, `README`, `README.txt`, `README.rst`,
 
 `sdlc adopt --apply` writes the draft: it adds the proposed commands and paths to `openspec/sdlc.yaml`, keeping everything already there, and writes `openspec/roles.yaml` only when the file does not exist. Applying is a person's decision: agents are refused by the CLI and the hook. A second run with nothing new writes nothing.
 
-In Claude Code and OpenCode, `/sdlc:adopt` (`/sdlc-adopt`) prepares the whole project: `sdlc layout check`, `layout adapt` for existing documents (conversion is only proposed), `layout scaffold` for missing ones, then the agent fills them from the code — architecture, conventions, build and test commands, glossary, sensitive areas, decisions — with a file reference for every statement and "to check" on anything uncertain. It ends with the `sdlc adopt` draft and the command for you to apply it. `sdlc init` suggests this workflow for an existing project.
+In every supported tool, the adopt workflow (`/sdlc:adopt` in Claude Code, `/sdlc-adopt` in OpenCode, Cursor, Qwen Code and GigaCode, `$sdlc-adopt` in Codex CLI) prepares the whole project: `sdlc layout check`, `layout adapt` for existing documents (conversion is only proposed), `layout scaffold` for missing ones, then the agent fills them from the code — architecture, conventions, build and test commands, glossary, sensitive areas, decisions — with a file reference for every statement and "to check" on anything uncertain. It ends with the `sdlc adopt` draft and the command for you to apply it. `sdlc init` suggests this workflow for an existing project.
 
 ## 7.9. Progress: report and dashboard
 

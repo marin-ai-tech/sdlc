@@ -8,11 +8,19 @@ npm install -g https://github.com/marin-ai-tech/sdlc/releases/latest/download/sd
 sdlc --version
 
 # in the project root (a git repository)
-sdlc init --tools claude,opencode      # or any combination of claude, opencode, cursor, codex, qwen, gigacode
+sdlc init --tools claude,opencode      # any comma-separated set of: claude, opencode, cursor, codex, qwen, gigacode
 sdlc doctor                            # check the installation
 ```
 
-For Cursor, see [15. Cursor IDE](15-cursor.md): `sdlc init --tools cursor --mcp` sets up skills, commands, subagents, a rule, the MCP server and Cursor's own hooks. For Codex CLI, see [16. Codex CLI](16-codex.md): `sdlc init --tools codex --mcp`, then trust sdlc's hooks once in Codex's `/hooks`. For Qwen Code and GigaCode, see [17. Qwen Code and GigaCode](17-qwen-gigacode.md): `sdlc init --tools qwen --mcp` (or `gigacode`, experimental), then trust the project folder.
+Examples: `--tools cursor`, `--tools claude,codex`, `--tools qwen`, `--tools gigacode`. Without `--tools`, `sdlc init`
+uses the tools it finds in the project (for example a `.claude/`, `.cursor/`, `.codex/` or `.qwen/` folder), else
+Claude Code and OpenCode. The tools are compared in [Supported tools](#supported-tools) at the end of this section.
+
+For Cursor, see [15. Cursor IDE](15-cursor.md): `sdlc init --tools cursor --mcp` sets up skills, commands, subagents,
+a rule, the MCP server and Cursor's own hooks. For Codex CLI, see [16. Codex CLI](16-codex.md):
+`sdlc init --tools codex --mcp`, then trust sdlc's hooks once in Codex's `/hooks`. For Qwen Code and GigaCode, see
+[17. Qwen Code and GigaCode](17-qwen-gigacode.md): `sdlc init --tools qwen --mcp` (or `gigacode`, experimental), then
+trust the project folder.
 
 From git, install the `release` branch, which carries the built code: `npm install -g github:marin-ai-tech/sdlc#release`. Never `npm install -g sdlc`: the registry package of that name is unrelated.
 
@@ -23,7 +31,9 @@ With no flags in a terminal, `sdlc init` guides you through the setup (tools, en
 `sdlc init`:
 - creates `openspec/` by running `openspec init` if it does not exist, and makes `sdlc` the default schema. In an existing OpenSpec project, the default schema does not change;
 - copies the schema to `openspec/schemas/sdlc/` and creates `openspec/sdlc.yaml`. Verification commands are detected automatically from `package.json`, `Makefile`, `pyproject`, `go.mod` or `Cargo.toml`;
-- generates skills, commands, subagents and hooks (Claude) or a plugin (OpenCode), plus `REVIEW.md` if it does not exist.
+- generates, for each chosen tool, the workflows (skills, commands), the subagents and what holds the gates: hooks for
+  Claude Code, a plugin for OpenCode, the tool's own hooks and rules for Cursor, Codex CLI, Qwen Code and GigaCode
+  ([Supported tools](#supported-tools)); plus `REVIEW.md` if it does not exist.
 
 Useful flags: `--mode block` — strict enforcement; `--cli "npx --no-install sdlc"` — if the CLI is installed locally in the project (`npm i -D https://github.com/marin-ai-tech/sdlc/releases/latest/download/sdlc.tgz`; `--no-install` keeps npx from fetching the unrelated registry package); `--opsx` — also install OpenSpec's own `/opsx:*` workflows alongside; `--delivery skills|commands|both`; `--no-hooks`; `--statusline` — install the Claude Code status line.
 
@@ -32,17 +42,40 @@ Useful flags: `--mode block` — strict enforcement; `--cli "npx --no-install sd
 /plugin marketplace add marin-ai-tech/sdlc
 /plugin install sdlc@sdlc
 ```
-After you install the plugin, it is enough to run `sdlc init --tools none` (or `--tools opencode`) in the project, so that skills are not duplicated. To make the plugin installation mandatory, use `extraKnownMarketplaces` and `enabledPlugins` in `.claude/settings.json` or in managed settings.
+After you install the plugin, it is enough to run `sdlc init --tools none` in the project (or name only the other
+tools, for example `--tools opencode,cursor`), so that skills are not duplicated. To make the plugin installation
+mandatory, use `extraKnownMarketplaces` and `enabledPlugins` in `.claude/settings.json` or in managed settings.
 
 After `init`, commit the generated files: they are shared by the team.
 
 **License.** By default, a project uses sdlc under the free Community License. It covers noncommercial use, open source projects and a 30-day evaluation. `sdlc init` and `sdlc doctor` warn you if the project has no OSI-approved license. Commercial use requires a commercial license. After the agreement is signed, record the license with `sdlc license set commercial --agreement <id> --licensee "<company>"`.
 
+### Supported tools
+
+sdlc works the same way in every supported tool: the same workflows, subagents, gates, checks and CLI. Several tools
+can share one project: a change started in one continues in another. What differs is how you call a workflow, what
+holds the gates inside the tool, and how the CLI knows the agent's shell (the agent marker; `sdlc approve` refuses
+where it is set).
+
+| Tool | `--tools` id | A workflow is called | What holds the gates | Agent marker | Main limit | Chapter |
+|---|---|---|---|---|---|---|
+| Claude Code | `claude` | `/sdlc:next` (as a skill: `/sdlc-next`) | hooks in `.claude/settings.json`: SessionStart, PreToolUse, Stop | `CLAUDECODE=1` | without the `sdlc` CLI on the PATH the hooks let calls through (`sdlc doctor` warns) | [4.5](04-architecture.md#45-deterministic-enforcement-hooks-and-plugin) |
+| OpenCode | `opencode` | `/sdlc-next` | the plugin `.opencode/plugins/sdlc.js` | `OPENCODE=1` or `AGENT=1`; the plugin adds `SDLC_AGENT` | no Stop hook, so no check of verification before the agent stops | [4.5](04-architecture.md#45-deterministic-enforcement-hooks-and-plugin) |
+| Cursor | `cursor` | `/sdlc-next` | hooks in `.cursor/hooks.json` and the rule `.cursor/rules/sdlc.mdc` | `CURSOR_AGENT=1` | the marker is documented for the Cursor CLI, not confirmed for the IDE | [15](15-cursor.md) |
+| Codex CLI | `codex` | `$sdlc-next` | hooks in `.codex/hooks.json` and command rules in `.codex/rules/sdlc.rules` | `CODEX_CI=1`, `CODEX_SESSION_ID` | the hooks run only after you trust them in `/hooks` | [16](16-codex.md) |
+| Qwen Code | `qwen` | `/sdlc-next` | hooks and `permissions.deny` in `.qwen/settings.json` | `QWEN_CODE=1` | the hooks run only in a trusted folder | [17](17-qwen-gigacode.md) |
+| GigaCode (experimental) | `gigacode` | `/sdlc-next` | hooks and `permissions.deny` in `.gigacode/settings.json` | `QWEN_CODE=1` (GigaCode's own is not documented) | not checked on a live installation; trusted folder as in Qwen Code | [17](17-qwen-gigacode.md) |
+
+In every tool, the CLI itself refuses a person's decision in the agent's shell, the agent cannot edit the guard's
+configuration, and commits made in the agent's shell carry `SDLC-Agent: <agent>`.
+
 ## 5.2. Working with sdlc: from init to an empty backlog
 
-The usual path for an existing project:
+The usual path for an existing project. Workflows are shown as Claude Code (`/sdlc:adopt`) and as OpenCode, Cursor,
+Qwen Code and GigaCode call them (`/sdlc-adopt`); in Codex CLI they are `$sdlc-adopt` and so on
+([Supported tools](#supported-tools)).
 
-| # | Step | Claude Code / OpenCode | Who decides |
+| # | Step | Workflow | Who decides |
 |---|---|---|---|
 | 1 | Set up: `sdlc init` in the project root. The wizard compares the project with the AI-ready layout and offers to build the AI-ready project in a new git worktree, to adapt in place, or to skip. | — | you, in the wizard |
 | 2 | Prepare the project for agents: the documents are filled from the code (architecture, conventions, build and test commands, glossary, sensitive areas) with a file reference for every statement, then a draft of the settings and roles. | `/sdlc:adopt` / `/sdlc-adopt` | you apply the settings: `sdlc adopt --apply` |
@@ -61,7 +94,7 @@ Repeat steps 3–6 until the backlog is empty. A new idea goes through step 3 at
 
 ## 5.3. Lifecycle of a change
 
-| Step | Who | Claude Code | OpenCode | CLI |
+| Step | Who | Claude Code | OpenCode, Cursor, Qwen Code, GigaCode | CLI |
 |---|---|---|---|---|
 | Idea → intent.md | agent + idea author | `/sdlc:intent "customers call to check the status of their request"` | `/sdlc-intent …` | `sdlc new <id>` |
 | Approve the intent | product owner | | | `sdlc approve intent --change <id>` |
@@ -77,7 +110,9 @@ Repeat steps 3–6 until the backlog is empty. A new idea goes through step 3 at
 | Archive: deltas → living specs | agent | `/sdlc:archive` | `/sdlc-archive` | `sdlc archive <id> --yes` |
 | Alert/incident → new intent | agent | `/sdlc:triage <alert>` | `/sdlc-triage` | |
 
-At any point, `/sdlc:next` (`/sdlc-next`) runs the next step or tells you who must do it and with which command. `sdlc status` shows all changes, and `sdlc status --markdown` produces a report for a PR or a wiki.
+In Codex CLI, call the same workflows as `$sdlc-intent`, `$sdlc-spec` and so on.
+
+At any point, `/sdlc:next` (`/sdlc-next`, `$sdlc-next` in Codex) runs the next step or tells you who must do it and with which command. `sdlc status` shows all changes, and `sdlc status --markdown` produces a report for a PR or a wiki.
 
 **A human runs approvals in their own terminal.** Inside an agent session, `sdlc approve` refuses to run. This is by design.
 
@@ -86,8 +121,8 @@ At any point, `/sdlc:next` (`/sdlc-next`) runs the next step or tells you who mu
 ### Getting around
 
 - Language: help, hints, `status`, the init wizard, hook reasons and reports follow `--locale`, `SDLC_LOCALE`, `locale:` in `sdlc.yaml` or the system locale, in that order; English when there is no translation (English and Russian ship). JSON never changes with the locale.
-- `sdlc help [topic] [--json]` and `/sdlc:help` (`/sdlc-help`) list workflows and CLI commands and say who runs each one (agent or person).
-- **Ask the agent how sdlc works.** "How do I send this back?", "why did the hook say no?", "who approves the plan?": the agent answers for your project with the guide workflow (`/sdlc:guide`, `/sdlc-guide`, or just ask). The material ships with sdlc in English and Russian, so it matches the installed version: `sdlc guide` lists the topics (start, lifecycle, gates, roles, tracks, bugfix, backlog, rework, verify, review, mcp, config, denials, faq), and `sdlc guide <topic>` prints one. Every hook denial ends with the section that explains it, for example `sdlc guide denials#plan-gate`. The sdlc MCP server offers the same as its `guide` tool.
+- `sdlc help [topic] [--json]` and `/sdlc:help` (`/sdlc-help`, `$sdlc-help`) list workflows and CLI commands and say who runs each one (agent or person).
+- **Ask the agent how sdlc works.** "How do I send this back?", "why did the hook say no?", "who approves the plan?": the agent answers for your project with the guide workflow (`/sdlc:guide`, `/sdlc-guide`, `$sdlc-guide` in Codex, or just ask). The material ships with sdlc in English and Russian, so it matches the installed version: `sdlc guide` lists the topics (start, lifecycle, gates, roles, team, tracks, bugfix, backlog, rework, verify, review, health, mcp, config, denials, faq), and `sdlc guide <topic>` prints one. Every hook denial ends with the section that explains it, for example `sdlc guide denials#plan-gate`. The sdlc MCP server offers the same as its `guide` tool.
 - **What is waiting for me:** `sdlc next --me` lists every gate, across the active changes, that you (your git identity, matched in `roles.yaml`) may take now, with the command. Without `roles.yaml` it lists every gate waiting for a person.
 - **What am I approving:** `sdlc approve <gate> --change <id> --preview` shows the gate's artifacts, what changed since the last approval, the approvals so far and needed, open findings and verification for review and release, and whether you may approve. It writes nothing.
 - After a state-changing command, the CLI prints a `Next:` hint (who acts next and how; the exact command when a person must act) and adds `next` to JSON. With no active change, session-start context names the next ready backlog item.
@@ -122,7 +157,7 @@ Goal: policyholders see claim status without calling support.
 
 Commands: `sdlc backlog epic add <title> [--goal]`, `sdlc backlog epic edit <E-id> [--title --goal --clear-goal]` (changes an epic's title or goal, never the order), `sdlc backlog add <title> [--epic --kind --risk --outcome --accept --depends --source-type --source-ref]`, `list [--epic --status --ready]`, `next`, `edit <B-id> [--title --outcome --accept --add-accept --depends --clear-depends --kind --risk]` (changes an open or in-progress item's text, never its place or status; `--accept` and `--depends` replace the list), `start <B-id> [--change <id>]` (creates the change and a draft `intent.md`, sets the item to `in-progress`), `move <B-id> (--top | --before | --after | --epic)` and `drop <B-id> --note` (human-only), `done <B-id> --note`. Flow: ready item → `backlog start` → change lifecycle → `sdlc archive` marks the item `done`. With no active change, `sdlc next` proposes the next ready item.
 
-People edit `openspec/backlog.md` by hand as well — notes under items and epics, extra fields and sections stay when a command writes the file — and agents change it only through these commands — the hook denies an agent's direct edit, so order and removal stay a person's decision. In Claude Code and OpenCode, `/sdlc:backlog` (`/sdlc-backlog`) works with the backlog: without input it shows the list, the next ready item and what blocks the others; with an epic or an idea it proposes items with an outcome and acceptance criteria and adds only those you confirm; with `B<n>` it brings the item to ready and offers to start it. For a reorder or a drop it gives you the command to run.
+People edit `openspec/backlog.md` by hand as well — notes under items and epics, extra fields and sections stay when a command writes the file — and agents change it only through these commands — the hook denies an agent's direct edit, so order and removal stay a person's decision. In every supported tool, the backlog workflow (`/sdlc:backlog`, `/sdlc-backlog`, `$sdlc-backlog` in Codex) works with the backlog: without input it shows the list, the next ready item and what blocks the others; with an epic or an idea it proposes items with an outcome and acceptance criteria and adds only those you confirm; with `B<n>` it brings the item to ready and offers to start it. For a reorder or a drop it gives you the command to run.
 
 ### Explore before intent
 
@@ -265,7 +300,7 @@ stages:                       # what each stage uses (chapter 10.5); MCP servers
   build:  { skills: [test-driven-development], agents: [sdlc-simplifier] }
 mcp:                          # chapter 10
   serve: true                 # register `sdlc mcp serve` for the tools (sdlc init --mcp)
-  servers:                    # the team's MCP servers, laid out into .mcp.json and opencode.json
+  servers:                    # the team's MCP servers, laid out into every tool's MCP configuration
     build: { type: stdio, command: [npx, -y, corp-build-mcp], env: { CI_TOKEN: "${CI_TOKEN}" }, stages: [build, test] }
     jira:  { type: http, url: https://mcp.corp.example/jira, headers: { Authorization: "Bearer ${JIRA_TOKEN}" }, stages: [plan, deploy] }
 questions: { required: true } # a person answers open questions before intent/spec approval (sdlc answer)

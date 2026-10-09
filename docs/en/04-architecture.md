@@ -8,6 +8,10 @@
 ┌──────────────────────────── agents ─────────────────────────────┐
 │ Claude Code: skills, /sdlc:* commands, subagents, hooks         │
 │ OpenCode:    /sdlc-* commands, subagents, plugin .opencode/…    │
+│ Cursor:      skills, /sdlc-* commands, subagents, hooks, a rule │
+│ Codex CLI:   $sdlc-* skills, subagents, hooks, command rules    │
+│ Qwen Code, GigaCode: skills, /sdlc-* commands, subagents,       │
+│              hooks and deny rules in settings.json              │
 └──────────────┬────────────────────────────────┬─────────────────┘
                │ call the CLI (--json)          │ sdlc hook <event>
 ┌──────────────▼────────────────────────────────▼─────────────────┐
@@ -26,7 +30,7 @@
 1. **The same `openspec/` layout.** An SDLC change is a regular OpenSpec change. `openspec list/show/status/validate/archive` work with it as with a native change.
 2. **Its own `sdlc` schema, not a fork.** `openspec/schemas/sdlc/` (copied by `sdlc init`) is a standard OpenSpec schema: `intent → proposal → specs + design → plan → tasks`, `apply.tracks: tasks.md`. The instructions for proposal, specs, design and tasks are taken from `spec-driven` and extended. That is why `/opsx:propose` also creates SDLC changes when `sdlc` is selected as the default schema.
 3. **Its own files, only next to OpenSpec's files:** `openspec/sdlc.yaml` (OpenSpec does not read it), `.sdlc.yaml`, and the `verification.md`, `review.md`, `release.md` records in the change folder. OpenSpec ignores them and moves them into the archive.
-4. **Its own namespace in the agents:** `sdlc-*` skills, `/sdlc:*` and `/sdlc-*` commands, `sdlc-*` subagents. `openspec update` touches only `openspec-*`/`opsx*`, so `/opsx:*` can be installed alongside (`sdlc init --opsx`).
+4. **Its own namespace in the agents:** `sdlc-*` skills (`$sdlc-*` in Codex CLI), `/sdlc:*` and `/sdlc-*` commands, `sdlc-*` subagents. `openspec update` touches only `openspec-*`/`opsx*`, so `/opsx:*` can be installed alongside (`sdlc init --opsx`).
 5. **Existing OpenSpec projects:** `sdlc init` does not change the default schema. Changes on `spec-driven` are read correctly: the `intent` gate is marked `n/a`, and the `plan` gate covers only `tasks`.
 6. **The same semantics:** task progress is counted with the same regex as in OpenSpec; artifact statuses are computed from the presence of files, in the same DAG order.
 
@@ -68,7 +72,7 @@ The stage **is not stored anywhere**: it is computed each time from the artifact
 Mechanics:
 - **Approval is bound to content.** `.sdlc.yaml` records the role, who (git identity), when, and the **sha256 digest** of the covered files. Any edit → status `stale` → a new approval is needed. Checkboxes in `tasks.md` are normalized: progress does not make the plan stale.
 - **The worktree fingerprint for verify, review and release** is the git tree id of all files (tracked + untracked, excluding ignored files and `openspec/`). It is computed in a temporary index and does not depend on commits: committing verified code does not make the verification stale, while any change to the content does.
-- **Separation of duties: agents.** `approve`, `reject`, `waive`, `track set`, `tests unlock`, `archive --force`, `license set`, `backlog move`, `backlog drop` and `roles migrate` refuse to run in an agent session (`CLAUDECODE=1`, `OPENCODE=1`/`AGENT=1`, `SDLC_AGENT`). Hooks also stop the agent from calling the commands in `HUMAN_COMMANDS` and from editing `.sdlc.yaml`, `openspec/roles.yaml` and the project log `openspec/.sdlc/log.jsonl`. Backlog priority and dropping an item are human product decisions.
+- **Separation of duties: agents.** `approve`, `reject`, `waive`, `track set`, `tests unlock`, `archive --force`, `license set`, `backlog move`, `backlog drop` and `roles migrate` refuse to run in an agent session (`CLAUDECODE=1`, `OPENCODE=1`/`AGENT=1`, `SDLC_AGENT`, `CURSOR_AGENT=1`, `CODEX_CI=1`/`CODEX_SESSION_ID`, `QWEN_CODE=1`/`QWEN_CODE_SESSION_ID`; `src/core/agent-env.ts`). Hooks also stop the agent from calling the commands in `HUMAN_COMMANDS` and from editing `.sdlc.yaml`, `openspec/roles.yaml` and the project log `openspec/.sdlc/log.jsonl`. Backlog priority and dropping an item are human product decisions.
 - **Separation of duties: people.** Without `openspec/roles.yaml`, `roles.<role>: [emails]` in sdlc.yaml limits the set of approvers, and without a list any person with a git identity can approve (convenient for small teams). With the file (`src/core/roles.ts`), the git email names a person, the gate needs one of that person's roles, and `checkApproval` applies the separation rules against the change's recorded approvals and its code authors (`changeAuthors`: commit authors and `Co-authored-by` since the review base, files outside `openspec/`). `sdlc approvals verify` (`src/commands/approvals.ts`) finds the commit that introduced each approval record (`git log -S<timestamp>`) and checks its SSH signature against an `allowed_signers` file built from the people's keys; `roles.yaml` commits are checked against the maintainers of the previous version. The hook denies agent writes to `roles.yaml`. See [8. Roles, separation of duties and signed approvals](08-roles-and-signing.md).
 - **Tracks:** `full` (all gates) and `lite` (intent and spec are optional, the change starts with the plan) for bug fixes, refactorings and minor work.
 - **Process hygiene (0.11.2):** after a rework, an approval with the digest approved before it needs a note (`src/core/approval-hygiene.ts`); `gates.<gate>.auto_waive` turns into a policy waiver during evaluation (`src/core/auto-waive.ts`; not for verify, review, release, nor for a kind chosen in an agent session, recorded as `kind_by_agent`); the rework record counts its `cycle`, and at `rework.max_cycles` the next action becomes a person's `review-scope` (`src/core/rework-limit.ts`); approvals propose a commit with an `SDLC-Approval` trailer.
@@ -89,14 +93,14 @@ One engine (`src/core/policy.ts`) and one dispatcher (`sdlc hook pre-tool | sess
 | Protected paths (`protected_paths`) | hard | deny |
 | Tests locked (`sdlc tests lock` during a bug fix) | hard | deny edits to `test_paths` |
 | Agent approves a gate / edits `.sdlc.yaml`, `openspec/roles.yaml` or the project log | hard | deny |
-| Agent edits the guard's own configuration (`openspec/sdlc.yaml`, `.claude/settings*.json`, `.opencode/plugins/sdlc.js`, `.mcp.json`, `opencode.json(c)`, the manifest, the review policy, the sdlc schema, `openspec/config.yaml`; user-level `~/.claude/settings.json`, `$CLAUDE_CONFIG_DIR/settings.json`, `~/.config/opencode/opencode.json(c)`, `$OPENCODE_CONFIG`), by edit or shell; runs `sdlc uninstall`, or `sdlc init`/`update` with flags that weaken the guard (lower mode, fewer tools, `--no-hooks`, another `--cli`) | hard | deny (rule `guard-config`; the CLI refuses with `agent_cannot_weaken_guard`); `init`/`update` without such flags still restore the files |
+| Agent edits the guard's own configuration (`openspec/sdlc.yaml`, `.claude/settings*.json`, `.opencode/plugins/sdlc.js`, `.mcp.json`, `opencode.json(c)`, `.cursor/hooks.json`, `.cursor/mcp.json`, `.codex/hooks.json`, `.codex/config.toml`, `.codex/rules/sdlc.rules`, `.qwen/settings.json`, `.gigacode/settings.json`, the generated `sdlc-*` files, the manifest, the review policy, the sdlc schema, `openspec/config.yaml`; user-level `~/.claude/settings.json`, `$CLAUDE_CONFIG_DIR/settings.json`, `~/.config/opencode/opencode.json(c)`, `$OPENCODE_CONFIG`, `~/.codex/config.toml` and `~/.codex/hooks.json` (or under `CODEX_HOME`), `~/.qwen/settings.json`, `~/.gigacode/settings.json`), by edit or shell; runs `sdlc uninstall`, or `sdlc init`/`update` with flags that weaken the guard (lower mode, fewer tools, `--no-hooks`, another `--cli`) | hard | deny (rule `guard-config`; the CLI refuses with `agent_cannot_weaken_guard`); `init`/`update` without such flags still restore the files |
 | Agent adds a key, token or password in an edit or a shell write (`secret_allow` exempts test data) | hard | deny (rule `secret-in-edit`; the reason names the kind and the file, never the value) |
 | Agent calls a registry MCP server outside its `stages` (`mcp.servers`) | process | `warn`: a reminder; `block`: deny (rule `mcp-stage`) |
 | Production release without authorization (`release.commands`) | hard | deny until there is a `release` approval or `SDLC_RELEASE_APPROVAL` |
-| Stopping without fresh verification (`verify_before_stop`) | optional | Claude Code: `Stop → decision: block` |
-| Session context | — | Claude: `SessionStart.additionalContext`; OpenCode: `experimental.chat.system.transform` |
+| Stopping without fresh verification (`verify_before_stop`) | optional | Claude Code, Codex CLI, Qwen Code, GigaCode: `Stop → decision: block`; Cursor: stop answers a `followup_message`; OpenCode: none |
+| Session context | — | Claude Code, Codex CLI, Qwen Code, GigaCode: `SessionStart.additionalContext`; Cursor: sessionStart `additional_context`; OpenCode: `experimental.chat.system.transform` |
 
-`enforcement.mode: off | warn | block`. In `warn`, the hard rules still apply. If the CLI is not installed, hooks allow the action and `sdlc doctor` shows the problem: a missing guardrail must not block every edit. A check that **fails** is different: the OpenCode plugin (since 0.7.1) and the Claude Code hook command (since 0.8.0) run it once more and then block the call with the reason (OpenCode on Windows sometimes kills the check after a few milliseconds, and a failed check used to let the call through). Inside the CLI, an uninitialized project or an internal error still answers "allow".
+`enforcement.mode: off | warn | block`. In `warn`, the hard rules still apply. If the CLI is not installed, hooks allow the action and `sdlc doctor` shows the problem: a missing guardrail must not block every edit. A check that **fails** is different: the OpenCode plugin (since 0.7.1) and the Claude Code hook command (since 0.8.0) run it once more and then block the call with the reason (OpenCode on Windows sometimes kills the check after a few milliseconds, and a failed check used to let the call through). Cursor's edit and shell hooks are `failClosed`: a hook that cannot run blocks the call, so there a missing CLI blocks too. Codex CLI, Qwen Code and GigaCode let a call through when a hook fails; since 0.14.3 the `sdlc` command answers a `deny` itself when its pre-tool hook fails to load or throws, so only a missing CLI or a timeout lets the call through there. Inside the CLI, an uninitialized project or an internal error still answers "allow".
 
 **Claude Code:** `SessionStart`, `PreToolUse` (`Edit|Write|MultiEdit|NotebookEdit|Bash|PowerShell|mcp__.*`; PowerShell since 0.8.2, MCP tools since 0.9.0) and `Stop` are merged into `.claude/settings.json`. The response uses the `hookSpecificOutput.permissionDecision/additionalContext` format. Other hooks are left untouched. The harness recognizes its own handlers by the `sdlc hook` command.
 
@@ -111,11 +115,15 @@ OpenCode has no Stop hook, so `verify_before_stop` does not apply there.
 
 - **Server** (`sdlc mcp serve`, `src/mcp/server.ts`): stdio, low-level SDK `Server`, six read-only tools (`status`, `next`, `instructions`, `trace`, `audit`, `help`). Each runs the CLI with `--json` in a child process, never in-process, because stdout is the protocol channel. No decision is a tool.
 - **Client** (`src/mcp/`): the CLI connects to the registry servers for `sdlc mcp check` and for `verify.mcp` checks. The result is evidence written by the CLI, so an agent cannot forge it. Outside an agent session, results are also written to `openspec/.sdlc/inbox/` for the next agent session.
-- **Registry** (`mcp.servers` in `openspec/sdlc.yaml`): laid out into `.mcp.json` and `opencode.json`. Entries written by sdlc are tracked in the manifest. Secrets are only `${VAR}` references, checked with the patterns of the `secret-in-edit` rule.
+- **Registry** (`mcp.servers` in `openspec/sdlc.yaml`): laid out into `.mcp.json`, `opencode.json`, `.cursor/mcp.json`, `.codex/config.toml`, `.qwen/settings.json` and `.gigacode/settings.json`, for the configured tools. Entries written by sdlc are tracked in the manifest. Secrets are only `${VAR}` references, checked with the patterns of the `secret-in-edit` rule.
 
 See chapter 10 for the user's view.
 
 ## 4.6. Agent integration
+
+One adapter per tool (`src/integrations/<tool>.ts`; Qwen Code and GigaCode share `qwen-family.ts`) renders the same
+workflow templates and subagents. The table covers the first two tools; the paragraphs after it cover the others, and
+the [Supported tools](05-guide.md#supported-tools) table in the guide compares all six.
 
 | | Claude Code | OpenCode |
 |---|---|---|
@@ -136,7 +144,7 @@ See chapter 10 for the user's view.
 
 Eighteen workflows: `help`, `guide`, `next`, `status`, `health`, `adopt`, `team`, `backlog`, `explore`, `intent`, `spec`, `plan`, `build`, `verify`, `review`, `release`, `archive`, `triage`. The bodies are intentionally short (3–5 KB versus 10–22 KB in OpenSpec). The agent gets state, templates and instructions from the CLI at run time (`sdlc status/next/instructions --json`).
 
-Templates are written once (`assets/workflows/*.md`) and rendered for each surface. `{{cmd:x}}` references become `/sdlc:x` or `/sdlc-x`, `{{input}}` becomes `$ARGUMENTS` or a description, and `sdlc` becomes the configured prefix (`npx --no-install sdlc` for a local install).
+Templates are written once (`assets/workflows/*.md`) and rendered for each surface. `{{cmd:x}}` references become `/sdlc:x`, `/sdlc-x` or, in Codex, `$sdlc-x`; `{{tool:ask}}` and `{{tool:todo}}` name each tool's question and todo tools; `{{input}}` becomes `$ARGUMENTS` or a description, and `sdlc` becomes the configured prefix (`npx --no-install sdlc` for a local install).
 
 An answer in chat is never an approval: gate approvals, `track set`, `backlog move`/`drop`, `license set` and other human decisions are commands the person runs in their own terminal. Offer the choice, explain the consequences, and give the exact command.
 
@@ -157,7 +165,7 @@ Planning commands include `sdlc explore <slug> | list`, `sdlc track set <full|li
 | State in `.sdlc.yaml`, not in `.openspec.yaml` | OpenSpec rewrites its metadata through zod and drops unknown keys | one more file in the change folder |
 | Digests instead of "approved" flags | an approval cannot "survive" an edit to the artifact | fixing a typo requires a new approval |
 | Git tree id instead of "HEAD + diff" | a commit does not make verification stale | git is required; outside git, freshness is not checked (a warning) |
-| Hooks allow when the CLI is missing, block when a check fails | a missing installation does not paralyze work, a flaky check does not open a hole | without the CLI the rules do not apply (`doctor` catches this); a Claude Code check that exceeds the hook timeout (30 s) is still allowed by Claude Code itself |
+| Hooks allow when the CLI is missing, block when a check fails | a missing installation does not paralyze work, a flaky check does not open a hole | without the CLI the rules do not apply (`doctor` catches this; Cursor's `failClosed` hooks block instead); a check that exceeds the hook timeout (30 s in Claude Code and Codex CLI) is still allowed by Claude Code, Codex CLI and Qwen Code themselves |
 | Identity = git user | zero infrastructure | a git email can be forged by a person with access to the repository; `roles.yaml` with `signing: required` and `sdlc approvals verify` in CI close this, together with branch protection (see the playbook) |
 
 ## 4.9. Limitations and what comes next

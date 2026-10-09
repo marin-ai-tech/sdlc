@@ -3,6 +3,9 @@ import { line, printJson, reportFailure } from '../cli/output.js';
 import { helpCatalog, type CatalogCommand } from '../core/help-catalog.js';
 import { SdlcError } from '../core/errors.js';
 import { t } from '../core/i18n.js';
+import { loadConfig, type SdlcConfig } from '../core/config.js';
+import { findProjectRoot, projectPaths } from '../core/project.js';
+import { DEFAULT_TOOLS, TOOL_IDS, type ToolId } from '../integrations/types.js';
 
 function cmdKey(name: string): string {
   return `cmd.${name.replace(/ /g, '.')}`;
@@ -20,11 +23,25 @@ function printCommands(title: string, commands: CatalogCommand[]): void {
   }
 }
 
-function printWorkflows(workflows: ReturnType<typeof helpCatalog>['workflows']): void {
+function displayedTools(config: SdlcConfig | undefined): ToolId[] {
+  const configured = config?.tools.filter(
+    (tool): tool is ToolId => (TOOL_IDS as readonly string[]).includes(tool),
+  ) ?? [];
+  return configured.length > 0 ? configured : [...DEFAULT_TOOLS];
+}
+
+function workflowInvocations(
+  workflow: ReturnType<typeof helpCatalog>['workflows'][number],
+  tools: ToolId[],
+): string {
+  return tools.map((tool) => workflow.invocation[tool]).join(' · ');
+}
+
+function printWorkflows(workflows: ReturnType<typeof helpCatalog>['workflows'], tools: ToolId[]): void {
   line(t('help.workflows'));
   const titles = workflows.map((item) => t(`workflow.${item.id}.title`));
   const width = Math.max(...titles.map((title) => title.length), 0);
-  const invocations = workflows.map((item) => `${item.invocation.claude} · ${item.invocation.opencode}`);
+  const invocations = workflows.map((item) => workflowInvocations(item, tools));
   const invocationWidth = Math.max(...invocations.map((item) => item.length), 0);
   for (const [index, item] of workflows.entries()) {
     const title = titles[index];
@@ -36,15 +53,13 @@ function printWorkflows(workflows: ReturnType<typeof helpCatalog>['workflows']):
 function printTopic(
   workflow: ReturnType<typeof helpCatalog>['workflows'][number] | undefined,
   command: CatalogCommand | undefined,
+  tools: ToolId[],
 ): boolean {
   if (workflow) {
     line(`${t(`workflow.${workflow.id}.title`)}\n${t(`workflow.${workflow.id}.description`)}`);
-    line(t('help.claudeCode', {
-      claude: workflow.invocation.claude,
-      opencode: workflow.invocation.opencode,
-    }));
+    line(workflowInvocations(workflow, tools));
     line(t('help.whoRunsAgent'));
-    line(t('help.example', { example: workflow.invocation.claude }));
+    line(t('help.example', { example: workflow.invocation[tools[0]] }));
     return true;
   }
   if (!command) return false;
@@ -55,9 +70,22 @@ function printTopic(
   return true;
 }
 
+/** The project's configuration, if help runs inside a project whose sdlc.yaml loads; help never fails on it. */
+function projectConfig(): SdlcConfig | undefined {
+  const root = findProjectRoot();
+  if (!root) return undefined;
+  try {
+    return loadConfig(projectPaths(root).sdlcConfig);
+  } catch {
+    return undefined;
+  }
+}
+
 export function helpCommand(topic: string | undefined, opts: { json?: boolean }): void {
   try {
-    const catalog = helpCatalog(buildProgram());
+    const config = projectConfig();
+    const catalog = helpCatalog(buildProgram(), config);
+    const tools = displayedTools(config);
     const workflow = catalog.workflows.find((item) => item.id === topic);
     const command = catalog.commands.find((item) => item.name === topic);
     if (topic && !workflow && !command) {
@@ -71,8 +99,8 @@ export function helpCommand(topic: string | undefined, opts: { json?: boolean })
       printJson(topic ? workflow ?? command : catalog);
       return;
     }
-    if (printTopic(workflow, command)) return;
-    printWorkflows(catalog.workflows);
+    if (printTopic(workflow, command, tools)) return;
+    printWorkflows(catalog.workflows, tools);
     printCommands(t('help.commandsEveryone'), catalog.commands.filter((entry) => entry.actor === 'any'));
     printCommands(t('help.commandsPeople'), catalog.commands.filter((entry) => entry.actor === 'human'));
     line(`\n${t('help.details')}`);

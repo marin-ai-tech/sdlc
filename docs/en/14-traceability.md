@@ -53,7 +53,8 @@ date. A change without delta specs adds nothing.
 ### How much did the agents write?
 
 After `sdlc init` (or `sdlc update`), the project's git has a `prepare-commit-msg` hook. A commit made in an agent's
-terminal (Claude Code, OpenCode, or anything that sets `SDLC_AGENT`) gets a trailer:
+terminal (Claude Code, OpenCode, Cursor, Codex CLI, Qwen Code, GigaCode, or anything that sets `SDLC_AGENT`) gets a
+trailer:
 
 ```text
 Add CSV export

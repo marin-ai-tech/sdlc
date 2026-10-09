@@ -9,7 +9,7 @@ The question: "Is it worth fixing all the shortcomings in the OpenSpec implement
 | OpenSpec shortcoming | Why it is not an OpenSpec bug | What the harness does |
 |---|---|---|
 | No gates or approvals; `archive --yes` archives unfinished work (verified) | a deliberate "fluid not rigid" philosophy | gates with approvals bound to digests; `sdlc archive` checks all required gates |
-| Phases rely only on the prompt text (#1577, #405) | OpenSpec does not control the agent's permissions | Claude Code hooks and the OpenCode plugin: code cannot be written without an approved plan (`block`) |
+| Phases rely only on the prompt text (#1577, #405) | OpenSpec does not control the agent's permissions | Claude Code hooks, the OpenCode plugin, and the own hooks and rules of Cursor, Codex CLI, Qwen Code and GigaCode: code cannot be written without an approved plan (`block`) |
 | Spec ↔ code divergence (#169, #880) | no model of "evidence" | `sdlc verify` with a worktree fingerprint, scenario coverage (`verify --check`), plan drift in review |
 | No testing step and no TDD (#900, #1760) | outside the artifact model | the verify gate, a bug-fix protocol with `tests lock` |
 | No review or release | outside the model | `review.md` + reviewer + a code owner gate; a release gate and blocking of production commands |
@@ -30,8 +30,11 @@ The question: "Is it worth fixing all the shortcomings in the OpenSpec implement
 
 - Stores and multi-repository (beta in OpenSpec): wait until they stabilize, then pass `--store` through.
 - Generating specs from existing code (#739, #199): a separate product; the maintainers deliberately declined it.
-- Support for 40 agents: the harness needs Claude Code and OpenCode; the others can be added as adapters.
-- Different invocation syntax in different tools: an objective reality of the tools. The harness only documents `/sdlc:x` (Claude) and `/sdlc-x` (OpenCode, and also skills in Claude).
+- Support for 40 agents: the harness needs Claude Code and OpenCode; the others can be added as adapters. (Since then
+  the harness has added Cursor in 0.13.0, Codex CLI in 0.14.0, and Qwen Code and GigaCode in 0.14.1 as adapters.)
+- Different invocation syntax in different tools: an objective reality of the tools. The harness only documents
+  `/sdlc:x` (Claude) and `/sdlc-x` (OpenCode, and also skills in Claude); since 0.13.0–0.14.1 also `/sdlc-x` in
+  Cursor, Qwen Code and GigaCode, and `$sdlc-x` in Codex CLI.
 
 ## 6.2. Course of action
 

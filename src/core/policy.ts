@@ -5,7 +5,7 @@ import { listActiveChanges } from './changes.js';
 import { harnessStamp, stampText } from './license.js';
 import { evaluateChange, sharedFingerprint, type LifecycleView } from './lifecycle.js';
 import type { ProjectPaths } from './project.js';
-import { HUMAN_COMMANDS } from './help-catalog.js';
+import { HUMAN_COMMANDS } from './human-commands.js';
 import { nextBacklogItem, readBacklog } from './backlog.js';
 import { t } from './i18n.js';
 import { quotedCommand } from './human-command.js';

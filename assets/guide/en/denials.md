@@ -4,9 +4,9 @@ summary: Every hook rule - why it stopped the agent, and what to do.
 ---
 # Why the hook said no
 
-The Claude Code hook and the OpenCode plugin check every edit, shell command and MCP call of the agent. A denial names
-its rule in brackets, for example `[sdlc:plan-gate]`. Hard rules apply in `warn` mode too; process rules deny only in
-`block` mode and remind in `warn`.
+The guard of your tool checks every edit, shell command and MCP call of the agent: the hooks of Claude Code, Cursor,
+Codex CLI, Qwen Code and GigaCode, or the OpenCode plugin. A denial names its rule in brackets, for example
+`[sdlc:plan-gate]`. Hard rules apply in `warn` mode too; process rules deny only in `block` mode and remind in `warn`.
 
 ## plan-gate
 
@@ -38,10 +38,11 @@ writes.
 ## guard-config
 
 Hard rule. The file configures the guard itself: `openspec/sdlc.yaml`, `.claude/settings*.json`, the OpenCode plugin,
-`.mcp.json`, `opencode.json`, the manifest, the user's agent settings, the accepted team roles in `docs/agents/`,
-the files sdlc generates for the agents (`sdlc-*` subagents, workflow skills and commands), the review policy
-(`REVIEW.md` or `review.policy`), the sdlc schema and `openspec/config.yaml`. **Do:** ask a person to make the change;
-`sdlc update` restores generated files.
+`.mcp.json`, `opencode.json`, `.cursor/hooks.json`, `.cursor/mcp.json`, `.codex/hooks.json`, `.codex/config.toml`,
+`.codex/rules/sdlc.rules`, `.qwen/settings.json`, `.gigacode/settings.json`, the manifest, the user's agent settings,
+the accepted team roles in `docs/agents/`, the files sdlc generates for the agents (`sdlc-*` subagents, workflow
+skills and commands), the review policy (`REVIEW.md` or `review.policy`), the sdlc schema and `openspec/config.yaml`.
+**Do:** ask a person to make the change; `sdlc update` restores generated files.
 
 ## separation-of-duties
 

@@ -1,6 +1,6 @@
 # 12. The agent team
 
-Since 0.11.0, a project can have role agents: an **analyst**, an **architect**, a **developer**, a **tester** and a **reviewer**. Each is a short file the team reads and edits. sdlc turns an accepted role into a subagent for Claude Code and OpenCode, wires it to its stages, and adds what it knows about the project.
+Since 0.11.0, a project can have role agents: an **analyst**, an **architect**, a **developer**, a **tester** and a **reviewer**. Each is a short file the team reads and edits. sdlc turns an accepted role into a subagent for every supported tool (Claude Code, OpenCode, Cursor, Codex CLI, Qwen Code and GigaCode), wires it to its stages, and adds what it knows about the project.
 
 This chapter starts from situations a team runs into.
 
@@ -128,6 +128,10 @@ A pack holds `roles/<id>.md` (or `roles/<locale>/<id>.md`) and `skills/<id>/…`
 ## 12.6. Skills that reach the agents
 
 The skills a role lists are installed when the role is accepted, and only with a matching checksum.
+
+- **Where they go.** Into `.claude/skills/<id>/`, or `.opencode/skills/<id>/` in a project without Claude Code. A
+  project with neither Claude Code nor OpenCode among its tools gets the roles, but not the team's skills: the skill is
+  reported as not installed (no skills folder).
 
 - **A skill that carries more than Markdown** (scripts, binaries) waits for a person: `sdlc team accept --skill <id>`.
 - **`sdlc team check`** lists every skill with:

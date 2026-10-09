@@ -2,6 +2,17 @@
 
 All notable changes to sdlc. Versions follow [Semantic Versioning](https://semver.org/); while the major version is 0, a minor version may change behavior.
 
+## 0.14.5 — 2026-10-09
+
+### Added
+- **A course for every role.** [sdlc in practice](docs/en/course/README.md): twelve modules of short lessons that take a team — product owner, tech lead, developer, QA, code owner, release manager, platform engineer, engineering manager and an auditor — through a new project and the conversion of an existing one, with Claude Code and MCP servers for GitHub (issues, pull requests, Actions), a knowledge base and Telegram. Every command in it was checked against the CLI, and the outputs come from real runs. It is written to be cut into training videos.
+- **A supported-tools table** in the user guide: for each of the six tools, how a workflow is called, what holds the gates, the agent marker and the main limit.
+
+### Fixed
+- **`sdlc help` knows every supported tool.** `sdlc help --json` gives each workflow's invocation for Claude Code, OpenCode, Cursor, Codex CLI, Qwen Code and GigaCode; the text help shows the invocations of the tools the project is set up for. Help never fails on a broken `openspec/sdlc.yaml`.
+- **The health and team workflows have a title and a description** in `sdlc help`, in English and Russian, instead of their key names.
+- **The documentation covers every supported tool** where it still spoke of Claude Code and OpenCode only.
+
 ## 0.14.4 — 2026-10-09
 
 ### Security

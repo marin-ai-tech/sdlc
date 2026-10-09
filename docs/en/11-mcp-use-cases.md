@@ -14,7 +14,7 @@ MCP works in two directions here:
 | Read the process: status, next step, artifact instructions, trace, audit, help, guide | sdlc → others | `sdlc mcp serve`, registered by `sdlc init --mcp` | agents, orchestrators, chat clients, IDE assistants |
 | Read the team's knowledge: context packs, living specs, change artifacts, documents for agents | sdlc → others | MCP resources of `sdlc mcp serve` (0.10.0) | other agents and assistants |
 | Several projects in one server | sdlc → others | `sdlc mcp serve --project <path> --project <path>` (0.10.0) | Claude Desktop, central scripts |
-| One registry of the team's MCP servers for Claude Code and OpenCode | config → tools | `mcp.servers` in `openspec/sdlc.yaml` | the team lead, once |
+| One registry of the team's MCP servers for every supported tool | config → tools | `mcp.servers` in `openspec/sdlc.yaml` | the team lead, once |
 | Check that the servers are reachable and what they can do | sdlc → servers | `sdlc mcp check` | whoever adds a server |
 | A server's answer as gate evidence | sdlc → servers | `verify.mcp`; `release.mcp` for the release gate (0.10.0) | the verify and release gates |
 | Results for the agent from runs it was not part of | sdlc → agent | `sdlc inbox`, the session-start summary | the agent |
@@ -26,11 +26,14 @@ MCP works in two directions here:
 
 ## 11.2. Connecting a client
 
-**Claude Code and OpenCode** in the project:
+**The agent tools** in the project (Claude Code, OpenCode, Cursor, Codex CLI, Qwen Code, GigaCode):
 
 ```bash
-sdlc init --mcp          # writes the sdlc entry into .mcp.json and opencode.json
+sdlc init --mcp          # writes the sdlc entry into the MCP configuration of each configured tool
 ```
+
+The files are `.mcp.json`, `opencode.json`, `.cursor/mcp.json`, `.codex/config.toml`, `.qwen/settings.json` and
+`.gigacode/settings.json` (chapter 10.1).
 
 Claude Code asks once, in an interactive session, before it starts a project server.
 

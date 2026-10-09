@@ -1,17 +1,12 @@
 import type { Command } from 'commander';
 import { catalog } from './i18n.js';
+import { defaultConfig, type SdlcConfig } from './config.js';
+import { HUMAN_COMMANDS } from './human-commands.js';
 import { WORKFLOW_IDS, loadWorkflow } from '../integrations/assets.js';
+import { ADAPTERS, renderContext } from '../integrations/install.js';
+import { TOOL_IDS } from '../integrations/types.js';
 
-export const HUMAN_COMMANDS = [
-  'approve', 'reject', 'rework', 'waive', 'tests unlock', 'track set',
-  'backlog move', 'backlog drop', 'license set', 'roles migrate', 'takeover', 'release-control',
-  // Removing the harness switches the guard off: a person's decision (B41).
-  'uninstall',
-  // What a role of the agent team says is a person's decision (B72).
-  'team accept',
-  // An answer to an open question is a person's decision (B62).
-  'answer',
-] as const;
+export { HUMAN_COMMANDS } from './human-commands.js';
 
 const EXAMPLES: Record<string, string> = {
   approve: 'sdlc approve plan --change add-export',
@@ -127,11 +122,15 @@ function actionVariants(commands: CatalogCommand[]): CatalogCommand[] {
   });
 }
 
-export function helpCatalog(program: Command) {
+export function helpCatalog(program: Command, config: SdlcConfig = defaultConfig()) {
+  const context = renderContext(config, [...TOOL_IDS]);
   const workflows = WORKFLOW_IDS.map((id) => {
     const template = loadWorkflow(id);
+    const invocation = Object.fromEntries(
+      TOOL_IDS.map((tool) => [tool, ADAPTERS[tool].invocation(id, context)]),
+    ) as Record<(typeof TOOL_IDS)[number], string>;
     return { id, title: template.title, description: template.description,
-      invocation: { claude: `/sdlc:${id}`, opencode: `/sdlc-${id}` } };
+      invocation };
   });
   const commands = entries(program);
   return { workflows, commands: [...commands, ...actionVariants(commands)] };
