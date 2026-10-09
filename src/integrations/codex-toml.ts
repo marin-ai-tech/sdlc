@@ -31,10 +31,42 @@ export function keyParts(key: string): string[] {
   return parts;
 }
 
+/**
+ * The multi-line string (`"""` or `'''`) still open after a line, given the one open before it (B84): lines inside
+ * such a string are never table headers.
+ */
+function openString(line: string, open: string | undefined): string | undefined {
+  let current = open;
+  let at = 0;
+  while (at < line.length) {
+    const next = nextDelimiter(line, at, current);
+    if (next === undefined) return current;
+    current = current === undefined ? next.delimiter : undefined;
+    at = next.index + 3;
+  }
+  return current;
+}
+
+interface Hit {
+  delimiter: string;
+  index: number;
+}
+
+function nextDelimiter(line: string, from: number, open: string | undefined): Hit | undefined {
+  const candidates = open === undefined ? ['"""', "'''"] : [open];
+  const found = candidates
+    .map((delimiter) => ({ delimiter, index: line.indexOf(delimiter, from) }))
+    .filter((hit) => hit.index >= 0)
+    .sort((a, b) => a.index - b.index);
+  return found[0];
+}
+
 function blocks(text: string): Block[] {
   const out: Block[] = [{ key: undefined, lines: [] }];
+  let open: string | undefined;
   for (const line of text.split(/\r?\n/)) {
-    const header = HEADER.exec(line);
+    const header = open === undefined ? HEADER.exec(line) : null;
+    open = openString(line, open);
     if (header) {
       const previous = out[out.length - 1];
       const trailing: string[] = [];

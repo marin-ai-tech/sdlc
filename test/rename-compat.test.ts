@@ -85,7 +85,10 @@ describe('projects written before the rename from scdl', () => {
       ':!CHANGELOG.md'], { cwd: REPO_ROOT, encoding: 'utf-8' });
     const allowed = [/^package\.json:.*"scdl": "\.\/bin\/scdl\.js"/, /^bin\/scdl\.js:/, /^src\/core\/policy\.ts:.*\(\?:sdlc\|scdl\)/,
       /^src\/integrations\/settings\.ts:/, /^src\/core\/license\.ts:.*\(\?:sdlc\|scdl\)/, /^src\/core\/(change-state|log)\.ts:.*scdl/,
-      /^README\.md:.*under its old name \(`marin-ai-tech\/scdl`/];
+      /^README\.md:.*under its old name \(`marin-ai-tech\/scdl`/,
+      // 0.14.2 (B84): the second layer of Codex and Qwen refuses a person's commands under the `scdl` alias bin too.
+      /^src\/integrations\/second-layer\.ts:/, /^src\/integrations\/qwen-settings\.ts:.*\(\?:sdlc\|scdl\)/,
+      /^test\/b84-hardening\.test\.ts:/];
     const leftovers = r.stdout.split('\n').filter((line) => line && !allowed.some((re) => re.test(line)));
     expect(leftovers).toEqual([]);
     expect(fs.existsSync(path.join(REPO_ROOT, 'LICENSES/sdlc-Additional-Permissions.md'))).toBe(true);

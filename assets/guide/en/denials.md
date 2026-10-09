@@ -14,7 +14,9 @@ Process rule. Code was about to be written with no approved plan. **Do:** write 
 workflow) and have a person run `sdlc approve plan --change <id>`. Docs and `openspec/` are exempt.
 Since 0.14.0 a shell command counts too, in every tool: the files it writes (`>`, `tee`, `cp`, `mv`,
 `Set-Content`/`sc`, `Tee-Object`, `Out-File`, `New-Item`, `Copy-Item`/`Move-Item`, `Rename-Item`,
-`.NET File` writers, `sed -i`, `perl -i`, `touch`, `truncate`, `dd of=`, and `apply_patch`) are checked like an edit;
+`.NET File` writers, `sed -i`, `perl -i`, `touch`, `truncate`, `dd of=`, `git checkout`/`restore`/`mv`/`apply`, `patch`,
+`curl -o`, `wget -O`, `Invoke-WebRequest -OutFile`, `node -e`, `python -c`, commands inside `iex` and
+`Start-Process`, and `apply_patch`) are checked like an edit;
 reading never is.
 
 ## protected-path

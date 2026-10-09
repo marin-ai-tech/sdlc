@@ -2,6 +2,15 @@
 
 All notable changes to sdlc. Versions follow [Semantic Versioning](https://semver.org/); while the major version is 0, a minor version may change behavior.
 
+## 0.14.2 — 2026-10-09
+
+### Changed
+- **More shell writes count as edits, in every tool.** Before the plan is approved, `git checkout -- <paths>`, `git restore`, `git mv`, `git apply` and `patch` (the files the patch names), downloads (`curl -o`, `wget -O`, `Invoke-WebRequest -OutFile`), file writes in one-line `node -e` and `python -c`, and commands inside `iex`, `Invoke-Expression` and `Start-Process` are denied like an edit of code. Branch switches, `git restore --staged`, `git apply --check`, reads and discarded downloads are not affected.
+- **The second layer covers more spellings.** With `cli: sdlc`, Codex's command rules and Qwen Code's and GigaCode's `permissions.deny` also refuse a person's commands spelled `scdl`, `sdlc.cmd` and `scdl.cmd`, and they refuse `sdlc adopt --apply`; `sdlc uninstall` removes these entries too.
+
+### Fixed
+- **Codex's `config.toml` with multi-line strings.** A line inside a `"""…"""` or `'''…'''` string that looks like a table header is no longer taken for one, so adding or removing sdlc's MCP tables keeps such a file intact.
+
 ## 0.14.1 — 2026-10-09
 
 ### Added

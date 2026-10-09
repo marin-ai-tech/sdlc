@@ -14,7 +14,9 @@ summary: Каждое правило хука - почему остановил�
 (процесс plan), и человек выполняет `sdlc approve plan --change <id>`. Документация и `openspec/` не проверяются.
 С 0.14.0 это касается и команд оболочки в любом инструменте. Файлы, которые пишут `>`, `tee`, `cp`, `mv`,
 `Set-Content`/`sc`, `Tee-Object`, `Out-File`, `New-Item`, `Copy-Item`/`Move-Item`, `Rename-Item`,
-методы записи `.NET File`, `sed -i`, `perl -i`, `touch`, `truncate`, `dd of=` и `apply_patch`, проверяются как правка.
+методы записи `.NET File`, `sed -i`, `perl -i`, `touch`, `truncate`, `dd of=`, `git checkout`/`restore`/`mv`/`apply`, `patch`,
+`curl -o`, `wget -O`, `Invoke-WebRequest -OutFile`, `node -e`, `python -c`, команды внутри `iex` и `Start-Process`
+и `apply_patch`, проверяются как правка.
 Чтение файлов под это правило не подпадает.
 
 ## protected-path

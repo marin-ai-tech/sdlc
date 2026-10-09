@@ -1,6 +1,6 @@
 {
   "name": "sdlc",
-  "version": "0.14.1",
+  "version": "0.14.2",
   "description": "AI-native SDLC workflows (adopt, backlog, explore, intent, spec, plan, build, verify, review, release, archive, triage) with gates, built on OpenSpec. Requires the `sdlc` CLI (npm package sdlc).",
   "author": {
     "name": "marin-ai technologies",

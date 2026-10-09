@@ -1,7 +1,7 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { HUMAN_COMMANDS } from '../core/help-catalog.js';
 import { readJson, writeJson } from './mcp-config.js';
+import { cliSpellings, SECOND_LAYER_COMMANDS } from './second-layer.js';
 import type { SettingsChange } from './settings.js';
 import type { ToolId } from './types.js';
 
@@ -65,12 +65,16 @@ function ourGroups(cli: string, id: FamilyId): Json {
   };
 }
 
-const HUMAN = HUMAN_COMMANDS.map((command) => command.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/ /g, '\\s+'));
-const SDLC_CLI = String.raw`(?:[^)]*\s)?(?:[^\s()]*[/\\])?sdlc(?:\.js|\.cmd|\.ps1|\.exe)?`;
+const HUMAN = SECOND_LAYER_COMMANDS.map((command) =>
+  command.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/ /g, '\\s+'));
+const SDLC_CLI = String.raw`(?:[^)]*\s)?(?:[^\s()]*[/\\])?(?:sdlc|scdl)(?:\.js|\.cmd|\.ps1|\.exe)?`;
 const OUR_DENY = new RegExp(`^Bash\\(${SDLC_CLI}\\s+(?:${HUMAN.join('|')})(?:\\s+\\*)?\\)$`);
 
 export function qwenDeny(cli: string): string[] {
-  return HUMAN_COMMANDS.flatMap((command) => [`Bash(${cli} ${command})`, `Bash(${cli} ${command} *)`]);
+  return cliSpellings(cli).flatMap((spelling) => SECOND_LAYER_COMMANDS.flatMap((command) => [
+    `Bash(${spelling} ${command})`,
+    `Bash(${spelling} ${command} *)`,
+  ]));
 }
 
 function merged(file: Json, cli: string, id: FamilyId, install: boolean): Json {

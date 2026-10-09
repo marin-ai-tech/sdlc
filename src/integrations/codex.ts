@@ -1,9 +1,9 @@
 import { generatedNotice } from '../core/license.js';
-import { HUMAN_COMMANDS } from '../core/help-catalog.js';
 import type { RoleFile } from '../team/role-file.js';
 import { roleBody, subagentName } from '../team/render.js';
 import { AGENT_IDS, loadAgent, WORKFLOW_IDS } from './assets.js';
 import { renderBody } from './render.js';
+import { cliSpellings, SECOND_LAYER_COMMANDS } from './second-layer.js';
 import { skillFile, type SkillExtra, type SkillTarget } from './skills.js';
 import type { GeneratedFile, RenderContext, ToolAdapter } from './types.js';
 
@@ -12,7 +12,7 @@ import type { GeneratedFile, RenderContext, ToolAdapter } from './types.js';
  * - skills `.agents/skills/sdlc-<id>/SKILL.md` (Agent Skills format, rendered for Codex); in Codex the skills are the
  *   commands (`$sdlc-<id>`), so they are written whatever `delivery` says;
  * - subagents `.codex/agents/sdlc-<agent>.toml` (`name`, `description`, `developer_instructions`);
- * - command rules `.codex/rules/sdlc.rules`: a person's commands (HUMAN_COMMANDS) are `forbidden` for the agent.
+ * - command rules `.codex/rules/sdlc.rules`: a person's commands (second-layer.ts) are `forbidden` for the agent.
  * The hooks (`.codex/hooks.json`, see codex-hooks.ts) and the MCP servers (`.codex/config.toml`, see codex-toml.ts)
  * are merged into files a person may share, so they are not generated files of the manifest.
  */
@@ -74,8 +74,8 @@ function agentFiles(ctx: RenderContext, notice: string): GeneratedFile[] {
 
 /** The words of a person's command as Codex matches them: `config.cli`'s words, then the command's. */
 export function humanCommandPatterns(cli: string): string[][] {
-  const prefix = cli.trim().split(/\s+/);
-  return HUMAN_COMMANDS.map((command) => [...prefix, ...command.split(' ')]);
+  const prefixes = cliSpellings(cli).map((spelling) => spelling.split(/\s+/));
+  return prefixes.flatMap((prefix) => SECOND_LAYER_COMMANDS.map((command) => [...prefix, ...command.split(' ')]));
 }
 
 function prefixRule(words: string[]): string {

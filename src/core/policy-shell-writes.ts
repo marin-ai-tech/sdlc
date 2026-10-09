@@ -2,6 +2,7 @@ import * as path from 'node:path';
 import { absolute, isDirCommand, moveTo, relToRoot, simpleCommands, type DirState } from './policy-shell.js';
 import { patchFiles } from './policy-patch-files.js';
 import { scanShell } from './policy-shell-scanner.js';
+import { isWebRequest, toolTargets, type ToolContext } from './policy-shell-tools.js';
 
 /** Files a shell command writes, root-relative. Quoted text and here-document bodies are data. */
 const NULL_SINKS = /^(?:\/dev\/null|\$null|nul)$/i;
@@ -14,6 +15,11 @@ const FILE_METHOD = new RegExp(
 );
 const SWITCHES = ['Force', 'NoNewline', 'Append', 'NoClobber', 'Recurse', 'PassThru', 'WhatIf', 'Confirm', 'Container'];
 const VALUE_OPTIONS = ['ItemType', 'Encoding', 'Stream', 'Width'];
+const WEB_NAMES = ['Uri', 'OutFile', 'Method', 'Headers', 'Body', 'ContentType', 'UseBasicParsing', 'Credential'];
+const START_NAMES = ['FilePath', 'ArgumentList', 'WorkingDirectory', 'Verb', 'WindowStyle', 'Wait', 'NoNewWindow'];
+const EXPRESSION = /^(?:iex|Invoke-Expression)$/i;
+const START_PROCESS = /^(?:Start-Process|saps)$/i;
+const MAX_DEPTH = 3;
 
 interface Word {
   value: string;
@@ -111,9 +117,10 @@ function words(segment: string): Word[] {
   return out;
 }
 
-function redirects(tokens: Word[]): { targets: string[]; args: string[] } {
+function redirects(tokens: Word[]): { targets: string[]; args: string[]; inputs: string[] } {
   const targets: string[] = [];
   const args: string[] = [];
+  const inputs: string[] = [];
   for (let i = 0; i < tokens.length; i += 1) {
     const token = tokens[i];
     if (token.value === '>' && token.operator) {
@@ -124,11 +131,19 @@ function redirects(tokens: Word[]): { targets: string[]; args: string[] } {
       i += 1;
       continue;
     }
-    if (token.operator) continue;
+    if (token.operator) {
+      inputs.push(...inputOf(token, tokens[i + 1]));
+      continue;
+    }
     if (/^(?:\d+|\*)$/.test(token.value) && tokens[i + 1]?.value === '>') continue;
     args.push(token.value);
   }
-  return { targets, args };
+  return { targets, args, inputs };
+}
+
+function inputOf(token: Word, next: Word | undefined): string[] {
+  if (token.value !== '<' || next === undefined || next.operator) return [];
+  return [next.value];
 }
 
 function parameter(word: string, names: string[]): string | undefined {
@@ -230,7 +245,14 @@ function commandTargets(verb: string, args: string[]): string[] {
   }
   if (/^dd$/i.test(verb)) return args.filter((arg) => arg.startsWith('of=')).map((arg) => arg.slice(3));
   if (/^(?:sed|perl)$/i.test(verb)) return inPlaceTargets(args);
+  if (isWebRequest(verb)) return webTargets(args);
   return [];
+}
+
+/** `Invoke-WebRequest`/`iwr` `-OutFile <file>` (a unique prefix like `-OutF` counts). */
+function webTargets(args: string[]): string[] {
+  const file = value(args, 'OutFile', WEB_NAMES);
+  return file === undefined ? [] : [file];
 }
 
 function afterCondition(segment: string): string {
@@ -257,12 +279,19 @@ function afterCondition(segment: string): string {
   return depth === 0 ? segment.slice(end) : '';
 }
 
-function commandWords(segment: string): { targets: string[]; verb?: string; args: string[] } {
+interface Parsed {
+  targets: string[];
+  verb?: string;
+  args: string[];
+  inputs: string[];
+}
+
+function commandWords(segment: string): Parsed {
   const parsed = redirects(words(afterCondition(segment)));
   const list = parsed.args;
   const candidates = list.filter((word) => !/^(?:&|\.|\{|\})$/.test(word));
   const [verb, ...args] = candidates;
-  return { targets: parsed.targets, verb, args };
+  return { targets: parsed.targets, verb, args, inputs: parsed.inputs };
 }
 
 function nestedCommand(verb: string, args: string[]): string | undefined {
@@ -284,6 +313,35 @@ function nestedCommand(verb: string, args: string[]): string | undefined {
   return option < 0 ? undefined : args[option + 1];
 }
 
+/** `iex <string>` / `Invoke-Expression -Command <string>`: the string is a command again. */
+function expressionCommand(args: string[]): string | undefined {
+  const names = ['Command'];
+  return value(args, 'Command', names) ?? positionals(args, names)[0];
+}
+
+/** `Start-Process <shell> -ArgumentList <string>`: the shell's command line, parsed again. */
+function startProcessCommand(args: string[]): string | undefined {
+  const file = value(args, 'FilePath', START_NAMES) ?? positionals(args, START_NAMES)[0];
+  const list = value(args, 'ArgumentList', START_NAMES) ?? positionals(args, START_NAMES)[1];
+  if (file === undefined || list === undefined) return undefined;
+  if (!/^(?:powershell|pwsh|cmd|bash|sh)(?:\.exe)?$/i.test(file)) return undefined;
+  const inner = words(list).map((word) => word.value);
+  const option = inner.findIndex((arg) => /^(?:-c|-command|\/c|\/k)$/i.test(arg) || /^-co/i.test(arg));
+  return option < 0 ? undefined : inner.slice(option + 1).join(' ');
+}
+
+/** A command carried in a string argument: nested shells, `iex`, `Start-Process`. */
+function innerCommand(verb: string, args: string[]): string | undefined {
+  if (EXPRESSION.test(verb)) return expressionCommand(args);
+  if (START_PROCESS.test(verb)) return startProcessCommand(args);
+  return nestedCommand(verb, args);
+}
+
+function segmentTargets(parsed: Parsed, verb: string, dir: string | undefined): string[] {
+  const ctx: ToolContext = { dir, inputs: parsed.inputs };
+  return [...commandTargets(verb, parsed.args), ...toolTargets(verb, parsed.args, ctx)];
+}
+
 /** Project files (root-relative, posix) a shell command writes. */
 export function shellWriteDestinations(command: string, root: string, cwd: string, depth = 0): string[] {
   const source = heredocs(command);
@@ -303,9 +361,9 @@ export function shellWriteDestinations(command: string, root: string, cwd: strin
     }
     parsed.targets.forEach(add);
     if (parsed.verb !== undefined) {
-      commandTargets(parsed.verb, parsed.args).forEach(add);
-      const nested = nestedCommand(parsed.verb, parsed.args);
-      if (nested !== undefined && depth < 3 && state.dir !== undefined) {
+      segmentTargets(parsed, parsed.verb, state.dir).forEach(add);
+      const nested = innerCommand(parsed.verb, parsed.args);
+      if (nested !== undefined && depth < MAX_DEPTH && state.dir !== undefined) {
         shellWriteDestinations(nested, root, state.dir, depth + 1).forEach((rel) => rels.add(rel));
       }
     }

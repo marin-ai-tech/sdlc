@@ -1,6 +1,6 @@
 {
   "name": "sdlc",
-  "version": "0.14.1",
+  "version": "0.14.2",
   "description": "AI-native SDLC harness for Claude Code and OpenCode, built on OpenSpec",
   "keywords": [
     "sdlc",

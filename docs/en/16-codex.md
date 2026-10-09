@@ -79,9 +79,12 @@ gives the developer the command to run in their own terminal.
 - **Shell writes** are read from the command text: redirections, `tee`, `cp`, `mv`, `install`, `sed -i`,
   `perl -i`, `touch`, `truncate`, `dd of=`, PowerShell's `Set-Content`, `Add-Content`, `Clear-Content`,
   `Out-File`, `Tee-Object`, `New-Item`, `Copy-Item`, `Move-Item`, `Rename-Item` and the .NET `File` writers, inside
-  `bash -c`, `cmd /c` and `powershell -Command` too, and an `apply_patch` run through the shell. Quoted text and
-  here-strings are content, not commands. A write hidden inside a script or an interpreter (`node -e`,
-  `python -c`), `iex`, `git checkout`/`git apply` or a download (`curl -o`) is not read yet; the verify gate and
-  review still see the result before release.
-- **The command rules** match the command's first words with your `cli` setting (`sdlc approve`, `npx --no-install sdlc
-  approve`). A different spelling is caught by the hook and the CLI, not by the rules.
+  `bash -c`, `cmd /c`, `powershell -Command`, `iex` and `Start-Process` too; `git checkout -- <paths>`,
+  `git restore`, `git mv`, `git apply` and `patch` (the files the patch names), downloads (`curl -o`, `wget -O`,
+  `Invoke-WebRequest -OutFile`), file writes in `node -e` and `python -c`, and an `apply_patch` run through the
+  shell. Quoted text and here-strings are content, not commands. A write inside a script file, a computed path
+  (`$DIR/x`) or `git checkout <paths>` without `--` is not read; the verify gate and review still see the result
+  before release.
+- **The command rules** match the command's first words: your `cli` setting (`npx --no-install sdlc approve`),
+  and with the plain `sdlc` also its older alias and the Windows `.cmd` shims; they also refuse
+  `sdlc adopt --apply`. Another spelling is caught by the hook and the CLI, not by the rules.
