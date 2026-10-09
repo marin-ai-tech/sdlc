@@ -5,7 +5,7 @@ summary: Role agents (analyst, architect, developer, tester, reviewer) adapted t
 # The agent team
 
 Each project can have role agents: an analyst, an architect, a developer, a tester and a reviewer. A role is a file a
-person reads and edits; sdlc turns an accepted role into a subagent for Claude Code, OpenCode and Cursor.
+person reads and edits; sdlc turns an accepted role into a subagent for Claude Code, OpenCode, Cursor and Codex.
 
 ## Where roles come from
 

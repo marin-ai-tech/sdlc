@@ -2,7 +2,7 @@
 
 ## 4.1. The idea in one paragraph
 
-**OpenSpec is the specification subsystem, and SDLC is the process layer around it.** All spec operations (creating a change, artifact instructions, validation, delta merge) are performed by unmodified OpenSpec (the `@fission-ai/openspec` dependency, ≥ 1.13.2) through its documented JSON contract. On top of this, the harness adds the stages of the Anthropic playbook, gates with human approvals, verification evidence, review, release gates, audit and deterministic enforcement, identically for Claude Code, OpenCode and Cursor.
+**OpenSpec is the specification subsystem, and SDLC is the process layer around it.** All spec operations (creating a change, artifact instructions, validation, delta merge) are performed by unmodified OpenSpec (the `@fission-ai/openspec` dependency, ≥ 1.13.2) through its documented JSON contract. On top of this, the harness adds the stages of the Anthropic playbook, gates with human approvals, verification evidence, review, release gates, audit and deterministic enforcement, identically for Claude Code, OpenCode, Cursor and Codex CLI.
 
 ```
 ┌──────────────────────────── agents ─────────────────────────────┐
@@ -35,7 +35,7 @@
 | File | Owner | Contents |
 |---|---|---|
 | `openspec/config.yaml` | OpenSpec | default schema, `context`, `rules`; the harness respects them and passes them into the instructions |
-| `openspec/sdlc.yaml` | harness | gates (with `min_approvals`, `auto_waive`), `rework.reasons` and `max_cycles`, roles, verification commands, review policy, release commands, enforcement, `questions`, `design` (debate lens), `health` thresholds, `cli`, `tools` (claude, opencode, cursor) |
+| `openspec/sdlc.yaml` | harness | gates (with `min_approvals`, `auto_waive`), `rework.reasons` and `max_cycles`, roles, verification commands, review policy, release commands, enforcement, `questions`, `design` (debate lens), `health` thresholds, `cli`, `tools` (claude, opencode, cursor, codex) |
 | `openspec/explorations/<slug>.md` | agent + people | optional research and pressure test before intent; a change cites it with `--source-type exploration --source-ref openspec/explorations/<slug>.md` |
 | `openspec/deferred-work.md` | team | registry of deferred decisions and findings (`D<n>`) |
 | `openspec/roles.yaml` | people (maintainers) | optional: people (emails, SSH signing keys), roles, separation rules, signing mode; agents cannot edit it |
@@ -129,6 +129,8 @@ See chapter 10 for the user's view.
 | Live CLI injection | inline live output of `sdlc … --json` in `/sdlc:status`, `/sdlc:next`, `/sdlc:help` via the tool `!` injection (fallback: run the same command) | same `!` injection form |
 
 **Cursor (0.13.0).** Workflows as skills `.cursor/skills/sdlc-<id>/SKILL.md` with thin commands `.cursor/commands/sdlc-<id>.md` (`/sdlc-<id>`), subagents `.cursor/agents/sdlc-*.md` (`readonly`), an always-applied rule `.cursor/rules/sdlc.mdc`, the MCP server in `.cursor/mcp.json`, and hooks in `.cursor/hooks.json` (sessionStart, preToolUse without a matcher and `failClosed`, beforeShellExecution, stop) that call `sdlc hook <event> --agent cursor`; `src/hook-cursor.ts` maps Cursor's payloads (the project from `workspace_roots`; a Delete checked as `rm -r`) and answers in Cursor's format, always with JSON. `CURSOR_AGENT=1` marks the agent's terminal. See [15. Cursor IDE](15-cursor.md).
+
+**Codex CLI (0.14.0).** Workflows as skills `.agents/skills/sdlc-<id>/SKILL.md` (`$sdlc-<id>`), subagents `.codex/agents/sdlc-*.toml` (`developer_instructions`, `sandbox_mode = "read-only"` for read-only roles), hooks in `.codex/hooks.json` (SessionStart, PreToolUse without a matcher, Stop) that call `sdlc hook <event> --agent codex` — Codex sends Claude Code's payloads and reads Claude Code's answers, so the Claude path serves it; the patch text of `apply_patch` comes in `tool_input.command`. `.codex/rules/sdlc.rules` has one `forbidden` `prefix_rule` per person's command, spelled with the configured `cli`. The MCP servers are `[mcp_servers.<name>]` tables in `.codex/config.toml`, merged at the table level by `src/integrations/codex-toml.ts` (sdlc replaces or removes only the tables it wrote). `CODEX_CI=1` or `CODEX_SESSION_ID` marks the agent's shell. For every tool, `src/core/policy-shell-writes.ts` reads the files a shell command writes (redirections, `tee`/`cp`/`mv`/`install`, PowerShell `Set-Content`, `Add-Content`, `Clear-Content`, `Out-File`, `New-Item`, `Copy-Item`, `Move-Item`), and they go through the plan gate and locked tests like edits. See [16. Codex CLI](16-codex.md).
 
 Eighteen workflows: `help`, `guide`, `next`, `status`, `health`, `adopt`, `team`, `backlog`, `explore`, `intent`, `spec`, `plan`, `build`, `verify`, `review`, `release`, `archive`, `triage`. The bodies are intentionally short (3–5 KB versus 10–22 KB in OpenSpec). The agent gets state, templates and instructions from the CLI at run time (`sdlc status/next/instructions --json`).
 

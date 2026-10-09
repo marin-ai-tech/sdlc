@@ -2,6 +2,9 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { isDeepStrictEqual } from 'node:util';
 import { cursorRefs, mapValues, openCodeRefs, type McpServer } from '../mcp/registry.js';
+import {
+  CODEX_CONFIG_PATH, mcpTables, readConfigToml, registryServerTable, setMcpTables, writeConfigToml,
+} from './codex-toml.js';
 import { readManifest, writeManifest, type Manifest } from './manifest.js';
 import { readJson, servers as serverMap, writeJson } from './mcp-config.js';
 import type { ToolId } from './types.js';
@@ -13,7 +16,8 @@ import type { ToolId } from './types.js';
  * - opencode: `opencode.json` `mcp.<name>`: stdio `{ type: "local", command, environment, enabled }`, http
  *   `{ type: "remote", url, headers, enabled }`, with `${VAR}` written `{env:VAR}`;
  * - cursor (B81): `.cursor/mcp.json` `mcpServers.<name>`: stdio `{ command, args, env }`, http `{ url, headers }`, with
- *   `${VAR}` written `${env:VAR}`.
+ *   `${VAR}` written `${env:VAR}`;
+ * - codex (B82): `.codex/config.toml` `[mcp_servers.<name>]` tables (TOML, codex-toml.ts), sdlc's tables only.
  * The manifest (`mcpServers`) keeps the names sdlc wrote per file: a name dropped from the registry is removed, and
  * an entry a person wrote is never touched (kept, and reported, when the registry has a server of that name).
  */
@@ -28,7 +32,8 @@ interface Target {
   tool: ToolId;
   file: string;
   key: string;
-  entry: (server: McpServer) => Record<string, unknown>;
+  /** A JSON object for the JSON files; the table's text for Codex's TOML file. */
+  entry: (server: McpServer) => unknown;
 }
 
 interface Layout {
@@ -65,6 +70,7 @@ function cursorEntry(server: McpServer): Record<string, unknown> {
   const [command, ...args] = server.command.map(cursorRefs);
   return { command, args, ...nonEmpty('env', mapValues(server.env, cursorRefs)) };
 }
+
 
 const TARGETS: Target[] = [
   { tool: 'claude', file: '.mcp.json', key: 'mcpServers', entry: claudeEntry },
@@ -142,6 +148,23 @@ function layOut(root: string, target: Target, wanted: McpServer[], owned: string
   return { changes, owned: mine };
 }
 
+/** Codex's TOML file (B82): the same layout, with each server's table text as its entry. */
+function layOutCodex(root: string, wanted: McpServer[], owned: string[], dryRun: boolean): Layout {
+  const text = readConfigToml(root);
+  if (text === undefined && wanted.length === 0) return { changes: noChanges(), owned: [] };
+  const map: Record<string, unknown> = { ...mcpTables(text ?? '') };
+  const changes = noChanges();
+  const target: Target = { tool: 'codex', file: CODEX_CONFIG_PATH, key: 'mcp_servers', entry: registryServerTable };
+  const mine = setWanted(map, target, wanted, owned, changes);
+  dropUnwanted(map, wanted, owned, changes);
+  if (changed(changes) && !dryRun) {
+    const names = [...changes.added, ...changes.updated, ...changes.removed];
+    const tables = Object.fromEntries(names.map((name) => [name, map[name] as string | undefined]));
+    writeConfigToml(root, setMcpTables(text ?? '', tables));
+  }
+  return { changes, owned: mine };
+}
+
 function saveOwned(root: string, manifest: Manifest, owned: Record<string, string[]>, dryRun: boolean): void {
   const before = manifest.mcpServers ?? {};
   if (dryRun || isDeepStrictEqual(before, owned)) return;
@@ -166,6 +189,10 @@ export function applyRegistryServers(
     if (layout.owned.length > 0) owned[target.file] = layout.owned;
     if (changed(layout.changes) || layout.changes.kept.length > 0) result[target.file] = layout.changes;
   }
+  const codexOwned = manifest.mcpServers?.[CODEX_CONFIG_PATH] ?? [];
+  const codex = layOutCodex(root, tools.includes('codex') ? servers : [], codexOwned, dryRun);
+  if (codex.owned.length > 0) owned[CODEX_CONFIG_PATH] = codex.owned;
+  if (changed(codex.changes) || codex.changes.kept.length > 0) result[CODEX_CONFIG_PATH] = codex.changes;
   saveOwned(root, manifest, owned, dryRun);
   return result;
 }

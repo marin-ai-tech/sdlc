@@ -313,12 +313,7 @@ export function parseConfig(raw: Raw, file = 'openspec/sdlc.yaml'): SdlcConfig {
   if (team) config.team = team;
   const packs = parsePacksConfig(raw.packs, where);
   if (packs.length > 0) config.packs = packs;
-  if (!/^[A-Za-z0-9@._/ -]+$/.test(config.cli)) {
-    throw new SdlcError(
-      'invalid_config',
-      { key: 'error.x_may_only_contain_letters_digits_spaces_and', params: { p1: where('cli') } }
-    );
-  }
+  assertCliValue(config.cli, where('cli'));
   config.tools = asStringArray(raw.tools, where('tools')) ?? config.tools;
   const delivery = asString(raw.delivery, where('delivery'));
   if (delivery !== undefined) {
@@ -550,6 +545,16 @@ function serializeRework(rework: SdlcConfig['rework']): Record<string, unknown> 
   const reasons = rework.reasons.join() === DEFAULT_REWORK_REASONS.join() ? {} : { reasons: rework.reasons };
   const cycles = rework.maxCycles === DEFAULT_MAX_CYCLES ? {} : { max_cycles: rework.maxCycles };
   return Object.keys({ ...reasons, ...cycles }).length > 0 ? { rework: { ...reasons, ...cycles } } : {};
+}
+
+/**
+ * How agents and hooks call the CLI, written into hook commands: letters, digits, spaces and `. _ / @ - :` only, so no
+ * shell character can ride along. The colon is a Windows drive letter (`node C:/tools/sdlc.js`); paths use `/`.
+ */
+export function assertCliValue(value: string, where: string): void {
+  if (/^[A-Za-z0-9@._/: -]+$/.test(value)) return;
+  const key = 'error.x_may_only_contain_letters_digits_spaces_and';
+  throw new SdlcError('invalid_config', { key, params: { p1: where } });
 }
 
 /** Serializes back to the snake_case on-disk form. */

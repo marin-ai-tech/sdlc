@@ -18,6 +18,8 @@ import { readYamlObject } from './yaml-io.js';
 import { readManifest, sha256 } from '../integrations/manifest.js';
 import { SETTINGS_PATH } from '../integrations/settings.js';
 import { CURSOR_HOOKS_PATH, cursorHooksInstalled } from '../integrations/cursor-hooks.js';
+import { CODEX_RULES_PATH } from '../integrations/codex.js';
+import { CODEX_HOOKS_PATH, codexHooksInstalled } from '../integrations/codex-hooks.js';
 import { CHAIN_LINE, CHAIN_SUFFIX, inspectGitHook } from '../integrations/git-hook.js';
 
 /**
@@ -176,10 +178,26 @@ function integrationChecks(out: Checks, root: string, config: SdlcConfig): void 
     out.add('opencode plugin', plugin, '.opencode/plugins/sdlc.js', tt('doctor.fix.update'));
   }
   if (config.tools.includes('cursor')) cursorCheck(out, root);
+  if (config.tools.includes('codex')) codexCheck(out, root);
   const cliBin = config.cli.split(/\s+/)[0];
   const on = onPath(cliBin);
   const message = tt(on ? 'doctor.cliOnPath' : 'doctor.cliNotOnPath', { bin: cliBin, cli: config.cli });
   out.add('cli on PATH', on ? 'ok' : 'warn', message, tt('doctor.fix.cli', { install: INSTALL_COMMAND }));
+}
+
+/**
+ * Codex CLI (B82): sdlc's hooks in `.codex/hooks.json` and its command rules, and always a warning: Codex runs a
+ * project's hooks only in a trusted project after the user trusts them in `/hooks`, and `--ignore-rules` or
+ * `features.hooks=false` turn them off.
+ */
+function codexCheck(out: Checks, root: string): void {
+  const { tt } = out;
+  const installed = codexHooksInstalled(root) && isFile(path.join(root, CODEX_RULES_PATH));
+  const key = installed ? 'doctor.codexHooksInstalled' : 'doctor.codexHooksMissing';
+  const hooks = tt(key, { hooks: CODEX_HOOKS_PATH, rules: CODEX_RULES_PATH });
+  const parts = [hooks, tt('doctor.codexTrust'), tt('doctor.codexOff')];
+  const fix = installed ? tt('doctor.fix.codexTrust') : tt('doctor.fix.update');
+  out.add('codex', 'warn', parts.join('; '), fix);
 }
 
 /**

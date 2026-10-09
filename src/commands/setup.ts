@@ -2,6 +2,7 @@ import { currentLocale, t } from '../core/i18n.js';
 import * as path from 'node:path';
 import { c, line, printJson, reportFailure, warn } from '../cli/output.js';
 import {
+  assertCliValue,
   defaultConfig,
   loadConfig,
   saveConfig,
@@ -311,6 +312,8 @@ interface InitOutcome {
 
 export async function initCommand(target: string | undefined, opts: InitOptions, deps?: InitDeps): Promise<void> {
   try {
+    // Refused before anything is written: a value the configuration cannot load would break every later command.
+    if (opts.cli !== undefined) assertCliValue(opts.cli, '--cli');
     const root = path.resolve(target ?? process.cwd());
     if (!isDirectory(root)) throw new SdlcError(
       'invalid_path',
@@ -401,15 +404,21 @@ function mcpJson(result: InstallResult): Record<string, unknown> {
   return { ...(Object.keys(result.mcp).length > 0 ? { mcp: result.mcp } : {}), ...servers };
 }
 
-/** Cursor's hooks (B80), when they changed. */
+/** Cursor's hooks (B80) and Codex's (B82), when they changed. */
 function printCursorHooks(result: InstallResult): void {
-  if (result.cursorHooks === 'absent' || result.cursorHooks === 'unchanged') return;
-  line(t('init.cursorHooks', { state: stateLabel(result.cursorHooks) }));
+  if (result.cursorHooks !== 'absent' && result.cursorHooks !== 'unchanged') {
+    line(t('init.cursorHooks', { state: stateLabel(result.cursorHooks) }));
+  }
+  if (result.codexHooks !== 'absent' && result.codexHooks !== 'unchanged') {
+    line(t('init.codexHooks', { state: stateLabel(result.codexHooks) }));
+  }
 }
 
-/** The `cursorHooks` part of a JSON answer: only when the Cursor hooks file was looked at (B80). */
+/** The `cursorHooks` and `codexHooks` parts of a JSON answer: only for a hooks file that was looked at. */
 function cursorHooksJson(result: InstallResult): Record<string, unknown> {
-  return result.cursorHooks === 'absent' ? {} : { cursorHooks: result.cursorHooks };
+  const cursor = result.cursorHooks === 'absent' ? {} : { cursorHooks: result.cursorHooks };
+  const codex = result.codexHooks === 'absent' ? {} : { codexHooks: result.codexHooks };
+  return { ...cursor, ...codex };
 }
 
 /** One line per MCP file whose `sdlc` entry changed, and one per file whose registry entries changed. */

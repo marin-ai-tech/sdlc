@@ -103,7 +103,10 @@ describe('5: a held change is held for the shell too', () => {
       expect(evaluateToolCall(bash(p.root, command), p.ctx()), command).toMatchObject({ decision: 'deny', rule: 'takeover' });
     }
     for (const command of ['cat src/greet.js', "printf 'x' > src/other.js", 'sdlc status --change demo']) {
-      expect(evaluateToolCall(bash(p.root, command), p.ctx()).decision, command).toBe('allow');
+      // 0.14.0: shell writes count for the plan gate (a warning here); the held change does not hold other files.
+      const decision = evaluateToolCall(bash(p.root, command), p.ctx());
+      expect(decision.decision, command).not.toBe('deny');
+      expect(decision.rule, command).not.toBe('takeover');
     }
   }, 120000);
 });

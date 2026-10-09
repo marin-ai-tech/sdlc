@@ -47,7 +47,9 @@ describe('B24: the git hook and agent-env.ts check the same markers', () => {
     const fromSource = firstSeen(source, /\benv\.([A-Z_]+)/g);
     const fromHook = firstSeen(renderGitHook(), /\$\{([A-Z_]+):-\}/g);
     // 0.13.0 adds cursor: CURSOR_AGENT is checked last (B80).
-    expect(fromSource).toEqual(['SDLC_AGENT', 'CLAUDECODE', 'OPENCODE', 'AGENT', 'CURSOR_AGENT']);
+    expect(fromSource).toEqual(['SDLC_AGENT', 'CLAUDECODE', 'OPENCODE', 'AGENT', 'CURSOR_AGENT', 'CODEX_CI',
+      // 0.14.0 adds codex: CODEX_CI, then CODEX_SESSION_ID, after CURSOR_AGENT (B82).
+      'CODEX_SESSION_ID']);
     expect(fromHook).toEqual(fromSource);
   });
 

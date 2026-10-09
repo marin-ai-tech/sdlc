@@ -28,6 +28,8 @@ import {
   STATE_FILE_WRITE,
   WRITE_OPS,
 } from './policy-shell.js';
+import { shellWriteDestinations } from './policy-shell-writes.js';
+import { patchFiles } from './policy-patch-files.js';
 
 /**
  * Deterministic guardrails behind the advisory skills - the playbook's
@@ -65,23 +67,11 @@ const EDIT_TOOLS = new Set(['edit', 'write', 'multiedit', 'notebookedit', 'patch
 const BASH_TOOLS = new Set(['bash', 'shell', 'powershell', 'terminal', 'run_command']);
 const READ_TOOLS = new Set(['read', 'grep', 'glob', 'ls', 'list', 'webfetch', 'websearch']);
 
-/** `*** Update File: <path>` and the like, plus the target of a rename (`*** Move to: <path>`). */
-const PATCH_ENVELOPE_FILE = /^\*\*\*\s+(?:(?:Update|Add|Delete)\s+File|Move\s+to):\s*(.+)$/gm;
-const UNIFIED_DIFF_FILE = /^\+\+\+\s+(?:b\/)?(.+)$/gm;
-
-/** Extracts the files a patch touches from the common `*** Update File:` envelope or a unified diff. */
-function patchFiles(patch: string): string[] {
-  const files: string[] = [];
-  for (const m of patch.matchAll(PATCH_ENVELOPE_FILE)) {
-    files.push(m[1].trim());
-  }
-  for (const m of patch.matchAll(UNIFIED_DIFF_FILE)) {
-    const file = m[1].trim();
-    if (file !== '/dev/null') {
-      files.push(file);
-    }
-  }
-  return files;
+/** An edit tool's input with Codex's patch text (`command`, B82) under `patch`, so its written text is checked. */
+function patchInput(input: Record<string, unknown>, lower: string): Record<string, unknown> {
+  const command = input.command;
+  if (!EDIT_TOOLS.has(lower) || typeof command !== 'string' || typeof input.patch === 'string') return input;
+  return { ...input, patch: command };
 }
 
 /** Normalizes a tool call from either agent's hook payload. */
@@ -92,7 +82,9 @@ export function normalizeToolCall(tool: string, input: Record<string, unknown>, 
     const v = input[key];
     if (typeof v === 'string' && v) files.push(v);
   }
-  for (const key of ['patch', 'patchText', 'patch_text', 'input']) {
+  // Codex (B82) sends its `apply_patch` text in `tool_input.command`: for an edit tool it is the patch.
+  const patchKeys = ['patch', 'patchText', 'patch_text', 'input', ...(EDIT_TOOLS.has(lower) ? ['command'] : [])];
+  for (const key of patchKeys) {
     const v = input[key];
     if (typeof v === 'string' && (v.includes('***') || v.includes('+++ '))) files.push(...patchFiles(v));
   }
@@ -102,7 +94,7 @@ export function normalizeToolCall(tool: string, input: Record<string, unknown>, 
     : EDIT_TOOLS.has(lower) || (files.length > 0 && !READ_TOOLS.has(lower))
       ? 'edit'
       : READ_TOOLS.has(lower) ? 'read' : 'other';
-  const writes = kind === 'edit' ? editWrites(input) : [];
+  const writes = kind === 'edit' ? editWrites(patchInput(input, lower)) : [];
   return {
     tool,
     kind,
@@ -209,7 +201,13 @@ function stateWriteDenial(spelled: string, ctx: PolicyContext, cwd: string): Dec
  * Shell commands: cleared agent markers, human-only CLI steps, removing the CLI, writes to state files and to the
  * guard's configuration, a change a person holds, releases without an approved release gate.
  */
-function evaluateCommand(command: string, ctx: PolicyContext, env: NodeJS.ProcessEnv, cwd: string): Decision {
+function evaluateCommand(
+  command: string,
+  ctx: PolicyContext,
+  env: NodeJS.ProcessEnv,
+  cwd: string,
+  soft: Soft,
+): Decision {
   const cmd = joinContinuations(command);
   // First: a command that clears the markers would also slip past the CLI's own agent check.
   if (clearsAgentMarker(cmd)) {
@@ -242,6 +240,19 @@ function evaluateCommand(command: string, ctx: PolicyContext, env: NodeJS.Proces
   // A change a person holds: no shell writes to its paths, no sdlc steps on it but the read-only ones.
   const held = shellTakeoverDenial(ctx.paths, spelled, cwd, CLI_PREFIX);
   if (held) return held;
+  // 0.14.0 (B82): the files a command writes count for tests-locked and the plan gate, like an edit's.
+  const written = shellWriteDestinations(cmd, ctx.paths.root, cwd);
+  const protectedHit = written.find(matcher(ctx.config.enforcement.protectedPaths));
+  if (protectedHit) {
+    return { decision: 'deny', rule: 'protected-path', reason: t('hook.protectedPath', { path: protectedHit }) };
+  }
+  const gated = codeGateDenial(written, ctx, soft);
+  if (gated) return gated;
+  return releaseDecision(cmd, ctx, env);
+}
+
+/** A release command without an approved release gate (and without SDLC_RELEASE_APPROVAL) is denied. */
+function releaseDecision(cmd: string, ctx: PolicyContext, env: NodeJS.ProcessEnv): Decision {
   const release = ctx.config.release.commands.find((p) => new RegExp(p, 'i').test(cmd));
   if (!release || env.SDLC_RELEASE_APPROVAL) return { decision: 'allow' };
   const authorized = snapshots(ctx, true).filter((c) => gateOk(c.view, 'release'));
@@ -266,11 +277,11 @@ function evaluateRules(call: ToolCall, ctx: PolicyContext): Decision {
   const env = ctx.env ?? process.env;
   const mode = config.enforcement.mode;
   if (mode === 'off') return { decision: 'allow' };
-  const soft = (rule: string, reason: string): Decision =>
+  const soft: Soft = (rule: string, reason: string): Decision =>
     ({ decision: mode === 'block' ? 'deny' : 'warn', rule, reason });
 
   if (call.kind === 'bash' && call.command) {
-    return evaluateCommand(call.command, ctx, env, call.cwd);
+    return evaluateCommand(call.command, ctx, env, call.cwd, soft);
   }
 
   if (call.kind !== 'edit' || call.files.length === 0) return { decision: 'allow' };
@@ -314,40 +325,46 @@ function evaluateRules(call: ToolCall, ctx: PolicyContext): Decision {
   const secret = secretEditDenial(call.writes, paths.root, call.cwd, config.enforcement.secretAllow);
   if (secret) return secret;
 
-  const isTest = matcher(config.enforcement.testPaths);
-  const isExempt = matcher(config.enforcement.exemptPaths);
-  const needsChanges = rels.some(isTest) || (config.enforcement.requireApprovedPlan && rels.some((r) => !isExempt(r)));
-  if (!needsChanges) return { decision: 'allow' };
-  const changes = snapshots(ctx);
+  return codeGateDenial(rels, ctx, soft) ?? { decision: 'allow' };
+}
 
+/** A rule of the enforcement mode: `deny` in block mode, `warn` otherwise. */
+type Soft = (rule: string, reason: string) => Decision;
+
+/** Tests-locked: a test file written while a change has its tests locked. */
+function testsLockedDenial(rels: string[], changes: ChangeSnapshot[], isTest: (p: string) => boolean) {
   const testHit = rels.find(isTest);
-  if (testHit) {
-    const locking = changes.find((c) => c.testsLocked);
-    if (locking) {
-      return {
-        decision: 'deny',
-        rule: 'tests-locked',
-        reason: t('hook.testsLocked', { change: locking.id, path: testHit }),
-      };
-    }
-  }
+  if (testHit === undefined) return undefined;
+  const locking = changes.find((c) => c.testsLocked);
+  if (!locking) return undefined;
+  const reason = t('hook.testsLocked', { change: locking.id, path: testHit });
+  const denial: Decision = { decision: 'deny', rule: 'tests-locked', reason };
+  return denial;
+}
 
-  if (config.enforcement.requireApprovedPlan) {
-    const code = rels.filter((r) => !isExempt(r));
-    if (code.length > 0) {
-      const approved = changes.filter((c) => gateOk(c.view, 'plan'));
-      if (approved.length === 0) {
-        const pending = changes.map((c) => c.id);
-        return soft(
-          'plan-gate',
-          pending.length === 0
-            ? t('hook.planGateNone', { path: code[0] })
-            : t('hook.planGatePending', { changes: pending.join(', '), path: code[0] }),
-        );
-      }
-    }
-  }
-  return { decision: 'allow' };
+/** The plan gate: code (a path that is not exempt) written while no change has an approved plan. */
+function planGateDenial(code: string[], changes: ChangeSnapshot[], soft: Soft): Decision | undefined {
+  if (code.length === 0) return undefined;
+  if (changes.some((c) => gateOk(c.view, 'plan'))) return undefined;
+  const pending = changes.map((c) => c.id);
+  const reason = pending.length === 0
+    ? t('hook.planGateNone', { path: code[0] })
+    : t('hook.planGatePending', { changes: pending.join(', '), path: code[0] });
+  return soft('plan-gate', reason);
+}
+
+/**
+ * Tests-locked and the plan gate for root-relative paths an edit or (0.14.0, B82) a shell command writes; the exempt
+ * paths (`openspec/**` and the like) stay writable before the plan.
+ */
+function codeGateDenial(rels: string[], ctx: PolicyContext, soft: Soft): Decision | undefined {
+  const { enforcement } = ctx.config;
+  const isTest = matcher(enforcement.testPaths);
+  const isExempt = matcher(enforcement.exemptPaths);
+  const code = enforcement.requireApprovedPlan ? rels.filter((r) => !isExempt(r)) : [];
+  if (!rels.some(isTest) && code.length === 0) return undefined;
+  const changes = snapshots(ctx);
+  return testsLockedDenial(rels, changes, isTest) ?? planGateDenial(code, changes, soft);
 }
 
 /** Session start with no active change: the next backlog item, then the open inbox items. */

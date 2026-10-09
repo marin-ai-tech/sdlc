@@ -4,6 +4,9 @@ import { isDeepStrictEqual } from 'node:util';
 import type { SdlcConfig } from '../core/config.js';
 import { SdlcError } from '../core/errors.js';
 import { readText, writeTextAtomic } from '../core/fs-utils.js';
+import {
+  CODEX_CONFIG_PATH, isOurSdlcTable, mcpTables, readConfigToml, sdlcServerTable, setMcpTables, writeConfigToml,
+} from './codex-toml.js';
 import type { SettingsChange } from './settings.js';
 import type { ToolId } from './types.js';
 
@@ -12,7 +15,8 @@ import type { ToolId } from './types.js';
  * servers and keys stay, a missing file is created, invalid JSON is an error naming the file (never overwritten).
  * - claude: `.mcp.json` -> `mcpServers.sdlc = { type: "stdio", command, args }`;
  * - opencode: `opencode.json` -> `mcp.sdlc = { type: "local", command: [command, ...args], enabled: true }`;
- * - cursor (B80): `.cursor/mcp.json` -> `mcpServers.sdlc = { command, args }`.
+ * - cursor (B80): `.cursor/mcp.json` -> `mcpServers.sdlc = { command, args }`;
+ * - codex (B82): `.codex/config.toml` -> `[mcp_servers.sdlc]` with `command` and `args` (TOML, see codex-toml.ts).
  * Only the `sdlc` entry is ever written or removed, and only while `mcp.serve` is true (uninstall removes it).
  */
 
@@ -34,7 +38,8 @@ export interface McpLaunch {
 
 export type McpChange = SettingsChange | 'kept (invalid JSON)';
 
-const TARGETS: Record<ToolId, McpTarget> = {
+/** The JSON targets; Codex's TOML file is handled on its own (codexRegister, codexUnregister). */
+const TARGETS: Record<Exclude<ToolId, 'codex'>, McpTarget> = {
   claude: {
     file: '.mcp.json',
     key: 'mcpServers',
@@ -135,6 +140,29 @@ function unregister(root: string, target: McpTarget, dryRun: boolean): McpChange
   return 'removed';
 }
 
+/** Sets `[mcp_servers.sdlc]` in `.codex/config.toml`, keeping every other table and key (B82). */
+function codexRegister(root: string, launch: McpLaunch, dryRun: boolean): McpChange {
+  const text = readConfigToml(root) ?? '';
+  const table = sdlcServerTable(launch.command, launch.args);
+  const current = mcpTables(text)[SERVER_NAME];
+  if (current === table) return 'unchanged';
+  if (!dryRun) writeConfigToml(root, setMcpTables(text, { [SERVER_NAME]: table }));
+  return current === undefined ? 'installed' : 'updated';
+}
+
+/** Removes sdlc's `[mcp_servers.sdlc]` only; a file left empty is removed. */
+function codexUnregister(root: string, dryRun: boolean): McpChange {
+  const text = readConfigToml(root);
+  if (text === undefined || !isOurSdlcTable(mcpTables(text)[SERVER_NAME])) return 'absent';
+  if (!dryRun) writeConfigToml(root, setMcpTables(text, { [SERVER_NAME]: undefined }));
+  return 'removed';
+}
+
+/** Codex's change, reported like a quiet target: an `absent` file is left out. */
+function reportCodex(changes: Record<string, McpChange>, change: McpChange): void {
+  if (change !== 'absent') changes[CODEX_CONFIG_PATH] = change;
+}
+
 /** Records a file's change; a quiet target's `absent` is left out. */
 function report(changes: Record<string, McpChange>, target: McpTarget, change: McpChange): void {
   if (target.quiet && change === 'absent') return;
@@ -161,6 +189,8 @@ export function applyMcpRegistration(
     const change = wanted ? register(root, target, launch, dryRun) : unregister(root, target, dryRun);
     report(changes, target, change);
   }
+  const codex = tools.includes('codex') ? codexRegister(root, launch, dryRun) : codexUnregister(root, dryRun);
+  reportCodex(changes, codex);
   return changes;
 }
 
@@ -168,5 +198,6 @@ export function applyMcpRegistration(
 export function removeMcpRegistration(root: string, dryRun = false): Record<string, McpChange> {
   const changes: Record<string, McpChange> = {};
   for (const target of Object.values(TARGETS)) report(changes, target, unregister(root, target, dryRun));
+  reportCodex(changes, codexUnregister(root, dryRun));
   return changes;
 }

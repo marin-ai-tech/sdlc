@@ -12,6 +12,10 @@ its rule in brackets, for example `[sdlc:plan-gate]`. Hard rules apply in `warn`
 
 Process rule. Code was about to be written with no approved plan. **Do:** write `plan.md` and `tasks.md` (the plan
 workflow) and have a person run `sdlc approve plan --change <id>`. Docs and `openspec/` are exempt.
+Since 0.14.0 a shell command counts too, in every tool: the files it writes (`>`, `tee`, `cp`, `mv`,
+`Set-Content`/`sc`, `Tee-Object`, `Out-File`, `New-Item`, `Copy-Item`/`Move-Item`, `Rename-Item`,
+`.NET File` writers, `sed -i`, `perl -i`, `touch`, `truncate`, `dd of=`, and `apply_patch`) are checked like an edit;
+reading never is.
 
 ## protected-path
 
@@ -45,8 +49,8 @@ for their own terminal — not a `!` command in the agent chat.
 
 ## agent-marker
 
-Hard rule. The command clears `CLAUDECODE`, `OPENCODE`, `AGENT`, `SDLC_AGENT` or `CURSOR_AGENT`, which would let an agent pass for a
-person. **Do:** run it without touching these variables.
+Hard rule. The command clears `CLAUDECODE`, `OPENCODE`, `AGENT`, `SDLC_AGENT`, `CURSOR_AGENT`, `CODEX_CI` or
+`CODEX_SESSION_ID` (Codex), which would let an agent pass for a person. **Do:** run it without touching these variables.
 
 ## cli-removal
 

@@ -1,6 +1,6 @@
 # Documentation (English)
 
-Research and design of the SDLC harness for Claude Code, OpenCode and Cursor, built on OpenSpec. 
+Research and design of the SDLC harness for Claude Code, OpenCode, Cursor and Codex CLI, built on OpenSpec. 
 
 1. [OpenSpec: principles, internals, integration with Claude Code and OpenCode](01-openspec-analysis.md)
 2. [The Anthropic AI-Native SDLC playbook, mapped to OpenSpec](02-sdlc-playbook.md)
@@ -17,5 +17,6 @@ Research and design of the SDLC harness for Claude Code, OpenCode and Cursor, bu
 13. [Process hygiene and project health: capabilities and use cases](13-process-health.md)
 14. [Traceability and audit: use cases](14-traceability.md)
 15. [Cursor IDE: setup, what is enforced, use cases](15-cursor.md)
+16. [Codex CLI: setup, what is enforced, use cases](16-codex.md)
 
 In short: **OpenSpec is the specification subsystem** (deltas, living specs, validation, archive), and **`sdlc` is the process layer** that follows the Anthropic playbook. It adds stages, gates with human approvals, verification evidence, review, release gates, an audit trail, and deterministic enforcement through hooks (Claude Code) and a plugin (OpenCode).

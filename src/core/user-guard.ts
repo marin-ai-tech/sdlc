@@ -5,14 +5,16 @@ import { absolute, realTarget, writeSegments, type WriteSegment } from './policy
 
 /**
  * User-level agent settings (B42). Outside the project, two files switch the hooks off for every project: the
- * user's Claude Code settings (`disableAllHooks: true`) and the global OpenCode config. They are the guard's
+ * user's Claude Code settings (`disableAllHooks: true`), global OpenCode config, and Codex's user-level
+ * config.toml and hooks.json. They are the guard's
  * configuration too (rule `guard-config`, `policy-guard.ts`): an agent's edits and shell writes of them are denied,
  * also when the file does not exist yet or is reached through a symbolic link. Reads stay allowed, and so do the
- * other files in the user folders (`~/.claude/CLAUDE.md`, `~/.claude/projects/**`, agents, skills).
+ * other files in the user folders (`~/.claude/CLAUDE.md`, `~/.codex/AGENTS.md`, agents, skills).
  *
  * The paths come from the policy context's environment: `$CLAUDE_CONFIG_DIR/settings.json`, else
  * `<home>/.claude/settings.json`; `$OPENCODE_CONFIG` and `<config>/opencode/opencode.json(c)`, where `<config>` is
- * `XDG_CONFIG_HOME`, else `<home>/.config`; `<home>` is `HOME`, else `USERPROFILE`, else `os.homedir()`. An empty
+ * `XDG_CONFIG_HOME`, else `<home>/.config`; Codex uses `CODEX_HOME`, else `<home>/.codex`;
+ * `<home>` is `HOME`, else `USERPROFILE`, else `os.homedir()`. An empty
  * variable counts as unset; paths compare case-insensitively on Windows and macOS.
  *
  * A disabled hook cannot report itself, so `sdlc doctor` names every settings file that sets `disableAllHooks`.
@@ -54,8 +56,11 @@ export function userClaudeSettings(env: Env): string {
 export function userGuardFiles(env: Env): string[] {
   const config = envValue(env, 'XDG_CONFIG_HOME') ?? path.join(userHome(env), '.config');
   const opencode = envValue(env, 'OPENCODE_CONFIG');
+  const codex = envValue(env, 'CODEX_HOME') ?? path.join(userHome(env), '.codex');
   const files = [
     userClaudeSettings(env),
+    path.resolve(codex, 'config.toml'),
+    path.resolve(codex, 'hooks.json'),
     path.resolve(config, 'opencode', 'opencode.json'),
     path.resolve(config, 'opencode', 'opencode.jsonc'),
   ];

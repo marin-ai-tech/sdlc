@@ -12,6 +12,10 @@ summary: Каждое правило хука - почему остановил�
 
 Правило процесса. Агент собирался писать код без утверждённого плана. **Что делать:** написать `plan.md` и `tasks.md`
 (процесс plan), и человек выполняет `sdlc approve plan --change <id>`. Документация и `openspec/` не проверяются.
+С 0.14.0 это касается и команд оболочки в любом инструменте. Файлы, которые пишут `>`, `tee`, `cp`, `mv`,
+`Set-Content`/`sc`, `Tee-Object`, `Out-File`, `New-Item`, `Copy-Item`/`Move-Item`, `Rename-Item`,
+методы записи `.NET File`, `sed -i`, `perl -i`, `touch`, `truncate`, `dd of=` и `apply_patch`, проверяются как правка.
+Чтение файлов под это правило не подпадает.
 
 ## protected-path
 
@@ -44,7 +48,8 @@ summary: Каждое правило хука - почему остановил�
 
 ## agent-marker
 
-Жёсткое правило. Команда сбрасывает `CLAUDECODE`, `OPENCODE`, `AGENT`, `SDLC_AGENT` или `CURSOR_AGENT`, и агент сошёл бы за человека.
+Жёсткое правило. Команда сбрасывает `CLAUDECODE`, `OPENCODE`, `AGENT`, `SDLC_AGENT`, `CURSOR_AGENT`, `CODEX_CI` или
+`CODEX_SESSION_ID` (`Codex`), и агент сошёл бы за человека.
 **Что делать:** выполнить команду, не трогая эти переменные.
 
 ## cli-removal

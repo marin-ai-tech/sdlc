@@ -2,8 +2,8 @@ import type { SdlcConfig } from '../core/config.js';
 import type { HarnessStamp } from '../core/license.js';
 import type { RoleFile } from '../team/role-file.js';
 
-/** The agent tools sdlc integrates with; `cursor` since 0.13.0 (B80). */
-export const TOOL_IDS = ['claude', 'opencode', 'cursor'] as const;
+/** The agent tools sdlc integrates with; `cursor` since 0.13.0 (B80), `codex` (Codex CLI) since 0.14.0 (B82). */
+export const TOOL_IDS = ['claude', 'opencode', 'cursor', 'codex'] as const;
 export type ToolId = (typeof TOOL_IDS)[number];
 /** The tools of a new project where none is detected: Cursor is chosen, never assumed (0.13.0 keeps the default). */
 export const DEFAULT_TOOLS: readonly ToolId[] = ['claude', 'opencode'];

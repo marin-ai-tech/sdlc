@@ -8,7 +8,9 @@ export const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url
 export const BIN = path.join(REPO_ROOT, 'bin', 'sdlc.js');
 
 // 0.13.0 adds cursor
-const AGENT_VARS = ['CLAUDECODE', 'OPENCODE', 'AGENT', 'SDLC_AGENT', 'CLAUDE_PROJECT_DIR', 'CURSOR_AGENT'];
+const AGENT_VARS = ['CLAUDECODE', 'OPENCODE', 'AGENT', 'SDLC_AGENT', 'CLAUDE_PROJECT_DIR', 'CURSOR_AGENT',
+  // 0.14.0 adds codex
+  'CODEX_CI', 'CODEX_SESSION_ID'];
 
 export function tempDir(prefix = 'sdlc-test-'): string {
   return fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), prefix)));

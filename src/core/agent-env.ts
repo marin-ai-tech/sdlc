@@ -16,6 +16,8 @@ export function agentEnvironment(env: NodeJS.ProcessEnv = process.env): string |
   if (env.OPENCODE === '1') return 'opencode';
   if (env.AGENT === '1') return 'agent';
   if (env.CURSOR_AGENT === '1') return 'cursor';
+  // Codex CLI (B82, 0.14.0): its agent shells carry CODEX_CI=1 and CODEX_SESSION_ID (seen in Codex 0.158.0).
+  if (env.CODEX_CI === '1' || (env.CODEX_SESSION_ID ?? '') !== '') return 'codex';
   return undefined;
 }
 

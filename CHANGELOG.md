@@ -2,6 +2,19 @@
 
 All notable changes to sdlc. Versions follow [Semantic Versioning](https://semver.org/); while the major version is 0, a minor version may change behavior.
 
+## 0.14.0 — 2026-10-09
+
+### Added
+- **Codex CLI as a tool.** `sdlc init --tools codex` writes the workflows as skills (`.agents/skills/sdlc-*`, `$sdlc-next` and the like), the subagents (`.codex/agents/sdlc-*.toml`), the sdlc MCP server and the team's servers as `[mcp_servers.*]` tables in `.codex/config.toml` (your own tables stay), Codex's own hooks (`.codex/hooks.json`) and command rules (`.codex/rules/sdlc.rules`). An `apply_patch` or a shell write to code before the plan is approved is denied, a person's decisions in the agent's shell are denied by the hook and refused by the rules, protected files stay protected, and the session starts with the change and who acts next. `CODEX_CI=1` and `CODEX_SESSION_ID` mark the agent's shell, so `sdlc approve` refuses there and commits from it carry `SDLC-Agent: codex`. `sdlc doctor` reminds you that Codex runs a project's hooks only after you trust them in `/hooks`. Checked live with codex-cli 0.158.0. See [Codex CLI](docs/en/16-codex.md).
+
+### Changed
+- **A write through the shell counts as an edit, in every tool.** Before the plan is approved, `echo … > src/app.js`, `tee`, `cp`, `mv`, `install`, `sed -i`, `perl -i`, `touch`, `truncate`, `dd of=`, PowerShell's `Set-Content`, `Add-Content`, `Clear-Content`, `Out-File`, `Tee-Object`, `New-Item`, `Copy-Item`, `Move-Item`, `Rename-Item` and the .NET `File` writers to code are denied like an edit — also inside `bash -c`, `cmd /c` and `powershell -Command`, and for an `apply_patch` run through the shell — and so are such writes to locked tests and to `enforcement.protected_paths`. Quoted text and here-strings are content, not commands; reads, `2>&1`, `/dev/null`, paths outside the project and the change folder under `openspec/` are not affected.
+- **Codex's user-level settings are the guard's configuration.** An agent's edits and shell writes of `~/.codex/config.toml` and `~/.codex/hooks.json` (or under `CODEX_HOME`) are denied, as for Claude Code's and OpenCode's user settings: they can switch the project's hooks off.
+
+### Fixed
+- **A `cli` with a Windows drive letter.** `cli: node C:/tools/sdlc/bin/sdlc.js` was written by `sdlc init` but refused when the configuration was loaded, so every later command failed and the hooks let everything through. The colon is allowed now, and `sdlc init --cli` refuses a value the configuration could not load before it writes anything.
+- **`npm test *> $null` in PowerShell** is no longer denied as a write to the guard's configuration (`*>` is PowerShell's all-streams redirect, not a glob).
+
 ## 0.13.1 — 2026-10-08
 
 ### Added

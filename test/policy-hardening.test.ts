@@ -75,7 +75,11 @@ describe('state-file writes are caught however the path is spelled', () => {
     const { root, ctx } = context();
     for (const command of ['echo x >> docs/backlog.md', 'cp a.yaml config/roles.yaml', 'cat openspec/backlog.md',
       'grep -n B1 backlog.md']) {
-      expect(evaluateToolCall(bash(root, command), ctx).decision, command).toBe('allow');
+      // 0.14.0: shell writes count for the plan gate, so a write to code before the plan may be warned about; what this
+      // case checks is that the state-file rule leaves files of the same name elsewhere alone.
+      const decision = evaluateToolCall(bash(root, command), ctx);
+      expect(decision.decision, command).not.toBe('deny');
+      expect(decision.rule, command).not.toBe('state-integrity');
     }
     write(path.join(root, 'docs/notes.md'), 'x\n');
     const edit = normalizeToolCall('Edit', { file_path: path.join(root, 'docs/notes.md') }, root);

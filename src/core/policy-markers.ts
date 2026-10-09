@@ -7,9 +7,13 @@
  * to disk and run later) is not followed. A marker set to anything but `1` counts as cleared, because the CLI then
  * no longer sees an agent; `SDLC_AGENT` counts only when it becomes empty.
  */
-const NAME = String.raw`(?:CLAUDECODE|OPENCODE|SDLC_AGENT|CURSOR_AGENT|AGENT)`;
+const NAME = String.raw`(?:CLAUDECODE|OPENCODE|SDLC_AGENT|CURSOR_AGENT|CODEX_CI|CODEX_SESSION_ID|AGENT)`;
 /** The markers agent-env.ts reads; test/git-hook-sync.test.ts keeps the three lists (here, agent-env, git hook) equal. */
-export const AGENT_MARKERS = ['CLAUDECODE', 'OPENCODE', 'SDLC_AGENT', 'CURSOR_AGENT', 'AGENT'];
+export const AGENT_MARKERS = [
+  'CLAUDECODE', 'OPENCODE', 'SDLC_AGENT', 'CURSOR_AGENT', 'CODEX_CI', 'CODEX_SESSION_ID', 'AGENT',
+];
+/** Markers whose value is a name or an id: any non-empty value keeps the agent visible. */
+const NAMED_MARKERS = ['SDLC_AGENT', 'CODEX_SESSION_ID'];
 const END = String.raw`(?!\w)`;
 const VALUE = String.raw`(?<value>"[^"]*"|'[^']*'|[^\s;&|)]*)`;
 /** Options of `env` before the one that drops the whole environment (`env -i`, `env -`). */
@@ -61,7 +65,8 @@ function clears(name: string, raw: string | undefined, append: boolean): boolean
   if (value === '' || /^\$null$/i.test(value)) {
     return true;
   }
-  return name.toUpperCase() !== 'SDLC_AGENT' && value !== '1';
+  // SDLC_AGENT and CODEX_SESSION_ID (B82) are names, not flags: they count only when they become empty.
+  return !NAMED_MARKERS.includes(name.toUpperCase()) && value !== '1';
 }
 
 function assignsCleared(command: string): boolean {

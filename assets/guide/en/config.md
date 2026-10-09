@@ -26,7 +26,7 @@ also controls the guard itself.
 | `mcp.serve`, `mcp.servers` | sdlc's own MCP server, the team's servers |
 | `stages.<stage>` | skills and subagents of a stage |
 | `cli` | how agents call sdlc (`sdlc` or `npx --no-install sdlc`) |
-| `tools` | claude, opencode, cursor |
+| `tools` | claude, opencode, cursor, codex |
 
 ## After a change
 

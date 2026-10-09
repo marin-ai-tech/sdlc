@@ -3,6 +3,7 @@ import * as path from 'node:path';
 import picomatch from 'picomatch';
 import { isWithin, toPosix } from './fs-utils.js';
 import { INBOX_DIR } from '../mcp/inbox.js';
+import { scanShell } from './policy-shell-scanner.js';
 
 /**
  * Which state files a tool call writes, beyond the path text `policy.ts` matches (rule `state-integrity`):
@@ -150,15 +151,33 @@ export interface ProtectedSet {
   candidates(root: string, glob: string, folders: boolean): string[];
 }
 
-interface DirState {
+export interface DirState {
   dir: string | undefined;
   stack: Array<string | undefined>;
 }
 
-/** Splits a command into simple commands at `;`, `&&`, `||`, `|`, `&` and newlines (`2>&1` is not a split). */
+/** Splits at shell operators outside quotes and PowerShell here-strings. */
 export function simpleCommands(command: string): string[] {
-  const unduped = command.replace(/\d*>&(?:\d+|-)/g, ' ').replace(/&>/g, '>');
-  return unduped.split(/&&|\|\||[;&|\r\n]/);
+  const out: string[] = [];
+  let start = 0;
+  scanShell(command, (ch, i, quoted) => {
+    if (quoted || i < start) {
+      return;
+    }
+    if (ch === '>' && command[i - 1] === '&') {
+      return;
+    }
+    if (!/[;&|{}\r\n]/.test(ch)) {
+      return;
+    }
+    if (ch === '&' && (command[i - 1] === '>' || command[i + 1] === '>' || command[i + 1] === '{')) {
+      return;
+    }
+    out.push(command.slice(start, i));
+    start = i + (command[i + 1] === ch && /[&|]/.test(ch) ? 2 : 1);
+  });
+  out.push(command.slice(start));
+  return out;
 }
 
 /**
@@ -166,7 +185,7 @@ export function simpleCommands(command: string): string[] {
  * arguments (`[IO.Directory]::Delete('dir', $true)`) are words of their own.
  */
 function words(segment: string): string[] {
-  return segment
+  return segment.replace(/\*>>?/g, '>')
     .split(/[\s(),]+|[<>]+/)
     .map((word) => word.replace(/['"]/g, ''))
     .map((word) => word.replace(/^\(+|\)+$/g, ''))
@@ -181,13 +200,17 @@ export function absolute(dir: string | undefined, word: string | undefined): str
   return dir === undefined ? undefined : path.resolve(dir, word);
 }
 
-function moveTo(state: DirState, verb: string, args: string[]): void {
+export function moveTo(state: DirState, verb: string, args: string[]): void {
   if (POP_COMMAND.test(verb)) {
     state.dir = state.stack.pop();
     return;
   }
   if (/^push/i.test(verb)) state.stack.push(state.dir);
   state.dir = absolute(state.dir, args.find((arg) => !arg.startsWith('-')));
+}
+
+export function isDirCommand(verb: string): boolean {
+  return DIR_COMMAND.test(verb) || POP_COMMAND.test(verb);
 }
 
 /** The inbox files on disk, root-relative. */

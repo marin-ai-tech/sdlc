@@ -6,6 +6,8 @@ import { generatedNotice, harnessStamp, type HarnessStamp } from '../core/licens
 import { harnessPackageDir } from '../core/openspec-schema.js';
 import { harnessVersion } from '../core/version.js';
 import { claudeAdapter } from './claude.js';
+import { codexAdapter } from './codex.js';
+import { CODEX_HOOKS_PATH, mergeCodexHooks } from './codex-hooks.js';
 import { cursorAdapter } from './cursor.js';
 import { CURSOR_HOOKS_PATH, mergeCursorHooks } from './cursor-hooks.js';
 import { applyFiles, type ApplyReport } from './manifest.js';
@@ -23,6 +25,7 @@ export const ADAPTERS: Record<ToolId, ToolAdapter> = {
   claude: claudeAdapter,
   opencode: opencodeAdapter,
   cursor: cursorAdapter,
+  codex: codexAdapter,
 };
 
 export function parseTools(value: string | undefined, fallback: ToolId[]): ToolId[] {
@@ -82,6 +85,8 @@ export interface InstallResult {
   claudeHooks: SettingsChange;
   /** sdlc's entries in `.cursor/hooks.json` (B80); `absent` when Cursor is not a tool and the file has none. */
   cursorHooks: SettingsChange;
+  /** sdlc's entries in `.codex/hooks.json` (B82); `absent` when Codex is not a tool and the file has none. */
+  codexHooks: SettingsChange;
   statusLine: string;
   /** The `sdlc` MCP server entry per file (B13); empty when nothing MCP-related was touched. */
   mcp: Record<string, McpChange>;
@@ -113,9 +118,22 @@ export function installIntegrations(
     ? mergeClaudeStatusLine(root, config.cli, tools.includes('claude') && config.statusline, options.dryRun)
     : 'absent';
   const cursorHooks = applyCursorHooks(root, config.cli, tools, options);
+  const codexHooks = applyCodexHooks(root, config.cli, tools, options);
   const mcp = applyMcpRegistration(root, config, tools, options.dryRun);
   const servers = applyRegistryServers(root, config.mcp?.servers ?? [], tools, options.dryRun);
-  return { tools, files: report, claudeHooks, cursorHooks, statusLine, mcp, servers };
+  return { tools, files: report, claudeHooks, cursorHooks, codexHooks, statusLine, mcp, servers };
+}
+
+/** Codex's hooks while Codex is a tool (and hooks are wanted); sdlc's entries go when it no longer is (B82). */
+function applyCodexHooks(
+  root: string,
+  cli: string,
+  tools: ToolId[],
+  options: { dryRun?: boolean; hooks?: boolean },
+): SettingsChange {
+  const wanted = tools.includes('codex') && options.hooks !== false;
+  if (!tools.includes('codex') && !fs.existsSync(path.join(root, CODEX_HOOKS_PATH))) return 'absent';
+  return mergeCodexHooks(root, cli, wanted, options.dryRun);
 }
 
 /** Cursor's hooks while Cursor is a tool (and hooks are wanted); sdlc's entries go when it no longer is. */
@@ -130,14 +148,24 @@ function applyCursorHooks(
   return mergeCursorHooks(root, cli, wanted, options.dryRun);
 }
 
-/** The `.cursor` folder once sdlc's files are gone from it, if nothing of the person's own is left. */
-function pruneCursorFolder(root: string, dryRun: boolean | undefined): void {
-  const dir = path.join(root, '.cursor');
-  if (dryRun || !isDirectory(dir)) return;
-  try {
-    if (fs.readdirSync(dir).length === 0) fs.rmdirSync(dir);
-  } catch {
-    // Best effort: a folder that cannot be read or removed stays.
+/** Folders sdlc's files leave behind, deepest first; each goes only when nothing of the person's own is left. */
+const PRUNED_FOLDERS = [
+  '.cursor',
+  '.codex/rules', '.codex/agents', '.codex',
+  '.agents/skills', '.agents',
+];
+
+/** The tools' folders once sdlc's files are gone from them, if nothing of the person's own is left. */
+function pruneToolFolders(root: string, dryRun: boolean | undefined): void {
+  if (dryRun) return;
+  for (const rel of PRUNED_FOLDERS) {
+    const dir = path.join(root, rel);
+    if (!isDirectory(dir)) continue;
+    try {
+      if (fs.readdirSync(dir).length === 0) fs.rmdirSync(dir);
+    } catch {
+      // Best effort: a folder that cannot be read or removed stays.
+    }
   }
 }
 
@@ -150,7 +178,7 @@ export function refreshGeneratedFiles(root: string, config: SdlcConfig): ApplyRe
   return applyFiles(root, renderAll(ctx), { version: ctx.version, license: ctx.stamp.license });
 }
 
-/** Removes every generated file (unless edited), the Claude and Cursor hooks. Planning data is never touched. */
+/** Removes every generated file (unless edited), the Claude, Cursor and Codex hooks. Planning data is never touched. */
 export function uninstallIntegrations(root: string, options: { force?: boolean; dryRun?: boolean } = {}): InstallResult {
   const report = applyFiles(root, [], {
     force: options.force,
@@ -167,8 +195,11 @@ export function uninstallIntegrations(root: string, options: { force?: boolean; 
   const cursorHooks = fs.existsSync(path.join(root, CURSOR_HOOKS_PATH))
     ? mergeCursorHooks(root, 'sdlc', false, options.dryRun)
     : 'absent';
+  const codexHooks = fs.existsSync(path.join(root, CODEX_HOOKS_PATH))
+    ? mergeCodexHooks(root, 'sdlc', false, options.dryRun)
+    : 'absent';
   const mcp = removeMcpRegistration(root, options.dryRun);
   const servers = removeRegistryServers(root, options.dryRun);
-  pruneCursorFolder(root, options.dryRun);
-  return { tools: [], files: report, claudeHooks, cursorHooks, statusLine, mcp, servers };
+  pruneToolFolders(root, options.dryRun);
+  return { tools: [], files: report, claudeHooks, cursorHooks, codexHooks, statusLine, mcp, servers };
 }
