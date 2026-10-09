@@ -120,6 +120,9 @@ A pack holds `roles/<id>.md` (or `roles/<locale>/<id>.md`) and `skills/<id>/…`
 - `sdlc team sync` reads the registry first, then the packs, then the built-ins.
 - **Pin the version.** For git, prefer a commit or a tag; for npm, an exact version.
 - No code of a pack runs: no git hooks or submodules, no npm scripts.
+- An npm pack is a registry package (`@corp/sdlc-pack@1.2.0`) or a `.tgz` (a path or an `https://` URL). A
+  folder or a repository is refused for `npm:` — npm 10 runs a package's `prepare` script for those even with
+  `--ignore-scripts` — so put a repository in a `git:` pack.
 - An unreachable pack is reported, and sync goes on with the next source.
 
 ## 12.6. Skills that reach the agents

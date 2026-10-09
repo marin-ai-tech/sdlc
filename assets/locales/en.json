@@ -1243,6 +1243,7 @@
   "error.pack_name_x_not_kebab": "{where} must be lower-case words joined by - (found {name}).",
   "error.pack_name_x_twice": "{where}: the pack name {name} is used twice; pack names must be unique.",
   "error.pack_x_git_or_npm": "{where} must have either git (with ref) or npm, not both and not neither.",
+  "error.pack_npm_source": "{where}: npm pack must be a registry package or .tgz; use git: for a repository or folder.",
   "error.pack_x_needs_ref": "{where}: a git pack needs ref (a tag, a branch or a commit).",
   "error.pack_x_not_accepted": "{where}: {value} is not accepted: a git URL is https, http, ssh, git, file or user@host:path, a ref is letters, digits, ., _, / and - without ..; nothing may start with - or hold control characters.",
   "hook.guardSkill": "{path} belongs to an installed skill of the agent team; an agent may not change it, because agents follow it and it was checked against the team registry. Change the skill in the registry; a person installs the new version with `sdlc team accept`.",

@@ -2,6 +2,14 @@
 
 All notable changes to sdlc. Versions follow [Semantic Versioning](https://semver.org/); while the major version is 0, a minor version may change behavior.
 
+## 0.14.4 — 2026-10-09
+
+### Security
+- **No code of an npm pack runs, on any npm.** npm 10 runs a package's `prepare` script when `npm pack` is given a folder or a git spec, even with `--ignore-scripts` (npm 11 does not), so with npm 10 a team pack listed as `npm: ./folder` or `npm: github:…` could run its code during `sdlc team sync`. An npm pack is now only a registry package (`name`, `name@1.2.3`, `@scope/name@^1`) or a `.tgz` (a path or an `https://` URL); a folder or a repository is refused when the configuration is read — put a repository in a `git:` pack, which never runs anything. npm also runs with `npm_config_ignore_scripts=true`. If you used a folder or a git spec under `npm:` with npm 10, review what its `prepare` script does.
+
+### Fixed
+- **The release build on Linux.** A test wrote a team's own git hook without the executable bit, which Linux ignores; the product was not affected. Every push and pull request is now tested on Linux with npm 10 and npm 11 before a release is tagged.
+
 ## 0.14.3 — 2026-10-09
 
 ### Fixed

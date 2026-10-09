@@ -1,0 +1,31 @@
+# CI: every push to master and every pull request runs the tests on Linux, with npm 10 (Node 20 and 22) and npm 11
+# (Node 24). The release workflow tests again on a tag; push master first and tag after this is green, so a
+# difference between Linux and Windows, or between npm versions, is found before a release.
+name: ci
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        node: [20, 22, 24]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+
+      - name: Install and test
+        run: |
+          npm ci
+          npm test

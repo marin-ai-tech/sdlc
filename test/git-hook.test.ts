@@ -68,6 +68,8 @@ describe('B24: the prepare-commit-msg hook', () => {
     expect(warned).toMatchObject({ status: 'warn' });
     expect(warned.fix).toContain(CHAIN_LINE);
     write(hook, `#!/bin/sh\n# the team's own hook\n${CHAIN_LINE}\nexit 0\n`);
+    // A team's own hook is executable, or git never runs it (Linux ignores a hook without the bit).
+    fs.chmodSync(hook, 0o755);
     expect(commit(p.root, { ...p.env, CLAUDECODE: '1' }, 'chained')).toContain('SDLC-Agent: claude-code');
     const chained = p.cli(['doctor', '--json']).json().checks.find((c: { check: string }) => c.check === 'git hook');
     expect(chained).toMatchObject({ status: 'ok' });

@@ -12,7 +12,8 @@ import { LIMITS, unsafeSkillPath } from './vetting.js';
  * - git: a shallow fetch of the ref into a bare repository (no work tree, so no checkout, no filters, no hooks;
  *   `core.hooksPath` points nowhere and submodules are not fetched); the files under `roles/` and `skills/` are
  *   copied out of the commit's tree, regular blobs only (no symlinks, no submodules), each path checked.
- * - npm: `npm pack <spec> --ignore-scripts` (no prepack, prepare or postinstall), the tarball extracted by `tar`.
+ * - npm: only registry packages and tarballs are allowed. npm 10 can run `prepare` for folder and git specs even
+ *   with `--ignore-scripts`, so those sources are refused. The tarball is extracted by `tar`.
  * A pack that cannot be fetched throws `PackError`; sync reports it and goes on with the next source.
  */
 export class PackError extends Error {}
@@ -55,8 +56,8 @@ function firstLine(text: string): string {
   return (fatal ?? lines[0] ?? 'failed').slice(0, 200);
 }
 
-function spawn(cmd: string, args: string[], cwd: string, input?: string): Run {
-  const env = { ...process.env, GIT_TERMINAL_PROMPT: '0', GIT_ASKPASS: '', SSH_ASKPASS: '' };
+function spawn(cmd: string, args: string[], cwd: string, input?: string, extraEnv = {}): Run {
+  const env = { ...process.env, GIT_TERMINAL_PROMPT: '0', GIT_ASKPASS: '', SSH_ASKPASS: '', ...extraEnv };
   const options = { cwd, env, input, timeout: FETCH_MS, maxBuffer: 64 * 1024 * 1024, windowsHide: true };
   const result = spawnSync(cmd, args, options);
   const stderr = result.error ? result.error.message : (result.stderr ?? Buffer.alloc(0)).toString('utf8');
@@ -197,9 +198,13 @@ function packedInfo(stdout: string): NpmPacked {
 }
 
 function npmPack(root: string, spec: string, work: string): NpmPacked {
+  if (!spec.startsWith('https://') && isDirectory(path.resolve(root, spec))) {
+    throw new PackError(`npm pack: ${spec} is a directory, not a tarball`);
+  }
   const npm = npmCommand();
   const flags = ['pack', '--ignore-scripts', '--json', '--no-audit', '--no-fund', '--no-update-notifier'];
-  const run = spawn(npm.cmd, [...npm.args, ...flags, '--pack-destination', work, '--', spec], root);
+  const run = spawn(npm.cmd, [...npm.args, ...flags, '--pack-destination', work, '--', spec], root, undefined,
+    { npm_config_ignore_scripts: 'true' });
   if (!run.ok) throw new PackError(`npm pack: ${firstLine(run.stderr)}`);
   const info = packedInfo(run.stdout.toString('utf8'));
   if ((info.unpackedSize ?? 0) > PACK_LIMITS.bytes) {

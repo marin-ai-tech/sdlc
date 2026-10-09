@@ -36,8 +36,13 @@ function runGit(cwd: string, args: string[]): string {
   return execFileSync('git', args, { cwd, encoding: 'utf-8' }).trim();
 }
 
-function npmPack(): { dir: string; marker: string } {
-  const dir = tempDir('sdlc-pack-npm-');
+/**
+ * An npm pack as a tarball, made with `tar` (npm itself would run the prepare script while packing). Its scripts
+ * would write the marker if anything ran them.
+ */
+function npmPack(): { dir: string; tgz: string; marker: string } {
+  const stage = tempDir('sdlc-pack-npm-');
+  const dir = path.join(stage, 'package');
   const marker = path.join(tempDir('sdlc-pack-marker-'), 'ran.txt');
   const script = `node -e "require('fs').writeFileSync(process.argv[1], 'ran')" ${JSON.stringify(marker)}`;
   write(path.join(dir, 'package.json'), JSON.stringify({
@@ -45,7 +50,8 @@ function npmPack(): { dir: string; marker: string } {
     scripts: { prepack: script, prepare: script, postinstall: script },
   }));
   write(path.join(dir, 'roles/architect.md'), ANALYST.replace(/analyst/g, 'architect'));
-  return { dir, marker };
+  execFileSync('tar', ['-czf', 'corp-sdlc-pack-1.2.0.tgz', 'package'], { cwd: stage });
+  return { dir, tgz: path.join(stage, 'corp-sdlc-pack-1.2.0.tgz'), marker };
 }
 
 function project(packs: unknown[]) {
@@ -78,8 +84,9 @@ describe('packs', () => {
   }, 240000);
 
   it('an npm pack brings roles, and no script of the pack ever runs', () => {
+    // 0.14.4: a folder is no longer an npm pack source (npm 10 runs its prepare script); the tarball is.
     const pack = npmPack();
-    const p = project([{ name: 'corp-npm', npm: pack.dir }]);
+    const p = project([{ name: 'corp-npm', npm: pack.tgz }]);
     const r = p.cli(['team', 'sync', '--json']);
     expect(r.code, r.stdout + r.stderr).toBe(0);
     expect(p.text('docs/agents/drafts/architect.md')).toMatch(/kind: pack/);

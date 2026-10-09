@@ -3,7 +3,7 @@ import { ROLE_ID } from './role-file.js';
 
 /**
  * `packs` in openspec/sdlc.yaml (B76): `{ name, git, ref }` (a repository at a tag, a branch or a commit) or
- * `{ name, npm }` (an npm spec; an exact version is recommended). Parsed into typed entries here; config.ts only
+ * `{ name, npm }` (a registry package or tarball; an exact version is recommended). Parsed into typed entries here;
  * calls `parsePacksConfig`. A name is kebab-case and unique, a git pack needs its ref. Nothing is fetched here
  * (`src/team/pack-fetch.ts` does that); a URL, a ref or a spec that could pass for a command-line option is refused.
  */
@@ -71,7 +71,11 @@ function parsePack(value: unknown, at: string): PackConfig {
   const npm = field(raw, 'npm', `${at}.npm`);
   if ((git === undefined) === (npm === undefined)) throw invalid('error.pack_x_git_or_npm', at);
   if (git !== undefined) return gitPack(name, git, raw, at);
-  return { name, npm: checked(npm ?? '', `${at}.npm`, true) };
+  const spec = npm ?? '';
+  if (!validNpmSpec(spec) || spec.length > SPEC_MAX || spec.startsWith('-') || CONTROL.test(spec)) {
+    throw invalid('error.pack_npm_source', `${at}.npm`);
+  }
+  return { name, npm: spec };
 }
 
 /** `packs`: absent = none. Each entry checked; a name used twice is a config error naming it. */
@@ -93,6 +97,18 @@ export function isGitPack(pack: PackConfig): pack is GitPackConfig {
 
 const NPM_NAME = /^(?:@[a-z0-9~-][a-z0-9._~-]*\/)?[a-z0-9~-][a-z0-9._~-]*$/;
 const EXACT = /^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?$/;
+
+function validNpmSpec(spec: string): boolean {
+  const versionAt = spec.lastIndexOf('@');
+  const scoped = spec.startsWith('@');
+  const cut = versionAt > (scoped ? 0 : -1) ? versionAt : -1;
+  const name = cut === -1 ? spec : spec.slice(0, cut);
+  const version = cut === -1 ? '' : spec.slice(cut + 1);
+  if (NPM_NAME.test(name) && (cut === -1 || /^[^@/:\s]+$/.test(version))) return true;
+  if (/^https:\/\/[^\s]+\.(?:tgz|tar\.gz)$/.test(spec)) return true;
+  const localPath = /^(?:[A-Za-z]:[\\/])?[^:\s]+\.(?:tgz|tar\.gz)$/.test(spec);
+  return localPath && !spec.startsWith('//');
+}
 
 /**
  * True when an npm spec names a registry package without an exact version (a bare name, a range or a dist-tag):
