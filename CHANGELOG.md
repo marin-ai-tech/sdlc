@@ -2,6 +2,11 @@
 
 All notable changes to sdlc. Versions follow [Semantic Versioning](https://semver.org/); while the major version is 0, a minor version may change behavior.
 
+## 0.14.3 — 2026-10-09
+
+### Fixed
+- **A failing hook no longer opens the gates in Codex, Qwen Code and GigaCode.** Codex lets a tool call through when its hook exits non-zero (exit 2 too), crashes, prints bad JSON or times out — only a JSON `deny` blocks (checked live with codex-cli 0.158.0); Qwen Code documents the same. When sdlc's pre-tool hook fails to load or throws, the sdlc command now answers that `deny` itself for these tools, as Claude Code's guard and the OpenCode plugin already block a hook that cannot run. A CLI that is not installed still lets the call through, and `sdlc doctor` warns about it.
+
 ## 0.14.2 — 2026-10-09
 
 ### Changed

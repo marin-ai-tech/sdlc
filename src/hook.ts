@@ -26,6 +26,8 @@ import { cursorAllow, cursorDefault, cursorDeny, fromCursor, type CursorInput } 
  * error, signal, non-zero exit, output that is not JSON; Claude Code: a
  * non-zero exit, blocked with exit 2); only a CLI that is not installed at all
  * lets the call through there.
+ * Codex, Qwen Code and GigaCode fail open on a non-zero hook exit, so the CLI
+ * entry answers JSON deny when their pre-tool hook process fails (B85).
  */
 type HookEvent = 'pre-tool' | 'session-start' | 'stop';
 /** `codex` (B82): Codex CLI sends Claude Code's input and reads Claude Code's answers, so it shares that path. */

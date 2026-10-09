@@ -71,8 +71,10 @@ plan is denied (see 17.4).
 
 - **Folder trust.** Untrusted folders do not run the project's hooks. Until the folder is trusted, only the deny rules
   and the CLI's own refusal hold; the plan gate is not held for edits.
-- **A hook that cannot run.** Qwen Code lets the call through when a hook fails, times out or answers bad JSON. Keep
-  `sdlc` on the PATH of the tool's shell (`sdlc doctor` checks it).
+- **A hook that cannot run.** Qwen Code lets the call through when a hook fails, times out or answers bad JSON.
+  When sdlc's pre-tool hook fails to load or throws, the sdlc command answers a JSON `deny` itself, so the call is
+  blocked. `sdlc` missing from the PATH of the tool's shell (`sdlc doctor` checks it) and a timeout still let the
+  call through.
 - **The GigaCode marker.** GigaCode's own session variable is not documented. sdlc treats `QWEN_CODE=1` as the agent's
   marker for both tools, so commits from GigaCode carry `SDLC-Agent: qwen`. If a GigaCode build sets no marker, the CLI
   cannot tell the agent's shell from yours; the hooks and deny rules still refuse a person's commands by their text.

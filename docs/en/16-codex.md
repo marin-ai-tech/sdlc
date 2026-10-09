@@ -74,8 +74,12 @@ gives the developer the command to run in their own terminal.
   person can do that; the agent cannot: its edits and shell writes of `~/.codex/config.toml` and
   `~/.codex/hooks.json` (or under `CODEX_HOME`) are denied. The CLI still refuses a person's decision in the
   agent's shell by its marker.
-- **A hook that cannot run.** If `sdlc` is not on the PATH of Codex's shell or the hook fails, Codex may let the call
-  through. `sdlc doctor` checks that the cli is on PATH; keep it so.
+- **A hook that cannot run.** Codex lets a call through when its hook fails in any way — a non-zero exit (exit 2
+  too), a crash, bad JSON or a timeout; only a JSON `deny` blocks (checked live with codex-cli 0.158.0 on Windows,
+  where Codex runs hooks through Windows PowerShell). So when sdlc's pre-tool hook fails to load or throws, the
+  sdlc command answers a `deny` itself, and the call is blocked until `sdlc doctor` is clean. Two cases still let
+  the call through: `sdlc` not installed or not on the PATH of Codex's shell (`sdlc doctor` checks it), and a hook
+  that runs longer than its 30-second timeout.
 - **Shell writes** are read from the command text: redirections, `tee`, `cp`, `mv`, `install`, `sed -i`,
   `perl -i`, `touch`, `truncate`, `dd of=`, PowerShell's `Set-Content`, `Add-Content`, `Clear-Content`,
   `Out-File`, `Tee-Object`, `New-Item`, `Copy-Item`, `Move-Item`, `Rename-Item` and the .NET `File` writers, inside
