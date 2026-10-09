@@ -222,7 +222,8 @@ export function buildProgram(): Command {
   program
     .command('init [path]')
     .description(cmdDesc('cmd.init'))
-    .option('--tools <list>', 'claude,opencode,cursor,codex | all | none (default: detected, else claude,opencode)')
+    .option('--tools <list>', 'claude,opencode,cursor,codex,qwen,gigacode (experimental) | all | none '
+      + '(default: detected, else claude,opencode)')
     .option('--delivery <mode>', 'both | skills | commands')
     .option('--cli <command>', 'how agents invoke the CLI, e.g. "npx --no-install sdlc" for a project-local install')
     .option('--mode <mode>', 'enforcement mode: off | warn | block')
@@ -241,7 +242,8 @@ export function buildProgram(): Command {
   program
     .command('update [path]')
     .description(cmdDesc('cmd.update'))
-    .option('--tools <list>', 'change the configured tools (claude,opencode,cursor,codex | all | none)')
+    .option('--tools <list>', 'change the configured tools '
+      + '(claude,opencode,cursor,codex,qwen,gigacode (experimental) | all | none)')
     .option('--force', 'overwrite generated files even if edited locally')
     .option('--dry-run', 'show what would change')
     .option('--json', 'output JSON')
@@ -542,7 +544,7 @@ export function buildProgram(): Command {
   program
     .command('hook <event>')
     .description(cmdDesc('cmd.hook'))
-    .option('--agent <agent>', 'claude | opencode | cursor | codex', 'claude')
+    .option('--agent <agent>', 'claude | opencode | cursor | codex | qwen | gigacode', 'claude')
     .action((event, opts) => runHook(event, opts.agent));
 
   program

@@ -38,10 +38,10 @@ const ROLE_DIR = 'docs/agents';
  * The team's own agents and skills (names without the `sdlc` prefix) stay open.
  */
 const GENERATED_NAMES = [
-  String.raw`\.(?:claude|opencode|cursor)/agents/sdlc-[^/\s'"]+\.md`,
-  String.raw`\.(?:claude|opencode|cursor)/skills/sdlc-[^/\s'"]+/[^\s'"]+`,
+  String.raw`\.(?:claude|opencode|cursor|qwen|gigacode)/agents/sdlc-[^/\s'"]+\.md`,
+  String.raw`\.(?:claude|opencode|cursor|qwen|gigacode)/skills/sdlc-[^/\s'"]+/[^\s'"]+`,
   String.raw`\.claude/commands/sdlc/[^\s'"]+`,
-  String.raw`\.(?:opencode|cursor)/commands/sdlc-[^/\s'"]+\.md`,
+  String.raw`\.(?:opencode|cursor|qwen|gigacode)/commands/sdlc-[^/\s'"]+\.md`,
   // Cursor (B80): the rule every agent reads.
   String.raw`\.cursor/rules/sdlc\.mdc`,
   // Codex CLI (B82): its subagents, the skills it reads and its command rules.
@@ -53,7 +53,9 @@ const GENERATED_NAMES = [
 const GENERATED_DIRS = ['.claude/agents', '.claude/skills', '.claude/commands', '.claude/commands/sdlc',
   '.opencode/agents', '.opencode/skills', '.opencode/commands',
   '.cursor/agents', '.cursor/skills', '.cursor/commands', '.cursor/rules',
-  '.codex/agents', '.codex/rules', '.agents/skills'];
+  '.codex/agents', '.codex/rules', '.agents/skills',
+  '.qwen/agents', '.qwen/skills', '.qwen/commands',
+  '.gigacode/agents', '.gigacode/skills', '.gigacode/commands'];
 /**
  * What a review checks and what an artifact must contain (B75): the review policy in its usual places, the sdlc
  * schema and OpenSpec's artifact rules. The policy may also live at the path set in `review.policy`, which the
@@ -77,6 +79,7 @@ const GUARD_NAMES = [
   // Codex CLI (B82): its hooks and its configuration (the MCP servers).
   String.raw`\.codex/hooks\.json`,
   String.raw`\.codex/config\.toml`,
+  String.raw`\.(?:qwen|gigacode)/settings\.json`,
   ROLE_NAME,
   ...GENERATED_NAMES,
   ...POLICY_NAMES,
@@ -88,6 +91,7 @@ const TOOL_FOLDERS = [
   String.raw`\.opencode(?:/(?:plugins|agents|skills|commands))?`,
   String.raw`\.cursor(?:/(?:agents|skills|commands|rules))?`,
   String.raw`\.codex(?:/(?:agents|rules))?`,
+  String.raw`\.(?:qwen|gigacode)(?:/(?:agents|skills|commands))?`,
   String.raw`\.agents(?:/skills)?`,
 ].join('|');
 /** Folders whose removal, move or replacement takes guard files with it. */
@@ -102,9 +106,11 @@ const FIXED_GUARD_FILES = [
   '.opencode/opencode.jsonc', 'REVIEW.md', 'docs/REVIEW.md', '.github/REVIEW.md', 'openspec/config.yaml',
   'openspec/schemas/sdlc/schema.yaml', '.cursor/hooks.json', '.cursor/mcp.json',
   '.codex/hooks.json', '.codex/config.toml', '.codex/rules/sdlc.rules',
+  '.qwen/settings.json', '.gigacode/settings.json',
 ];
 const GUARD_FOLDERS = [
   '.claude', '.opencode', '.opencode/plugins', '.cursor', '.codex', '.agents', 'openspec', 'openspec/.sdlc',
+  '.qwen', '.gigacode',
   'openspec/schemas', 'openspec/schemas/sdlc',
   ...GENERATED_DIRS,
 ];

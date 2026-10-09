@@ -9,6 +9,8 @@ import { claudeAdapter } from './claude.js';
 import { codexAdapter } from './codex.js';
 import { CODEX_HOOKS_PATH, mergeCodexHooks } from './codex-hooks.js';
 import { cursorAdapter } from './cursor.js';
+import { qwenAdapter, gigacodeAdapter } from './qwen-family.js';
+import { mergeQwenSettings, qwenSettingsPath } from './qwen-settings.js';
 import { CURSOR_HOOKS_PATH, mergeCursorHooks } from './cursor-hooks.js';
 import { applyFiles, type ApplyReport } from './manifest.js';
 import { opencodeAdapter } from './opencode.js';
@@ -26,6 +28,8 @@ export const ADAPTERS: Record<ToolId, ToolAdapter> = {
   opencode: opencodeAdapter,
   cursor: cursorAdapter,
   codex: codexAdapter,
+  qwen: qwenAdapter,
+  gigacode: gigacodeAdapter,
 };
 
 export function parseTools(value: string | undefined, fallback: ToolId[]): ToolId[] {
@@ -87,6 +91,8 @@ export interface InstallResult {
   cursorHooks: SettingsChange;
   /** sdlc's entries in `.codex/hooks.json` (B82); `absent` when Codex is not a tool and the file has none. */
   codexHooks: SettingsChange;
+  qwenHooks: SettingsChange;
+  gigacodeHooks: SettingsChange;
   statusLine: string;
   /** The `sdlc` MCP server entry per file (B13); empty when nothing MCP-related was touched. */
   mcp: Record<string, McpChange>;
@@ -119,9 +125,18 @@ export function installIntegrations(
     : 'absent';
   const cursorHooks = applyCursorHooks(root, config.cli, tools, options);
   const codexHooks = applyCodexHooks(root, config.cli, tools, options);
+  const qwenHooks = applyFamilySettings(root, config.cli, 'qwen', tools, options);
+  const gigacodeHooks = applyFamilySettings(root, config.cli, 'gigacode', tools, options);
   const mcp = applyMcpRegistration(root, config, tools, options.dryRun);
   const servers = applyRegistryServers(root, config.mcp?.servers ?? [], tools, options.dryRun);
-  return { tools, files: report, claudeHooks, cursorHooks, codexHooks, statusLine, mcp, servers };
+  return { tools, files: report, claudeHooks, cursorHooks, codexHooks, qwenHooks, gigacodeHooks,
+    statusLine, mcp, servers };
+}
+
+function applyFamilySettings(root: string, cli: string, id: 'qwen' | 'gigacode', tools: ToolId[],
+  options: { dryRun?: boolean; hooks?: boolean }): SettingsChange {
+  if (!tools.includes(id) && !fs.existsSync(path.join(root, qwenSettingsPath(id)))) return 'absent';
+  return mergeQwenSettings(root, cli, id, tools.includes(id) && options.hooks !== false, options.dryRun);
 }
 
 /** Codex's hooks while Codex is a tool (and hooks are wanted); sdlc's entries go when it no longer is (B82). */
@@ -153,6 +168,8 @@ const PRUNED_FOLDERS = [
   '.cursor',
   '.codex/rules', '.codex/agents', '.codex',
   '.agents/skills', '.agents',
+  '.qwen/agents', '.qwen/commands', '.qwen/skills', '.qwen',
+  '.gigacode/agents', '.gigacode/commands', '.gigacode/skills', '.gigacode',
 ];
 
 /** The tools' folders once sdlc's files are gone from them, if nothing of the person's own is left. */
@@ -198,8 +215,13 @@ export function uninstallIntegrations(root: string, options: { force?: boolean; 
   const codexHooks = fs.existsSync(path.join(root, CODEX_HOOKS_PATH))
     ? mergeCodexHooks(root, 'sdlc', false, options.dryRun)
     : 'absent';
+  const qwenHooks = fs.existsSync(path.join(root, qwenSettingsPath('qwen')))
+    ? mergeQwenSettings(root, 'sdlc', 'qwen', false, options.dryRun) : 'absent';
+  const gigacodeHooks = fs.existsSync(path.join(root, qwenSettingsPath('gigacode')))
+    ? mergeQwenSettings(root, 'sdlc', 'gigacode', false, options.dryRun) : 'absent';
   const mcp = removeMcpRegistration(root, options.dryRun);
   const servers = removeRegistryServers(root, options.dryRun);
   pruneToolFolders(root, options.dryRun);
-  return { tools: [], files: report, claudeHooks, cursorHooks, codexHooks, statusLine, mcp, servers };
+  return { tools: [], files: report, claudeHooks, cursorHooks, codexHooks, qwenHooks, gigacodeHooks,
+    statusLine, mcp, servers };
 }

@@ -412,13 +412,21 @@ function printCursorHooks(result: InstallResult): void {
   if (result.codexHooks !== 'absent' && result.codexHooks !== 'unchanged') {
     line(t('init.codexHooks', { state: stateLabel(result.codexHooks) }));
   }
+  if (result.qwenHooks !== 'absent' && result.qwenHooks !== 'unchanged') {
+    line(t('init.qwenHooks', { state: stateLabel(result.qwenHooks) }));
+  }
+  if (result.gigacodeHooks !== 'absent' && result.gigacodeHooks !== 'unchanged') {
+    line(t('init.gigacodeHooks', { state: stateLabel(result.gigacodeHooks) }));
+  }
 }
 
 /** The `cursorHooks` and `codexHooks` parts of a JSON answer: only for a hooks file that was looked at. */
 function cursorHooksJson(result: InstallResult): Record<string, unknown> {
   const cursor = result.cursorHooks === 'absent' ? {} : { cursorHooks: result.cursorHooks };
   const codex = result.codexHooks === 'absent' ? {} : { codexHooks: result.codexHooks };
-  return { ...cursor, ...codex };
+  const qwen = result.qwenHooks === 'absent' ? {} : { qwenHooks: result.qwenHooks };
+  const gigacode = result.gigacodeHooks === 'absent' ? {} : { gigacodeHooks: result.gigacodeHooks };
+  return { ...cursor, ...codex, ...qwen, ...gigacode };
 }
 
 /** One line per MCP file whose `sdlc` entry changed, and one per file whose registry entries changed. */

@@ -26,7 +26,7 @@ summary: Основные ключи openspec/sdlc.yaml и кто может и�
 | `mcp.serve`, `mcp.servers` | свой MCP-сервер sdlc, серверы команды |
 | `stages.<стадия>` | навыки и субагенты стадии |
 | `cli` | как агенты вызывают sdlc (`sdlc` или `npx --no-install sdlc`) |
-| `tools` | claude, opencode, cursor, codex |
+| `tools` | claude, opencode, cursor, codex, qwen, gigacode (экспериментально) |
 
 ## После изменения
 

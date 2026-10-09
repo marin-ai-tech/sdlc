@@ -56,6 +56,12 @@ const TARGETS: Record<Exclude<ToolId, 'codex'>, McpTarget> = {
     entry: (l) => ({ command: l.command, args: l.args }),
     quiet: true,
   },
+  qwen: {
+    file: '.qwen/settings.json', key: 'mcpServers',
+    entry: (l) => ({ command: l.command, args: l.args }), quiet: true,
+  },
+  gigacode: { file: '.gigacode/settings.json', key: 'mcpServers',
+    entry: (l) => ({ command: l.command, args: l.args }), quiet: true },
 };
 
 /** `cli` from sdlc.yaml split on whitespace, plus `mcp serve`: `npx --no-install sdlc` -> npx [..., mcp, serve]. */

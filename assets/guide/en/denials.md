@@ -49,8 +49,9 @@ for their own terminal — not a `!` command in the agent chat.
 
 ## agent-marker
 
-Hard rule. The command clears `CLAUDECODE`, `OPENCODE`, `AGENT`, `SDLC_AGENT`, `CURSOR_AGENT`, `CODEX_CI` or
-`CODEX_SESSION_ID` (Codex), which would let an agent pass for a person. **Do:** run it without touching these variables.
+Hard rule. The command clears `CLAUDECODE`, `OPENCODE`, `AGENT`, `SDLC_AGENT`, `CURSOR_AGENT`, `CODEX_CI`, `QWEN_CODE` or
+`CODEX_SESSION_ID` (Codex) or `QWEN_CODE_SESSION_ID` (Qwen), which would let an agent pass for a person.
+**Do:** run it without touching these variables.
 
 ## cli-removal
 

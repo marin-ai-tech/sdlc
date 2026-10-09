@@ -61,6 +61,8 @@ export function userGuardFiles(env: Env): string[] {
     userClaudeSettings(env),
     path.resolve(codex, 'config.toml'),
     path.resolve(codex, 'hooks.json'),
+    path.resolve(userHome(env), '.qwen', 'settings.json'),
+    path.resolve(userHome(env), '.gigacode', 'settings.json'),
     path.resolve(config, 'opencode', 'opencode.json'),
     path.resolve(config, 'opencode', 'opencode.jsonc'),
   ];
@@ -176,9 +178,11 @@ function disablesHooks(file: string): boolean {
 
 /** Settings files that switch every Claude Code hook off: the user's, the project's shared and local ones. */
 export function hooksDisabledFiles(root: string | undefined, env: Env): string[] {
-  const files = [userClaudeSettings(env)];
+  const files = [userClaudeSettings(env), path.resolve(userHome(env), '.qwen', 'settings.json'),
+    path.resolve(userHome(env), '.gigacode', 'settings.json')];
   if (root !== undefined) {
     files.push(path.join(root, '.claude', 'settings.json'), path.join(root, '.claude', 'settings.local.json'));
+    files.push(path.join(root, '.qwen', 'settings.json'), path.join(root, '.gigacode', 'settings.json'));
   }
   const unique = new Map(files.map((file) => [pathKey(file), file]));
   return [...unique.values()].filter(disablesHooks);

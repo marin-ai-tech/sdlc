@@ -71,11 +71,19 @@ function cursorEntry(server: McpServer): Record<string, unknown> {
   return { command, args, ...nonEmpty('env', mapValues(server.env, cursorRefs)) };
 }
 
+function qwenEntry(server: McpServer): Record<string, unknown> {
+  if (server.type === 'http') return { httpUrl: server.url, ...nonEmpty('headers', server.headers) };
+  const [command, ...args] = server.command;
+  return { command, args, ...nonEmpty('env', server.env) };
+}
+
 
 const TARGETS: Target[] = [
   { tool: 'claude', file: '.mcp.json', key: 'mcpServers', entry: claudeEntry },
   { tool: 'opencode', file: 'opencode.json', key: 'mcp', entry: openCodeEntry },
   { tool: 'cursor', file: '.cursor/mcp.json', key: 'mcpServers', entry: cursorEntry },
+  { tool: 'qwen', file: '.qwen/settings.json', key: 'mcpServers', entry: qwenEntry },
+  { tool: 'gigacode', file: '.gigacode/settings.json', key: 'mcpServers', entry: qwenEntry },
 ];
 
 function noChanges(): ServerChanges {

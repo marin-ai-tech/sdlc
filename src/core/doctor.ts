@@ -20,6 +20,7 @@ import { SETTINGS_PATH } from '../integrations/settings.js';
 import { CURSOR_HOOKS_PATH, cursorHooksInstalled } from '../integrations/cursor-hooks.js';
 import { CODEX_RULES_PATH } from '../integrations/codex.js';
 import { CODEX_HOOKS_PATH, codexHooksInstalled } from '../integrations/codex-hooks.js';
+import { qwenSettingsInstalled, qwenSettingsPath } from '../integrations/qwen-settings.js';
 import { CHAIN_LINE, CHAIN_SUFFIX, inspectGitHook } from '../integrations/git-hook.js';
 
 /**
@@ -179,10 +180,23 @@ function integrationChecks(out: Checks, root: string, config: SdlcConfig): void 
   }
   if (config.tools.includes('cursor')) cursorCheck(out, root);
   if (config.tools.includes('codex')) codexCheck(out, root);
+  if (config.tools.includes('qwen')) qwenCheck(out, root, 'qwen');
+  if (config.tools.includes('gigacode')) qwenCheck(out, root, 'gigacode');
   const cliBin = config.cli.split(/\s+/)[0];
   const on = onPath(cliBin);
   const message = tt(on ? 'doctor.cliOnPath' : 'doctor.cliNotOnPath', { bin: cliBin, cli: config.cli });
   out.add('cli on PATH', on ? 'ok' : 'warn', message, tt('doctor.fix.cli', { install: INSTALL_COMMAND }));
+}
+
+function qwenCheck(out: Checks, root: string, id: 'qwen' | 'gigacode'): void {
+  const { tt } = out;
+  const installed = qwenSettingsInstalled(root, id);
+  const status = tt(installed ? 'doctor.qwenInstalled' : 'doctor.qwenMissing',
+    { path: qwenSettingsPath(id) });
+  const parts = [status, tt('doctor.qwenTrust')];
+  if (id === 'gigacode') parts.push(tt('doctor.gigacodeExperimental'));
+  const fix = tt(installed ? 'doctor.fix.qwenTrust' : 'doctor.fix.update');
+  out.add(id, 'warn', parts.join('; '), fix);
 }
 
 /**

@@ -47,6 +47,8 @@ const SCRIPT_LINES = [
   '  agent="cursor"',
   'elif [ "${CODEX_CI:-}" = "1" ] || [ -n "${CODEX_SESSION_ID:-}" ]; then',
   '  agent="codex"',
+  'elif [ "${QWEN_CODE:-}" = "1" ] || [ -n "${QWEN_CODE_SESSION_ID:-}" ]; then',
+  '  agent="qwen"',
   'fi',
   '[ -n "$agent" ] || exit 0',
   '# Only a plain name goes into the trailer (the same rule as agent-env.ts).',

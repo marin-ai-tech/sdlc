@@ -7,13 +7,15 @@
  * to disk and run later) is not followed. A marker set to anything but `1` counts as cleared, because the CLI then
  * no longer sees an agent; `SDLC_AGENT` counts only when it becomes empty.
  */
-const NAME = String.raw`(?:CLAUDECODE|OPENCODE|SDLC_AGENT|CURSOR_AGENT|CODEX_CI|CODEX_SESSION_ID|AGENT)`;
+const NAME = String.raw`(?:CLAUDECODE|OPENCODE|SDLC_AGENT|CURSOR_AGENT|CODEX_CI|CODEX_SESSION_ID|`
+  + String.raw`QWEN_CODE|QWEN_CODE_SESSION_ID|AGENT)`;
 /** The markers agent-env.ts reads; test/git-hook-sync.test.ts keeps the three lists (here, agent-env, git hook) equal. */
 export const AGENT_MARKERS = [
-  'CLAUDECODE', 'OPENCODE', 'SDLC_AGENT', 'CURSOR_AGENT', 'CODEX_CI', 'CODEX_SESSION_ID', 'AGENT',
+  'CLAUDECODE', 'OPENCODE', 'SDLC_AGENT', 'CURSOR_AGENT', 'CODEX_CI', 'CODEX_SESSION_ID',
+  'QWEN_CODE', 'QWEN_CODE_SESSION_ID', 'AGENT',
 ];
 /** Markers whose value is a name or an id: any non-empty value keeps the agent visible. */
-const NAMED_MARKERS = ['SDLC_AGENT', 'CODEX_SESSION_ID'];
+const NAMED_MARKERS = ['SDLC_AGENT', 'CODEX_SESSION_ID', 'QWEN_CODE_SESSION_ID'];
 const END = String.raw`(?!\w)`;
 const VALUE = String.raw`(?<value>"[^"]*"|'[^']*'|[^\s;&|)]*)`;
 /** Options of `env` before the one that drops the whole environment (`env -i`, `env -`). */
@@ -57,6 +59,10 @@ const DOTNET_SET = new RegExp(
   String.raw`SetEnvironmentVariable\(\s*["'](?<name>${NAME})["']\s*(?:,\s*(?<value>[^,)]*))?`,
   'gi',
 );
+const CMD_SET = new RegExp(
+  String.raw`\bset\s+(?:"(?<name>${NAME})=(?<value>[^"]*)"|(?<plain>${NAME})=(?<plainValue>[^\s&|]*))`,
+  'gi',
+);
 
 /** True when the value assigned to a marker (appended to its `1` with `+=`) makes the CLI stop seeing an agent. */
 function clears(name: string, raw: string | undefined, append: boolean): boolean {
@@ -70,6 +76,10 @@ function clears(name: string, raw: string | undefined, append: boolean): boolean
 }
 
 function assignsCleared(command: string): boolean {
+  for (const match of command.matchAll(CMD_SET)) {
+    const groups = match.groups ?? {};
+    if (clears(groups.name ?? groups.plain, groups.value ?? groups.plainValue, false)) return true;
+  }
   for (const pattern of [SH_ASSIGN, PS_ASSIGN, DOTNET_SET]) {
     for (const match of command.matchAll(pattern)) {
       const groups = match.groups ?? {};

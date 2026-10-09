@@ -29,7 +29,7 @@ import { cursorAllow, cursorDefault, cursorDeny, fromCursor, type CursorInput } 
  */
 type HookEvent = 'pre-tool' | 'session-start' | 'stop';
 /** `codex` (B82): Codex CLI sends Claude Code's input and reads Claude Code's answers, so it shares that path. */
-type Agent = 'claude' | 'opencode' | 'cursor' | 'codex';
+type Agent = 'claude' | 'opencode' | 'cursor' | 'codex' | 'qwen' | 'gigacode';
 
 interface HookInput {
   session_id?: string;
@@ -146,7 +146,8 @@ function applyHookLocale(configLocale: string | undefined): void {
 }
 
 function agentOf(flag: string | undefined): Agent {
-  return flag === 'opencode' || flag === 'cursor' || flag === 'codex' ? flag : 'claude';
+  return flag === 'opencode' || flag === 'cursor' || flag === 'codex' || flag === 'qwen'
+    || flag === 'gigacode' ? flag : 'claude';
 }
 
 /** The session-start context in the agent's format. */

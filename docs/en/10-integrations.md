@@ -23,6 +23,7 @@ sdlc init --mcp            # or answer "yes" to the MCP question in the init wiz
 - `opencode.json` (OpenCode): `mcp.sdlc = { "type": "local", "command": ["sdlc", "mcp", "serve"], "enabled": true }`
 - `.cursor/mcp.json` (Cursor): `mcpServers.sdlc = { "command": "sdlc", "args": ["mcp", "serve"] }`
 - `.codex/config.toml` (Codex CLI): `[mcp_servers.sdlc]` with `command = "sdlc"` and `args = ["mcp", "serve"]`
+- `.qwen/settings.json` (Qwen Code) and `.gigacode/settings.json` (GigaCode): `mcpServers.sdlc = { "command": "sdlc", "args": ["mcp", "serve"] }`
 
 Other servers in those files are kept. `sdlc update` keeps the entry; `sdlc uninstall` removes only the `sdlc` entry. With `cli: npx --no-install sdlc`, the command becomes `npx` and the arguments `--no-install sdlc mcp serve`.
 
@@ -69,6 +70,8 @@ mcp:
 | `type: stdio`, `command`, `env` | `type: stdio`, `command`, `args`, `env` | `type: local`, `command` (array), `environment` | `command`, `args`, `env` | `[mcp_servers.<name>]`: `command`, `args`, `.env` |
 | `type: http`, `url`, `headers` | `type: http`, `url`, `headers` | `type: remote`, `url`, `headers` | `url`, `headers` | `url`, `.http_headers` |
 | `${VAR}` | `${VAR}` | `{env:VAR}` | `${env:VAR}` | env `KEY: "${KEY}"` → `env_vars`; header `"${VAR}"` → `env_http_headers`; `Authorization: "Bearer ${VAR}"` → `bearer_token_env_var` |
+
+Qwen Code and GigaCode get the same servers under `mcpServers` in `.qwen/settings.json` or `.gigacode/settings.json`: stdio as `{ command, args, env }`, http as `{ httpUrl, headers }`, secrets as `${VAR}`, which the tools expand.
 
 sdlc remembers which entries it wrote. A server removed from the registry disappears on the next `update`, and a server someone added by hand is never touched.
 
@@ -231,7 +234,7 @@ Everything above depends on the agent not being able to switch the guard off. Si
 - `openspec/sdlc.yaml`;
 - `.claude/settings*.json`;
 - `.opencode/plugins/sdlc.js`;
-- `.mcp.json`, `opencode.json(c)`, `.cursor/mcp.json`, `.cursor/hooks.json`, `.codex/config.toml`, `.codex/hooks.json` and `.codex/rules/sdlc.rules`;
+- `.mcp.json`, `opencode.json(c)`, `.cursor/mcp.json`, `.cursor/hooks.json`, `.codex/config.toml`, `.codex/hooks.json`, `.codex/rules/sdlc.rules`, `.qwen/settings.json` and `.gigacode/settings.json`;
 - the manifest;
 - the user-level agent settings that can disable every hook.
 

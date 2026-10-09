@@ -48,8 +48,8 @@ summary: Каждое правило хука - почему остановил�
 
 ## agent-marker
 
-Жёсткое правило. Команда сбрасывает `CLAUDECODE`, `OPENCODE`, `AGENT`, `SDLC_AGENT`, `CURSOR_AGENT`, `CODEX_CI` или
-`CODEX_SESSION_ID` (`Codex`), и агент сошёл бы за человека.
+Жёсткое правило. Команда сбрасывает `CLAUDECODE`, `OPENCODE`, `AGENT`, `SDLC_AGENT`, `CURSOR_AGENT`, `CODEX_CI`, `QWEN_CODE` или
+`CODEX_SESSION_ID` (`Codex`) или `QWEN_CODE_SESSION_ID` (`Qwen`), и агент сошёл бы за человека.
 **Что делать:** выполнить команду, не трогая эти переменные.
 
 ## cli-removal

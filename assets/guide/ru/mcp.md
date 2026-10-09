@@ -8,7 +8,7 @@ sdlc работает с MCP в обе стороны. Через MCP ничег
 
 ## sdlc как сервер
 
-`sdlc init --mcp` регистрирует `sdlc mcp serve` для Claude Code (`.mcp.json`), OpenCode (`opencode.json`), Cursor (`.cursor/mcp.json`) и Codex (`.codex/config.toml`). Другие
+`sdlc init --mcp` регистрирует `sdlc mcp serve` для Claude Code (`.mcp.json`), OpenCode (`opencode.json`), Cursor (`.cursor/mcp.json`), Codex (`.codex/config.toml`), Qwen Code (`.qwen/settings.json`) и GigaCode (`.gigacode/settings.json`). Другие
 системы — оркестратор, чат-клиент, ассистент в IDE — читают процесс инструментами `status`, `next`, `instructions`,
 `trace`, `audit`, `help` и `guide`. Каждый отвечает тем же, что CLI печатает с `--json`.
 
@@ -26,7 +26,7 @@ mcp:
     jira:  { type: http, url: https://mcp.corp.example/jira, headers: { Authorization: "Bearer ${JIRA_TOKEN}" }, stages: [plan, deploy] }
 ```
 
-- `sdlc update` записывает их в `.mcp.json`, `opencode.json`, `.cursor/mcp.json` и `.codex/config.toml`; секреты — только ссылками `${VAR}`.
+- `sdlc update` записывает их в `.mcp.json`, `opencode.json`, `.cursor/mcp.json`, `.codex/config.toml`, `.qwen/settings.json` и `.gigacode/settings.json`; секреты — только ссылками `${VAR}`.
 - `sdlc mcp check` перечисляет инструменты каждого сервера и предупреждает о серверах, которые пишут файлы.
 - `stages` говорят, когда агенту можно вызывать сервер; вне их хук запрещает (block) или напоминает (warn).
 

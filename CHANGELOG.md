@@ -2,6 +2,11 @@
 
 All notable changes to sdlc. Versions follow [Semantic Versioning](https://semver.org/); while the major version is 0, a minor version may change behavior.
 
+## 0.14.1 — 2026-10-09
+
+### Added
+- **Qwen Code and GigaCode as tools.** `sdlc init --tools qwen` (or `gigacode`) writes the workflows as skills with thin commands (`/sdlc-next` and the like), the subagents (read-only roles cannot write files) and, in `.qwen/settings.json` or `.gigacode/settings.json`, the tool's own hooks, `permissions.deny` rules for a person's commands and the MCP servers; your own settings stay. Edits before the plan is approved (`write_file`, `edit`, a shell write) and a person's decisions in the agent's shell are denied — the deny rules hold even in YOLO mode — protected files stay protected, and the session starts with the change and who acts next. `QWEN_CODE=1` marks the agent's shell, so `sdlc approve` refuses there and commits from it carry `SDLC-Agent: qwen`; clearing it is denied, also in cmd.exe syntax (`set QWEN_CODE=`). `sdlc doctor` reminds you that Qwen Code runs a project's hooks only in a trusted folder. An agent cannot write `~/.qwen/settings.json` or `~/.gigacode/settings.json`. **GigaCode support is experimental**: it follows GigaCode's formats and Qwen Code's behaviour and was not checked on a live installation. See [Qwen Code and GigaCode](docs/en/17-qwen-gigacode.md).
+
 ## 0.14.0 — 2026-10-09
 
 ### Added

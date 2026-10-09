@@ -6,7 +6,9 @@ import { readAsset } from './assets.js';
  * tools; command bodies can use the slash syntax of their own tool.
  */
 export type Surface = 'skill' | 'plugin-skill' | 'claude-command' | 'opencode-command' | 'claude-agent'
-  | 'opencode-agent' | CursorSurface | CodexSurface;
+  | 'opencode-agent' | CursorSurface | CodexSurface | QwenSurface;
+
+export type QwenSurface = 'qwen-skill' | 'qwen-command' | 'qwen-agent';
 
 /** Cursor (B80, 0.13.0): its own skills, commands and subagents under `.cursor/`. */
 export type CursorSurface = 'cursor-skill' | 'cursor-command' | 'cursor-agent';
@@ -65,6 +67,11 @@ const PLAN_MODE: Record<Surface, string> = {
   'cursor-agent': '',
   'codex-skill': CODEX_PLAN_MODE,
   'codex-agent': '',
+  'qwen-skill': 'In Qwen Code, explore read-only and present the plan for acceptance before writing plan.md. '
+    + 'Otherwise edit only plan.md and tasks.md in this workflow.',
+  'qwen-command': 'In Qwen Code, explore read-only and present the plan for acceptance before writing plan.md. '
+    + 'Otherwise edit only plan.md and tasks.md in this workflow.',
+  'qwen-agent': '',
 };
 
 const ASK: Record<Surface, string> = {
@@ -79,6 +86,9 @@ const ASK: Record<Surface, string> = {
   'cursor-agent': 'ask the user, offering choices',
   'codex-skill': 'a question to the user in the chat, offering numbered choices',
   'codex-agent': 'ask the user, offering choices',
+  'qwen-skill': 'ask the user, offering choices',
+  'qwen-command': 'ask the user, offering choices',
+  'qwen-agent': 'ask the user, offering choices',
 };
 
 const TODO: Record<Surface, string> = {
@@ -93,6 +103,9 @@ const TODO: Record<Surface, string> = {
   'cursor-agent': 'a task list',
   'codex-skill': 'the plan tool (update_plan)',
   'codex-agent': 'a task list',
+  'qwen-skill': 'the todo_write tool',
+  'qwen-command': 'the todo_write tool',
+  'qwen-agent': 'a task list',
 };
 
 /** Rewrites `sdlc ` invocations to the configured CLI prefix (for `npx --no-install sdlc` pins). */
@@ -110,7 +123,7 @@ function workflowRef(surface: Surface): string {
 export function renderBody(body: string, options: RenderOptions): string {
   const { surface } = options;
   const isCommand = surface === 'claude-command' || surface === 'opencode-command';
-  const input = surface === 'cursor-command'
+  const input = surface === 'cursor-command' || surface === 'qwen-command'
     ? 'the text after the command (a change id, or a description of the work)'
     : "the user's request (a change id, or a description of the work)";
   let out = body;
@@ -127,7 +140,8 @@ export function renderBody(body: string, options: RenderOptions): string {
     .replace(/\{\{tool:todo\}\}/g, TODO[surface])
     .replace(/\{\{inject:([^}]+)\}\}/g, (_m, args: string) => {
       const command = `${options.cli} ${args}`;
-      if (surface.endsWith('-agent') || isCursor(surface) || isCodex(surface)) return `Run \`${command}\`.`;
+      if (surface.endsWith('-agent') || isCursor(surface) || isCodex(surface)
+        || surface.startsWith('qwen-')) return `Run \`${command}\`.`;
       return `!\`${command}\`\nIf the output above is missing, run \`${command}\`.`;
     })
     .replace(/\{\{plan-mode\}\}/g, PLAN_MODE[surface])
