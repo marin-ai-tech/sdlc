@@ -167,6 +167,11 @@ export function openCodeRefs(value: string): string {
   return value.replace(REFERENCE, (_match, name: string) => `{env:${name}}`);
 }
 
+/** `${VAR}` references as Cursor writes them: `${env:VAR}` (B81). */
+export function cursorRefs(value: string): string {
+  return value.replace(REFERENCE, (_match, name: string) => `\${env:${name}}`);
+}
+
 /** Each value of a map passed through `fn`. */
 export function mapValues(map: Record<string, string>, fn: (value: string) => string): Record<string, string> {
   return Object.fromEntries(Object.entries(map).map(([key, value]) => [key, fn(value)]));

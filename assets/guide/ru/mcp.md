@@ -26,7 +26,7 @@ mcp:
     jira:  { type: http, url: https://mcp.corp.example/jira, headers: { Authorization: "Bearer ${JIRA_TOKEN}" }, stages: [plan, deploy] }
 ```
 
-- `sdlc update` записывает их в `.mcp.json` и `opencode.json` (в файл Cursor — пока нет); секреты — только ссылками `${VAR}`.
+- `sdlc update` записывает их в `.mcp.json`, `opencode.json` и `.cursor/mcp.json`; секреты — только ссылками `${VAR}`.
 - `sdlc mcp check` перечисляет инструменты каждого сервера и предупреждает о серверах, которые пишут файлы.
 - `stages` говорят, когда агенту можно вызывать сервер; вне их хук запрещает (block) или напоминает (warn).
 

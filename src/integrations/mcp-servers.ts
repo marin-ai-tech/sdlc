@@ -1,7 +1,7 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { isDeepStrictEqual } from 'node:util';
-import { mapValues, openCodeRefs, type McpServer } from '../mcp/registry.js';
+import { cursorRefs, mapValues, openCodeRefs, type McpServer } from '../mcp/registry.js';
 import { readManifest, writeManifest, type Manifest } from './manifest.js';
 import { readJson, servers as serverMap, writeJson } from './mcp-config.js';
 import type { ToolId } from './types.js';
@@ -11,7 +11,9 @@ import type { ToolId } from './types.js';
  * 090-A and with the same merge: other servers and keys stay, a file left empty is removed.
  * - claude: `.mcp.json` `mcpServers.<name>`: stdio `{ type, command, args, env }`, http `{ type, url, headers }`;
  * - opencode: `opencode.json` `mcp.<name>`: stdio `{ type: "local", command, environment, enabled }`, http
- *   `{ type: "remote", url, headers, enabled }`, with `${VAR}` written `{env:VAR}`.
+ *   `{ type: "remote", url, headers, enabled }`, with `${VAR}` written `{env:VAR}`;
+ * - cursor (B81): `.cursor/mcp.json` `mcpServers.<name>`: stdio `{ command, args, env }`, http `{ url, headers }`, with
+ *   `${VAR}` written `${env:VAR}`.
  * The manifest (`mcpServers`) keeps the names sdlc wrote per file: a name dropped from the registry is removed, and
  * an entry a person wrote is never touched (kept, and reported, when the registry has a server of that name).
  */
@@ -55,9 +57,19 @@ function openCodeEntry(server: McpServer): Record<string, unknown> {
   return { type: 'local', command, ...nonEmpty('environment', environment), enabled: true };
 }
 
+function cursorEntry(server: McpServer): Record<string, unknown> {
+  if (server.type === 'http') {
+    const headers = mapValues(server.headers, cursorRefs);
+    return { url: cursorRefs(server.url), ...nonEmpty('headers', headers) };
+  }
+  const [command, ...args] = server.command.map(cursorRefs);
+  return { command, args, ...nonEmpty('env', mapValues(server.env, cursorRefs)) };
+}
+
 const TARGETS: Target[] = [
   { tool: 'claude', file: '.mcp.json', key: 'mcpServers', entry: claudeEntry },
   { tool: 'opencode', file: 'opencode.json', key: 'mcp', entry: openCodeEntry },
+  { tool: 'cursor', file: '.cursor/mcp.json', key: 'mcpServers', entry: cursorEntry },
 ];
 
 function noChanges(): ServerChanges {

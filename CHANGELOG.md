@@ -2,6 +2,11 @@
 
 All notable changes to sdlc. Versions follow [Semantic Versioning](https://semver.org/); while the major version is 0, a minor version may change behavior.
 
+## 0.13.1 — 2026-10-08
+
+### Added
+- **The team's MCP servers in Cursor.** `sdlc update` lays the registry (`mcp.servers`) out into `.cursor/mcp.json` too — stdio as `{ command, args, env }`, http as `{ url, headers }`, secrets as Cursor's `${env:VAR}` — next to the sdlc server; servers added by hand stay.
+
 ## 0.13.0 — 2026-10-08
 
 ### Added

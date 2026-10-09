@@ -61,15 +61,13 @@ mcp:
       stages: [build, test]
 ```
 
-`sdlc update` lays the registry out for both tools:
+`sdlc update` lays the registry out for every tool:
 
-| Registry | `.mcp.json` (Claude Code) | `opencode.json` (OpenCode) |
-|---|---|---|
-| `type: stdio`, `command`, `env` | `type: stdio`, `command`, `args`, `env` | `type: local`, `command` (array), `environment` |
-| `type: http`, `url`, `headers` | `type: http`, `url`, `headers` | `type: remote`, `url`, `headers` |
-| `${VAR}` | `${VAR}` | `{env:VAR}` |
-
-Cursor gets the sdlc server in `.cursor/mcp.json`; the team's registry is not laid out for Cursor yet (planned), so add those servers to `.cursor/mcp.json` by hand for now.
+| Registry | `.mcp.json` (Claude Code) | `opencode.json` (OpenCode) | `.cursor/mcp.json` (Cursor) |
+|---|---|---|---|
+| `type: stdio`, `command`, `env` | `type: stdio`, `command`, `args`, `env` | `type: local`, `command` (array), `environment` | `command`, `args`, `env` |
+| `type: http`, `url`, `headers` | `type: http`, `url`, `headers` | `type: remote`, `url`, `headers` | `url`, `headers` |
+| `${VAR}` | `${VAR}` | `{env:VAR}` | `${env:VAR}` |
 
 sdlc remembers which entries it wrote. A server removed from the registry disappears on the next `update`, and a server someone added by hand is never touched.
 
