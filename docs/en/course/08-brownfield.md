@@ -1,12 +1,12 @@
 # Module 8. Converting an existing project
 
 `billing-api` is an existing Northwind Labs service. It has code, tests, a CI workflow on GitHub Actions, a
-CODEOWNERS file and open GitHub issues. It has no sdlc. **Sergey** (platform engineer) converts it, with **Ivan**
+CODEOWNERS file and open GitHub issues. It has no sdlc. **Steven** (platform engineer) converts it, with **Ethan**
 (tech lead) deciding what the team keeps and what changes. The rest of the team keeps working while this happens.
 
 The outputs in this module are real. They come from sdlc 0.14.4 on a small copy of `billing-api` made for this
 course: `package.json` with `build`, `test` and `lint` scripts, `src/`, `test/`, `.github/workflows/ci.yml`,
-`.github/CODEOWNERS`, `ARCHITECTURE.md`, `CONTRIBUTING.md` and `docs/adr/`, with commits by Ivan, Pavel and Oleg.
+`.github/CODEOWNERS`, `ARCHITECTURE.md`, `CONTRIBUTING.md` and `docs/adr/`, with commits by Ethan, Paul and Oliver.
 
 In this module:
 
@@ -23,15 +23,15 @@ In this module:
 
 ## Lesson 8.1 — What you have, and the plan            (video: ~5 min)
 
-**Role:** Sergey (platform engineer), Ivan (tech lead)   **Project:** billing-api   **You need:** the repository
+**Role:** Steven (platform engineer), Ethan (tech lead)   **Project:** billing-api   **You need:** the repository
 cloned, sdlc installed (`sdlc --version`)
 
-**Goal.** Sergey and Ivan list what the project already has, what sdlc adds, and in which order they switch it on,
+**Goal.** Steven and Ethan list what the project already has, what sdlc adds, and in which order they switch it on,
 so that nobody's work stops.
 
 ### Steps
 
-1. Sergey and Ivan write down what exists:
+1. Steven and Ethan write down what exists:
 
    | What | Where in billing-api | What sdlc does with it |
    |---|---|---|
@@ -51,13 +51,13 @@ so that nobody's work stops.
    4. One lite change and one full change, still in `warn` mode (Lesson 8.6).
    5. `block` mode (Lesson 8.7), and a short talk to the team (Lesson 8.8).
 
-3. They agree on who decides. Sergey runs the setup. Ivan approves the layout choice and the roles. Every person's
+3. They agree on who decides. Steven runs the setup. Ethan approves the layout choice and the roles. Every person's
    command in this module runs in that person's own terminal, never in the agent chat.
 
 ### Check yourself
 
 - You can name, for each row of the table, the file that holds it in your project.
-- You know who runs `sdlc adopt --apply` (a person, Sergey) and who checks the roles (Ivan).
+- You know who runs `sdlc adopt --apply` (a person, Steven) and who checks the roles (Ethan).
 
 ### Pitfalls
 
@@ -73,13 +73,13 @@ so that nobody's work stops.
 
 ## Lesson 8.2 — `sdlc init` on an existing repository            (video: ~6 min)
 
-**Role:** Sergey (platform engineer)   **Project:** billing-api   **You need:** Lesson 8.1, a clean working copy
+**Role:** Steven (platform engineer)   **Project:** billing-api   **You need:** Lesson 8.1, a clean working copy
 
-**Goal.** Sergey installs the harness without changing the code, and reads what `sdlc init` detected.
+**Goal.** Steven installs the harness without changing the code, and reads what `sdlc init` detected.
 
 ### Steps
 
-1. In a terminal, Sergey runs `sdlc init`. With no flags in a terminal, a wizard asks for the tools, the enforcement
+1. In a terminal, Steven runs `sdlc init`. With no flags in a terminal, a wizard asks for the tools, the enforcement
    mode, the status line and the roles, and shows a summary before it writes. For the video, the flags show the same
    choices (`warn` is the default mode):
 
@@ -110,19 +110,19 @@ so that nobody's work stops.
    Make it AI-ready: `sdlc init --layout adapt` (here, moves nothing) or `sdlc init --layout worktree --worktree <path>` (in a new worktree, this copy stays as it is)
    ```
 
-2. Sergey reads what was detected:
+2. Steven reads what was detected:
 
    | Line | Meaning |
    |---|---|
    | `verify.commands detected` | the three `package.json` scripts became the verify checks |
-   | `review policy: created REVIEW.md` | a starting review policy; Pavel adds the team's principles |
+   | `review policy: created REVIEW.md` | a starting review policy; Paul adds the team's principles |
    | `git hook ... installed` | agent commits get `SDLC-Agent: <agent>`; an existing hook of the project is kept |
    | `warning: community license ...` | `billing-api` declares no OSI-approved license; a commercial project records its license with `sdlc license set` (a person's command) |
    | `Compared with the AI-ready layout` | missing documents, and documents under other names (Lesson 8.3) |
 
    Without `--layout`, init only reports the differences. Nothing in `src/` or `test/` changed.
 
-3. Sergey checks the installation and commits it:
+3. Steven checks the installation and commits it:
 
    ```bash
    sdlc doctor
@@ -154,14 +154,14 @@ so that nobody's work stops.
 
 ## Lesson 8.3 — The documents: `layout check`, `layout adapt` or `layout convert`            (video: ~7 min)
 
-**Role:** Sergey (platform engineer), Ivan decides   **Project:** billing-api   **You need:** Lesson 8.2
+**Role:** Steven (platform engineer), Ethan decides   **Project:** billing-api   **You need:** Lesson 8.2
 
-**Goal.** The agents get the documents they rely on. Ivan chooses between keeping the current file names (adapt) and
+**Goal.** The agents get the documents they rely on. Ethan chooses between keeping the current file names (adapt) and
 moving them to the canonical paths (convert, in a worktree).
 
 ### Steps
 
-1. Sergey checks the layout:
+1. Steven checks the layout:
 
    ```bash
    sdlc layout check
@@ -241,7 +241,7 @@ moving them to the canonical paths (convert, in a worktree).
    Discard: git worktree remove ...\billing-api-layout-convert && git branch -D sdlc/layout-convert
    ```
 
-   Ivan reviews `git diff main...sdlc/layout-convert` and merges it through a pull request, or discards it with the
+   Ethan reviews `git diff main...sdlc/layout-convert` and merges it through a pull request, or discards it with the
    two commands printed. Only committed content is copied into the worktree.
 
 5. When the agent tries to apply the conversion, the CLI refuses, because it would commit on a person's behalf:
@@ -251,7 +251,7 @@ moving them to the canonical paths (convert, in a worktree).
    fix: Run `sdlc layout convert --apply` yourself in your terminal.
    ```
 
-For `billing-api`, Ivan chose adapt: the team knows `ARCHITECTURE.md`, and links from the wiki point to it.
+For `billing-api`, Ethan chose adapt: the team knows `ARCHITECTURE.md`, and links from the wiki point to it.
 
 ### Check yourself
 
@@ -271,20 +271,20 @@ For `billing-api`, Ivan chose adapt: the team knows `ARCHITECTURE.md`, and links
 
 - The layout table: highlight `alias` and `missing`.
 - Two columns: adapt (nothing moves, `layout:` mapping) and convert (a worktree, `git mv`).
-- The agent's refused `convert --apply`, then Sergey running it in his terminal.
+- The agent's refused `convert --apply`, then Steven running it in his terminal.
 
 ---
 
 ## Lesson 8.4 — `/sdlc:adopt`, `sdlc adopt --apply` and the roles of the real team            (video: ~8 min)
 
-**Role:** Sergey with the agent; Ivan checks the roles   **Project:** billing-api   **You need:** Lessons 8.2 and 8.3
+**Role:** Steven with the agent; Ethan checks the roles   **Project:** billing-api   **You need:** Lessons 8.2 and 8.3
 
 **Goal.** The agent fills the documents from the real code and drafts the settings. A person applies the draft, and
 `openspec/roles.yaml` names the real team, with CODEOWNERS as the source of truth for the code owner.
 
 ### Steps
 
-1. Sergey starts Claude Code and runs:
+1. Steven starts Claude Code and runs:
 
    ```text
    > /sdlc:adopt
@@ -308,25 +308,25 @@ For `billing-api`, Ivan chose adapt: the team knows `ARCHITECTURE.md`, and links
    CI: .github/workflows/ci.yml
    Protected: .github/workflows/**
    Protected: .github/CODEOWNERS
-   Person: Ivan <ivan@northwind.example>
-   Person: Oleg <oleg@northwind.example>
-   Person: Pavel <pavel@northwind.example>
-   Person: Sergey <sergey@northwind.example>
+   Person: Ethan <ethan@northwind.example>
+   Person: Oliver <oliver@northwind.example>
+   Person: Paul <paul@northwind.example>
+   Person: Steven <steven@northwind.example>
    Roles (written to openspec/roles.yaml only if it does not exist):
-     product-owner: sergey (to check)
-     tech-lead: sergey (to check)
-     engineer: sergey (to check)
-     code-owner: pavel
-     release-manager: sergey (to check)
-     maintainer: sergey (to check)
-   Owner of some paths only, to check: ivan@northwind.example (/src/payments/)
+     product-owner: steven (to check)
+     tech-lead: steven (to check)
+     engineer: steven (to check)
+     code-owner: paul
+     release-manager: steven (to check)
+     maintainer: steven (to check)
+   Owner of some paths only, to check: ethan@northwind.example (/src/payments/)
    A person can apply this draft with: sdlc adopt --apply
    ```
 
    How the draft is made:
-   - The people come from the git history (and Sergey, who runs the command). Bots are skipped.
-   - `code-owner` comes from the catch-all CODEOWNERS rule `* pavel@northwind.example`. Owners of narrower rules
-     (Ivan, for `/src/payments/`) are listed "to check".
+   - The people come from the git history (and Steven, who runs the command). Bots are skipped.
+   - `code-owner` comes from the catch-all CODEOWNERS rule `* paul@northwind.example`. Owners of narrower rules
+     (Ethan, for `/src/payments/`) are listed "to check".
    - Every other role goes to the person who runs it, marked "to check", to hand over later.
    - The CI configuration and CODEOWNERS are proposed as protected paths.
 
@@ -338,7 +338,7 @@ For `billing-api`, Ivan chose adapt: the team knows `ARCHITECTURE.md`, and links
    sdlc adopt --apply
    ```
 
-   Sergey applies it in his own terminal:
+   Steven applies it in his own terminal:
 
    ```bash
    sdlc adopt --apply
@@ -351,28 +351,28 @@ For `billing-api`, Ivan chose adapt: the team knows `ARCHITECTURE.md`, and links
    The proposed commands and protected paths are added to `openspec/sdlc.yaml`, and everything already there stays.
    `openspec/roles.yaml` is written only because it did not exist. A second run with nothing new writes nothing.
 
-4. Ivan replaces the "to check" holders with the real team. Maria, Anna and Elena never committed to `billing-api`,
-   so the draft could not know them. Sergey (a maintainer) edits `openspec/roles.yaml` by hand; the agent may not edit
+4. Ethan replaces the "to check" holders with the real team. Megan, Grace and Emily never committed to `billing-api`,
+   so the draft could not know them. Steven (a maintainer) edits `openspec/roles.yaml` by hand; the agent may not edit
    it (`[sdlc:state-integrity]`):
 
    ```yaml
    version: 1
    signing: warn
    people:
-     maria:  { name: Maria,   emails: [maria@northwind.example] }
-     ivan:   { name: Ivan,   emails: [ivan@northwind.example] }
-     oleg:   { name: Oleg,   emails: [oleg@northwind.example] }
-     anna:   { name: Anna,      emails: [anna@northwind.example] }
-     pavel:  { name: Pavel, emails: [pavel@northwind.example] }
-     elena:  { name: Elena,   emails: [elena@northwind.example] }
-     sergey: { name: Sergey,  emails: [sergey@northwind.example] }
+     megan:  { name: Megan,  emails: [megan@northwind.example] }
+     ethan:  { name: Ethan,  emails: [ethan@northwind.example] }
+     oliver: { name: Oliver, emails: [oliver@northwind.example] }
+     grace:  { name: Grace,  emails: [grace@northwind.example] }
+     paul:   { name: Paul,   emails: [paul@northwind.example] }
+     emily:  { name: Emily,  emails: [emily@northwind.example] }
+     steven: { name: Steven, emails: [steven@northwind.example] }
    roles:
-     product-owner: [maria]
-     tech-lead: [ivan]
-     engineer: [ivan, oleg]
-     code-owner: [pavel, ivan]        # CODEOWNERS: * -> pavel, /src/payments/ -> ivan
-     release-manager: [elena]
-     maintainer: [sergey, ivan]
+     product-owner: [megan]
+     tech-lead: [ethan]
+     engineer: [ethan, oliver]
+     code-owner: [paul, ethan]        # CODEOWNERS: * -> paul, /src/payments/ -> ethan
+     release-manager: [emily]
+     maintainer: [steven, ethan]
    separation:
      author_cannot_approve: [review, release]
      distinct_approvers: [[spec, review], [plan, review]]
@@ -384,31 +384,31 @@ For `billing-api`, Ivan chose adapt: the team knows `ARCHITECTURE.md`, and links
    ```
 
    ```text
-   ID      Name           Roles
-   maria   Maria    product-owner
-   ivan    Ivan    tech-lead, engineer, code-owner, maintainer
-   oleg    Oleg    engineer
-   anna    Anna
-   pavel   Pavel  code-owner
-   elena   Elena    release-manager
-   sergey  Sergey   maintainer
+   ID      Name    Roles
+   megan   Megan   product-owner
+   ethan   Ethan   tech-lead, engineer, code-owner, maintainer
+   oliver  Oliver  engineer
+   grace   Grace
+   paul    Paul    code-owner
+   emily   Emily   release-manager
+   steven  Steven   maintainer
    ```
 
 5. CODEOWNERS stays the source of truth for the code owner. Keep `code-owner` in `roles.yaml` equal to the owners in
    CODEOWNERS, and change both in one pull request. `sdlc review suggest` reads CODEOWNERS to put the owners of the
    changed files first. An owner written as an email matches the person with that email. An owner written as a
    `@handle` matches the person whose id in `roles.yaml` is that handle, so give people the id of their GitHub
-   handle (for example `pavel-s:` instead of `pavel:`) when CODEOWNERS uses handles. A team such as
+   handle (for example `paul-s:` instead of `paul:`) when CODEOWNERS uses handles. A team such as
    `@northwind/billing-reviewers` matches nobody.
 
-6. Sergey commits the documents, `openspec/sdlc.yaml` and `openspec/roles.yaml`, and adds `openspec/roles.yaml` to
+6. Steven commits the documents, `openspec/sdlc.yaml` and `openspec/roles.yaml`, and adds `openspec/roles.yaml` to
    CODEOWNERS with the maintainers, so a change to it needs a maintainer's review.
 
 ### Check yourself
 
 - `sdlc layout check` says `Layout ready.` and the new documents are filled, with file references.
 - `openspec/sdlc.yaml` lists `.github/workflows/**` and `.github/CODEOWNERS` under `enforcement.protected_paths`.
-- `sdlc roles who review --change <id>` names Pavel (and Ivan for payments), never the author of the code.
+- `sdlc roles who review --change <id>` names Paul (and Ethan for payments), never the author of the code.
 
 ### Pitfalls
 
@@ -422,14 +422,14 @@ For `billing-api`, Ivan chose adapt: the team knows `ARCHITECTURE.md`, and links
 ### On screen (for the video)
 
 - `/sdlc:adopt` filling `docs/runbook.md`: highlight a file reference and a "to check" mark.
-- The draft: highlight `code-owner: pavel` next to the CODEOWNERS line.
-- The agent's refused `--apply`; Sergey's apply; the edited `roles.yaml`; `sdlc roles check`.
+- The draft: highlight `code-owner: paul` next to the CODEOWNERS line.
+- The agent's refused `--apply`; Steven's apply; the edited `roles.yaml`; `sdlc roles check`.
 
 ---
 
 ## Lesson 8.5 — Open issues and planning documents into the backlog            (video: ~6 min)
 
-**Role:** Ivan (tech lead) with the agent; Maria orders the backlog   **Project:** billing-api   **You need:**
+**Role:** Ethan (tech lead) with the agent; Megan orders the backlog   **Project:** billing-api   **You need:**
 Lesson 8.4, the `github` MCP server in `mcp.servers`
 
 **Goal.** The open GitHub issues that the team still wants become backlog items with an outcome and acceptance
@@ -438,12 +438,12 @@ criteria. Planning documents, if the team has them in BMAD format, are imported.
 ### Steps
 
 1. sdlc has **no built-in GitHub Issues sync**. The agent reads the issues through the GitHub MCP server and adds
-   items with `sdlc backlog`. Ivan asks:
+   items with `sdlc backlog`. Ethan asks:
 
    > /sdlc:backlog Bring the open GitHub issues labelled "accepted" into the backlog. One item per issue, link each
    > to its issue. Show me the list before you add anything.
 
-   The agent calls the tool your server exposes, e.g. `list_issues`, and proposes items. It adds only those Ivan
+   The agent calls the tool your server exposes, e.g. `list_issues`, and proposes items. It adds only those Ethan
    confirms:
 
    ```bash
@@ -471,7 +471,7 @@ criteria. Planning documents, if the team has them in BMAD format, are imported.
 
    Each item in `openspec/backlog.md` carries `- **Source**: ticket GH-17`.
 
-2. The order is Maria's decision. The agent proposes it and gives the command; Maria runs it:
+2. The order is Megan's decision. The agent proposes it and gives the command; Megan runs it:
 
    ```bash
    sdlc backlog move B2 --top
@@ -502,7 +502,7 @@ criteria. Planning documents, if the team has them in BMAD format, are imported.
 
 - `sdlc backlog list` shows the items with `Ready ✓`.
 - Each item links to its issue (`Source: ticket GH-<n>`).
-- `sdlc backlog next` names the item Maria put at the top.
+- `sdlc backlog next` names the item Megan put at the top.
 
 ### Pitfalls
 
@@ -519,21 +519,21 @@ criteria. Planning documents, if the team has them in BMAD format, are imported.
 ### On screen (for the video)
 
 - The GitHub issues page next to the agent's proposed list.
-- `sdlc backlog list` with the bars; Maria's `backlog move`.
+- `sdlc backlog list` with the bars; Megan's `backlog move`.
 - The BMAD dry run, then `sdlc backlog list` after the import.
 
 ---
 
 ## Lesson 8.6 — The first changes in warn mode: lite, then full            (video: ~7 min)
 
-**Role:** Oleg with the agent; Ivan, Maria, Pavel decide   **Project:** billing-api   **You need:** Lesson 8.5
+**Role:** Oliver with the agent; Ethan, Megan, Paul decide   **Project:** billing-api   **You need:** Lesson 8.5
 
 **Goal.** The team runs one small change on the lite track and one full change while the hooks only remind. They see
 the gates, the people and the reminders before anything is denied.
 
 ### Steps
 
-1. The first change is the VAT bug, B2. Oleg asks the agent to start it:
+1. The first change is the VAT bug, B2. Oliver asks the agent to start it:
 
    ```bash
    sdlc backlog start B2 --change fix-vat-rounding
@@ -544,7 +544,7 @@ the gates, the people and the reminders before anything is denied.
    ```
 
    The change record shows `track_suggestion: lite` with the reason `bugfix with low risk`. The track stays `full`
-   until a person decides. Ivan confirms it in his terminal:
+   until a person decides. Ethan confirms it in his terminal:
 
    ```bash
    sdlc track set lite --change fix-vat-rounding --note "One rounding function, covered by tests"
@@ -555,8 +555,8 @@ the gates, the people and the reminders before anything is denied.
    Next: agent — Write plan (plan.md) for the plan gate. (/sdlc:plan)
    ```
 
-   From here the change follows Module 6: plan, Ivan's plan approval, the bug-fix protocol with locked tests,
-   `sdlc verify`, the review, Pavel's approval and the archive.
+   From here the change follows Module 6: plan, Ethan's plan approval, the bug-fix protocol with locked tests,
+   `sdlc verify`, the review, Paul's approval and the archive.
 
 2. In `warn` mode, an edit of code before the plan is approved goes through, and the agent gets a reminder once per
    session:
@@ -574,12 +574,12 @@ the gates, the people and the reminders before anything is denied.
    openspec/sdlc.yaml). Change it through its owning process, not in an agent session.
    ```
 
-3. The second change is a full one, B1 (partial refunds): `sdlc backlog start B1`, then `/sdlc:intent`, Maria's intent
-   approval, `/sdlc:spec`, Maria's spec approval (Ivan's too when the risk is `high`), `/sdlc:plan`, Ivan's plan
+3. The second change is a full one, B1 (partial refunds): `sdlc backlog start B1`, then `/sdlc:intent`, Megan's intent
+   approval, `/sdlc:spec`, Megan's spec approval (Ethan's too when the risk is `high`), `/sdlc:plan`, Ethan's plan
    approval, and the rest as in Modules 6 and 7.
 
-4. To make GitHub Actions part of the evidence, Sergey adds a `verify.mcp` check for the existing `ci` workflow
-   (Lesson 2.4; Anna reads it in Lesson 7.2). The workflow file itself stays as it is.
+4. To make GitHub Actions part of the evidence, Steven adds a `verify.mcp` check for the existing `ci` workflow
+   (Lesson 2.4; Grace reads it in Lesson 7.2). The workflow file itself stays as it is.
 
 ### Check yourself
 
@@ -596,7 +596,7 @@ the gates, the people and the reminders before anything is denied.
 
 ### On screen (for the video)
 
-- `sdlc backlog start B2`, the suggestion in the record, and Ivan's `sdlc track set lite`.
+- `sdlc backlog start B2`, the suggestion in the record, and Ethan's `sdlc track set lite`.
 - The warn reminder in Claude Code (the edit goes through) next to the protected-path denial (it does not).
 - `sdlc status` with both changes.
 
@@ -604,15 +604,15 @@ the gates, the people and the reminders before anything is denied.
 
 ## Lesson 8.7 — From warn to block            (video: ~5 min)
 
-**Role:** Sergey (platform engineer), Ivan decides   **Project:** billing-api   **You need:** at least one change
+**Role:** Steven (platform engineer), Ethan decides   **Project:** billing-api   **You need:** at least one change
 archived in warn mode
 
-**Goal.** Sergey switches the process rules from reminding to denying, when the team is ready and the reminders show
+**Goal.** Steven switches the process rules from reminding to denying, when the team is ready and the reminders show
 no surprise.
 
 ### Steps
 
-1. Sergey looks at what the hooks reminded and denied:
+1. Steven looks at what the hooks reminded and denied:
 
    ```bash
    sdlc log
@@ -623,7 +623,7 @@ no surprise.
    2026-10-09T20:34:41.280Z  hook.warned   agent:claude - plan-gate: Edit src/invoice.js [sdlc 0.14.4 · community]
    ```
 
-   Every `hook.warned` line is an action that `block` mode would have denied. Sergey and Ivan read each one: was it a
+   Every `hook.warned` line is an action that `block` mode would have denied. Steven and Ethan read each one: was it a
    real skip of the plan, or work that should be exempt (for example a generated folder)?
 
 2. `sdlc health` says the same from the configuration side:
@@ -638,7 +638,7 @@ no surprise.
        Recommendation: Use `enforcement.mode: block`, so the hooks deny actions that skip a gate.
    ```
 
-3. Ivan agrees. Sergey edits `openspec/sdlc.yaml` himself (the agent may not):
+3. Ethan agrees. Steven edits `openspec/sdlc.yaml` himself (the agent may not):
 
    ```yaml
    enforcement:
@@ -680,34 +680,34 @@ no surprise.
 
 ## Lesson 8.8 — What to tell the team            (video: ~5 min)
 
-**Role:** Ivan (tech lead), Sergey (platform engineer)   **Project:** billing-api   **You need:** Lessons 8.2–8.7
+**Role:** Ethan (tech lead), Steven (platform engineer)   **Project:** billing-api   **You need:** Lessons 8.2–8.7
 
 **Goal.** Every person on the team knows what changed for them, which commands they run, and where to ask.
 
 ### Steps
 
-1. Ivan shows one table at the team meeting:
+1. Ethan shows one table at the team meeting:
 
    | Person | What changes | Their commands (own terminal) |
    |---|---|---|
-   | Maria (product owner) | approves intent and spec; answers open questions; orders the backlog | `sdlc approve intent`, `sdlc approve spec`, `sdlc answer`, `sdlc backlog move` |
-   | Ivan (tech lead) | approves plans, high-risk specs; sets the track; sends work back | `sdlc approve plan`, `sdlc track set`, `sdlc rework`, `sdlc tests unlock` |
-   | Oleg (developer) | works through `/sdlc:next`; takes a change over when needed | `sdlc takeover`, `sdlc release-control`, `sdlc next --me` |
-   | Anna (QA) | reads and completes the evidence; runs verify outside the agent | `sdlc verify`, `sdlc verify --check`, `sdlc trace` |
-   | Pavel (code owner) | approves the review gate | `sdlc review suggest`, `sdlc approve review --preview`, `sdlc approve review` |
-   | Elena (release manager) | authorizes production releases | `sdlc release check`, `sdlc approve release` |
-   | Sergey (platform) | owns `openspec/sdlc.yaml`, MCP servers, CI | `sdlc update`, `sdlc doctor`, `sdlc mcp check` |
-   | Olga (manager) | reads health and audit | `sdlc health`, `sdlc audit`, `sdlc report` |
+   | Megan (product owner) | approves intent and spec; answers open questions; orders the backlog | `sdlc approve intent`, `sdlc approve spec`, `sdlc answer`, `sdlc backlog move` |
+   | Ethan (tech lead) | approves plans, high-risk specs; sets the track; sends work back | `sdlc approve plan`, `sdlc track set`, `sdlc rework`, `sdlc tests unlock` |
+   | Oliver (developer) | works through `/sdlc:next`; takes a change over when needed | `sdlc takeover`, `sdlc release-control`, `sdlc next --me` |
+   | Grace (QA) | reads and completes the evidence; runs verify outside the agent | `sdlc verify`, `sdlc verify --check`, `sdlc trace` |
+   | Paul (code owner) | approves the review gate | `sdlc review suggest`, `sdlc approve review --preview`, `sdlc approve review` |
+   | Emily (release manager) | authorizes production releases | `sdlc release check`, `sdlc approve release` |
+   | Steven (platform) | owns `openspec/sdlc.yaml`, MCP servers, CI | `sdlc update`, `sdlc doctor`, `sdlc mcp check` |
+   | Laura (manager) | reads health and audit | `sdlc health`, `sdlc audit`, `sdlc report` |
 
-2. Ivan repeats three rules:
+2. Ethan repeats three rules:
    - An answer in the chat is never an approval. Approve in your own terminal; a `!` command in the agent chat is
      refused.
    - When the hook says no, read the rule in brackets and run `sdlc guide denials#<rule>`, or ask `/sdlc:guide`.
    - `sdlc next --me` shows what waits for you.
 
-3. Sergey points newcomers to the tour: `sdlc guide tour` (seven short steps), and to `sdlc guide` for the topics.
+3. Steven points newcomers to the tour: `sdlc guide tour` (seven short steps), and to `sdlc guide` for the topics.
 
-4. Sergey adds the sdlc checks to the CI pipeline. `.github/workflows/ci.yml` is a protected path, so he edits it
+4. Steven adds the sdlc checks to the CI pipeline. `.github/workflows/ci.yml` is a protected path, so he edits it
    himself, for example with steps that run `sdlc validate --all --json`, `sdlc review check --change <id>` and,
    with signing on, `sdlc approvals verify`. sdlc 0.14.4 ships no ready workflow file for this.
 

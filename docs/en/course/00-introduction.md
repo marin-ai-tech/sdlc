@@ -73,7 +73,7 @@ gates, and you know where sdlc keeps its state.
        verify   · blocked            waiting on the intent gate
        review   · blocked            waiting on the intent gate
        release  · blocked            (optional) waiting on the intent gate
-     next      person: Maria (product-owner) must review and approve the intent gate (intent).
+     next      person: Megan (product-owner) must review and approve the intent gate (intent).
                 $ sdlc approve intent --change add-due-dates --as product-owner
    ```
 
@@ -111,14 +111,14 @@ gates, and you know where sdlc keeps its state.
 ### On screen (for the video)
 
 - The lifecycle diagram from `sdlc guide lifecycle`, then the stage table.
-- `sdlc status --change add-due-dates`: highlight the stepper line and the `next` line with Maria's name.
+- `sdlc status --change add-due-dates`: highlight the stepper line and the `next` line with Megan's name.
 - The `openspec/` tree in the editor; highlight `changes/add-due-dates/` and `.sdlc.yaml`.
 
 ---
 
 ## Lesson 0.2 — People decide, agents work            (video: ~7 min)
 
-**Role:** everyone; Oleg (developer) and Maria (product owner) on screen   **Project:** tasklet
+**Role:** everyone; Oliver (developer) and Megan (product owner) on screen   **Project:** tasklet
 **You need:** lesson 0.1
 
 **Goal.** You know which steps belong to the agent and which belong to a person. You know what happens when the
@@ -135,9 +135,9 @@ agent tries to take a person's decision, and where a person runs their commands.
    | reviews in passes and records findings | sends work back (`sdlc rework`), takes a change over (`sdlc takeover`) |
    | prepares the release notes | authorizes the release (`sdlc approve release`) |
 
-2. In Claude Code, Oleg asks the agent to approve for Maria:
+2. In Claude Code, Oliver asks the agent to approve for Megan:
 
-   > Approve the intent of add-due-dates, Maria is busy.
+   > Approve the intent of add-due-dates, Megan is busy.
 
    The agent tries to run `sdlc approve intent --change add-due-dates`. The sdlc hook denies the call before it runs.
    The agent sees this reason (real text, wrapped):
@@ -149,7 +149,7 @@ agent tries to take a person's decision, and where a person runs their commands.
    too). Why, and what to do: `sdlc guide denials#separation-of-duties`.
    ```
 
-3. Oleg tries a shortcut and types `! sdlc approve intent --change add-due-dates` in the chat. A `!` command runs in
+3. Oliver tries a shortcut and types `! sdlc approve intent --change add-due-dates` in the chat. A `!` command runs in
    the agent's shell, so the CLI itself refuses:
 
    ```text
@@ -161,8 +161,8 @@ agent tries to take a person's decision, and where a person runs their commands.
    The CLI knows it runs in an agent session from markers the tools set in the agent's shell, for example
    `CLAUDECODE=1` in Claude Code.
 
-4. Maria opens **her own terminal**, in her clone of the repository. Her git identity is
-   `maria@northwind.example`. She first looks at what she is about to approve:
+4. Megan opens **her own terminal**, in her clone of the repository. Her git identity is
+   `megan@northwind.example`. She first looks at what she is about to approve:
 
    ```bash
    sdlc approve intent --change add-due-dates --preview
@@ -178,14 +178,14 @@ agent tries to take a person's decision, and where a person runs their commands.
    $ sdlc approve intent --change add-due-dates
    ```
 
-5. Maria reads `intent.md`, then approves:
+5. Megan reads `intent.md`, then approves:
 
    ```bash
    sdlc approve intent --change add-due-dates
    ```
 
    ```text
-   ✓ intent gate: Maria <maria@northwind.example> approved as product-owner (ca24099d2dc4)
+   ✓ intent gate: Megan <megan@northwind.example> approved as product-owner (ca24099d2dc4)
    Suggested commit message (its trailer ties the commit to this approval):
      $ git commit -m "chore(add-due-dates): approve the intent gate" -m "SDLC-Approval: add-due-dates:intent:ca24099d2dc4"
    Next: agent — Write proposal (proposal.md) for the spec gate. (/sdlc:spec)
@@ -226,8 +226,8 @@ agent tries to take a person's decision, and where a person runs their commands.
 
 ### Check yourself
 
-- `sdlc status --change add-due-dates` shows the intent gate approved by Maria.
-- `sdlc log` lists the hook denial (`hook.denied`, rule `separation-of-duties`) and, after it, Maria's approval.
+- `sdlc status --change add-due-dates` shows the intent gate approved by Megan.
+- `sdlc log` lists the hook denial (`hook.denied`, rule `separation-of-duties`) and, after it, Megan's approval.
 - You can say why a `!` command in the chat is not "your own terminal".
 
 ### Pitfalls
@@ -240,7 +240,7 @@ agent tries to take a person's decision, and where a person runs their commands.
 
 ### On screen (for the video)
 
-- Split screen: Oleg's Claude Code on the left, Maria's terminal on the right.
+- Split screen: Oliver's Claude Code on the left, Megan's terminal on the right.
 - Highlight `[sdlc:separation-of-duties]` and the `sdlc guide` pointer in the denial.
 - Show the `--preview` first, then the approval, then the `SDLC-Approval` trailer in `git log`.
 
@@ -283,7 +283,7 @@ know when a change may take the short `lite` track and who decides that.
    - **lite** — for small, bounded work: a fix, a docs change, a tooling tweak. The change starts at the plan. The
      plan is still approved before any code, the evidence is still required, and a code owner still reviews.
 
-5. Show how the track is chosen. Oleg's agent starts a small bug fix:
+5. Show how the track is chosen. Oliver's agent starts a small bug fix:
 
    ```bash
    sdlc new fix-empty-title --kind bugfix --risk low
@@ -302,7 +302,7 @@ know when a change may take the short `lite` track and who decides that.
    error: An agent session (claude-code) cannot set the track.
    ```
 
-6. Ivan, the tech lead, confirms the track in his own terminal:
+6. Ethan, the tech lead, confirms the track in his own terminal:
 
    ```bash
    sdlc track set lite --change fix-empty-title --note "One validation rule, covered by a test"
@@ -329,7 +329,7 @@ know when a change may take the short `lite` track and who decides that.
 
 - The change folder in the editor, file by file, with the table above as an overlay.
 - The `verification.md` evidence block: highlight the literal test output.
-- The `track_suggestion` lines in `.sdlc.yaml`, then Ivan's `track set`.
+- The `track_suggestion` lines in `.sdlc.yaml`, then Ethan's `track set`.
 
 ---
 
@@ -354,25 +354,25 @@ lessons to watch for your role.
 
    | Person | Job | Role in `roles.yaml` | What they do with sdlc |
    |---|---|---|---|
-   | Maria | product owner | `product-owner` | approves intent and spec |
-   | Ivan | tech lead, architect | `tech-lead` | approves high-risk specs and plans; confirms tracks |
-   | Oleg | developer | `engineer` | works with Claude Code; approves the plan |
-   | Anna | QA engineer | — (no gate role) | reads the evidence, checks the verifier's table, fixes test gaps with the agent |
-   | Pavel | code owner, reviewer | `code-owner` | approves the review |
-   | Elena | release manager | `release-manager` | approves the release |
-   | Sergey | platform engineer | `maintainer` | installs and configures sdlc, MCP and CI; may change `roles.yaml` |
-   | Olga | engineering manager | — (no gate role) | reports, health, audit |
+   | Megan | product owner | `product-owner` | approves intent and spec |
+   | Ethan | tech lead, architect | `tech-lead` | approves high-risk specs and plans; confirms tracks |
+   | Oliver | developer | `engineer` | works with Claude Code; approves the plan |
+   | Grace | QA engineer | — (no gate role) | reads the evidence, checks the verifier's table, fixes test gaps with the agent |
+   | Paul | code owner, reviewer | `code-owner` | approves the review |
+   | Emily | release manager | `release-manager` | approves the release |
+   | Steven | platform engineer | `maintainer` | installs and configures sdlc, MCP and CI; may change `roles.yaml` |
+   | Laura | engineering manager | — (no gate role) | reports, health, audit |
 
    An external **auditor** appears once, to receive the evidence bundle (`sdlc audit --export`).
 
 3. Show the toolchain. The agent is **Claude Code CLI** in the terminal. It reaches other systems through MCP
-   servers, which Sergey lists once in `mcp.servers` of `openspec/sdlc.yaml` (Module 2):
+   servers, which Steven lists once in `mcp.servers` of `openspec/sdlc.yaml` (Module 2):
 
    | Server | What it is | What the team uses it for |
    |---|---|---|
    | `github` | the official GitHub MCP server | issues and projects (the task manager), pull requests, Actions (the build server) |
    | `knowledge` | the team's own server | project data (docs, ADRs, glossary) and the team registry of agent roles and skills |
-   | `telegram` | a Telegram bot server | receives process events: a gate waits for Maria, approvals, overdue gates |
+   | `telegram` | a Telegram bot server | receives process events: a gate waits for Megan, approvals, overdue gates |
    | `sdlc` | sdlc itself (`sdlc mcp serve`) | lets other AI systems read the process; it cannot decide anything |
 
 4. Show the six supported agent tools. The process is the same in each one; only the file locations, the way you
@@ -400,11 +400,11 @@ lessons to watch for your role.
 
    | You are | Watch first |
    |---|---|
-   | platform engineer (Sergey) | Module 1, Module 2 |
-   | developer (Oleg) | Module 0, lessons 1.2 and 1.5 for the setup you will meet |
+   | platform engineer (Steven) | Module 1, Module 2 |
+   | developer (Oliver) | Module 0, lessons 1.2 and 1.5 for the setup you will meet |
    | product owner, tech lead, code owner, release manager | Module 0, lesson 1.3 (roles), lesson 0.2 again before your first approval |
-   | QA engineer (Anna) | Module 0, lesson 2.4 (CI as evidence) |
-   | engineering manager (Olga) | Module 0, lesson 2.6 (events) and lesson 2.7 (reading the process from a chat client) |
+   | QA engineer (Grace) | Module 0, lesson 2.4 (CI as evidence) |
+   | engineering manager (Laura) | Module 0, lesson 2.6 (events) and lesson 2.7 (reading the process from a chat client) |
 
 ### Check yourself
 
@@ -414,7 +414,7 @@ lessons to watch for your role.
 
 ### Pitfalls
 
-- A role in `roles.yaml` is a gate role, not a job title. Anna and Olga hold no gate role, and that is correct.
+- A role in `roles.yaml` is a gate role, not a job title. Grace and Laura hold no gate role, and that is correct.
 - GigaCode support is experimental: it was not checked against a live installation.
 
 ### On screen (for the video)

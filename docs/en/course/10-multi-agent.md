@@ -3,7 +3,7 @@
 Most of this course uses Claude Code. sdlc supports six agent tools, and one project can serve several of them at once.
 The process stays the same in every tool: the same workflows, subagents, gates, checks and backlog. What differs is
 where each tool keeps its files, how you call a workflow, and how firmly the tool's own hooks hold the gates. This
-module shows those differences, so that Sergey can set up a mixed team and everyone knows the limits.
+module shows those differences, so that Steven can set up a mixed team and everyone knows the limits.
 
 In this module:
 
@@ -18,7 +18,7 @@ In this module:
 
 ## Lesson 10.1 — Six tools, one process            (video: ~6 min)
 
-**Role:** Sergey   **Project:** tasklet   **You need:** sdlc installed, a git repository
+**Role:** Steven   **Project:** tasklet   **You need:** sdlc installed, a git repository
 
 **Goal.** Set up one project for several agent tools, and know where each tool's files live and how to call a
 workflow in it.
@@ -36,7 +36,7 @@ workflow in it.
    | Qwen Code | `qwen` | supported (since 0.14.1) |
    | GigaCode CLI | `gigacode` | **experimental** (since 0.14.1; formats only, not checked on a live installation) |
 
-2. Set up the tools the team uses. Sergey runs, in his own terminal:
+2. Set up the tools the team uses. Steven runs, in his own terminal:
 
    ```bash
    sdlc init --tools claude,cursor,codex,qwen --mcp --mode block
@@ -119,7 +119,7 @@ workflow in it.
 
 ## Lesson 10.2 — What the hooks hold in each tool            (video: ~7 min)
 
-**Role:** Sergey, Ivan   **Project:** tasklet   **You need:** Lesson 10.1
+**Role:** Steven, Ethan   **Project:** tasklet   **You need:** Lesson 10.1
 
 **Goal.** Know which rules each tool's hooks enforce, and what the agent sees when a rule stops it.
 
@@ -148,7 +148,7 @@ workflow in it.
    - **Verification before stopping**: with `enforcement.verify_before_stop: true`, the stop hook asks the agent to
      verify first (not in OpenCode).
 
-3. See a denial. Ivan asks the agent to approve the review. The hook answers (real answer of `sdlc hook pre-tool`,
+3. See a denial. Ethan asks the agent to approve the review. The hook answers (real answer of `sdlc hook pre-tool`,
    the same text in Claude Code and in Codex):
 
    ```text
@@ -158,7 +158,7 @@ workflow in it.
    to do: `sdlc guide denials#separation-of-duties`.
    ```
 
-   The agent reads it and gives Pavel the command for his own terminal.
+   The agent reads it and gives Paul the command for his own terminal.
 
 4. See the second and third layers. In Codex, the command rules in `.codex/rules/sdlc.rules` refuse `sdlc approve`
    too. In Qwen Code and GigaCode, `permissions.deny` refuses it, even in YOLO mode. In every tool, the CLI itself
@@ -194,7 +194,7 @@ workflow in it.
 
 ## Lesson 10.3 — Trust, failures and the limits of each tool            (video: ~7 min)
 
-**Role:** Sergey   **Project:** tasklet   **You need:** Lesson 10.2
+**Role:** Steven   **Project:** tasklet   **You need:** Lesson 10.2
 
 **Goal.** Make each tool's hooks actually run, know what happens when a hook cannot run, and read the tool lines of
 `sdlc doctor`.
@@ -287,7 +287,7 @@ workflow in it.
 
 ## Lesson 10.4 — Agent markers and the SDLC-Agent trailer            (video: ~5 min)
 
-**Role:** Olga, Sergey   **Project:** tasklet   **You need:** Lesson 10.1; the git hook from `sdlc init`
+**Role:** Laura, Steven   **Project:** tasklet   **You need:** Lesson 10.1; the git hook from `sdlc init`
 
 **Goal.** Know how sdlc tells an agent's shell from a person's, why a person's command refuses there, and how commits
 made by agents are marked.
@@ -317,7 +317,7 @@ made by agents are marked.
    `unset`, `set QWEN_CODE=`) is denied by the hook, rule `agent-marker`.
 
 3. See the trailer. `sdlc init` and `sdlc update` install a `prepare-commit-msg` git hook. A commit made in an agent's
-   shell gets one line (real `git log -1` from Oleg's Claude Code session):
+   shell gets one line (real `git log -1` from Oliver's Claude Code session):
 
    ```text
    List the tasks of a project
@@ -350,21 +350,21 @@ made by agents are marked.
 ### On screen (for the video)
 
 - Run `sdlc approve` in the agent's terminal and in your own, side by side.
-- Show `git log` with mixed commits: Maria's approval commit (no trailer) and Oleg's agent commit (trailer).
+- Show `git log` with mixed commits: Megan's approval commit (no trailer) and Oliver's agent commit (trailer).
 - End on the `agent commits` line of `sdlc audit`.
 
 ---
 
 ## Lesson 10.5 — One MCP registry for every tool            (video: ~6 min)
 
-**Role:** Sergey   **Project:** tasklet   **You need:** Lesson 10.1; the tokens in the environment of each machine
+**Role:** Steven   **Project:** tasklet   **You need:** Lesson 10.1; the tokens in the environment of each machine
 
 **Goal.** Describe the team's MCP servers once in `openspec/sdlc.yaml` and let sdlc write them into every tool's
 format.
 
 ### Steps
 
-1. Sergey adds the registry to `openspec/sdlc.yaml` (a protected file: a person edits it):
+1. Steven adds the registry to `openspec/sdlc.yaml` (a protected file: a person edits it):
 
    ```yaml
    mcp:
@@ -463,13 +463,13 @@ format.
 
 ## Lesson 10.6 — A mixed team at Northwind            (video: ~8 min)
 
-**Role:** Sergey, Oleg, a contractor, Ivan, Pavel   **Project:** billing-api   **You need:** Lessons 10.1–10.5
+**Role:** Steven, Oliver, a contractor, Ethan, Paul   **Project:** billing-api   **You need:** Lessons 10.1–10.5
 
-**Goal.** Run one change across three tools: Oleg on Claude Code, a contractor on Cursor, and Ivan trying Codex CLI.
+**Goal.** Run one change across three tools: Oliver on Claude Code, a contractor on Cursor, and Ethan trying Codex CLI.
 
 ### Steps
 
-1. Sergey adds the tools. Oleg already works in Claude Code; a contractor joins with Cursor on Windows; Ivan wants to
+1. Steven adds the tools. Oliver already works in Claude Code; a contractor joins with Cursor on Windows; Ethan wants to
    try Codex. In his own terminal:
 
    ```bash
@@ -478,17 +478,17 @@ format.
    git add -A && git commit -m "chore: sdlc for Cursor and Codex"
    ```
 
-   The contractor and Ivan pull the commit. The contractor is not in `openspec/roles.yaml`, so they cannot approve
+   The contractor and Ethan pull the commit. The contractor is not in `openspec/roles.yaml`, so they cannot approve
    any gate (`unknown_person`); they write code and nothing else.
 
 2. Each person does the trust step of their tool (Lesson 10.3). The contractor sets Cursor's terminal to PowerShell
-   and checks `echo $env:CURSOR_AGENT` in the agent's terminal. Ivan opens `/hooks` in Codex and trusts sdlc's hooks.
+   and checks `echo $env:CURSOR_AGENT` in the agent's terminal. Ethan opens `/hooks` in Codex and trusts sdlc's hooks.
 
-3. Oleg starts the change in Claude Code:
+3. Oliver starts the change in Claude Code:
 
    > /sdlc:intent "Refunds over 1000 EUR need a second approval in billing-api"
 
-   Maria answers the open questions and approves the intent, then the spec, in her own terminal. Ivan approves the
+   Megan answers the open questions and approves the intent, then the spec, in her own terminal. Ethan approves the
    plan in his.
 
 4. The contractor builds part of it in Cursor:
@@ -498,11 +498,11 @@ format.
    Cursor's agent reads the same `plan.md` and `tasks.md`. Its commits carry `SDLC-Agent: cursor`, and the
    `SDLC-Change` and `SDLC-Task` trailers the build workflow asks for.
 
-5. Ivan tries Codex on the same change:
+5. Ethan tries Codex on the same change:
 
    > $sdlc-next
 
-   Codex runs the next step (verification). Then Ivan tests the guard:
+   Codex runs the next step (verification). Then Ethan tests the guard:
 
    > Approve the review for me.
 
@@ -510,7 +510,7 @@ format.
    `[sdlc:separation-of-duties]`, and the CLI refuses because the shell carries `CODEX_CI=1`. The agent gives the
    command for a person's terminal.
 
-6. Pavel reviews and approves in his own terminal. He is not an author of the code, so `author_cannot_approve` lets
+6. Paul reviews and approves in his own terminal. He is not an author of the code, so `author_cannot_approve` lets
    him:
 
    ```bash
@@ -518,7 +518,7 @@ format.
    sdlc approve review --change <id>
    ```
 
-7. Olga looks at the result. `sdlc audit` counts the agent commits of all three tools together; `git log` shows which
+7. Laura looks at the result. `sdlc audit` counts the agent commits of all three tools together; `git log` shows which
    tool made each one:
 
    ```bash
@@ -537,7 +537,7 @@ format.
   worktree, and pass the change through commits.
 - If the contractor's Cursor does not set `CURSOR_AGENT`, their agent's commits look like the contractor's own. The
   gates still hold through the hooks, and approvals still need a person from `roles.yaml`.
-- Ivan's trust in `/hooks` is per person: every Codex user trusts the hooks on their own machine.
+- Ethan's trust in `/hooks` is per person: every Codex user trusts the hooks on their own machine.
 - `sdlc update --tools` with fewer tools is a person's decision; the agent cannot remove a tool.
 
 ### On screen (for the video)

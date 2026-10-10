@@ -1,12 +1,12 @@
 # Module 6. The developer's day with Claude Code
 
-Oleg is a developer at Northwind Labs. He works on `tasklet` with Claude Code in his terminal. The agent writes the
-artifacts and the code. Oleg steers it, reads what it produced and runs the commands that only a person may run. This
+Oliver is a developer at Northwind Labs. He works on `tasklet` with Claude Code in his terminal. The agent writes the
+artifacts and the code. Oliver steers it, reads what it produced and runs the commands that only a person may run. This
 module follows one working day: from the first prompt in the morning to a bug fix and an alert in the afternoon.
 
-The outputs in this module come from sdlc 0.14.4 on a copy of `tasklet`. In `tasklet`, Sergey set
+The outputs in this module come from sdlc 0.14.4 on a copy of `tasklet`. In `tasklet`, Steven set
 `enforcement.mode: block` and made the release gate required. The `roles.yaml` of that copy gave each person a last
-name (Maria, Ivan, Oleg, Anna, Pavel, Elena, Sergey); your output shows the
+name (Megan, Ethan, Oliver, Grace, Paul, Emily, Steven); your output shows the
 names from your own `roles.yaml`. In a project in `warn` mode the process rules only remind the agent; the hard rules deny in both modes.
 
 In this module:
@@ -25,15 +25,15 @@ In this module:
 
 ## Lesson 6.1 — Starting a session: what the agent knows            (video: ~5 min)
 
-**Role:** Oleg (developer)   **Project:** tasklet   **You need:** `tasklet` set up with `sdlc init` (Module 1), Claude
-Code installed, Oleg's git identity in `openspec/roles.yaml`
+**Role:** Oliver (developer)   **Project:** tasklet   **You need:** `tasklet` set up with `sdlc init` (Module 1), Claude
+Code installed, Oliver's git identity in `openspec/roles.yaml`
 
-**Goal.** Oleg starts Claude Code and knows, before he types anything, which changes are active, who acts next and
+**Goal.** Oliver starts Claude Code and knows, before he types anything, which changes are active, who acts next and
 what happened overnight. He turns on the status line.
 
 ### Steps
 
-1. Oleg opens a terminal in the project and starts Claude Code:
+1. Oliver opens a terminal in the project and starts Claude Code:
 
    ```bash
    cd ~/work/tasklet
@@ -47,7 +47,7 @@ what happened overnight. He turns on the status line.
    ```text
    SDLC harness (sdlc 0.14.4, license: community (...)): active changes in openspec/changes (run `sdlc status` for details).
    - fix-due-today: stage build; next (agent): Implement the approved plan: 3 of 3 task(s) remain.
-   fix-due-today was handed back by Oleg <oleg@northwind.example>: Comparison fixed in src/tasks.js; run verify
+   fix-due-today was handed back by Oliver <oliver@northwind.example>: Comparison fixed in src/tasks.js; run verify
    - inbox: add-due-dates, check ci-green: ok (once read: `sdlc inbox done 20261009T203152306Z-ci-green-26d8f8`)
    - inbox: add-due-dates, check ci-green: failed (once read: `sdlc inbox done 20261009T203142906Z-ci-green-d1f43d`)
    Enforcement mode is block. Gate approvals are made by people with `sdlc approve`, never by the agent.
@@ -59,14 +59,14 @@ what happened overnight. He turns on the status line.
    | Line | Meaning |
    |---|---|
    | `- fix-due-today: stage build; next (agent): …` | one line per active change: its stage and who acts next |
-   | `… was handed back by Oleg …` | the note a person left with `sdlc release-control` (Lesson 6.5) |
-   | `- inbox: …` | results of MCP checks that ran outside an agent session, for example Anna's `sdlc verify` |
+   | `… was handed back by Oliver …` | the note a person left with `sdlc release-control` (Lesson 6.5) |
+   | `- inbox: …` | results of MCP checks that ran outside an agent session, for example Grace's `sdlc verify` |
    | `Enforcement mode is block.` | the hooks deny actions that skip a gate |
 
    When `sdlc health` has a `bad` finding, one more line names it. With no active change, the summary names the next
    ready backlog item instead.
 
-2. Oleg asks the agent what is new:
+2. Oliver asks the agent what is new:
 
    > What happened since yesterday? Work through the inbox.
 
@@ -79,15 +79,15 @@ what happened overnight. He turns on the status line.
 
    `inbox done` decides nothing, so the agent may run it. The inbox files themselves are written only by the CLI.
 
-3. Oleg turns on the status line once. Sergey can do it for the project with `sdlc init --statusline`; it adds a
-   `statusLine` entry to `.claude/settings.json` that runs `sdlc statusline`. Under the prompt Oleg now sees one line:
+3. Oliver turns on the status line once. Steven can do it for the project with `sdlc init --statusline`; it adds a
+   `statusLine` entry to `.claude/settings.json` that runs `sdlc statusline`. Under the prompt Oliver now sees one line:
 
    ```text
    add-due-dates · Build (plan + implementation) · next: person
    ```
 
    The line is `change · stage · who acts`. With several active changes it starts with their count. With no active
-   change it shows the next ready backlog item. A status line Oleg defined himself is never replaced.
+   change it shows the next ready backlog item. A status line Oliver defined himself is never replaced.
 
 ### Check yourself
 
@@ -99,7 +99,7 @@ what happened overnight. He turns on the status line.
 
 - The summary is a snapshot of the session start. After a person approves a gate in another terminal, ask the agent
   to run `sdlc status` again.
-- Inbox items from CI reach Oleg's checkout only after CI commits them (`openspec/.sdlc/inbox/`). Pull first.
+- Inbox items from CI reach Oliver's checkout only after CI commits them (`openspec/.sdlc/inbox/`). Pull first.
 - The agent cannot edit the inbox files or the log. A try is denied with `[sdlc:state-integrity]`
   (`sdlc guide denials#state-integrity`).
 - The status line in 0.14.4 can lag behind after a review approval: it may say `next: person` while
@@ -116,14 +116,14 @@ what happened overnight. He turns on the status line.
 
 ## Lesson 6.2 — Moving a change on: `/sdlc:next` and `/sdlc:status`            (video: ~6 min)
 
-**Role:** Oleg (developer)   **Project:** tasklet   **You need:** Lesson 6.1, an active change (`add-due-dates`)
+**Role:** Oliver (developer)   **Project:** tasklet   **You need:** Lesson 6.1, an active change (`add-due-dates`)
 
-**Goal.** Oleg moves a change forward with one command and stops where a person must decide. He knows how to find
+**Goal.** Oliver moves a change forward with one command and stops where a person must decide. He knows how to find
 what waits for him.
 
 ### Steps
 
-1. Oleg asks for the dashboard:
+1. Oliver asks for the dashboard:
 
    ```text
    > /sdlc:status
@@ -145,7 +145,7 @@ what waits for him.
        verify   · blocked            waiting on the intent gate
    ```
 
-2. Oleg moves the change on:
+2. Oliver moves the change on:
 
    ```text
    > /sdlc:next
@@ -157,29 +157,29 @@ what waits for him.
 
    ```text
    add-due-dates: Build (plan + implementation)
-   person: Ivan or Oleg (engineer) must review and approve the plan gate (plan, tasks).
+   person: Ethan or Oliver (engineer) must review and approve the plan gate (plan, tasks).
    $ sdlc approve plan --change add-due-dates --as engineer
    ```
 
    The names come from `openspec/roles.yaml`. The agent does not run this command.
 
-3. Ivan approves the plan in **his own terminal**, not in the agent chat:
+3. Ethan approves the plan in **his own terminal**, not in the agent chat:
 
    ```bash
    sdlc approve plan --change add-due-dates
    ```
 
    ```text
-   ✓ plan gate: Ivan <ivan@northwind.example> approved as engineer (e20c9c3960e5)
+   ✓ plan gate: Ethan <ethan@northwind.example> approved as engineer (e20c9c3960e5)
    Suggested commit message (its trailer ties the commit to this approval):
      $ git commit -m "chore(add-due-dates): approve the plan gate" -m "SDLC-Approval: add-due-dates:plan:e20c9c3960e5"
    Next: agent — Implement the approved plan: 4 of 4 task(s) remain. (/sdlc:build)
    ```
 
-4. Oleg types `/sdlc:next` again. The agent now runs the build workflow: it works through `tasks.md`, runs the checks
+4. Oliver types `/sdlc:next` again. The agent now runs the build workflow: it works through `tasks.md`, runs the checks
    after each task and keeps `plan.md` in step with the code.
 
-5. When Oleg wants to know what waits for **him** across all changes, he runs in his terminal:
+5. When Oliver wants to know what waits for **him** across all changes, he runs in his terminal:
 
    ```bash
    sdlc next --me
@@ -189,13 +189,13 @@ what waits for him.
    Nothing is waiting for you.
    ```
 
-   For Maria, the same command lists `add-tags, gate spec: sdlc approve spec --change add-tags --as product-owner`.
+   For Megan, the same command lists `add-tags, gate spec: sdlc approve spec --change add-tags --as product-owner`.
 
 ### Check yourself
 
 - After `/sdlc:next`, the agent either ran a workflow or stopped with a person's command.
-- `sdlc status --change add-due-dates` shows the plan gate `✓ approved` by Ivan.
-- `sdlc next --me` in Oleg's terminal lists only gates his roles allow him to take.
+- `sdlc status --change add-due-dates` shows the plan gate `✓ approved` by Ethan.
+- `sdlc next --me` in Oliver's terminal lists only gates his roles allow him to take.
 
 ### Pitfalls
 
@@ -207,23 +207,23 @@ what waits for him.
 
 ### On screen (for the video)
 
-- Split screen: Claude Code on the left, Ivan's terminal on the right.
+- Split screen: Claude Code on the left, Ethan's terminal on the right.
 - `/sdlc:next` stops at the plan gate. Highlight the people's names and the exact command.
-- Ivan runs the command on the right; `/sdlc:next` on the left starts the build. Show the status line change from
+- Ethan runs the command on the right; `/sdlc:next` on the left starts the build. Show the status line change from
   `next: person` to `next: agent`.
 
 ---
 
 ## Lesson 6.3 — The plan gate and how to read a denial            (video: ~6 min)
 
-**Role:** Oleg (developer)   **Project:** tasklet   **You need:** a change whose plan is not approved yet
+**Role:** Oliver (developer)   **Project:** tasklet   **You need:** a change whose plan is not approved yet
 
-**Goal.** Oleg understands why the agent may not write code before the plan is approved, how a shell write counts as
+**Goal.** Oliver understands why the agent may not write code before the plan is approved, how a shell write counts as
 an edit, and how to read any denial in two steps.
 
 ### Steps
 
-1. Before Ivan approves the plan, Oleg asks the agent to start coding:
+1. Before Ethan approves the plan, Oliver asks the agent to start coding:
 
    > Just add the due date to `src/tasks.js`, the plan is obvious.
 
@@ -240,7 +240,7 @@ an edit, and how to read any denial in two steps.
    `mv`, `sed -i`, PowerShell `Set-Content` and `Out-File`, `git checkout -- <paths>`, `git apply`, `curl -o`,
    one-line `node -e` and `python -c`, and more. Reading a file is never denied.
 
-3. Oleg reads the denial in two steps:
+3. Oliver reads the denial in two steps:
    - The rule name is in brackets: `[sdlc:plan-gate]`.
    - The section that explains it is at the end: `sdlc guide denials#plan-gate`.
 
@@ -266,7 +266,7 @@ an edit, and how to read any denial in two steps.
 
    The guide workflow reads the same section and answers for this project, with this change's id.
 
-4. Oleg does the right thing: `/sdlc:plan` writes `plan.md` and `tasks.md`, and Ivan approves (Lesson 6.2).
+4. Oliver does the right thing: `/sdlc:plan` writes `plan.md` and `tasks.md`, and Ethan approves (Lesson 6.2).
 
 ### Check yourself
 
@@ -294,13 +294,13 @@ an edit, and how to read any denial in two steps.
 
 ## Lesson 6.4 — The hard rules: what the agent may never do            (video: ~7 min)
 
-**Role:** Oleg (developer)   **Project:** tasklet   **You need:** Lesson 6.3
+**Role:** Oliver (developer)   **Project:** tasklet   **You need:** Lesson 6.3
 
-**Goal.** Oleg knows the rules that deny in every mode, what each protects, and what to do instead.
+**Goal.** Oliver knows the rules that deny in every mode, what each protects, and what to do instead.
 
 ### Steps
 
-1. Oleg goes through the hard rules with the real denials from `tasklet` and `billing-api`:
+1. Oliver goes through the hard rules with the real denials from `tasklet` and `billing-api`:
 
    | Rule | When the agent hits it | Real reason (shortened) | What to do |
    |---|---|---|---|
@@ -312,9 +312,9 @@ an edit, and how to read any denial in two steps.
    | `agent-marker` | clears `CLAUDECODE`, `AGENT`, `SDLC_AGENT` and the other markers | `... unsetting or blanking them would let an agent pass for a person, so this command is refused.` | run the command without touching them |
    | `tests-locked` | edits a test while a bug fix locked the tests | Lesson 6.7 | fix the code |
    | `takeover` | edits files of a change a person holds | Lesson 6.5 | wait for `sdlc release-control` |
-   | `release-gate` | runs a production release command before the release approval | Module 7, Lesson 7.7 | prepare `release.md`; Elena approves |
+   | `release-gate` | runs a production release command before the release approval | Module 7, Lesson 7.7 | prepare `release.md`; Emily approves |
 
-2. Oleg sees why `agent-marker` exists. Claude Code sets `CLAUDECODE=1` in the agent's shell, and the CLI refuses a
+2. Oliver sees why `agent-marker` exists. Claude Code sets `CLAUDECODE=1` in the agent's shell, and the CLI refuses a
    person's command when it sees the marker:
 
    ```text
@@ -325,8 +325,8 @@ an edit, and how to read any denial in two steps.
 
    An agent that tried `env -u CLAUDECODE sdlc approve plan …` is denied by the hook with `[sdlc:agent-marker]`.
 
-3. When an edit is really needed in a protected file, Oleg asks the agent to prepare the change as text, and the
-   owner of that file makes it. For `openspec/sdlc.yaml` that is Sergey; then Sergey runs `sdlc update` and
+3. When an edit is really needed in a protected file, Oliver asks the agent to prepare the change as text, and the
+   owner of that file makes it. For `openspec/sdlc.yaml` that is Steven; then Steven runs `sdlc update` and
    `sdlc doctor`.
 
 ### Check yourself
@@ -354,15 +354,15 @@ an edit, and how to read any denial in two steps.
 
 ## Lesson 6.5 — Why is my change stuck? `sdlc explain` and taking a change over            (video: ~6 min)
 
-**Role:** Oleg (developer)   **Project:** tasklet   **You need:** an active change; Oleg holds a role in
+**Role:** Oliver (developer)   **Project:** tasklet   **You need:** an active change; Oliver holds a role in
 `roles.yaml`
 
-**Goal.** Oleg gets one answer to "why is this change here", and takes a change from the agent when he wants to fix
+**Goal.** Oliver gets one answer to "why is this change here", and takes a change from the agent when he wants to fix
 something by hand.
 
 ### Steps
 
-1. Oleg asks why `add-due-dates` does not move:
+1. Oliver asks why `add-due-dates` does not move:
 
    ```bash
    sdlc explain --change add-due-dates
@@ -372,22 +372,22 @@ something by hand.
    add-due-dates: Build (plan + implementation)
    Open gate: plan (pending): awaiting approval (engineer; 0 of 1).
 
-   Waiting for: person (Ivan, engineer; Oleg, engineer).
+   Waiting for: person (Ethan, engineer; Oliver, engineer).
 
    What unblocks it:
-     1. person: Ivan or Oleg (engineer) must review and approve the plan gate (plan, tasks).
+     1. person: Ethan or Oliver (engineer) must review and approve the plan gate (plan, tasks).
         $ sdlc approve plan --change add-due-dates --as engineer
      2. agent: After the approval the agent implements the plan and runs the verification.
 
    Latest decisions (newest last):
-     2026-10-09T20:24:56.462Z  change.created  Sergey <sergey@northwind.example>: schema sdlc, full track
-     2026-10-09T20:25:13.921Z  gate.intent.approved  Maria <maria@northwind.example>: role product-owner
-     2026-10-09T20:25:27.107Z  gate.spec.approved  Maria <maria@northwind.example>: role product-owner
+     2026-10-09T20:24:56.462Z  change.created  Steven <steven@northwind.example>: schema sdlc, full track
+     2026-10-09T20:25:13.921Z  gate.intent.approved  Megan <megan@northwind.example>: role product-owner
+     2026-10-09T20:25:27.107Z  gate.spec.approved  Megan <megan@northwind.example>: role product-owner
    ```
 
    `sdlc explain` writes nothing. The agent may run it as often as it likes.
 
-2. In `fix-due-today` the date comparison is delicate. Oleg wants to fix it himself, without the agent editing the
+2. In `fix-due-today` the date comparison is delicate. Oliver wants to fix it himself, without the agent editing the
    same files. In **his own terminal**:
 
    ```bash
@@ -395,28 +395,28 @@ something by hand.
    ```
 
    ```text
-   fix-due-today taken over by Oleg <oleg@northwind.example>: I will fix the date comparison myself. The agent
+   fix-due-today taken over by Oliver <oliver@northwind.example>: I will fix the date comparison myself. The agent
    may not edit it until you run `sdlc release-control --change fix-due-today --note ...`.
    ```
 
-3. While Oleg holds the change, the agent's edits of the change folder and of the plan's files are denied:
+3. While Oliver holds the change, the agent's edits of the change folder and of the plan's files are denied:
 
    ```text
-   [sdlc:takeover] fix-due-today is taken over by Oleg <oleg@northwind.example> (I will fix the date
+   [sdlc:takeover] fix-due-today is taken over by Oliver <oliver@northwind.example> (I will fix the date
    comparison myself); the agent may not edit src/tasks.js until the person hands it back with
    `sdlc release-control --change fix-due-today`. Why, and what to do: `sdlc guide denials#takeover`.
    ```
 
    `sdlc next` tells the agent to wait. Read-only commands still work.
 
-4. Oleg fixes the code, commits, and hands the change back with a note for the agent:
+4. Oliver fixes the code, commits, and hands the change back with a note for the agent:
 
    ```bash
    sdlc release-control --change fix-due-today --note "Comparison fixed in src/tasks.js; run verify"
    ```
 
    ```text
-   fix-due-today handed back to the agent by Oleg <oleg@northwind.example>: Comparison fixed in src/tasks.js;
+   fix-due-today handed back to the agent by Oliver <oliver@northwind.example>: Comparison fixed in src/tasks.js;
    run verify
    ```
 
@@ -424,7 +424,7 @@ something by hand.
 
 ### Check yourself
 
-- `sdlc explain --change fix-due-today` says "Waiting for: person" while Oleg holds the change.
+- `sdlc explain --change fix-due-today` says "Waiting for: person" while Oliver holds the change.
 - An agent edit of `src/tasks.js` is denied with `[sdlc:takeover]` until `sdlc release-control`.
 - `sdlc audit --change fix-due-today` counts one takeover.
 
@@ -441,20 +441,20 @@ something by hand.
 ### On screen (for the video)
 
 - Run `sdlc explain` and walk through its four blocks: stage, open gate, waiting for, what unblocks it.
-- Oleg runs `sdlc takeover`; the agent's next edit is denied. Highlight the note in the denial.
-- Oleg runs `sdlc release-control`; restart Claude Code and show the hand-back note in the session summary.
+- Oliver runs `sdlc takeover`; the agent's next edit is denied. Highlight the note in the denial.
+- Oliver runs `sdlc release-control`; restart Claude Code and show the hand-back note in the session summary.
 
 ---
 
 ## Lesson 6.6 — Small work on the lite track            (video: ~5 min)
 
-**Role:** Oleg (developer), Ivan (tech lead)   **Project:** tasklet   **You need:** Lesson 6.2
+**Role:** Oliver (developer), Ethan (tech lead)   **Project:** tasklet   **You need:** Lesson 6.2
 
-**Goal.** Oleg starts a small, bounded change that skips intent and spec. He knows that only a person sets the track.
+**Goal.** Oliver starts a small, bounded change that skips intent and spec. He knows that only a person sets the track.
 
 ### Steps
 
-1. A user reports in GitHub issue 42 that a task due today is shown as overdue. Oleg asks the agent:
+1. A user reports in GitHub issue 42 that a task due today is shown as overdue. Oliver asks the agent:
 
    > Start a bug-fix change for GitHub issue 42: a task due today is listed as overdue. Low risk.
 
@@ -477,7 +477,7 @@ something by hand.
    error: An agent session (claude-code) cannot set the track.
    ```
 
-3. Ivan reads the suggestion and confirms it in his own terminal:
+3. Ethan reads the suggestion and confirms it in his own terminal:
 
    ```bash
    sdlc track set lite --change fix-due-today --note "One function, covered by tests"
@@ -494,7 +494,7 @@ something by hand.
 ### Check yourself
 
 - `sdlc status --change fix-due-today` shows `lite track` and `source ticket GH-42`.
-- `sdlc log` has a `track.set` line by Ivan with his note.
+- `sdlc log` has a `track.set` line by Ethan with his note.
 
 ### Pitfalls
 
@@ -508,16 +508,16 @@ something by hand.
 ### On screen (for the video)
 
 - Show the warning line after `sdlc new`. Explain "suggested" versus "set".
-- Ivan runs `sdlc track set lite` on the right; `sdlc status` on the left shows the optional gates.
+- Ethan runs `sdlc track set lite` on the right; `sdlc status` on the left shows the optional gates.
 
 ---
 
 ## Lesson 6.7 — The bug-fix protocol: locked tests            (video: ~7 min)
 
-**Role:** Oleg (developer), Ivan (tech lead)   **Project:** tasklet   **You need:** Lesson 6.6, the plan of
+**Role:** Oliver (developer), Ethan (tech lead)   **Project:** tasklet   **You need:** Lesson 6.6, the plan of
 `fix-due-today` approved
 
-**Goal.** Oleg fixes a bug so that the evidence means what it says: a test that failed for the right reason now
+**Goal.** Oliver fixes a bug so that the evidence means what it says: a test that failed for the right reason now
 passes, and nobody changed the test to get there.
 
 ### Steps
@@ -560,13 +560,13 @@ passes, and nobody changed the test to get there.
    error: `sdlc tests unlock` records a human decision and cannot run inside an agent session (claude-code).
    ```
 
-   Ivan runs it in his terminal:
+   Ethan runs it in his terminal:
 
    ```bash
    sdlc tests unlock --change fix-due-today
    ```
 
-6. Oleg asks the agent the main question of the protocol:
+6. Oliver asks the agent the main question of the protocol:
 
    > Which layer should have caught this bug, and why did it not? Propose the check that closes the gap.
 
@@ -582,8 +582,8 @@ passes, and nobody changed the test to get there.
 ### Pitfalls
 
 - What counts as a test comes from `enforcement.test_paths` (for example `**/*.test.*`, `**/test/**`). A test file
-  outside these patterns is not locked. Sergey adds the pattern.
-- If the test is really wrong, do not let the agent work around the lock. Ivan unlocks, the test is fixed, and the
+  outside these patterns is not locked. Steven adds the pattern.
+- If the test is really wrong, do not let the agent work around the lock. Ethan unlocks, the test is fixed, and the
   tests are locked again.
 - `sdlc health` reports a lock that stays on longer than `health.lock_days` (default 7).
 
@@ -591,15 +591,15 @@ passes, and nobody changed the test to get there.
 
 - Show the red test run first. Highlight "fails for the right reason".
 - `sdlc tests lock`, then the agent's attempt to change the assertion and the denial.
-- Green `sdlc verify`, then Ivan's `sdlc tests unlock` in his own terminal.
+- Green `sdlc verify`, then Ethan's `sdlc tests unlock` in his own terminal.
 
 ---
 
 ## Lesson 6.8 — Commits, checkpoints and going back to the plan            (video: ~6 min)
 
-**Role:** Oleg (developer), Ivan (tech lead)   **Project:** tasklet   **You need:** Lessons 6.2 and 6.7
+**Role:** Oliver (developer), Ethan (tech lead)   **Project:** tasklet   **You need:** Lessons 6.2 and 6.7
 
-**Goal.** Oleg knows what the agent's commits carry, how an approval leaves a checkpoint, and how a person sends a
+**Goal.** Oliver knows what the agent's commits carry, how an approval leaves a checkpoint, and how a person sends a
 change back to the plan.
 
 ### Steps
@@ -616,7 +616,7 @@ change back to the plan.
    SDLC-Agent: claude-code
    ```
 
-   A commit Oleg makes in his own terminal gets no `SDLC-Agent` trailer. `sdlc audit` and the dashboard show how many
+   A commit Oliver makes in his own terminal gets no `SDLC-Agent` trailer. `sdlc audit` and the dashboard show how many
    commits came from agents.
 
 2. Every approval records a checkpoint: a snapshot commit under `refs/sdlc/<change>/<gate>`. Branches and HEAD do not
@@ -632,7 +632,7 @@ change back to the plan.
    af25ddd39cec66159d627e6cb014b1974b88a5b9 commit	refs/sdlc/fix-due-today/plan
    ```
 
-3. Ivan reads the code and sees that the plan rests on a wrong assumption. He sends the change back to the plan, in
+3. Ethan reads the code and sees that the plan rests on a wrong assumption. He sends the change back to the plan, in
    his own terminal:
 
    ```bash
@@ -641,16 +641,16 @@ change back to the plan.
    ```
 
    ```text
-   ↺ plan gate sent back by Ivan <ivan@northwind.example> (wrong-assumption): Compare dates in the user's time
+   ↺ plan gate sent back by Ethan <ethan@northwind.example> (wrong-assumption): Compare dates in the user's time
    zone, not UTC
-   Next: agent — The plan gate was sent back by Ivan <ivan@northwind.example> (wrong-assumption): Compare
+   Next: agent — The plan gate was sent back by Ethan <ethan@northwind.example> (wrong-assumption): Compare
    dates in the user's time zone, not UTC. Revise the plan, tasks artifact(s), then ask for approval again. (/sdlc:plan)
    ```
 
    With `--reset`, the command also restores the files planned under "Files that change" and the change folder from
    the checkpoint. It refuses when those files have uncommitted edits.
 
-4. Oleg types `/sdlc:next`. The agent reads the reason and the note and revises the plan. Ivan approves it again.
+4. Oliver types `/sdlc:next`. The agent reads the reason and the note and revises the plan. Ethan approves it again.
 
 ### Check yourself
 
@@ -671,21 +671,21 @@ change back to the plan.
 
 - `git log` with the trailers highlighted.
 - `git for-each-ref refs/sdlc` after each approval.
-- Ivan's `sdlc rework`, then `/sdlc:next` reading the note back.
+- Ethan's `sdlc rework`, then `/sdlc:next` reading the note back.
 
 ---
 
 ## Lesson 6.9 — From a failing build or an alert to a new change: `/sdlc:triage`            (video: ~6 min)
 
-**Role:** Oleg (developer), Maria (product owner)   **Project:** tasklet   **You need:** the `github` and `telegram`
+**Role:** Oliver (developer), Megan (product owner)   **Project:** tasklet   **You need:** the `github` and `telegram`
 MCP servers in `mcp.servers` (Module 2)
 
-**Goal.** Oleg turns a failing build or a production alert into a diagnosed intent that a person approves or
+**Goal.** Oliver turns a failing build or a production alert into a diagnosed intent that a person approves or
 dismisses. No fix happens before that decision.
 
 ### Steps
 
-1. A failing build. The CI run on `main` failed. Oleg pastes what he has:
+1. A failing build. The CI run on `main` failed. Oliver pastes what he has:
 
    ```text
    > /sdlc:triage CI run 1874 on main failed: test "overdue first" times out on GitHub Actions
@@ -701,8 +701,8 @@ dismisses. No fix happens before that decision.
    [ALERT] tasklet prod: POST /tasks 5xx rate 7% for 10 min (band 5%)
    ```
 
-   Oleg copies the text into `/sdlc:triage`. In `tasklet` the `telegram` server only receives events from the CLI
-   (Lesson 2.6); the agent does not read the channel. sdlc has no built-in alert intake: the input is the text Oleg
+   Oliver copies the text into `/sdlc:triage`. In `tasklet` the `telegram` server only receives events from the CLI
+   (Lesson 2.6); the agent does not read the channel. sdlc has no built-in alert intake: the input is the text Oliver
    gives the agent.
 
 3. The agent classifies the problem (a bounded fix, or wider work), then creates the change:
@@ -714,21 +714,21 @@ dismisses. No fix happens before that decision.
    It writes `intent.md` with the anomaly and its evidence in Problem, the desired end state and the open questions.
    It recommends, but does not run, a rollback or a runbook step.
 
-4. The agent stops at the intent gate and names Maria. Maria decides in her own terminal:
+4. The agent stops at the intent gate and names Megan. Megan decides in her own terminal:
 
    ```bash
    sdlc approve intent --change fix-tasks-5xx                                  # fix it now
    sdlc reject intent --change fix-tasks-5xx --note "Known load test, no fix"  # dismiss it
    ```
 
-   With `events` configured (Lesson 2.6), the waiting intent gate goes to the Telegram bot, and Maria gets the message
+   With `events` configured (Lesson 2.6), the waiting intent gate goes to the Telegram bot, and Megan gets the message
    with her name in `waitingFor`.
 
 ### Check yourself
 
 - `sdlc status` lists `fix-tasks-5xx` at the intent gate, with source `alert`.
 - `intent.md` holds the evidence: run id, error rate, time window.
-- No code changed before Maria's decision.
+- No code changed before Megan's decision.
 
 ### Pitfalls
 
@@ -743,5 +743,5 @@ dismisses. No fix happens before that decision.
 ### On screen (for the video)
 
 - Paste the Telegram alert into `/sdlc:triage`. Show the agent collecting evidence without editing anything.
-- Show the new `intent.md` and the stop at the intent gate with Maria's command.
-- On a phone screen, show the Telegram message that the intent gate waits for Maria.
+- Show the new `intent.md` and the stop at the intent gate with Megan's command.
+- On a phone screen, show the Telegram message that the intent gate waits for Megan.

@@ -1,7 +1,7 @@
 # Module 3. People and the agent team
 
-This module ties the gates to named people and sets up the agents that do the work. It is for **Sergey** (platform
-engineer), who writes the configuration, for **Ivan** (tech lead), who accepts the agent roles, and for everyone who
+This module ties the gates to named people and sets up the agents that do the work. It is for **Steven** (platform
+engineer), who writes the configuration, for **Ethan** (tech lead), who accepts the agent roles, and for everyone who
 approves a gate.
 
 In this module:
@@ -20,7 +20,7 @@ in that run were small local stand-ins with the same tool names, so the answers 
 
 ## Lesson 3.1 — `roles.yaml`: people, roles and the gates they approve            (video: ~7 min)
 
-**Role:** Sergey (writes the files), the whole team (reads them)   **Project:** tasklet
+**Role:** Steven (writes the files), the whole team (reads them)   **Project:** tasklet
 **You need:** sdlc initialized in `tasklet` (Module 1); every person has a git identity with their work email
 
 **Goal.** Write `openspec/roles.yaml` for the Northwind team, connect its roles to the gates in
@@ -32,7 +32,7 @@ in that run were small local stand-ins with the same tool names, so the answers 
    sdlc reads the git email of the person who runs `sdlc approve`, finds that person in the file, and checks that the
    person holds a role the gate accepts.
 
-2. Sergey opens `openspec/sdlc.yaml` in his editor and checks the `gates` section. It names **roles**, not people:
+2. Steven opens `openspec/sdlc.yaml` in his editor and checks the `gates` section. It names **roles**, not people:
 
    ```yaml
    gates:
@@ -50,40 +50,40 @@ in that run were small local stand-ins with the same tool names, so the answers 
    | `high_risk_approvers` | for a change with `risk: high`, **each** of these roles must approve as well |
    | `min_approvals` | the number of different people the gate waits for (default 1) |
    | `overdue_hours` | after this many hours of waiting, sdlc raises a `gate.<gate>.overdue` event (lesson 5.1) |
-   | `required` | `release` is `false` by default; Northwind turns it on so that Elena authorizes every release |
+   | `required` | `release` is `false` by default; Northwind turns it on so that Emily authorizes every release |
 
    `verify` has no approvers: the checks decide it (Module 5).
 
-3. Sergey wrote a first `openspec/roles.yaml` in lesson 1.3. Now that the team starts real work, he makes two
-   changes: Ivan also holds `engineer`, because he approves the plans of `tasklet`'s changes, and Olga becomes a
+3. Steven wrote a first `openspec/roles.yaml` in lesson 1.3. Now that the team starts real work, he makes two
+   changes: Ethan also holds `engineer`, because he approves the plans of `tasklet`'s changes, and Laura becomes a
    second maintainer, so that a change to this file never depends on one person. The file now reads:
 
    ```yaml
    version: 1
    signing: warn                 # off | warn | required (lesson 3.3)
    people:
-     maria:  { name: Maria,  emails: [maria@northwind.example] }
-     ivan:   { name: Ivan,   emails: [ivan@northwind.example] }
-     oleg:   { name: Oleg,   emails: [oleg@northwind.example] }
-     anna:   { name: Anna,   emails: [anna@northwind.example] }
-     pavel:  { name: Pavel,  emails: [pavel@northwind.example] }
-     elena:  { name: Elena,  emails: [elena@northwind.example] }
-     sergey: { name: Sergey, emails: [sergey@northwind.example] }
-     olga:   { name: Olga,   emails: [olga@northwind.example] }
+     megan:  { name: Megan,  emails: [megan@northwind.example] }
+     ethan:  { name: Ethan,  emails: [ethan@northwind.example] }
+     oliver: { name: Oliver, emails: [oliver@northwind.example] }
+     grace:  { name: Grace,  emails: [grace@northwind.example] }
+     paul:   { name: Paul,   emails: [paul@northwind.example] }
+     emily:  { name: Emily,  emails: [emily@northwind.example] }
+     steven: { name: Steven, emails: [steven@northwind.example] }
+     laura:  { name: Laura,  emails: [laura@northwind.example] }
    roles:
-     product-owner: [maria]
-     tech-lead: [ivan]
-     engineer: [ivan, oleg]
-     code-owner: [pavel]
-     release-manager: [elena]
-     maintainer: [sergey, olga]    # may change this file
+     product-owner: [megan]
+     tech-lead: [ethan]
+     engineer: [ethan, oliver]
+     code-owner: [paul]
+     release-manager: [emily]
+     maintainer: [steven, laura]   # may change this file
    separation:
      author_cannot_approve: [review, release]
      distinct_approvers: [[spec, review], [plan, review]]
      max_gates_per_person: 3
    ```
 
-   - **people**: a stable id, a name, one or more emails. An email belongs to one person only. Anna and Olga hold no
+   - **people**: a stable id, a name, one or more emails. An email belongs to one person only. Grace and Laura hold no
      gate role; they are listed so that the tools can name them.
    - **roles**: the role names the gates use, and who holds each. `maintainer` is special: it is the role that may
      change this file (lesson 3.3).
@@ -91,7 +91,7 @@ in that run were small local stand-ins with the same tool names, so the answers 
      or the plan may not approve the review of the same change; one person approves at most three gates of one
      change.
 
-4. Sergey checks the file:
+4. Steven checks the file:
 
    ```bash
    sdlc roles check
@@ -99,28 +99,28 @@ in that run were small local stand-ins with the same tool names, so the answers 
 
    ```text
    ID      Name    Roles
-   maria   Maria   product-owner
-   ivan    Ivan    tech-lead, engineer
-   oleg    Oleg    engineer
-   anna    Anna
-   pavel   Pavel   code-owner
-   elena   Elena   release-manager
-   sergey  Sergey  maintainer
-   olga    Olga    maintainer
+   megan   Megan   product-owner
+   ethan   Ethan   tech-lead, engineer
+   oliver  Oliver  engineer
+   grace   Grace
+   paul    Paul    code-owner
+   emily   Emily   release-manager
+   steven  Steven  maintainer
+   laura   Laura   maintainer
    ```
 
-5. Sergey commits both files and pushes them. He also protects the file in GitHub with one line in
+5. Steven commits both files and pushes them. He also protects the file in GitHub with one line in
    `.github/CODEOWNERS`, so a change to it needs a maintainer's review:
 
    ```text
    /openspec/roles.yaml @northwind/maintainers
    ```
 
-6. Show what happens when the agent tries to change the file. Oleg asks Claude Code:
+6. Show what happens when the agent tries to change the file. Oliver asks Claude Code:
 
    > Add me to code-owner in roles.yaml so I can approve my own review.
 
-   The hook denies the edit before it happens (rule `state-integrity`). The agent tells Oleg that a maintainer must
+   The hook denies the edit before it happens (rule `state-integrity`). The agent tells Oliver that a maintainer must
    make the change.
 
 7. Mention the way in for a team that already lists approvers in `sdlc.yaml` (`roles: { product-owner: [...] }`):
@@ -131,7 +131,7 @@ in that run were small local stand-ins with the same tool names, so the answers 
 
 - `sdlc roles check` lists every person, and each gate role in `sdlc.yaml` has at least one holder.
 - `openspec/roles.yaml` is committed, and CODEOWNERS names the maintainers for it.
-- You can say why Anna and Olga have no role and why that is correct.
+- You can say why Grace and Laura have no role and why that is correct.
 
 ### Pitfalls
 
@@ -146,14 +146,14 @@ in that run were small local stand-ins with the same tool names, so the answers 
 ### On screen (for the video)
 
 - `sdlc.yaml` gates on the left, `roles.yaml` on the right; draw a line from each role name to its holders.
-- Run `sdlc roles check`; highlight the empty role cell for Anna and Olga.
+- Run `sdlc roles check`; highlight the empty role cell for Grace and Laura.
 - The CODEOWNERS line, then the denied agent edit in Claude Code.
 
 ---
 
 ## Lesson 3.2 — Who may approve: `roles check`, `roles who`, `next --me` and `--preview`            (video: ~7 min)
 
-**Role:** Maria, Ivan, Pavel, Elena (approvers); Oleg (author)   **Project:** tasklet
+**Role:** Megan, Ethan, Paul, Emily (approvers); Oliver (author)   **Project:** tasklet
 **You need:** lesson 3.1; a change in progress (`add-due-dates`, Module 5)
 
 **Goal.** Each approver finds what waits for them, sees who else may approve and why, and looks at exactly what
@@ -170,7 +170,7 @@ they are about to approve before they approve it.
    | `sdlc next --me` | every gate, across all active changes, that **you** may decide now, with the command |
    | `sdlc approve <gate> --change <id> --preview` | what you would approve, what changed, and whether you may |
 
-2. The change `add-due-dates` waits for its plan. Ivan opens his own terminal and asks what waits for him:
+2. The change `add-due-dates` waits for its plan. Ethan opens his own terminal and asks what waits for him:
 
    ```bash
    sdlc next --me
@@ -181,7 +181,7 @@ they are about to approve before they approve it.
      add-due-dates, gate plan: sdlc approve plan --change add-due-dates --as engineer
    ```
 
-   Oleg also holds `engineer`, so the same line waits for him. Maria, Anna, Sergey and Olga see:
+   Oliver also holds `engineer`, so the same line waits for him. Megan, Grace, Steven and Laura see:
 
    ```text
    Nothing is waiting for you.
@@ -193,38 +193,38 @@ they are about to approve before they approve it.
    guest@example.com is not a person in openspec/roles.yaml, so nothing waits for you.
    ```
 
-3. Later the change reaches review. Pavel asks who may approve it:
+3. Later the change reaches review. Paul asks who may approve it:
 
    ```bash
    sdlc roles who review --change add-due-dates
    ```
 
    ```text
-   review · add-due-dates — may approve: Pavel (pavel)
-     Maria (maria): missing_role — Maria does not hold code-owner; ask Pavel.; distinct_approvers — Maria already approved the paired gate spec/review.
-     Ivan (ivan): missing_role — Ivan does not hold code-owner; ask Pavel.; distinct_approvers — Ivan already approved the paired gate plan/review.
-     Oleg (oleg): missing_role — Oleg does not hold code-owner; ask Pavel.; author_cannot_approve — Oleg authored code in this change.
-     Anna (anna): missing_role — Anna does not hold code-owner; ask Pavel.
-     Elena (elena): missing_role — Elena does not hold code-owner; ask Pavel.
-     Sergey (sergey): missing_role — Sergey does not hold code-owner; ask Pavel.
-     Olga (olga): missing_role — Olga does not hold code-owner; ask Pavel.
+   review · add-due-dates — may approve: Paul (paul)
+     Megan (megan): missing_role — Megan does not hold code-owner; ask Paul.; distinct_approvers — Megan already approved the paired gate spec/review.
+     Ethan (ethan): missing_role — Ethan does not hold code-owner; ask Paul.; distinct_approvers — Ethan already approved the paired gate plan/review.
+     Oliver (oliver): missing_role — Oliver does not hold code-owner; ask Paul.; author_cannot_approve — Oliver authored code in this change.
+     Grace (grace): missing_role — Grace does not hold code-owner; ask Paul.
+     Emily (emily): missing_role — Emily does not hold code-owner; ask Paul.
+     Steven (steven): missing_role — Steven does not hold code-owner; ask Paul.
+     Laura (laura): missing_role — Laura does not hold code-owner; ask Paul.
    ```
 
-   Read the three rule names aloud: `missing_role`, `distinct_approvers`, `author_cannot_approve`. Oleg wrote the
+   Read the three rule names aloud: `missing_role`, `distinct_approvers`, `author_cannot_approve`. Oliver wrote the
    code, so he may not approve its review even if he held the role.
 
-4. Show the refusal. Oleg tries anyway, in his own terminal:
+4. Show the refusal. Oliver tries anyway, in his own terminal:
 
    ```bash
    sdlc approve review --change add-due-dates
    ```
 
    ```text
-   error: Oleg does not hold code-owner; ask Pavel. Oleg authored code in this change.
-   fix: Ask one of: Pavel.
+   error: Oliver does not hold code-owner; ask Paul. Oliver authored code in this change.
+   fix: Ask one of: Paul.
    ```
 
-5. Before deciding, Pavel previews the gate. `--preview` writes nothing:
+5. Before deciding, Paul previews the gate. `--preview` writes nothing:
 
    ```bash
    sdlc approve review --change add-due-dates --preview
@@ -246,7 +246,7 @@ they are about to approve before they approve it.
    lists the files. When something blocks the gate, the preview says "You may not approve it now" and gives the
    reason, for example an open question that has no answer yet.
 
-6. Show `min_approvals` on a busier project. Sergey can make a gate wait for two different people:
+6. Show `min_approvals` on a busier project. Steven can make a gate wait for two different people:
 
    ```yaml
    review: { required: true, approvers: [code-owner], min_approvals: 2 }
@@ -258,30 +258,30 @@ they are about to approve before they approve it.
 ### Check yourself
 
 - Each approver runs `sdlc next --me` and sees only their own gates.
-- `sdlc roles who review --change <id>` names Pavel and explains every other person.
+- `sdlc roles who review --change <id>` names Paul and explains every other person.
 - You ran `--preview` before an approval and read the "Changed since the last approval" line.
 
 ### Pitfalls
 
 - `sdlc next --me` lists a gate only when you may decide it **now**. While the intent has an open question,
-  Maria's list is empty even though the intent waits for her: `sdlc answer --change <id> --list` shows the questions
+  Megan's list is empty even though the intent waits for her: `sdlc answer --change <id> --list` shows the questions
   (lesson 5.2).
-- `roles who spec` for a medium-risk change also names Ivan, because `tech-lead` is a high-risk approver of the spec.
+- `roles who spec` for a medium-risk change also names Ethan, because `tech-lead` is a high-risk approver of the spec.
   For a medium-risk change, only a `product-owner` approval satisfies the gate.
 - With `min_approvals: 2`, `sdlc approve review` accepts any two holders of the listed roles. sdlc cannot require
   "one approval from each role" except through `high_risk_approvers` on a high-risk change.
 
 ### On screen (for the video)
 
-- Four terminals in a grid (Maria, Ivan, Pavel, Elena), each running `sdlc next --me`.
+- Four terminals in a grid (Megan, Ethan, Paul, Emily), each running `sdlc next --me`.
 - `sdlc roles who review`: highlight the three rule names in different colours.
-- Pavel's `--preview`: highlight "Verification: … matches the current code".
+- Paul's `--preview`: highlight "Verification: … matches the current code".
 
 ---
 
 ## Lesson 3.3 — Signed approvals and `sdlc approvals verify`            (video: ~8 min)
 
-**Role:** Sergey (setup), every approver (signs), CI   **Project:** tasklet
+**Role:** Steven (setup), every approver (signs), CI   **Project:** tasklet
 **You need:** lesson 3.1; git 2.34 or newer; an SSH key per person
 
 **Goal.** Make every approval provable: each approval arrives in a commit signed by the person who gave it, and
@@ -290,7 +290,7 @@ every change to `roles.yaml` is signed by a maintainer. Check it locally and in 
 ### Steps
 
 1. Explain the gap that signing closes. A git email is easy to fake: anyone can run
-   `git config user.email maria@northwind.example`. A signature made with Maria's private key cannot be faked.
+   `git config user.email megan@northwind.example`. A signature made with Megan's private key cannot be faked.
 
 2. Each person sets up SSH signing once on their machine:
 
@@ -300,22 +300,22 @@ every change to `roles.yaml` is signed by a maintainer. Check it locally and in 
    git config commit.gpgsign true
    ```
 
-3. Sergey adds each public key to `roles.yaml`. Signing stays in `warn` mode (set in lesson 1.3) until everyone
+3. Steven adds each public key to `roles.yaml`. Signing stays in `warn` mode (set in lesson 1.3) until everyone
    signs:
 
    ```yaml
    signing: warn
    people:
-     maria:  { name: Maria,  emails: [maria@northwind.example],  signing_key: "ssh-ed25519 AAAA... maria@northwind" }
-     sergey: { name: Sergey, emails: [sergey@northwind.example], signing_key: "ssh-ed25519 AAAA... sergey@northwind" }
+     megan:  { name: Megan,  emails: [megan@northwind.example],  signing_key: "ssh-ed25519 AAAA... megan@northwind" }
+     steven: { name: Steven, emails: [steven@northwind.example], signing_key: "ssh-ed25519 AAAA... steven@northwind" }
    ```
 
    He commits the change signed: `git commit -S -m "chore: signing keys"`.
 
-4. Maria approves the intent of a change in her own terminal. `sdlc approve` prints the commit to make:
+4. Megan approves the intent of a change in her own terminal. `sdlc approve` prints the commit to make:
 
    ```text
-   ✓ intent gate: Maria <maria@northwind.example> approved as product-owner (b5a9bc0504a1)
+   ✓ intent gate: Megan <megan@northwind.example> approved as product-owner (b5a9bc0504a1)
    Suggested commit message (its trailer ties the commit to this approval):
      $ git commit -m "chore(export-csv): approve the intent gate" -m "SDLC-Approval: export-csv:intent:b5a9bc0504a1"
    ```
@@ -330,11 +330,11 @@ every change to `roles.yaml` is signed by a maintainer. Check it locally and in 
    ```
 
    ```text
-   ✓ export-csv/intent maria valid 3a9c4294
-   ✗ add-due-dates/intent maria unsigned 3be65de2
-   ✗ add-due-dates/plan ivan unsigned 874de62d
-   ✗ openspec/roles.yaml sergey@northwind.example bad-signature de01b076
-   ✗ openspec/roles.yaml sergey@northwind.example unsigned b202d5d4
+   ✓ export-csv/intent megan valid 3a9c4294
+   ✗ add-due-dates/intent megan unsigned 3be65de2
+   ✗ add-due-dates/plan ethan unsigned 874de62d
+   ✗ openspec/roles.yaml steven@northwind.example bad-signature de01b076
+   ✗ openspec/roles.yaml steven@northwind.example unsigned b202d5d4
    7 approvals checked, 8 invalid (warn: not blocking)
    Sign commits: git config gpg.format ssh; git config user.signingkey <key>; git commit -S
    ```
@@ -347,7 +347,7 @@ every change to `roles.yaml` is signed by a maintainer. Check it locally and in 
    |---|---|
    | `valid` | the approval is in a commit signed by the approver's key |
    | `unsigned` | the commit has no signature |
-   | `wrong-signer` | signed by someone else, for example Pavel signing a commit that claims Maria's approval |
+   | `wrong-signer` | signed by someone else, for example Paul signing a commit that claims Megan's approval |
    | `bad-signature` | the signature does not verify against the keys sdlc knows |
    | `not-committed` | the approval record is not in a commit yet |
    | `not-maintainer` | a `roles.yaml` commit signed by someone who was not a maintainer in the version before |
@@ -362,10 +362,10 @@ every change to `roles.yaml` is signed by a maintainer. Check it locally and in 
    sdlc approvals verify --mode required
    ```
 
-   It exits 1 when any approval is invalid. Sergey adds it as a required check on the default branch, together with
+   It exits 1 when any approval is invalid. Steven adds it as a required check on the default branch, together with
    branch protection.
 
-8. When everyone signs, Sergey changes `signing: warn` to `signing: required` in `roles.yaml`.
+8. When everyone signs, Steven changes `signing: warn` to `signing: required` in `roles.yaml`.
 
 ### Check yourself
 
@@ -385,7 +385,7 @@ every change to `roles.yaml` is signed by a maintainer. Check it locally and in 
 
 ### On screen (for the video)
 
-- A fake `git config user.email` on Oleg's machine, then the same approval failing `approvals verify` as
+- A fake `git config user.email` on Oliver's machine, then the same approval failing `approvals verify` as
   `wrong-signer` or `unsigned`: show why an email alone is not proof.
 - The status table as an overlay.
 - The CI job turning red, then green after a signed commit.
@@ -394,7 +394,7 @@ every change to `roles.yaml` is signed by a maintainer. Check it locally and in 
 
 ## Lesson 3.4 — The agent team: sync, drafts and a person's acceptance            (video: ~7 min)
 
-**Role:** Ivan (accepts), Oleg (asks the agent), Claude Code   **Project:** tasklet
+**Role:** Ethan (accepts), Oliver (asks the agent), Claude Code   **Project:** tasklet
 **You need:** lesson 3.1
 
 **Goal.** Give the project five role agents (analyst, architect, developer, tester, reviewer) that know the project's
@@ -415,12 +415,12 @@ rules, and accept them as a person.
    | tester | test | the behavioural table and the verdict in `verification.md` |
    | reviewer | deploy | findings in `review.md` |
 
-2. Oleg asks Claude Code to set up the team:
+2. Oliver asks Claude Code to set up the team:
 
    > /sdlc:team
 
    The agent runs `sdlc team sync`, reads the project (for an empty project: the intent of the first change, or it
-   asks Oleg for the idea and the stack) and adds a `## Project rules` section to each draft. Every rule names the
+   asks Oliver for the idea and the stack) and adds a `## Project rules` section to each draft. Every rule names the
    file it comes from. The sync part looks like this (real output, run directly):
 
    ```bash
@@ -460,7 +460,7 @@ rules, and accept them as a person.
    shell): sdlc team accept tester
    ```
 
-5. Ivan reads each draft in `docs/agents/drafts/`, fixes what is wrong, and accepts the roles in **his own
+5. Ethan reads each draft in `docs/agents/drafts/`, fixes what is wrong, and accepts the roles in **his own
    terminal**:
 
    ```bash
@@ -477,12 +477,12 @@ rules, and accept them as a person.
    Role reviewer accepted: docs/agents/reviewer.md, recorded in openspec/.sdlc/team.json; subagent sdlc-reviewer generated.
    ```
 
-   Accepting also says whether the draft differs from its source, so Ivan sees what the agent added.
+   Accepting also says whether the draft differs from its source, so Ethan sees what the agent added.
 
-6. `sdlc team list` now shows every role `accepted` with its subagent. Ivan commits `docs/agents/`,
+6. `sdlc team list` now shows every role `accepted` with its subagent. Ethan commits `docs/agents/`,
    `openspec/.sdlc/team.json` and `.claude/agents/`.
 
-7. Show the protection. Oleg asks the agent to make the tester less strict:
+7. Show the protection. Oliver asks the agent to make the tester less strict:
 
    > Edit docs/agents/tester.md so that a case it could not run counts as PASS.
 
@@ -505,24 +505,24 @@ rules, and accept them as a person.
 
 ### Pitfalls
 
-- The project facts in a role follow the project only through `sdlc update`. After Sergey changes a verify command,
+- The project facts in a role follow the project only through `sdlc update`. After Steven changes a verify command,
   he runs `sdlc update`.
 - A `Project rules` section is only as good as what the agent found. Read it before you accept.
 - `sdlc team accept` checks that you are a person, not which role you hold in `roles.yaml`. Agree in the team who
-  accepts roles (at Northwind: Ivan).
+  accepts roles (at Northwind: Ethan).
 - Denials in this lesson: `sdlc guide denials#guard-config` and `denials#separation-of-duties`.
 
 ### On screen (for the video)
 
 - `/sdlc:team` in Claude Code; then a draft open in the editor with the new `## Project rules` section highlighted.
-- Ivan's terminal accepting the five roles.
+- Ethan's terminal accepting the five roles.
 - The denied edit of an accepted role.
 
 ---
 
 ## Lesson 3.5 — Roles and skills from the `knowledge` registry and from packs            (video: ~8 min)
 
-**Role:** Sergey (configures), Ivan (accepts)   **Project:** tasklet (the same applies to billing-api)
+**Role:** Steven (configures), Ethan (accepts)   **Project:** tasklet (the same applies to billing-api)
 **You need:** lesson 3.4; the `knowledge` MCP server in `mcp.servers` (Module 2)
 
 **Goal.** Take the company's shared roles and skills from one place, with versions and checksums, and accept a skill
@@ -536,7 +536,7 @@ that carries a script.
    2. **packs**: a git repository or an npm package with `roles/<id>.md` and `skills/<id>/…`;
    3. the **built-in** roles of sdlc.
 
-2. At Northwind the registry is the `knowledge` server that Sergey registered in lesson 2.1. He points the team at
+2. At Northwind the registry is the `knowledge` server that Steven registered in lesson 2.1. He points the team at
    it in `openspec/sdlc.yaml`:
 
    ```yaml
@@ -560,7 +560,7 @@ that carries a script.
        list_roles, get_role, list_skills, get_skill
    ```
 
-3. Packs, when there is no registry server. Sergey can add them to the same file:
+3. Packs, when there is no registry server. Steven can add them to the same file:
 
    ```yaml
    packs:
@@ -596,7 +596,7 @@ that carries a script.
    checksum does not match is refused. In a new project with no accepted roles, the same sync writes the registry
    tester and the four built-in roles as drafts.
 
-5. Ivan reads the draft and accepts the registry tester in his own terminal. It replaces the built-in tester. The role
+5. Ethan reads the draft and accepts the registry tester in his own terminal. It replaces the built-in tester. The role
    lists a skill with a script, so the skill waits:
 
    ```bash
@@ -608,7 +608,7 @@ that carries a script.
    Skill api-smoke-test has files that are not Markdown (scripts/smoke.sh); it is installed only when a person runs `sdlc team accept --skill api-smoke-test`.
    ```
 
-6. Before accepting the skill, Ivan vets it. `sdlc team check` is read-only:
+6. Before accepting the skill, Ethan vets it. `sdlc team check` is read-only:
 
    ```bash
    sdlc team check
@@ -623,7 +623,7 @@ that carries a script.
    `team check` lists for each skill its source and version, whether the checksum matches, its scripts, the URLs
    inside, and the tools it allows, with a warning when they grant unrestricted shell or file writes.
 
-7. Ivan reads `scripts/smoke.sh`, then accepts the skill:
+7. Ethan reads `scripts/smoke.sh`, then accepts the skill:
 
    ```bash
    sdlc team accept --skill api-smoke-test
@@ -666,7 +666,7 @@ that carries a script.
 
 ## Lesson 3.6 — The built-in subagents            (video: ~5 min)
 
-**Role:** Oleg, Ivan, Sergey   **Project:** tasklet   **You need:** lesson 3.4
+**Role:** Oliver, Ethan, Steven   **Project:** tasklet   **You need:** lesson 3.4
 
 **Goal.** Know the six subagents that come with sdlc, which workflow calls each, and how the accepted team roles take
 the place of two of them.
@@ -695,7 +695,7 @@ the place of two of them.
 
    If a person edits an accepted role and has not accepted it again, the workflows fall back to the built-ins.
 
-3. Show the debate lens. Sergey turns it on in `openspec/sdlc.yaml` for decisions with a lot at stake:
+3. Show the debate lens. Steven turns it on in `openspec/sdlc.yaml` for decisions with a lot at stake:
 
    ```yaml
    design: { debate: true }    # debate_sides: [simplicity and speed, robustness and safety]

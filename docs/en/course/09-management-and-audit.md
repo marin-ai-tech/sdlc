@@ -1,6 +1,6 @@
 # Module 9. Managing and auditing the process
 
-This module is for **Olga**, the engineering manager at Northwind Labs. She does not write code and does not approve
+This module is for **Laura**, the engineering manager at Northwind Labs. She does not write code and does not approve
 gates. She watches how the process works, finds where it suffers, and answers questions from management and from an
 external auditor. Every command in this module only reads the process (or writes a report file). Anyone may run them,
 including the agent.
@@ -16,15 +16,15 @@ In this module:
 - Lesson 9.7 — The daily summary and events in Telegram
 - Lesson 9.8 — A portfolio view over MCP
 
-The outputs in this module come from a trial run of `tasklet` with sdlc 0.14.4: Maria approved the intent and the
-spec, Ivan approved the plan (and sent it back once), Oleg's agent built and verified the change, and Pavel approved
+The outputs in this module come from a trial run of `tasklet` with sdlc 0.14.4: Megan approved the intent and the
+spec, Ethan approved the plan (and sent it back once), Oliver's agent built and verified the change, and Paul approved
 the review. Times are short because the run took a few minutes.
 
 ---
 
 ## Lesson 9.1 — The progress report            (video: ~5 min)
 
-**Role:** Olga   **Project:** tasklet   **You need:** sdlc installed, a clone of `tasklet`, at least one change
+**Role:** Laura   **Project:** tasklet   **You need:** sdlc installed, a clone of `tasklet`, at least one change
 
 **Goal.** Produce the progress report of a project in Markdown or JSON, for one period or one change, and save it to
 a file.
@@ -114,7 +114,7 @@ a file.
 
 ## Lesson 9.2 — The dashboard, and keeping it current            (video: ~6 min)
 
-**Role:** Olga, with Sergey for the background job   **Project:** tasklet   **You need:** Lesson 9.1, `reports/` in
+**Role:** Laura, with Steven for the background job   **Project:** tasklet   **You need:** Lesson 9.1, `reports/` in
 `.gitignore`
 
 **Goal.** Build the HTML dashboard of a project and keep it fresh while the team works.
@@ -141,7 +141,7 @@ a file.
 
 5. Keep the page current. `sdlc dashboard` has no watch mode of its own. The sdlc repository ships an example script,
    `scripts/examples/dashboard-watch.mjs`, that watches `openspec/` and rebuilds the page. It is not part of the
-   installed package, so Sergey copies it from the sdlc repository into the team's tools folder:
+   installed package, so Steven copies it from the sdlc repository into the team's tools folder:
 
    ```bash
    node dashboard-watch.mjs --once                          # build once and exit
@@ -181,11 +181,11 @@ a file.
 
 ## Lesson 9.3 — Project health and the health workflow            (video: ~7 min)
 
-**Role:** Olga, with Maria for ordering the backlog   **Project:** tasklet and billing-api   **You need:** a project
+**Role:** Laura, with Megan for ordering the backlog   **Project:** tasklet and billing-api   **You need:** a project
 with some history; Claude Code for step 4
 
 **Goal.** Find where the process suffers with `sdlc health`, tune its thresholds, and turn the improvements you choose
-into backlog items that Maria orders.
+into backlog items that Megan orders.
 
 ### Steps
 
@@ -227,7 +227,7 @@ into backlog items that Maria orders.
    | Configuration | `config.no_verify`, `config.enforcement`, `config.single_person`, `config.signing`, `config.context_stale`, `config.doctor` |
 
 3. Tune the thresholds. They live under `health` in `openspec/sdlc.yaml`. Only a person edits that file (the hook
-   denies the agent, rule `guard-config`). Sergey adds, for example:
+   denies the agent, rule `guard-config`). Steven adds, for example:
 
    ```yaml
    health:
@@ -259,7 +259,7 @@ into backlog items that Maria orders.
    The agent never moves the item and never edits `openspec/sdlc.yaml` or `openspec/roles.yaml`. For configuration
    findings it proposes the exact change for a person to make.
 
-5. Maria orders the new item in her own terminal. This is a person's command:
+5. Megan orders the new item in her own terminal. This is a person's command:
 
    ```bash
    sdlc backlog move B12 --top
@@ -274,14 +274,14 @@ into backlog items that Maria orders.
 ### Check yourself
 
 - `sdlc health` prints a findings line and exits 0.
-- `sdlc backlog list` shows the drafted item; the item came from the agent, its order from Maria.
-- After Sergey changes `wait_hours`, a gate that waited 30 hours appears under `flow.wait`.
+- `sdlc backlog list` shows the drafted item; the item came from the agent, its order from Megan.
+- After Steven changes `wait_hours`, a gate that waited 30 hours appears under `flow.wait`.
 
 ### Pitfalls
 
 - A health finding is advice, not a gate. Do not wait for a "score".
 - An unknown key under `health` is a configuration error; check the spelling against the list above.
-- The agent may draft items, never order them. "Put it at the top" in the chat does nothing; Maria runs
+- The agent may draft items, never order them. "Put it at the top" in the chat does nothing; Megan runs
   `sdlc backlog move`. See `sdlc guide denials#separation-of-duties`.
 - Repeated denials of one hook rule show up as `discipline.denials`, with the guide article to read.
 
@@ -290,13 +290,13 @@ into backlog items that Maria orders.
 - Run `sdlc health` on both projects; compare a quiet project with a noisy one.
 - Zoom on one finding: id, facts, recommendation.
 - Show `/sdlc:health` in Claude Code, the question "which improvements?", and the `backlog add` command it runs.
-- Cut to Maria's terminal for `sdlc backlog move`.
+- Cut to Megan's terminal for `sdlc backlog move`.
 
 ---
 
 ## Lesson 9.4 — The audit: where the time goes            (video: ~7 min)
 
-**Role:** Olga   **Project:** tasklet   **You need:** at least one change that passed a few gates
+**Role:** Laura   **Project:** tasklet   **You need:** at least one change that passed a few gates
 
 **Goal.** Read the SDLC metrics of a project and the timeline of one change: lead times, first-pass verification,
 waits per gate, reworks, people's participation and the agents' share of commits.
@@ -324,7 +324,7 @@ waits per gate, reworks, people's participation and the agents' share of commits
 
 2. Read it line by line:
 
-   | Line | What it tells Olga |
+   | Line | What it tells Laura |
    |---|---|
    | median hours | lead time between stages; long gaps show where work waits |
    | first-pass rate | share of changes whose first `sdlc verify` passed |
@@ -334,7 +334,7 @@ waits per gate, reworks, people's participation and the agents' share of commits
    | rework reasons | why work went back (`missing-requirement`, `test-gap`, ...) |
    | participation | per change: the decisions the track planned against what people did |
 
-   `add-task-list` planned four approvals and got five: Ivan approved the plan twice because he sent it back once.
+   `add-task-list` planned four approvals and got five: Ethan approved the plan twice because he sent it back once.
 
 3. Read the timeline of one change:
 
@@ -346,15 +346,15 @@ waits per gate, reworks, people's participation and the agents' share of commits
 
    ```text
    Audit trail: add-task-list[feature · risk medium · full]
-     2026-10-09T20:32:51.539Z  change.created             Oleg <oleg@northwind.example> - schema sdlc, full track
-     2026-10-09T20:32:55.299Z  gate.intent.approved       Maria <maria@northwind.example> - role product-owner
-     2026-10-09T20:33:00.620Z  gate.spec.approved         Maria <maria@northwind.example> - role product-owner
-     2026-10-09T20:33:05.191Z  gate.plan.approved         Ivan <ivan@northwind.example> - role engineer
-     2026-10-09T20:33:07.417Z  gate.plan.rework           Ivan <ivan@northwind.example> - test-gap: Name the test ...
-     2026-10-09T20:33:10.809Z  gate.plan.approved         Ivan <ivan@northwind.example> - role engineer
-     2026-10-09T20:33:15.731Z  verify.passed              Oleg <oleg@northwind.example> - test=0
-     2026-10-09T20:33:33.308Z  gate.review.approved       Pavel <pavel@northwind.example> - role code-owner
-     2026-10-09T20:33:45.419Z  change.archived            Oleg <oleg@northwind.example>
+     2026-10-09T20:32:51.539Z  change.created             Oliver <oliver@northwind.example> - schema sdlc, full track
+     2026-10-09T20:32:55.299Z  gate.intent.approved       Megan <megan@northwind.example> - role product-owner
+     2026-10-09T20:33:00.620Z  gate.spec.approved         Megan <megan@northwind.example> - role product-owner
+     2026-10-09T20:33:05.191Z  gate.plan.approved         Ethan <ethan@northwind.example> - role engineer
+     2026-10-09T20:33:07.417Z  gate.plan.rework           Ethan <ethan@northwind.example> - test-gap: Name the test ...
+     2026-10-09T20:33:10.809Z  gate.plan.approved         Ethan <ethan@northwind.example> - role engineer
+     2026-10-09T20:33:15.731Z  verify.passed              Oliver <oliver@northwind.example> - test=0
+     2026-10-09T20:33:33.308Z  gate.review.approved       Paul <paul@northwind.example> - role code-owner
+     2026-10-09T20:33:45.419Z  change.archived            Oliver <oliver@northwind.example>
      ...
      reworks 1: plan (test-gap, 2026-10-09T20:33:07.417Z)
      verify attempts to the first pass 1; approvals: intent 1 · spec 1 · plan 2 · review 1
@@ -410,7 +410,7 @@ waits per gate, reworks, people's participation and the agents' share of commits
 
 ## Lesson 9.5 — Trace, changelog and the project log            (video: ~6 min)
 
-**Role:** Olga (also Elena before a release)   **Project:** tasklet   **You need:** an archived change
+**Role:** Laura (also Emily before a release)   **Project:** tasklet   **You need:** an archived change
 
 **Goal.** Follow one change from intent to evidence, build release notes from the specs, and read the raw project
 log.
@@ -443,7 +443,7 @@ log.
 
 2. Read the gaps. A scenario has evidence when `verification.md` has a behavioral verification row for it. A task has
    a commit when a commit carries the trailers `SDLC-Change: add-task-list` and `SDLC-Task: 1.2`; `/sdlc:build` asks
-   the agent to add them. Gaps are not failures; they are questions for the reviewer and for Olga.
+   the agent to add them. Gaps are not failures; they are questions for the reviewer and for Laura.
 
 3. Build the changelog of one change, or of everything archived since a date:
 
@@ -473,10 +473,10 @@ log.
 
    ```text
    (last 4 of 13 entries; --limit to see more)
-   2026-10-09T20:33:15.744Z  verify.passed         add-task-list Oleg <oleg@northwind.example> - test=0
+   2026-10-09T20:33:15.744Z  verify.passed         add-task-list Oliver <oliver@northwind.example> - test=0
    2026-10-09T20:33:32.420Z  gate.review.awaiting  add-task-list  - sha256:b50993561014b52a...
-   2026-10-09T20:33:33.320Z  gate.review.approved  add-task-list Pavel <pavel@northwind.example> - role code-owner
-   2026-10-09T20:33:46.449Z  change.archived       add-task-list Oleg <oleg@northwind.example> - archived as ...
+   2026-10-09T20:33:33.320Z  gate.review.approved  add-task-list Paul <paul@northwind.example> - role code-owner
+   2026-10-09T20:33:46.449Z  change.archived       add-task-list Oliver <oliver@northwind.example> - archived as ...
    ```
 
    The log is `openspec/.sdlc/log.jsonl`. Only the CLI writes it; the hook denies agent edits (rule
@@ -505,7 +505,7 @@ log.
 
 ## Lesson 9.6 — Evidence for the auditor            (video: ~7 min)
 
-**Role:** Olga and the external auditor   **Project:** tasklet   **You need:** `openspec/roles.yaml` with
+**Role:** Laura and the external auditor   **Project:** tasklet   **You need:** `openspec/roles.yaml` with
 `signing: warn` or `required`, approvals committed with their trailers
 
 **Goal.** Check that every approval came from the right person in a commit, and hand the auditor one folder with the
@@ -513,7 +513,7 @@ evidence of a quarter.
 
 ### Steps
 
-1. The auditor asks: "Who approved each gate, and can you prove it was them?" Olga checks the signatures and the
+1. The auditor asks: "Who approved each gate, and can you prove it was them?" Laura checks the signatures and the
    trailers:
 
    ```bash
@@ -523,11 +523,11 @@ evidence of a quarter.
    With `signing: warn` in `roles.yaml` and no signed commits yet, the viewer sees (real output):
 
    ```text
-   ✗ add-task-list/intent maria unsigned 4a6f4655
-   ✗ add-task-list/spec maria unsigned f27536f3
-   ✗ add-task-list/plan ivan unsigned 335461ad
-   ✗ add-task-list/review pavel unsigned 134eb0e3
-   ✗ openspec/roles.yaml sergey@northwind.example unsigned 278233e6
+   ✗ add-task-list/intent megan unsigned 4a6f4655
+   ✗ add-task-list/spec megan unsigned f27536f3
+   ✗ add-task-list/plan ethan unsigned 335461ad
+   ✗ add-task-list/review paul unsigned 134eb0e3
+   ✗ openspec/roles.yaml steven@northwind.example unsigned 278233e6
    4 approvals checked, 5 invalid (warn: not blocking)
    Sign commits: git config gpg.format ssh; git config user.signingkey <key>; git commit -S
    ```
@@ -545,7 +545,7 @@ evidence of a quarter.
 
    Without `roles.yaml` or with `signing: off`, the command prints `Approval signing is off.`
 
-4. Export the evidence bundle for the quarter. Olga runs it in her terminal and writes it next to the repository, not
+4. Export the evidence bundle for the quarter. Laura runs it in her terminal and writes it next to the repository, not
    inside it:
 
    ```bash
@@ -564,7 +564,7 @@ evidence of a quarter.
 
    ```text
    | Gate | Role | By | At | Digest | Signature | Trailer |
-   | review | code-owner | Pavel <pavel@northwind.example> (pavel) | 2026-10-09T20:33:33.308Z | sha256:b509… | unsigned | found |
+   | review | code-owner | Paul <paul@northwind.example> (paul) | 2026-10-09T20:33:33.308Z | sha256:b509… | unsigned | found |
    ```
 
 5. Give the folder to the auditor. It holds only files from inside `openspec/`: no source code, no secrets. The
@@ -599,12 +599,12 @@ evidence of a quarter.
 
 ## Lesson 9.7 — The daily summary and events in Telegram            (video: ~8 min)
 
-**Role:** Olga asks, Sergey sets it up   **Project:** tasklet   **You need:** a team server with a checkout of
+**Role:** Laura asks, Steven sets it up   **Project:** tasklet   **You need:** a team server with a checkout of
 `tasklet`, a Telegram bot, the `telegram` MCP server in `mcp.servers` (set up by
-Sergey)
+Steven)
 
 **Goal.** Get a short summary of the project into the team's Telegram chat every morning, and the important process
-events (a gate waits for Maria, an approval, an overdue gate, health degraded) as they happen.
+events (a gate waits for Megan, an approval, an overdue gate, health degraded) as they happen.
 
 sdlc itself sends nothing to Telegram. It gives two pieces: an example script that writes the summary to a file, and
 `events` that call a tool of an MCP server. The sending is done by the team's own script and the team's Telegram MCP
@@ -612,7 +612,7 @@ server.
 
 ### Steps
 
-1. Find the example script. It ships in the sdlc package as `assets/examples/daily-summary.mjs`. Sergey copies it to
+1. Find the example script. It ships in the sdlc package as `assets/examples/daily-summary.mjs`. Steven copies it to
    the server's tools folder:
 
    ```bash
@@ -635,10 +635,10 @@ server.
 
    ## Done
 
-   - add-task-list: gate.intent.approved (Maria <maria@northwind.example>)
-   - add-task-list: gate.plan.approved (Ivan <ivan@northwind.example>)
-   - add-task-list: gate.review.approved (Pavel <pavel@northwind.example>)
-   - add-task-list: change.archived (Oleg <oleg@northwind.example>)
+   - add-task-list: gate.intent.approved (Megan <megan@northwind.example>)
+   - add-task-list: gate.plan.approved (Ethan <ethan@northwind.example>)
+   - add-task-list: gate.review.approved (Paul <paul@northwind.example>)
+   - add-task-list: change.archived (Oliver <oliver@northwind.example>)
 
    ## Next
 
@@ -712,9 +712,9 @@ server.
 
 6. Know what the tool receives. After a command, sdlc calls the tool with your static `args` plus one `event`
    object: `{ id, project, event, change, gate, at, sdlc, by, waitingFor }`. `waitingFor` names the people from
-   `roles.yaml` who may take a waiting gate, so the bot can write "Maria, the intent of fix-empty-title waits for
+   `roles.yaml` who may take a waiting gate, so the bot can write "Megan, the intent of fix-empty-title waits for
    you". `id` is stable, so the bot can drop repeats. An event never carries an email address, a command, its output
-   or a note. A Telegram server whose send tool takes only a chat id and a text cannot use this directly: Sergey adds
+   or a note. A Telegram server whose send tool takes only a chat id and a text cannot use this directly: Steven adds
    a small tool to the team's server that turns the `event` object into a message.
 
 7. Make overdue gates arrive on time. Add `overdue_hours` to a gate in `openspec/sdlc.yaml`, inside its existing
@@ -739,7 +739,7 @@ server.
 
 - The chat gets one summary file every weekday morning.
 - `sdlc events list` names the `telegram` receiver and its patterns.
-- When Maria's intent gate waits longer than 24 hours, the chat gets one overdue message.
+- When Megan's intent gate waits longer than 24 hours, the chat gets one overdue message.
 
 ### Pitfalls
 
@@ -755,13 +755,13 @@ server.
 
 - Show the summary file first, then the same file arriving in the Telegram chat.
 - Show the `events` block and `sdlc events list`.
-- Simulate a waiting gate: Oleg's agent finishes an intent, Maria's phone shows the event.
+- Simulate a waiting gate: Oliver's agent finishes an intent, Megan's phone shows the event.
 
 ---
 
 ## Lesson 9.8 — A portfolio view over MCP            (video: ~6 min)
 
-**Role:** Olga   **Project:** both   **You need:** checkouts of `tasklet` and `billing-api`, Claude Desktop (or another
+**Role:** Laura   **Project:** both   **You need:** checkouts of `tasklet` and `billing-api`, Claude Desktop (or another
 MCP client)
 
 **Goal.** Ask about both Northwind projects in plain words from one chat client, and build a simple cross-project
@@ -843,4 +843,4 @@ report.
 
 - Show the config file, restart Claude Desktop, open the tools list.
 - Ask the three questions; show which tool the assistant called for each.
-- Ask "approve the intent of fix-empty-title": the assistant explains it cannot, and gives Maria's command.
+- Ask "approve the intent of fix-empty-title": the assistant explains it cannot, and gives Megan's command.

@@ -21,7 +21,7 @@ All outputs are real, from a trial run of `tasklet` with sdlc 0.14.4, unless a s
 
 ## Lesson 11.1 — Check the installation with `sdlc doctor`            (video: ~5 min)
 
-**Role:** Sergey (anyone may run it)   **Project:** both   **You need:** sdlc installed
+**Role:** Steven (anyone may run it)   **Project:** both   **You need:** sdlc installed
 
 **Goal.** Run `sdlc doctor`, read each line, and apply the fix it names.
 
@@ -105,13 +105,13 @@ All outputs are real, from a trial run of `tasklet` with sdlc 0.14.4, unless a s
 
 ## Lesson 11.2 — Why the hook said no            (video: ~6 min)
 
-**Role:** Oleg (anyone working with an agent)   **Project:** tasklet   **You need:** Claude Code with sdlc's hooks
+**Role:** Oliver (anyone working with an agent)   **Project:** tasklet   **You need:** Claude Code with sdlc's hooks
 
 **Goal.** Read a denial, find its rule, and know the right next step for each of the twelve rules.
 
 ### Steps
 
-1. Read the denial. Every denial starts with its rule in brackets and ends with the guide section. Oleg asks the
+1. Read the denial. Every denial starts with its rule in brackets and ends with the guide section. Oliver asks the
    agent to start coding before the plan is approved:
 
    ```text
@@ -180,7 +180,7 @@ All outputs are real, from a trial run of `tasklet` with sdlc 0.14.4, unless a s
 
 ## Lesson 11.3 — A change that does not move            (video: ~7 min)
 
-**Role:** Maria, Ivan, Oleg   **Project:** tasklet   **You need:** an active change
+**Role:** Megan, Ethan, Oliver   **Project:** tasklet   **You need:** an active change
 
 **Goal.** Find out why a change is stuck and unblock it: open questions, a stale approval, a rework, a takeover.
 
@@ -205,7 +205,7 @@ All outputs are real, from a trial run of `tasklet` with sdlc 0.14.4, unless a s
 
    It writes nothing; the agent may ask it as often as it likes.
 
-2. Open questions. Maria answers in her own terminal; then the gate can be approved:
+2. Open questions. Megan answers in her own terminal; then the gate can be approved:
 
    ```bash
    sdlc answer --change fix-empty-title --list
@@ -215,16 +215,16 @@ All outputs are real, from a trial run of `tasklet` with sdlc 0.14.4, unless a s
 
    An answer typed into `intent.md` by hand or by the agent does not count; only `sdlc answer` records it.
 
-3. A stale approval. Someone edits `intent.md` after Maria approved it. `sdlc status --change fix-empty-title` shows:
+3. A stale approval. Someone edits `intent.md` after Megan approved it. `sdlc status --change fix-empty-title` shows:
 
    ```text
    gates
      intent   ↻ stale              content changed after approval; re-approval needed
-   next      person: The intent artifacts changed after approval; Maria (product-owner) must re-approve.
+   next      person: The intent artifacts changed after approval; Megan (product-owner) must re-approve.
               $ sdlc approve intent --change fix-empty-title --as product-owner
    ```
 
-   Before approving again, Maria looks at what changed:
+   Before approving again, Megan looks at what changed:
 
    ```bash
    sdlc approve intent --change fix-empty-title --preview
@@ -246,7 +246,7 @@ All outputs are real, from a trial run of `tasklet` with sdlc 0.14.4, unless a s
    (`unchanged_after_rework`). After `rework.max_cycles` reworks of one gate (default 3), `sdlc next` asks a person to
    take the change over or review its scope.
 
-5. A held change. Ivan took the change over:
+5. A held change. Ethan took the change over:
 
    ```bash
    sdlc takeover --change fix-empty-title --note "I will rewrite the intent myself"
@@ -255,12 +255,12 @@ All outputs are real, from a trial run of `tasklet` with sdlc 0.14.4, unless a s
    Until he hands it back, the agent is denied:
 
    ```text
-   [sdlc:takeover] fix-empty-title is taken over by Ivan <ivan@northwind.example> (I will rewrite the intent myself)
+   [sdlc:takeover] fix-empty-title is taken over by Ethan <ethan@northwind.example> (I will rewrite the intent myself)
    and has no plan.md, so the agent is paused in the whole project until the person hands it back with
    `sdlc release-control --change fix-empty-title`. ...
    ```
 
-   With a `plan.md`, the agent is paused only in the change folder and the plan's files. Ivan hands it back:
+   With a `plan.md`, the agent is paused only in the change folder and the plan's files. Ethan hands it back:
 
    ```bash
    sdlc release-control --change fix-empty-title --note "Intent rewritten, carry on"
@@ -285,7 +285,7 @@ All outputs are real, from a trial run of `tasklet` with sdlc 0.14.4, unless a s
 ### On screen (for the video)
 
 - Start with a stuck change on the dashboard; run `sdlc explain`.
-- Show the stale gate in `sdlc status`, then `--preview`, then Maria's new approval.
+- Show the stale gate in `sdlc status`, then `--preview`, then Megan's new approval.
 - Show the takeover denial in Claude Code and the hand-back note that the agent reads next.
 
 ---
@@ -382,7 +382,7 @@ your script does the sending.
 Commands marked **(person)** refuse inside an agent session; run them in your own terminal. Workflows are shown in
 Claude Code spelling; in Cursor, OpenCode, Qwen Code and GigaCode use `/sdlc-<name>`, in Codex `$sdlc-<name>`.
 
-### Maria — product owner
+### Megan — product owner
 
 | Run in the terminal | Ask the agent |
 |---|---|
@@ -394,7 +394,7 @@ Claude Code spelling; in Cursor, OpenCode, Qwen Code and GigaCode use `/sdlc-<na
 | `sdlc rework intent --change <id> --reason <r> --note "…"` **(person)** | |
 | `sdlc backlog move B<n> --top`, `sdlc backlog drop B<n> --note "…"` **(person)** | |
 
-### Ivan — tech lead and architect
+### Ethan — tech lead and architect
 
 | Run in the terminal | Ask the agent |
 |---|---|
@@ -406,7 +406,7 @@ Claude Code spelling; in Cursor, OpenCode, Qwen Code and GigaCode use `/sdlc-<na
 | `sdlc takeover`, `sdlc release-control` **(person)** | |
 | `sdlc roles who <gate> --change <id>`, `sdlc explain --change <id>` | |
 
-### Oleg — developer (Claude Code)
+### Oliver — developer (Claude Code)
 
 | Run in the terminal | Ask the agent |
 |---|---|
@@ -416,7 +416,7 @@ Claude Code spelling; in Cursor, OpenCode, Qwen Code and GigaCode use `/sdlc-<na
 | `sdlc tests lock --change <id>` | `/sdlc:triage <alert>` — an incident becomes an intent |
 | `sdlc guide denials#<rule>` | `/sdlc:guide why was this denied?` |
 
-### Anna — QA engineer
+### Grace — QA engineer
 
 | Run in the terminal | Ask the agent |
 |---|---|
@@ -426,7 +426,7 @@ Claude Code spelling; in Cursor, OpenCode, Qwen Code and GigaCode use `/sdlc-<na
 | `sdlc tests unlock --change <id>` **(person)**, only when a locked test is really wrong | |
 | `sdlc defer add "<title>" --why "…" --change <id>` | |
 
-### Pavel — code owner and reviewer
+### Paul — code owner and reviewer
 
 | Run in the terminal | Ask the agent |
 |---|---|
@@ -436,7 +436,7 @@ Claude Code spelling; in Cursor, OpenCode, Qwen Code and GigaCode use `/sdlc-<na
 | `sdlc reject review --change <id> --note "…"` **(person)** | |
 | `sdlc rework review --change <id> --reason <r> --note "…"` **(person)** | |
 
-### Elena — release manager
+### Emily — release manager
 
 | Run in the terminal | Ask the agent |
 |---|---|
@@ -445,7 +445,7 @@ Claude Code spelling; in Cursor, OpenCode, Qwen Code and GigaCode use `/sdlc-<na
 | `sdlc approve release --change <id> [--preview]` **(person)** | |
 | `sdlc reject release --change <id> --note "…"` **(person)** | |
 
-### Sergey — platform engineer
+### Steven — platform engineer
 
 | Run in the terminal | Ask the agent |
 |---|---|
@@ -457,7 +457,7 @@ Claude Code spelling; in Cursor, OpenCode, Qwen Code and GigaCode use `/sdlc-<na
 | `sdlc uninstall --dry-run`, `sdlc uninstall` **(person)** | |
 | edits `openspec/sdlc.yaml` and `openspec/roles.yaml` by hand (the agent cannot) | |
 
-### Olga — engineering manager
+### Laura — engineering manager
 
 | Run in the terminal | Ask the agent |
 |---|---|
@@ -473,7 +473,7 @@ Claude Code spelling; in Cursor, OpenCode, Qwen Code and GigaCode use `/sdlc-<na
 
 | Do | With |
 |---|---|
-| read the evidence bundle | `index.md`, `index.json`, `changes/`, `log.jsonl` from Olga's export |
+| read the evidence bundle | `index.md`, `index.json`, `changes/`, `log.jsonl` from Laura's export |
 | check signatures in a clone of the repository | `sdlc approvals verify --mode required --json` |
 | follow one change from intent to evidence | `sdlc trace <id>`, `sdlc audit --change <id>` |
 

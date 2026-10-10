@@ -1,6 +1,6 @@
 # Module 2. Connecting the toolchain through MCP
 
-Sergey connects `tasklet` to the team's systems: GitHub (the task manager and the build server), the team's
+Steven connects `tasklet` to the team's systems: GitHub (the task manager and the build server), the team's
 knowledge server and a Telegram bot. He also lets other AI systems read the process. Every step here is
 configuration in `openspec/sdlc.yaml`, so only a person makes it. The same steps work for `billing-api`.
 
@@ -24,7 +24,7 @@ their own terminal.
 
 ## Lesson 2.1 — The MCP registry: github, knowledge, telegram            (video: ~8 min)
 
-**Role:** Sergey (platform engineer)   **Project:** tasklet
+**Role:** Steven (platform engineer)   **Project:** tasklet
 **You need:** Module 1; a GitHub token, the knowledge server and the Telegram bot server installed on the machine
 
 **Goal.** The team's MCP servers are described once in `openspec/sdlc.yaml`, with secrets as references, and sdlc
@@ -33,10 +33,10 @@ writes them into the agent tool's own configuration.
 ### Steps
 
 1. Explain the idea. Without a registry, every developer configures the same servers by hand, in each tool, with
-   tokens pasted into files. With the registry, Sergey writes the servers once, and `sdlc update` lays them out for
+   tokens pasted into files. With the registry, Steven writes the servers once, and `sdlc update` lays them out for
    every tool of the project (`.mcp.json` for Claude Code; the other tools get their own files).
 
-2. Sergey adds this block to `openspec/sdlc.yaml` in his editor. The server package names are Northwind's examples:
+2. Steven adds this block to `openspec/sdlc.yaml` in his editor. The server package names are Northwind's examples:
 
    ```yaml
    project:
@@ -84,7 +84,7 @@ writes them into the agent tool's own configuration.
    export TELEGRAM_BOT_TOKEN=…
    ```
 
-4. Sergey lays the registry out:
+4. Steven lays the registry out:
 
    ```bash
    sdlc update
@@ -99,7 +99,7 @@ writes them into the agent tool's own configuration.
    other references kept as references. Claude Code expands them from the environment when it starts a server.
    The workflows were updated too: each one now names the servers of its stage (lesson 2.3).
 
-5. Show the refusal of a literal secret. Sergey pastes a token into the header by mistake and runs `sdlc update`:
+5. Show the refusal of a literal secret. Steven pastes a token into the header by mistake and runs `sdlc update`:
 
    ```text
    error: The MCP server github has a secret written out in headers.Authorization; nothing was written.
@@ -114,7 +114,7 @@ writes them into the agent tool's own configuration.
 
 - `.mcp.json` lists `sdlc`, `github`, `knowledge` and `telegram`.
 - `grep -n '\${' .mcp.json` shows only references, no token values.
-- A server Sergey added to `.mcp.json` by hand earlier is still there: sdlc touches only the entries it wrote.
+- A server Steven added to `.mcp.json` by hand earlier is still there: sdlc touches only the entries it wrote.
 
 ### Pitfalls
 
@@ -136,7 +136,7 @@ writes them into the agent tool's own configuration.
 
 ## Lesson 2.2 — Check the servers with `sdlc mcp check`            (video: ~5 min)
 
-**Role:** Sergey   **Project:** tasklet   **You need:** lesson 2.1
+**Role:** Steven   **Project:** tasklet   **You need:** lesson 2.1
 
 **Goal.** You can see which registry servers answer, which tools they offer, and which of them could write files
 behind the guard's back.
@@ -162,14 +162,14 @@ behind the guard's back.
 
    An unset `${GITHUB_TOKEN}` becomes an empty value, so the header is just `Bearer` and GitHub refuses it.
 
-2. Sergey sets the variables, installs the two servers and runs the check again. Described: each server shows a
+2. Steven sets the variables, installs the two servers and runs the check again. Described: each server shows a
    line `<name>: available, N tool(s)` followed by the names of its tools. Note the tool names: lessons 2.4 to 2.6
    use them.
 
 3. Read the warnings. A tool whose name looks like a file write (a verb such as write, edit, create, delete, move,
    rename or patch together with file, dir or path) gets a warning: "… looks like it writes files; the hook does not
    see what an MCP server writes." The official GitHub server has file tools in its repository toolset. GitHub lets
-   you choose the toolsets the server offers (see its documentation). Sergey keeps issues, pull requests, Actions
+   you choose the toolsets the server offers (see its documentation). Steven keeps issues, pull requests, Actions
    and projects, and leaves out the tools that write repository files.
 
 4. For a script, use JSON:
@@ -201,7 +201,7 @@ behind the guard's back.
 
 ## Lesson 2.3 — The stage rule: which server the agent may call when            (video: ~6 min)
 
-**Role:** Sergey; Oleg sees the effect   **Project:** tasklet   **You need:** lesson 2.1
+**Role:** Steven; Oliver sees the effect   **Project:** tasklet   **You need:** lesson 2.1
 
 **Goal.** You can give each server the stages where the agent needs it, and you know what the agent sees outside
 those stages.
@@ -220,7 +220,7 @@ those stages.
    The design stage is left out of `github` on purpose: the spec is written from the approved intent, not from the
    tracker.
 
-2. Show the effect. `add-due-dates` is at the design stage. In Claude Code, Oleg's agent tries to list the GitHub
+2. Show the effect. `add-due-dates` is at the design stage. In Claude Code, Oliver's agent tries to list the GitHub
    issues. In `block` mode the hook denies the call (real text, wrapped):
 
    ```text
@@ -267,7 +267,7 @@ those stages.
 
 - When two changes are active at different stages, a server is allowed if any of those stages is in its list.
 - `stages: []` or no `stages` means "not checked", not "never". The agent can still call `telegram`. Claude Code
-  asks the person before it uses an MCP tool that is not allowed; Oleg should not allow `mcp__telegram__*`.
+  asks the person before it uses an MCP tool that is not allowed; Oliver should not allow `mcp__telegram__*`.
 - An open change is never at the `maintain` stage: its stage is plan, design, build, test or deploy. A server listed
   only for `maintain` is therefore outside its stages whenever a change is active.
 - Hook denial in this lesson: `sdlc guide denials#mcp-stage`.
@@ -282,7 +282,7 @@ those stages.
 
 ## Lesson 2.4 — GitHub Actions as gate evidence, and the inbox            (video: ~8 min)
 
-**Role:** Sergey configures; Oleg and Anna see the result   **Project:** tasklet
+**Role:** Steven configures; Oliver and Grace see the result   **Project:** tasklet
 **You need:** lessons 2.1 and 2.2; a CI workflow in GitHub Actions
 
 **Goal.** The verify gate passes only when the CI run for the exact head commit is green. The CLI asks GitHub
@@ -291,7 +291,7 @@ reach the agent through the inbox.
 
 ### Steps
 
-1. Sergey adds the CI workflow, `.github/workflows/ci.yml`:
+1. Steven adds the CI workflow, `.github/workflows/ci.yml`:
 
    ```yaml
    name: ci
@@ -309,7 +309,7 @@ reach the agent through the inbox.
          - run: npm test
    ```
 
-2. Sergey adds an MCP check to the `verify` block of `openspec/sdlc.yaml`:
+2. Steven adds an MCP check to the `verify` block of `openspec/sdlc.yaml`:
 
    ```yaml
    verify:
@@ -339,7 +339,7 @@ reach the agent through the inbox.
    | `expect` | what the answer must contain (a deep subset: objects by key, lists item by item) |
    | `required` | `true` by default; a failing required check fails the verification |
 
-3. Explain the run. Oleg's agent finishes the build, commits, and Oleg pushes the branch. CI runs on that commit.
+3. Explain the run. Oliver's agent finishes the build, commits, and Oliver pushes the branch. CI runs on that commit.
    Then the agent runs `/sdlc:verify`, which calls `sdlc verify`:
    - the CLI runs `build`, `lint` and `test` locally;
    - then it calls `list_workflow_runs` on the GitHub server itself, with the head commit;
@@ -359,9 +359,9 @@ reach the agent through the inbox.
 
    The result goes into `verification.md` and `.sdlc.yaml` next to the command results, under `mcp`.
 
-5. **The inbox.** Anna runs `sdlc verify` in her own terminal in the evening, not in an agent session. The MCP
+5. **The inbox.** Grace runs `sdlc verify` in her own terminal in the evening, not in an agent session. The MCP
    check results of such a run are also written to `openspec/.sdlc/inbox/`, for the agent. She commits them with
-   the rest. The next morning Oleg's Claude Code session starts with this line in its context (real):
+   the rest. The next morning Oliver's Claude Code session starts with this line in its context (real):
 
    ```text
    - inbox: add-due-dates, check ci-green: failed (once read: `sdlc inbox done 20261009T202717197Z-ci-green-4715ea`)
@@ -406,14 +406,14 @@ reach the agent through the inbox.
 
 ## Lesson 2.5 — Release checks: `release.mcp` and `sdlc release check`            (video: ~6 min)
 
-**Role:** Sergey configures; Elena (release manager) approves   **Project:** tasklet   **You need:** lesson 2.4
+**Role:** Steven configures; Emily (release manager) approves   **Project:** tasklet   **You need:** lesson 2.4
 
-**Goal.** Elena cannot approve a release until an outside system agrees, for example the release workflow passed
+**Goal.** Emily cannot approve a release until an outside system agrees, for example the release workflow passed
 for the commit she is releasing. Anyone can run the checks beforehand.
 
 ### Steps
 
-1. Sergey makes the release gate required for `tasklet` and adds the release check:
+1. Steven makes the release gate required for `tasklet` and adds the release check:
 
    ```yaml
    gates:
@@ -449,7 +449,7 @@ for the commit she is releasing. Anyone can run the checks beforehand.
 
    The command exits 1. When everything passes it prints "Every required release check passed."
 
-3. Elena approves in her own terminal:
+3. Emily approves in her own terminal:
 
    ```bash
    sdlc approve release --change add-due-dates
@@ -467,7 +467,7 @@ for the commit she is releasing. Anyone can run the checks beforehand.
 ### Check yourself
 
 - `sdlc release check --change add-due-dates` exits 0 after the release workflow is green.
-- `.sdlc.yaml` of the change shows the release approval by Elena with the check results kept next to it.
+- `.sdlc.yaml` of the change shows the release approval by Emily with the check results kept next to it.
 
 ### Pitfalls
 
@@ -475,18 +475,18 @@ for the commit she is releasing. Anyone can run the checks beforehand.
 - `sdlc approve release` is a person's command; an agent's attempt is denied (`denials#separation-of-duties`).
 - A production deploy command run by the agent is denied until the release is approved
   (`sdlc guide denials#release-gate`).
-- Elena needs `${GITHUB_TOKEN}` in her own environment: the CLI calls GitHub from her machine.
+- Emily needs `${GITHUB_TOKEN}` in her own environment: the CLI calls GitHub from her machine.
 
 ### On screen (for the video)
 
 - The `release.mcp` block next to the `verify.mcp` block: same shape, different gate.
-- The failing `release check`, then Elena's refused approval, then the green check and the approval.
+- The failing `release check`, then Emily's refused approval, then the green check and the approval.
 
 ---
 
 ## Lesson 2.6 — Events to Telegram: waits, approvals, overdue gates            (video: ~8 min)
 
-**Role:** Sergey configures; Maria and Olga receive   **Project:** tasklet
+**Role:** Steven configures; Megan and Laura receive   **Project:** tasklet
 **You need:** lesson 2.1; a team Telegram bot server whose tool accepts sdlc's `event` argument
 
 **Goal.** The team's Telegram chat learns when a gate waits for someone, when a gate is approved or sent back, and
@@ -494,7 +494,7 @@ when a wait is overdue, without anyone asking `sdlc next`.
 
 ### Steps
 
-1. Sergey describes the receiver in `openspec/sdlc.yaml`:
+1. Steven describes the receiver in `openspec/sdlc.yaml`:
 
    ```yaml
    events:
@@ -535,13 +535,13 @@ when a wait is overdue, without anyone asking `sdlc next`.
      "gate": "intent",
      "at": "2026-10-09T20:26:09.312Z",
      "sdlc": "0.14.4",
-     "waitingFor": ["maria"]
+     "waitingFor": ["megan"]
    }
    ```
 
    `waitingFor` holds the person ids from `roles.yaml`; an approval carries `by` instead. An event never carries an
-   email, a command, its output or a note. The bot turns it into a message such as "add-due-dates waits for Maria:
-   intent". Mapping `maria` to her Telegram account is the bot's job.
+   email, a command, its output or a note. The bot turns it into a message such as "add-due-dates waits for Megan:
+   intent". Mapping `megan` to her Telegram account is the bot's job.
 
 3. Show the queue. Delivery takes at most five seconds after a command and never fails the command. What could not
    be sent waits in `.git/sdlc/outbox/`, which is never committed:
@@ -572,7 +572,7 @@ when a wait is overdue, without anyone asking `sdlc next`.
    overdue gates first, as `status` and `next` do. It exits 0 either way.
 
 5. **Overdue gates on time.** sdlc has no daemon: a wait is found overdue by the next command, session start or
-   `sdlc events flush`. Sergey runs the flush on a schedule, from a dedicated clone on a team machine that keeps its
+   `sdlc events flush`. Steven runs the flush on a schedule, from a dedicated clone on a team machine that keeps its
    log between runs:
 
    ```bash
@@ -596,9 +596,9 @@ when a wait is overdue, without anyone asking `sdlc next`.
 
 ### Check yourself
 
-- After Maria's approval, the chat shows `gate.intent.approved` for `add-due-dates` by `maria`.
+- After Megan's approval, the chat shows `gate.intent.approved` for `add-due-dates` by `megan`.
 - `sdlc events list` shows "No events wait for delivery." on a machine with the token set.
-- 24 hours after an unanswered intent, the chat gets one `gate.intent.overdue` message naming Maria.
+- 24 hours after an unanswered intent, the chat gets one `gate.intent.overdue` message naming Megan.
 
 ### Pitfalls
 
@@ -623,10 +623,10 @@ when a wait is overdue, without anyone asking `sdlc next`.
 
 ## Lesson 2.7 — Other AI systems read the process: `sdlc mcp serve`            (video: ~6 min)
 
-**Role:** Sergey sets up; Olga (engineering manager) and Maria use it   **Project:** both
+**Role:** Steven sets up; Laura (engineering manager) and Megan use it   **Project:** both
 **You need:** lesson 1.2 (`--mcp`); Claude Desktop or another MCP client
 
-**Goal.** Olga asks a chat assistant about both projects ("what waits for Maria?") and gets answers from sdlc's own
+**Goal.** Laura asks a chat assistant about both projects ("what waits for Megan?") and gets answers from sdlc's own
 data. The assistant can read, but it cannot decide anything.
 
 ### Steps
@@ -653,10 +653,10 @@ data. The assistant can read, but it cannot decide anything.
    [sdlc mcp] serving C:\work\tasklet over stdio (version 0.14.4)
    status, next, instructions, trace, audit, help, guide
    {"change":"add-due-dates","stage":"plan","stageTitle":"Plan (intent)","track":"full","next":{"actor":"human", …
-   "message":"Maria (product-owner) must review and approve the intent gate (intent)." …
+   "message":"Megan (product-owner) must review and approve the intent gate (intent)." …
    ```
 
-3. Set up Olga's Claude Desktop for both projects. She edits `claude_desktop_config.json`:
+3. Set up Laura's Claude Desktop for both projects. She edits `claude_desktop_config.json`:
 
    ```json
    {
@@ -672,20 +672,20 @@ data. The assistant can read, but it cannot decide anything.
    With several projects, each tool takes a `project` argument: `project.name` from `openspec/sdlc.yaml`
    (`tasklet`), else the folder name. `status` without it answers for all projects.
 
-4. Olga asks in plain words:
+4. Laura asks in plain words:
 
    > Which gates are waiting for a person in tasklet and billing-api, and for how long?
 
    > What did we rework this month, and why?
 
-   The assistant answers from `next`, `status` and `audit`. Described: it names `add-due-dates` waiting for Maria
+   The assistant answers from `next`, `status` and `audit`. Described: it names `add-due-dates` waiting for Megan
    at the intent gate.
 
-5. Maria asks her own assistant to prepare an approval:
+5. Megan asks her own assistant to prepare an approval:
 
    > Summarize the intent of add-due-dates and what changed since I last looked.
 
-   The assistant reads `sdlc://change/add-due-dates/intent`. Approving is still `sdlc approve intent` in Maria's
+   The assistant reads `sdlc://change/add-due-dates/intent`. Approving is still `sdlc approve intent` in Megan's
    own terminal. There is no approve tool.
 
 6. The knowledge server's roles and skills. With `team: { registry: knowledge }` in `openspec/sdlc.yaml`,
@@ -695,7 +695,7 @@ data. The assistant can read, but it cannot decide anything.
 
 ### Check yourself
 
-- Olga's assistant lists both projects by name.
+- Laura's assistant lists both projects by name.
 - Asking the assistant to approve a gate gets an explanation and the command for the right person, not an approval.
 
 ### Pitfalls
@@ -710,8 +710,8 @@ data. The assistant can read, but it cannot decide anything.
 ### On screen (for the video)
 
 - The tools table, then the script output with the seven tool names.
-- Olga's Claude Desktop answering about both projects.
-- Maria's assistant summarizing the intent; then Maria's own terminal for the approval.
+- Laura's Claude Desktop answering about both projects.
+- Megan's assistant summarizing the intent; then Megan's own terminal for the approval.
 
 ---
 

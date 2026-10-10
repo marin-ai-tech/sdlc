@@ -1,20 +1,20 @@
 # Module 5. One change from idea to archive (tasklet)
 
 This module follows one change through every stage: **"Add due dates to tasks"** (`add-due-dates`) in the
-`tasklet` API. Every person of the team appears at their gate. Oleg drives the agent; the others decide in their own
+`tasklet` API. Every person of the team appears at their gate. Oliver drives the agent; the others decide in their own
 terminals.
 
 In this module:
 
 - Lesson 5.1 — The map: stages, gates, people and Telegram
-- Lesson 5.2 — Intent: Maria answers a question and approves
-- Lesson 5.3 — Spec: requirements and design, Maria approves
+- Lesson 5.2 — Intent: Megan answers a question and approves
+- Lesson 5.3 — Spec: requirements and design, Megan approves
 - Lesson 5.4 — Plan: the plan gate holds the code back
-- Lesson 5.5 — Rework: Ivan sends the spec back
-- Lesson 5.6 — Build: Oleg and Claude Code under the hooks
-- Lesson 5.7 — Verify: evidence, CI and Anna's check
-- Lesson 5.8 — Review: findings, a rejection and Pavel's approval
-- Lesson 5.9 — Release: Elena authorizes production
+- Lesson 5.5 — Rework: Ethan sends the spec back
+- Lesson 5.6 — Build: Oliver and Claude Code under the hooks
+- Lesson 5.7 — Verify: evidence, CI and Grace's check
+- Lesson 5.8 — Review: findings, a rejection and Paul's approval
+- Lesson 5.9 — Release: Emily authorizes production
 - Lesson 5.10 — Archive: living specs, the backlog and the record
 
 All outputs come from a trial run of `tasklet` with sdlc 0.14.4 and the configuration of Modules 1 to 3. Each person
@@ -26,7 +26,7 @@ your servers' answers will be richer. "Gaps found" at the end of this file lists
 
 ## Lesson 5.1 — The map: stages, gates, people and Telegram            (video: ~7 min)
 
-**Role:** everyone; Sergey for the Telegram setup   **Project:** tasklet
+**Role:** everyone; Steven for the Telegram setup   **Project:** tasklet
 **You need:** Modules 3 and 4 (roles, the team, B1 ready in the backlog); the `telegram` server in `mcp.servers`
 
 **Goal.** Know the whole path of the change before it starts: who acts at each step, which command they run, and
@@ -34,24 +34,24 @@ what the team's Telegram chat receives.
 
 ### Steps
 
-1. Show the path of `add-due-dates`. The agent works in Oleg's Claude Code; every gate is a person's command in their
+1. Show the path of `add-due-dates`. The agent works in Oliver's Claude Code; every gate is a person's command in their
    own terminal.
 
    | Step | Workflow (agent) | Gate | Who decides | Person's command |
    |---|---|---|---|---|
-   | 1 | `/sdlc:intent` | intent | Maria (product-owner) | `sdlc answer …`, then `sdlc approve intent --change add-due-dates` |
-   | 2 | `/sdlc:spec` | spec | Maria; also Ivan (tech-lead) when the risk is high | `sdlc approve spec --change add-due-dates` |
-   | 3 | `/sdlc:plan` | plan | Ivan or Oleg (engineer) | `sdlc approve plan --change add-due-dates` |
+   | 1 | `/sdlc:intent` | intent | Megan (product-owner) | `sdlc answer …`, then `sdlc approve intent --change add-due-dates` |
+   | 2 | `/sdlc:spec` | spec | Megan; also Ethan (tech-lead) when the risk is high | `sdlc approve spec --change add-due-dates` |
+   | 3 | `/sdlc:plan` | plan | Ethan or Oliver (engineer) | `sdlc approve plan --change add-due-dates` |
    | 4 | `/sdlc:build` | — | — | — |
-   | 5 | `/sdlc:verify` | verify | nobody: the checks; Anna reads the evidence | — |
-   | 6 | `/sdlc:review` | review | Pavel (code-owner) | `sdlc approve review --change add-due-dates` |
-   | 7 | `/sdlc:release` | release | Elena (release-manager) | `sdlc approve release --change add-due-dates` |
+   | 5 | `/sdlc:verify` | verify | nobody: the checks; Grace reads the evidence | — |
+   | 6 | `/sdlc:review` | review | Paul (code-owner) | `sdlc approve review --change add-due-dates` |
+   | 7 | `/sdlc:release` | release | Emily (release-manager) | `sdlc approve release --change add-due-dates` |
    | 8 | `/sdlc:archive` | — | — | — |
 
    At any moment, `sdlc next` names the next step and the person; `/sdlc:next` in Claude Code runs the next agent
    step or stops and names the person.
 
-2. Show how the team is told. Sergey added the receiver in Module 2 (lesson 2.6):
+2. Show how the team is told. Steven added the receiver in Module 2 (lesson 2.6):
 
    ```yaml
    events:
@@ -65,29 +65,29 @@ what the team's Telegram chat receives.
    ```
 
    After a command, sdlc calls the tool with the static `args` and an `event`. This is the first call the Telegram
-   server received in the trial, when the intent started to wait for Maria:
+   server received in the trial, when the intent started to wait for Megan:
 
    ```json
    {"chat":"tasklet-team","event":{"id":"7db8a1d5f45a4b0d3220a23d","project":"tasklet",
     "event":"gate.intent.awaiting","change":"add-due-dates","gate":"intent","at":"2026-10-09T21:01:48.218Z",
-    "sdlc":"0.14.4","waitingFor":["maria"]}}
+    "sdlc":"0.14.4","waitingFor":["megan"]}}
    ```
 
-   `waitingFor` holds the people from `roles.yaml` who may take the gate, so the bot can mention Maria. A decision
+   `waitingFor` holds the people from `roles.yaml` who may take the gate, so the bot can mention Megan. A decision
    event carries `by` instead.
 
 3. Show the whole sequence the chat received during this module, in order (event, then `waitingFor` or `by`):
 
    ```text
-   gate.intent.awaiting   ["maria"]          gate.plan.approved     by ivan
-   gate.intent.awaiting   ["maria"]          gate.review.awaiting   ["pavel"]
-   gate.intent.approved   by maria           gate.review.rejected   by pavel
-   gate.spec.awaiting     ["maria"]          gate.review.awaiting   ["pavel"]
-   gate.spec.approved     by maria           gate.review.approved   by pavel
-   gate.plan.awaiting     ["ivan","oleg"]    gate.release.awaiting  ["elena"]
-   gate.spec.rework       by ivan            gate.release.approved  by elena
-   gate.spec.approved     by maria           change.archived        by oleg
-   gate.plan.awaiting     ["ivan","oleg"]
+   gate.intent.awaiting   ["megan"]          gate.plan.approved     by ethan
+   gate.intent.awaiting   ["megan"]          gate.review.awaiting   ["paul"]
+   gate.intent.approved   by megan           gate.review.rejected   by paul
+   gate.spec.awaiting     ["megan"]          gate.review.awaiting   ["paul"]
+   gate.spec.approved     by megan           gate.review.approved   by paul
+   gate.plan.awaiting     ["ethan","oliver"] gate.release.awaiting  ["emily"]
+   gate.spec.rework       by ethan           gate.release.approved  by emily
+   gate.spec.approved     by megan           change.archived        by oliver
+   gate.plan.awaiting     ["ethan","oliver"]
    ```
 
    Read the left column first, then the right one. Passing verifications are not sent: the `on` list names only
@@ -106,7 +106,7 @@ what the team's Telegram chat receives.
    ```
 
    `sdlc events flush` sends the waiting events now. A gate that waits longer than its `overdue_hours` raises
-   `gate.<gate>.overdue` once; sdlc notices it at the next command, so Sergey runs `sdlc events flush` from a
+   `gate.<gate>.overdue` once; sdlc notices it at the next command, so Steven runs `sdlc events flush` from a
    scheduler every hour.
 
 5. Show the three read-only views everyone uses in this module:
@@ -140,21 +140,21 @@ what the team's Telegram chat receives.
 
 ---
 
-## Lesson 5.2 — Intent: Maria answers a question and approves            (video: ~7 min)
+## Lesson 5.2 — Intent: Megan answers a question and approves            (video: ~7 min)
 
-**Role:** Oleg with Claude Code (writes), Maria (decides)   **Project:** tasklet
+**Role:** Oliver with Claude Code (writes), Megan (decides)   **Project:** tasklet
 **You need:** lesson 5.1; B1 ready in the backlog (Module 4)
 
-**Goal.** Turn B1 into an approved `intent.md`. Maria answers the open question and approves in her own terminal.
+**Goal.** Turn B1 into an approved `intent.md`. Megan answers the open question and approves in her own terminal.
 
 ### Steps
 
-1. Oleg starts the item and asks the agent to complete the intent:
+1. Oliver starts the item and asks the agent to complete the intent:
 
    > Start B1 as add-due-dates, then run /sdlc:intent add-due-dates.
 
    The agent runs `sdlc backlog start B1 --change add-due-dates` (lesson 4.4), then `/sdlc:intent`. It reads the
-   draft built from the backlog item, asks Oleg about scope and users one or two questions at a time, and rewrites
+   draft built from the backlog item, asks Oliver about scope and users one or two questions at a time, and rewrites
    `intent.md`: problem, proposed outcome, affected users, constraints, success measures, out of scope. It records
    what it could not decide under `## Open questions`:
 
@@ -163,9 +163,9 @@ what the team's Telegram chat receives.
    1. Is a due date a date only (2026-10-20) or a date and time?
    ```
 
-   It stops at the gate and gives Maria two commands: the answer and the approval.
+   It stops at the gate and gives Megan two commands: the answer and the approval.
 
-2. Show what the agent may not do. It may not answer the question for Maria; the CLI refuses (and the hook denies
+2. Show what the agent may not do. It may not answer the question for Megan; the CLI refuses (and the hook denies
    the call in Claude Code):
 
    ```text
@@ -180,7 +180,7 @@ what the team's Telegram chat receives.
    error: `sdlc approve` records a human decision and cannot run inside an agent session (claude-code).
    ```
 
-3. Telegram receives `gate.intent.awaiting` with `waitingFor: ["maria"]`. Maria opens **her own terminal** and
+3. Telegram receives `gate.intent.awaiting` with `waitingFor: ["megan"]`. Megan opens **her own terminal** and
    previews the gate:
 
    ```bash
@@ -212,7 +212,7 @@ what the team's Telegram chat receives.
    ```
 
    ```text
-   Answer to question 1 of intent.md recorded by Maria <maria@northwind.example>.
+   Answer to question 1 of intent.md recorded by Megan <megan@northwind.example>.
    ```
 
    sdlc writes the answer under the question in `intent.md` and records it, with the exact question text, in the
@@ -220,7 +220,7 @@ what the team's Telegram chat receives.
 
    ```markdown
    1. Is a due date a date only (2026-10-20) or a date and time?
-     - Answer (Maria, 2026-10-09): A date only, for example 2026-10-20. A time can come later.
+     - Answer (Megan, 2026-10-09): A date only, for example 2026-10-20. A time can come later.
    ```
 
 5. Now the gate is hers to take:
@@ -239,33 +239,33 @@ what the team's Telegram chat receives.
    ```
 
    ```text
-   ✓ intent gate: Maria <maria@northwind.example> approved as product-owner (1d2438bcf31f)
+   ✓ intent gate: Megan <megan@northwind.example> approved as product-owner (1d2438bcf31f)
    Suggested commit message (its trailer ties the commit to this approval):
      $ git commit -m "chore(add-due-dates): approve the intent gate" -m "SDLC-Approval: add-due-dates:intent:1d2438bcf31f"
    Next: agent — Write proposal (proposal.md) for the spec gate. (/sdlc:spec)
    ```
 
    She commits with the suggested message (signed, lesson 3.3) and pushes. Telegram receives
-   `gate.intent.approved` by `maria`.
+   `gate.intent.approved` by `megan`.
 
 6. Gate card:
 
    | Gate | Who | Command | Telegram | `sdlc next` after |
    |---|---|---|---|---|
-   | intent | Maria | `sdlc answer 1 …`, `sdlc approve intent --change add-due-dates` | `gate.intent.awaiting` → `gate.intent.approved` | agent: write proposal (`/sdlc:spec`) |
+   | intent | Megan | `sdlc answer 1 …`, `sdlc approve intent --change add-due-dates` | `gate.intent.awaiting` → `gate.intent.approved` | agent: write proposal (`/sdlc:spec`) |
 
 ### Check yourself
 
-- `sdlc status --change add-due-dates` shows `intent ✓ approved  Maria <maria@northwind.example> as product-owner`.
+- `sdlc status --change add-due-dates` shows `intent ✓ approved  Megan <megan@northwind.example> as product-owner`.
 - `sdlc answer --change add-due-dates --list` shows the question as answered.
-- `git log -1` in Maria's clone shows the `SDLC-Approval` trailer.
+- `git log -1` in Megan's clone shows the `SDLC-Approval` trailer.
 
 ### Pitfalls
 
-- While a question is unanswered, `sdlc next --me` tells Maria "Nothing is waiting for you.", and `sdlc next` asks
+- While a question is unanswered, `sdlc next --me` tells Megan "Nothing is waiting for you.", and `sdlc next` asks
   for an approval that would fail. Run `sdlc answer --change <id> --list` when the agent says the intent is ready.
 - An answer typed into `intent.md` by hand, or by the agent, does not count. Only `sdlc answer` records it.
-- Editing `intent.md` after the approval makes it stale; Maria approves again. Every change to `intent.md` before the
+- Editing `intent.md` after the approval makes it stale; Megan approves again. Every change to `intent.md` before the
   approval starts a new wait too, including the answer sdlc writes into it: the trial sent `gate.intent.awaiting`
   twice.
 - Denials: `sdlc guide denials#separation-of-duties`.
@@ -273,22 +273,22 @@ what the team's Telegram chat receives.
 ### On screen (for the video)
 
 - Claude Code writing the intent; zoom on `## Open questions`.
-- Maria's terminal: preview (refused), answer, preview again (allowed), approve.
-- The Telegram chat: "Maria, add-due-dates waits for your intent approval", then "approved".
+- Megan's terminal: preview (refused), answer, preview again (allowed), approve.
+- The Telegram chat: "Megan, add-due-dates waits for your intent approval", then "approved".
 
 ---
 
-## Lesson 5.3 — Spec: requirements and design, Maria approves            (video: ~7 min)
+## Lesson 5.3 — Spec: requirements and design, Megan approves            (video: ~7 min)
 
-**Role:** Oleg with Claude Code; Maria (decides); Ivan (for high-risk changes)   **Project:** tasklet
+**Role:** Oliver with Claude Code; Megan (decides); Ethan (for high-risk changes)   **Project:** tasklet
 **You need:** lesson 5.2
 
-**Goal.** The agent writes the proposal, the delta specs and the design; `sdlc validate` passes; Maria approves the
+**Goal.** The agent writes the proposal, the delta specs and the design; `sdlc validate` passes; Megan approves the
 spec gate.
 
 ### Steps
 
-1. Oleg runs the next step:
+1. Oliver runs the next step:
 
    > /sdlc:spec add-due-dates
 
@@ -327,11 +327,11 @@ spec gate.
 
    ```text
    add-due-dates: Design (requirements + design spec)
-   person: Maria (product-owner) must review and approve the spec gate (proposal, specs, design).
+   person: Megan (product-owner) must review and approve the spec gate (proposal, specs, design).
    $ sdlc approve spec --change add-due-dates --as product-owner
    ```
 
-4. Maria reads the three files and previews:
+4. Megan reads the three files and previews:
 
    ```bash
    sdlc approve spec --change add-due-dates --preview
@@ -354,7 +354,7 @@ spec gate.
    ```
 
    ```text
-   ✓ spec gate: Maria <maria@northwind.example> approved as product-owner (254381749a18)
+   ✓ spec gate: Megan <megan@northwind.example> approved as product-owner (254381749a18)
    Next: agent — Write plan (plan.md) for the plan gate. (/sdlc:plan)
    ```
 
@@ -364,16 +364,16 @@ spec gate.
    the tech lead, as a second approval:
 
    ```bash
-   sdlc approve spec --change <id> --as tech-lead      # Ivan, in his own terminal
+   sdlc approve spec --change <id> --as tech-lead      # Ethan, in his own terminal
    ```
 
-   The gate stays pending until both Maria and Ivan have approved.
+   The gate stays pending until both Megan and Ethan have approved.
 
 6. Gate card:
 
    | Gate | Who | Command | Telegram | `sdlc next` after |
    |---|---|---|---|---|
-   | spec | Maria (+ Ivan if high risk) | `sdlc approve spec --change add-due-dates` | `gate.spec.awaiting` → `gate.spec.approved` | agent: write plan (`/sdlc:plan`) |
+   | spec | Megan (+ Ethan if high risk) | `sdlc approve spec --change add-due-dates` | `gate.spec.awaiting` → `gate.spec.approved` | agent: write plan (`/sdlc:plan`) |
 
 ### Check yourself
 
@@ -392,24 +392,24 @@ spec gate.
 ### On screen (for the video)
 
 - The three artifacts in the editor, one after the other; highlight the WHEN/THEN lines.
-- `sdlc validate` passing, then Maria's preview and approval.
+- `sdlc validate` passing, then Megan's preview and approval.
 
 ---
 
 ## Lesson 5.4 — Plan: the plan gate holds the code back            (video: ~6 min)
 
-**Role:** Oleg with Claude Code; Ivan (reads the plan)   **Project:** tasklet   **You need:** lesson 5.3
+**Role:** Oliver with Claude Code; Ethan (reads the plan)   **Project:** tasklet   **You need:** lesson 5.3
 
 **Goal.** The agent writes `plan.md` and `tasks.md`. Until an engineer approves the plan, the hook stops every code
 edit, including shell writes.
 
 ### Steps
 
-1. Oleg runs:
+1. Oliver runs:
 
    > /sdlc:plan add-due-dates
 
-   The agent works read-only, asks Oleg what could break and which step is riskiest, then writes `plan.md`:
+   The agent works read-only, asks Oliver what could break and which step is riskiest, then writes `plan.md`:
 
    ```markdown
    ## Files that change
@@ -424,7 +424,7 @@ edit, including shell writes.
    The other sections are Order of work, Risks, Alternatives considered and Rollback. `tasks.md` holds three tasks:
    the failing tests, the implementation, and `sdlc verify`.
 
-2. Show the plan gate. Oleg asks the agent to "start coding while Ivan reads". The agent tries to write
+2. Show the plan gate. Oliver asks the agent to "start coding while Ethan reads". The agent tries to write
    `src/tasks.js` and the hook denies it (block mode; real reason):
 
    ```text
@@ -436,7 +436,7 @@ edit, including shell writes.
    A shell write is checked the same way: `echo export {} > src/tasks.js` gets the same denial. Docs and `openspec/`
    are exempt.
 
-3. Ivan checks what waits for him and previews the plan:
+3. Ethan checks what waits for him and previews the plan:
 
    ```bash
    sdlc next --me
@@ -462,14 +462,14 @@ edit, including shell writes.
    $ sdlc approve plan --change add-due-dates
    ```
 
-4. Ivan reads the plan against the spec and finds a hole: there is no way to **remove** a due date once it is set.
+4. Ethan reads the plan against the spec and finds a hole: there is no way to **remove** a due date once it is set.
    That is a missing requirement, not a planning detail. He does not approve. Lesson 5.5 continues from here.
 
 5. Gate card (as it ends in lesson 5.5):
 
    | Gate | Who | Command | Telegram | `sdlc next` after |
    |---|---|---|---|---|
-   | plan | Ivan (or Oleg) as engineer; + Ivan as tech-lead if high risk | `sdlc approve plan --change add-due-dates` | `gate.plan.awaiting` (`["ivan","oleg"]`) → `gate.plan.approved` | agent: implement (`/sdlc:build`) |
+   | plan | Ethan (or Oliver) as engineer; + Ethan as tech-lead if high risk | `sdlc approve plan --change add-due-dates` | `gate.plan.awaiting` (`["ethan","oliver"]`) → `gate.plan.approved` | agent: implement (`/sdlc:build`) |
 
 ### Check yourself
 
@@ -491,16 +491,16 @@ edit, including shell writes.
 
 ---
 
-## Lesson 5.5 — Rework: Ivan sends the spec back            (video: ~7 min)
+## Lesson 5.5 — Rework: Ethan sends the spec back            (video: ~7 min)
 
-**Role:** Ivan (sends back), Oleg with Claude Code (revises), Maria (approves again)   **Project:** tasklet
+**Role:** Ethan (sends back), Oliver with Claude Code (revises), Megan (approves again)   **Project:** tasklet
 **You need:** lesson 5.4
 
 **Goal.** Send an approved gate back with a reason, let the agent fix it, approve it again, and approve the plan.
 
 ### Steps
 
-1. Ivan sends the change back to the spec stage, in his own terminal. The reason is a category; the note says what
+1. Ethan sends the change back to the spec stage, in his own terminal. The reason is a category; the note says what
    has to change:
 
    ```bash
@@ -509,11 +509,11 @@ edit, including shell writes.
    ```
 
    ```text
-   ↺ spec gate sent back by Ivan <ivan@northwind.example> (missing-requirement): No way to clear a due date: PATCH /tasks/:id with dueDate null
-   Next: agent — The spec gate was sent back by Ivan <ivan@northwind.example> (missing-requirement): No way to clear a due date: PATCH /tasks/:id with dueDate null. Revise the proposal, specs, design artifact(s), then ask for approval again. (/sdlc:spec)
+   ↺ spec gate sent back by Ethan <ethan@northwind.example> (missing-requirement): No way to clear a due date: PATCH /tasks/:id with dueDate null
+   Next: agent — The spec gate was sent back by Ethan <ethan@northwind.example> (missing-requirement): No way to clear a due date: PATCH /tasks/:id with dueDate null. Revise the proposal, specs, design artifact(s), then ask for approval again. (/sdlc:spec)
    ```
 
-   Ivan may do this because he holds `tech-lead`, which the spec gate accepts. The reasons come from
+   Ethan may do this because he holds `tech-lead`, which the spec gate accepts. The reasons come from
    `rework.reasons`: missing-requirement, wrong-assumption, design-flaw, implementation-bug, test-gap, scope-change,
    other. `sdlc audit` counts them.
 
@@ -531,8 +531,8 @@ edit, including shell writes.
      intent ✓ ─ spec ● ─ plan ○ ─ build ○ ─ verify ○ ─ review ○ ─ release ○ ─ archive ○
      tasks     ░░░░░░░░░░  0/3
      gates
-       intent   ✓ approved           Maria <maria@northwind.example> as product-owner
-       spec     ✗ rejected           sent back by Ivan <ivan@northwind.example> (missing-requirement): No way to clear a due date: PATCH /tasks/:id with dueDate null
+       intent   ✓ approved           Megan <megan@northwind.example> as product-owner
+       spec     ✗ rejected           sent back by Ethan <ethan@northwind.example> (missing-requirement): No way to clear a due date: PATCH /tasks/:id with dueDate null
        plan     · blocked            waiting on the spec gate
        ...
    ```
@@ -541,14 +541,14 @@ edit, including shell writes.
 
    ```text
    What unblocks it:
-     1. agent: The spec gate was sent back by Ivan ... Revise the proposal, specs, design artifact(s), then ask for approval again.
+     1. agent: The spec gate was sent back by Ethan ... Revise the proposal, specs, design artifact(s), then ask for approval again.
      2. person: Then a person reviews and approves the spec gate.
         $ sdlc approve spec --change add-due-dates
    ```
 
-   Telegram receives `gate.spec.rework` by `ivan` (without the note).
+   Telegram receives `gate.spec.rework` by `ethan` (without the note).
 
-3. Oleg runs `/sdlc:next`. The agent reads the reason and the note from `sdlc next`, adds the requirement and its
+3. Oliver runs `/sdlc:next`. The agent reads the reason and the note from `sdlc next`, adds the requirement and its
    scenario to `specs/tasks/spec.md`, adds one line to `proposal.md`, and validates:
 
    ```markdown
@@ -560,9 +560,9 @@ edit, including shell writes.
    - **THEN** reading the task returns no `dueDate`
    ```
 
-   It then tells Oleg that the spec is ready for Maria and gives her command.
+   It then tells Oliver that the spec is ready for Megan and gives her command.
 
-4. Maria previews. The preview lists exactly what changed since her first approval:
+4. Megan previews. The preview lists exactly what changed since her first approval:
 
    ```bash
    sdlc approve spec --change add-due-dates --preview
@@ -585,18 +585,18 @@ edit, including shell writes.
    ```
 
    ```text
-   ✓ spec gate: Maria <maria@northwind.example> approved as product-owner (5bbfb701caa0)
-   Next: person — Ivan or Oleg (engineer) must review and approve the plan gate (plan, tasks): sdlc approve plan --change add-due-dates --as engineer
+   ✓ spec gate: Megan <megan@northwind.example> approved as product-owner (5bbfb701caa0)
+   Next: person — Ethan or Oliver (engineer) must review and approve the plan gate (plan, tasks): sdlc approve plan --change add-due-dates --as engineer
    ```
 
-5. The agent adds the new scenario to the plan's Proof and to task 1.1. Ivan approves the plan:
+5. The agent adds the new scenario to the plan's Proof and to task 1.1. Ethan approves the plan:
 
    ```bash
    sdlc approve plan --change add-due-dates
    ```
 
    ```text
-   ✓ plan gate: Ivan <ivan@northwind.example> approved as engineer (77c0c941f5d1)
+   ✓ plan gate: Ethan <ethan@northwind.example> approved as engineer (77c0c941f5d1)
    Next: agent — Implement the approved plan: 3 of 3 task(s) remain. (/sdlc:build)
    ```
 
@@ -624,8 +624,8 @@ edit, including shell writes.
 
 ### Pitfalls
 
-- After the agent has revised the spec, `sdlc next` still says "agent: … Revise …", Maria's `sdlc next --me` says
-  "Nothing is waiting for you.", and Telegram sends no new `gate.spec.awaiting`. The agent must tell Maria that the
+- After the agent has revised the spec, `sdlc next` still says "agent: … Revise …", Megan's `sdlc next --me` says
+  "Nothing is waiting for you.", and Telegram sends no new `gate.spec.awaiting`. The agent must tell Megan that the
   spec is ready; she checks with `--preview`.
 - Approving again with nothing changed since the approval before the rework needs `--note` (why nothing had to
   change).
@@ -637,22 +637,22 @@ edit, including shell writes.
 
 ### On screen (for the video)
 
-- Ivan's terminal: the rework command; then the status with the red `✗ rejected` line.
+- Ethan's terminal: the rework command; then the status with the red `✗ rejected` line.
 - The new requirement appearing in `spec.md`.
-- Maria's preview: highlight "Changed since the last approval".
+- Megan's preview: highlight "Changed since the last approval".
 
 ---
 
-## Lesson 5.6 — Build: Oleg and Claude Code under the hooks            (video: ~7 min)
+## Lesson 5.6 — Build: Oliver and Claude Code under the hooks            (video: ~7 min)
 
-**Role:** Oleg with Claude Code   **Project:** tasklet   **You need:** lesson 5.5 (plan approved)
+**Role:** Oliver with Claude Code   **Project:** tasklet   **You need:** lesson 5.5 (plan approved)
 
 **Goal.** Implement the approved plan task by task, with commits that `sdlc trace` can follow, while the hooks keep
 the agent inside the rules.
 
 ### Steps
 
-1. Oleg starts a new Claude Code session. The session-start hook gives the agent the state of the project (real
+1. Oliver starts a new Claude Code session. The session-start hook gives the agent the state of the project (real
    context, shortened):
 
    ```text
@@ -718,9 +718,9 @@ the agent inside the rules.
 ### Pitfalls
 
 - When the work departs from `plan.md`, the agent updates `plan.md` in the same commit. A changed task text makes
-  the plan stale and Ivan approves again.
+  the plan stale and Ethan approves again.
 - Protected paths (`enforcement.protected_paths`) are denied in any mode (`denials#protected-path`).
-- If Oleg wants to fix something delicate by hand, he runs `sdlc takeover --change add-due-dates --note "…"` in his
+- If Oliver wants to fix something delicate by hand, he runs `sdlc takeover --change add-due-dates --note "…"` in his
   terminal. The hook then denies the agent's edits in the plan's files until `sdlc release-control`.
 
 ### On screen (for the video)
@@ -731,16 +731,16 @@ the agent inside the rules.
 
 ---
 
-## Lesson 5.7 — Verify: evidence, CI and Anna's check            (video: ~8 min)
+## Lesson 5.7 — Verify: evidence, CI and Grace's check            (video: ~8 min)
 
-**Role:** Oleg with Claude Code; Anna (QA)   **Project:** tasklet   **You need:** lesson 5.6
+**Role:** Oliver with Claude Code; Grace (QA)   **Project:** tasklet   **You need:** lesson 5.6
 
 **Goal.** Record literal evidence of every check, including the CI status from GitHub Actions, get an independent
-behavioural verification, and let Anna confirm that every scenario was exercised.
+behavioural verification, and let Grace confirm that every scenario was exercised.
 
 ### Steps
 
-1. Show the configuration Sergey wrote in lesson 2.4. Besides the commands, the verify gate asks the `github` server
+1. Show the configuration Steven wrote in lesson 2.4. Besides the commands, the verify gate asks the `github` server
    about the CI run of the head commit. The CLI calls the tool itself, so the agent cannot fake the answer:
 
    ```yaml
@@ -761,7 +761,7 @@ behavioural verification, and let Anna confirm that every scenario was exercised
 
    `${HEAD}` becomes the head commit and `${CHANGE}` the change id; the answer must contain `expect`.
 
-2. Oleg runs:
+2. Oliver runs:
 
    > /sdlc:verify add-due-dates
 
@@ -822,7 +822,7 @@ behavioural verification, and let Anna confirm that every scenario was exercised
    | Due date cleared | updateTask with dueDate null | no dueDate | PASS |
    ```
 
-4. Anna checks the coverage. Before the table was written, the check reported:
+4. Grace checks the coverage. Before the table was written, the check reported:
 
    ```bash
    sdlc verify --check --change add-due-dates
@@ -846,10 +846,10 @@ behavioural verification, and let Anna confirm that every scenario was exercised
    ✓ every spec scenario (4) has a row under "Behavioral verification".
    ```
 
-   Anna reads every row and the "Not run / limits" section. A row that says PASS for a case that was not run is a
-   defect of the verification: she asks Oleg's agent to fix the gap, not to change the test.
+   Grace reads every row and the "Not run / limits" section. A row that says PASS for a case that was not run is a
+   defect of the verification: she asks Oliver's agent to fix the gap, not to change the test.
 
-5. Anna runs the checks once herself, in her own terminal. Outside an agent session, the MCP results also go to the
+5. Grace runs the checks once herself, in her own terminal. Outside an agent session, the MCP results also go to the
    inbox, so the agent learns about them at its next session start:
 
    ```bash
@@ -870,7 +870,7 @@ behavioural verification, and let Anna confirm that every scenario was exercised
 
    | Gate | Who | Command | Telegram | `sdlc next` after |
    |---|---|---|---|---|
-   | verify | nobody: the required checks; Anna reviews the evidence | `sdlc verify` (agent or person) | nothing when it passes; `verify.failed` when it fails | agent: run the review (`/sdlc:review`) |
+   | verify | nobody: the required checks; Grace reviews the evidence | `sdlc verify` (agent or person) | nothing when it passes; `verify.failed` when it fails | agent: run the review (`/sdlc:review`) |
 
 ### Check yourself
 
@@ -881,7 +881,7 @@ behavioural verification, and let Anna confirm that every scenario was exercised
 ### Pitfalls
 
 - The verify gate passes on the automated checks alone. The behavioural table is checked only by
-  `sdlc verify --check`, which is not part of the gate. Anna (or CI) runs it with `--strict`.
+  `sdlc verify --check`, which is not part of the gate. Grace (or CI) runs it with `--strict`.
 - `${HEAD}` is the head commit. If the agent verifies uncommitted work, CI answers for an older commit. Commit, push,
   let CI finish, then run `sdlc verify`.
 - `sdlc verify --list` shows only the commands, not the `verify.mcp` checks.
@@ -893,20 +893,20 @@ behavioural verification, and let Anna confirm that every scenario was exercised
 
 - `sdlc verify` running, then `verification.md` with the evidence block; zoom on the `ci-green` row and the server's
   answer.
-- Anna's terminal: `--check` (warning) and `--check --strict` (passing).
+- Grace's terminal: `--check` (warning) and `--check --strict` (passing).
 
 ---
 
-## Lesson 5.8 — Review: findings, a rejection and Pavel's approval            (video: ~8 min)
+## Lesson 5.8 — Review: findings, a rejection and Paul's approval            (video: ~8 min)
 
-**Role:** Oleg with Claude Code; Pavel (code owner)   **Project:** tasklet   **You need:** lesson 5.7
+**Role:** Oliver with Claude Code; Paul (code owner)   **Project:** tasklet   **You need:** lesson 5.7
 
-**Goal.** The agent reviews the change in independent passes and fixes what matters. Pavel rejects once, the agent
-addresses his note, and Pavel approves.
+**Goal.** The agent reviews the change in independent passes and fixes what matters. Paul rejects once, the agent
+addresses his note, and Paul approves.
 
 ### Steps
 
-1. Oleg runs:
+1. Oliver runs:
 
    > /sdlc:review add-due-dates
 
@@ -944,7 +944,7 @@ addresses his note, and Pavel approves.
    ...
    ```
 
-   For F2, Oleg chose "defer" when the agent asked. The agent recorded it:
+   For F2, Oliver chose "defer" when the agent asked. The agent recorded it:
 
    ```bash
    sdlc defer add "Overdue in the user's time zone" --why "First version is UTC only" \
@@ -985,12 +985,12 @@ addresses his note, and Pavel approves.
    ```
 
    ```text
-   Pavel (pavel) - suggested: owns 0 of 2 changed files, open reviews: 0
+   Paul (paul) - suggested: owns 0 of 2 changed files, open reviews: 0
    ```
 
-   Telegram receives `gate.review.awaiting` with `waitingFor: ["pavel"]`.
+   Telegram receives `gate.review.awaiting` with `waitingFor: ["paul"]`.
 
-6. Pavel previews in his own terminal:
+6. Paul previews in his own terminal:
 
    ```bash
    sdlc approve review --change add-due-dates --preview
@@ -1008,7 +1008,7 @@ addresses his note, and Pavel approves.
    $ sdlc approve review --change add-due-dates
    ```
 
-7. Pavel reads the diff and `review.md`. The code is fine, but the README says nothing about due dates. He rejects
+7. Paul reads the diff and `review.md`. The code is fine, but the README says nothing about due dates. He rejects
    with a note:
 
    ```bash
@@ -1016,60 +1016,60 @@ addresses his note, and Pavel approves.
    ```
 
    ```text
-   ✗ review gate rejected by Pavel <pavel@northwind.example>: README has no word about due dates. Document dueDate and the overdue filter.
-   Next: person — Pavel (code-owner) must read review.md and the diff, then approve the review gate: sdlc approve review --change add-due-dates
+   ✗ review gate rejected by Paul <paul@northwind.example>: README has no word about due dates. Document dueDate and the overdue filter.
+   Next: person — Paul (code-owner) must read review.md and the diff, then approve the review gate: sdlc approve review --change add-due-dates
    ```
 
    `sdlc status` shows the note on the review line:
 
    ```text
-       review   ✗ rejected           rejected by Pavel <pavel@northwind.example>: README has no word about due dates. Document dueDate and the overdue filter.
+       review   ✗ rejected           rejected by Paul <paul@northwind.example>: README has no word about due dates. Document dueDate and the overdue filter.
    ```
 
-8. Oleg tells the agent:
+8. Oliver tells the agent:
 
-   > Pavel rejected the review of add-due-dates. Read the note in sdlc status and address it.
+   > Paul rejected the review of add-due-dates. Read the note in sdlc status and address it.
 
    The agent adds a "Due dates" section to `README.md`. The README is part of the code, so the evidence is stale again
    and the agent re-runs `sdlc verify`. Telegram receives a new `gate.review.awaiting`.
 
-9. Show who may not approve. Oleg wrote the code; Ivan approved the plan:
+9. Show who may not approve. Oliver wrote the code; Ethan approved the plan:
 
    ```text
-   error: Oleg does not hold code-owner; ask Pavel. Oleg authored code in this change.
-   fix: Ask one of: Pavel.
+   error: Oliver does not hold code-owner; ask Paul. Oliver authored code in this change.
+   fix: Ask one of: Paul.
    ```
 
    ```text
-   error: Ivan does not hold code-owner; ask Pavel. Ivan already approved the paired gate plan/review.
-   fix: Ask one of: Pavel.
+   error: Ethan does not hold code-owner; ask Paul. Ethan already approved the paired gate plan/review.
+   fix: Ask one of: Paul.
    ```
 
-10. Pavel approves:
+10. Paul approves:
 
     ```bash
     sdlc approve review --change add-due-dates
     ```
 
     ```text
-    ✓ review gate: Pavel <pavel@northwind.example> approved as code-owner (bb6b43013e8f)
+    ✓ review gate: Paul <paul@northwind.example> approved as code-owner (bb6b43013e8f)
     ```
 
 11. Gate card:
 
     | Gate | Who | Command | Telegram | `sdlc next` after |
     |---|---|---|---|---|
-    | review | Pavel | `sdlc reject review … --note "…"`, later `sdlc approve review --change add-due-dates` | `gate.review.awaiting` → `gate.review.rejected` → `gate.review.awaiting` → `gate.review.approved` | agent: prepare `release.md` (`/sdlc:release`) |
+    | review | Paul | `sdlc reject review … --note "…"`, later `sdlc approve review --change add-due-dates` | `gate.review.awaiting` → `gate.review.rejected` → `gate.review.awaiting` → `gate.review.approved` | agent: prepare `release.md` (`/sdlc:release`) |
 
 ### Check yourself
 
 - `review.md` has a Coverage line for each of the six passes and lenses.
 - `sdlc review check --change add-due-dates` exits 0; `sdlc defer list` shows D2 linked to F2.
-- `sdlc status` shows `review ✓ approved  Pavel <pavel@northwind.example> as code-owner`.
+- `sdlc status` shows `review ✓ approved  Paul <paul@northwind.example> as code-owner`.
 
 ### Pitfalls
 
-- After `sdlc reject`, `sdlc next` still points at Pavel, not at the agent. Tell the agent to read the note, as in
+- After `sdlc reject`, `sdlc next` still points at Paul, not at the agent. Tell the agent to read the note, as in
   step 8. When the agent must clearly do more work, `sdlc rework review --reason … --note "…"` hands the change back
   with the reason in `sdlc next`.
 - The `Next:` line printed by `sdlc approve review` in the trial still asked for a review approval. Run `sdlc next`
@@ -1082,16 +1082,16 @@ addresses his note, and Pavel approves.
 ### On screen (for the video)
 
 - `review.md` with F1 open, then fixed; the `review check` turning green.
-- Pavel's rejection and the note on the status line; then the README diff.
+- Paul's rejection and the note on the status line; then the README diff.
 - The two refused approvals side by side: author and paired gate.
 
 ---
 
-## Lesson 5.9 — Release: Elena authorizes production            (video: ~7 min)
+## Lesson 5.9 — Release: Emily authorizes production            (video: ~7 min)
 
-**Role:** Oleg with Claude Code; Elena (release manager)   **Project:** tasklet   **You need:** lesson 5.8
+**Role:** Oliver with Claude Code; Emily (release manager)   **Project:** tasklet   **You need:** lesson 5.8
 
-**Goal.** The agent prepares `release.md` and deploys to staging. Production waits for Elena's approval, and the
+**Goal.** The agent prepares `release.md` and deploys to staging. Production waits for Emily's approval, and the
 approval waits for the release checks in GitHub.
 
 ### Steps
@@ -1114,7 +1114,7 @@ approval waits for the release checks in GitHub.
        - \bdeploy\b.*\bprod(uction)?\b
    ```
 
-2. Oleg runs:
+2. Oliver runs:
 
    > /sdlc:release add-due-dates
 
@@ -1136,7 +1136,7 @@ approval waits for the release checks in GitHub.
    their bands, the exact rollback command and when it was rehearsed. It deploys to staging, which the agent is
    allowed to do, and records the result.
 
-3. The agent runs the release checks before asking Elena. The command writes nothing:
+3. The agent runs the release checks before asking Emily. The command writes nothing:
 
    ```bash
    sdlc release check --change add-due-dates
@@ -1147,7 +1147,7 @@ approval waits for the release checks in GitHub.
    Every required release check passed.
    ```
 
-4. Show the release gate. Oleg asks the agent to deploy to production. The hook denies the command (real reason,
+4. Show the release gate. Oliver asks the agent to deploy to production. The hook denies the command (real reason,
    wrapped):
 
    ```text
@@ -1157,7 +1157,7 @@ approval waits for the release checks in GitHub.
    not authorize it. Why, and what to do: `sdlc guide denials#release-gate`.
    ```
 
-5. Telegram receives `gate.release.awaiting` with `waitingFor: ["elena"]`. Elena opens her own terminal:
+5. Telegram receives `gate.release.awaiting` with `waitingFor: ["emily"]`. Emily opens her own terminal:
 
    ```bash
    sdlc next --me
@@ -1193,7 +1193,7 @@ approval waits for the release checks in GitHub.
    ```
 
    ```text
-   ✓ release gate: Elena <elena@northwind.example> approved as release-manager (cd6018fe3d9b)
+   ✓ release gate: Emily <emily@northwind.example> approved as release-manager (cd6018fe3d9b)
    ```
 
    Now the same production command passes the hook. The agent deploys, records the outcome in `release.md` and
@@ -1203,13 +1203,13 @@ approval waits for the release checks in GitHub.
 
    | Gate | Who | Command | Telegram | `sdlc next` after |
    |---|---|---|---|---|
-   | release | Elena | `sdlc approve release --change add-due-dates` | `gate.release.awaiting` → `gate.release.approved` | agent: archive (`sdlc archive add-due-dates --yes`) |
+   | release | Emily | `sdlc approve release --change add-due-dates` | `gate.release.awaiting` → `gate.release.approved` | agent: archive (`sdlc archive add-due-dates --yes`) |
 
 ### Check yourself
 
 - `sdlc status --change add-due-dates` shows every gate approved and the stage `Done (ready to archive)`.
 - `release.md` has the changelog, the rollout table, the bands and the rollback command.
-- The production command was denied before Elena's approval and allowed after it.
+- The production command was denied before Emily's approval and allowed after it.
 
 ### Pitfalls
 
@@ -1223,13 +1223,13 @@ approval waits for the release checks in GitHub.
 ### On screen (for the video)
 
 - `release.md` in the editor; highlight the rollback row.
-- The denied production deploy, Elena's approval, the same deploy passing.
+- The denied production deploy, Emily's approval, the same deploy passing.
 
 ---
 
 ## Lesson 5.10 — Archive: living specs, the backlog and the record            (video: ~6 min)
 
-**Role:** Oleg with Claude Code; Olga watches   **Project:** tasklet   **You need:** lesson 5.9
+**Role:** Oliver with Claude Code; Laura watches   **Project:** tasklet   **You need:** lesson 5.9
 
 **Goal.** Close the change: merge its delta specs into the living specs, mark the backlog item done, and read the
 record the change leaves behind.
@@ -1244,7 +1244,7 @@ record the change leaves behind.
    $ sdlc archive add-due-dates --yes
    ```
 
-2. Oleg runs:
+2. Oliver runs:
 
    > /sdlc:archive add-due-dates
 
@@ -1264,7 +1264,7 @@ record the change leaves behind.
    evidence and the approvals, moved to `openspec/changes/archive/2026-10-09-add-due-dates/`. Telegram receives
    `change.archived`.
 
-3. The agent closes the loop, as proposals for Oleg: a CLAUDE.md rule for a mistake that happened twice, follow-up
+3. The agent closes the loop, as proposals for Oliver: a CLAUDE.md rule for a mistake that happened twice, follow-up
    intents for deferred work (D2), and here, a comment on the GitHub issue `northwind/tasklet#12` through the `github`
    server (lesson 4.3).
 
@@ -1321,16 +1321,16 @@ record the change leaves behind.
    ```
 
    ```text
-   ✗ add-due-dates/intent maria unsigned eb59275b
-   ✗ add-due-dates/spec maria unsigned 927d1e4b
-   ✗ add-due-dates/plan ivan unsigned b8d37b6b
-   ✗ add-due-dates/review pavel unsigned f49dc3f9
-   ✗ add-due-dates/release elena unsigned 305f15e4
-   ✗ openspec/roles.yaml sergey@northwind.example unsigned e17e6b14
+   ✗ add-due-dates/intent megan unsigned eb59275b
+   ✗ add-due-dates/spec megan unsigned 927d1e4b
+   ✗ add-due-dates/plan ethan unsigned b8d37b6b
+   ✗ add-due-dates/review paul unsigned f49dc3f9
+   ✗ add-due-dates/release emily unsigned 305f15e4
+   ✗ openspec/roles.yaml steven@northwind.example unsigned e17e6b14
    5 approvals checked, 6 invalid (warn: not blocking)
    ```
 
-   Nobody signed commits in the trial; with the setup of lesson 3.3 each line says `valid`. Olga reads the full
+   Nobody signed commits in the trial; with the setup of lesson 3.3 each line says `valid`. Laura reads the full
    history of the change with `sdlc audit --change add-due-dates` (Module 9).
 
 ### Check yourself
@@ -1387,7 +1387,7 @@ seen in the trial run unless the item says otherwise.
   `high_risk_approvers`.
 - `sdlc roles who spec` lists the tech lead for a medium-risk spec, though only a product-owner approval satisfies
   the gate.
-- The `missing_role` hint ("ask Pavel, Ivan, …") can name people whom `distinct_approvers` excludes (seen in the
+- The `missing_role` hint ("ask Paul, Ethan, …") can name people whom `distinct_approvers` excludes (seen in the
   first trial).
 - The `state-integrity` denial for an agent's edit of `openspec/roles.yaml` names `.sdlc.yaml` and the log, not
   `roles.yaml`.
@@ -1397,7 +1397,7 @@ seen in the trial run unless the item says otherwise.
 - No workflow calls the `sdlc-simplifier` subagent unless `stages.build.agents` lists it.
 - The verify gate passes without the behavioural table; only `sdlc verify --check --strict` checks it, outside the
   gate.
-- QA has no gate of its own: Anna's acceptance of the evidence is not recorded by sdlc.
+- QA has no gate of its own: Grace's acceptance of the evidence is not recorded by sdlc.
 - `sdlc verify --list` does not list the `verify.mcp` checks.
 - `${HEAD}` in `verify.mcp` is the head commit even when the evidence covers uncommitted changes.
 - Events carry a structured `event` object, not a message; a Telegram server that only takes text needs an adapter

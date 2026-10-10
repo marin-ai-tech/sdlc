@@ -1,6 +1,6 @@
 # Module 1. Setting up a new project
 
-Sergey, the platform engineer, sets up sdlc for `tasklet`, a new project that starts from an empty folder. Then the
+Steven, the platform engineer, sets up sdlc for `tasklet`, a new project that starts from an empty folder. Then the
 rest of the team joins. By the end of the module the repository has the sdlc files, the team's roles, working
 checks and a clean `sdlc doctor`.
 
@@ -17,7 +17,7 @@ In this module:
 
 ## Lesson 1.1 — Install the CLI            (video: ~5 min)
 
-**Role:** Sergey (platform engineer); later every team member   **Project:** tasklet
+**Role:** Steven (platform engineer); later every team member   **Project:** tasklet
 **You need:** Node.js 20.19 or newer, git, Claude Code CLI
 
 **Goal.** sdlc is installed on your machine, and you know why every person in the team needs it, not only the
@@ -55,8 +55,8 @@ developers.
 
 4. Explain who needs the CLI:
    - the developers, because the agent's hooks and workflows call `sdlc`;
-   - **every person who approves**, because approvals run in the person's own terminal (`sdlc approve`). Maria,
-     Ivan, Pavel and Elena install it too.
+   - **every person who approves**, because approvals run in the person's own terminal (`sdlc approve`). Megan,
+     Ethan, Paul and Emily install it too.
 
 ### Check yourself
 
@@ -80,7 +80,7 @@ developers.
 
 ## Lesson 1.2 — `sdlc init`: the wizard and the flags            (video: ~8 min)
 
-**Role:** Sergey   **Project:** tasklet   **You need:** lesson 1.1
+**Role:** Steven   **Project:** tasklet   **You need:** lesson 1.1
 
 **Goal.** You can set up sdlc in an empty folder, either with the interactive wizard or with flags in one command,
 and you know what each choice means.
@@ -92,14 +92,14 @@ and you know what each choice means.
    ```bash
    mkdir tasklet && cd tasklet
    git init
-   git config user.name "Sergey"
-   git config user.email sergey@northwind.example
+   git config user.name "Steven"
+   git config user.email steven@northwind.example
    ```
 
 2. **The wizard.** Run `sdlc init` with no flags, in a terminal you opened yourself. The wizard writes nothing until
    you confirm a summary. It asks, in this order:
 
-   | Question | What Sergey answers for tasklet |
+   | Question | What Steven answers for tasklet |
    |---|---|
    | "Initialize a git repository here?" (only in an empty folder without git) | yes, if he skipped `git init` |
    | "Which coding tools?" (claude, opencode, cursor, codex, qwen, gigacode) | Claude Code only |
@@ -180,7 +180,7 @@ and you know what each choice means.
 
 ## Lesson 1.3 — People and roles: `openspec/roles.yaml`            (video: ~7 min)
 
-**Role:** Sergey (maintainer); the team reviews   **Project:** tasklet   **You need:** lesson 1.2
+**Role:** Steven (maintainer); the team reviews   **Project:** tasklet   **You need:** lesson 1.2
 
 **Goal.** The repository names the people of the team, the gate roles they hold and the separation rules, so that
 sdlc refuses an approval from the wrong person.
@@ -190,28 +190,28 @@ sdlc refuses an approval from the wrong person.
 1. Explain why the file matters. Without `roles.yaml`, any person with a git identity may approve any gate. With
    it, sdlc checks the approver's git email against the people and their roles, and applies separation rules.
 
-2. Sergey writes `openspec/roles.yaml` in his editor. The agent may not write it: the hook denies agent edits of
+2. Steven writes `openspec/roles.yaml` in his editor. The agent may not write it: the hook denies agent edits of
    this file (`sdlc guide denials#state-integrity`).
 
    ```yaml
    version: 1
    signing: warn
    people:
-     maria:  { name: Maria,  emails: [maria@northwind.example] }
-     ivan:   { name: Ivan,   emails: [ivan@northwind.example] }
-     oleg:   { name: Oleg,   emails: [oleg@northwind.example] }
-     anna:   { name: Anna,   emails: [anna@northwind.example] }
-     pavel:  { name: Pavel,  emails: [pavel@northwind.example] }
-     elena:  { name: Elena,  emails: [elena@northwind.example] }
-     sergey: { name: Sergey, emails: [sergey@northwind.example] }
-     olga:   { name: Olga,   emails: [olga@northwind.example] }
+     megan:  { name: Megan,  emails: [megan@northwind.example] }
+     ethan:  { name: Ethan,  emails: [ethan@northwind.example] }
+     oliver: { name: Oliver, emails: [oliver@northwind.example] }
+     grace:  { name: Grace,  emails: [grace@northwind.example] }
+     paul:   { name: Paul,   emails: [paul@northwind.example] }
+     emily:  { name: Emily,  emails: [emily@northwind.example] }
+     steven: { name: Steven, emails: [steven@northwind.example] }
+     laura:  { name: Laura,  emails: [laura@northwind.example] }
    roles:
-     product-owner:   [maria]
-     tech-lead:       [ivan]
-     engineer:        [oleg]
-     code-owner:      [pavel]
-     release-manager: [elena]
-     maintainer:      [sergey]
+     product-owner:   [megan]
+     tech-lead:       [ethan]
+     engineer:        [oliver]
+     code-owner:      [paul]
+     release-manager: [emily]
+     maintainer:      [steven]
    separation:
      author_cannot_approve: [review, release]
      distinct_approvers: [[spec, review], [plan, review]]
@@ -232,14 +232,14 @@ sdlc refuses an approval from the wrong person.
 
    ```text
    ID      Name    Roles
-   maria   Maria   product-owner
-   ivan    Ivan    tech-lead
-   oleg    Oleg    engineer
-   anna    Anna    
-   pavel   Pavel   code-owner
-   elena   Elena   release-manager
-   sergey  Sergey  maintainer
-   olga    Olga    
+   megan   Megan   product-owner
+   ethan   Ethan   tech-lead
+   oliver  Oliver  engineer
+   grace   Grace    
+   paul    Paul    code-owner
+   emily   Emily   release-manager
+   steven  Steven  maintainer
+   laura   Laura    
    ```
 
 4. Explain signing. `signing: warn` makes `sdlc approvals verify` report approvals that did not arrive in a commit
@@ -252,10 +252,10 @@ sdlc refuses an approval from the wrong person.
    ```
 
    Then the person's public key goes into `signing_key` in `roles.yaml`, for example
-   `maria: { name: Maria, emails: [maria@northwind.example], signing_key: "ssh-ed25519 AAAA… maria" }`. When every
-   approver signs, Sergey switches to `signing: required` and runs `sdlc approvals verify --mode required` in CI.
+   `megan: { name: Megan, emails: [megan@northwind.example], signing_key: "ssh-ed25519 AAAA… megan" }`. When every
+   approver signs, Steven switches to `signing: required` and runs `sdlc approvals verify --mode required` in CI.
 
-5. Protect the file in code review. Sergey adds one line to `.github/CODEOWNERS`:
+5. Protect the file in code review. Steven adds one line to `.github/CODEOWNERS`:
 
    ```text
    /openspec/roles.yaml @northwind-labs/maintainers
@@ -268,8 +268,8 @@ sdlc refuses an approval from the wrong person.
    ```
 
    ```text
-   intent · add-due-dates — may approve: Maria (maria)
-     Ivan (ivan): missing_role — Ivan does not hold product-owner; ask Maria.
+   intent · add-due-dates — may approve: Megan (megan)
+     Ethan (ethan): missing_role — Ethan does not hold product-owner; ask Megan.
      …
    ```
 
@@ -284,7 +284,7 @@ sdlc refuses an approval from the wrong person.
 - An email may belong to one person only. A duplicate is an error that names the field.
 - A person whose git email is not in the file cannot approve (`unknown_person`). Check `git config user.email` on
   each approver's machine.
-- Anna and Olga hold no gate role. Do not give Anna `code-owner` "to help": she would then be a reviewer.
+- Grace and Laura hold no gate role. Do not give Grace `code-owner` "to help": she would then be a reviewer.
 - If the wizard created a starter `roles.yaml`, it has one person holding every role and separation switched off.
   Replace it with the team's file before the first change.
 
@@ -292,13 +292,13 @@ sdlc refuses an approval from the wrong person.
 
 - The YAML file, block by block: people, roles, separation.
 - `sdlc roles check` output.
-- A slide with the separation rules and an example: Oleg wrote the code, so Oleg can never approve its review.
+- A slide with the separation rules and an example: Oliver wrote the code, so Oliver can never approve its review.
 
 ---
 
 ## Lesson 1.4 — What init wrote, the verify commands and `sdlc doctor`            (video: ~7 min)
 
-**Role:** Sergey; Ivan chooses the stack   **Project:** tasklet   **You need:** lessons 1.2 and 1.3
+**Role:** Steven; Ethan chooses the stack   **Project:** tasklet   **You need:** lessons 1.2 and 1.3
 
 **Goal.** You know what each generated file is for, the verify gate has real commands to run, and `sdlc doctor`
 shows a healthy installation.
@@ -323,7 +323,7 @@ shows a healthy installation.
    | `AGENTS.md`, `CLAUDE.md`, `README.md`, `docs/…` | the AI-ready documents; `CLAUDE.md` imports `AGENTS.md` |
    | `.git/hooks/prepare-commit-msg` | adds `SDLC-Agent: <tool>` to commits made in an agent session (not committed) |
 
-2. Ivan chooses the stack: TypeScript, Vitest, ESLint. Sergey writes `package.json` himself. With `block` mode the
+2. Ethan chooses the stack: TypeScript, Vitest, ESLint. Steven writes `package.json` himself. With `block` mode the
    agent may not create code files before a plan is approved, and `package.json` counts as code.
 
    ```json
@@ -353,13 +353,13 @@ shows a healthy installation.
    Verify: npm run build
    Verify: npm run lint
    Verify: npm test
-   Person: Sergey <sergey@northwind.example>
+   Person: Steven <steven@northwind.example>
    Roles (written to openspec/roles.yaml only if it does not exist):
      …
    A person can apply this draft with: sdlc adopt --apply
    ```
 
-   `roles.yaml` already exists, so applying keeps it. Sergey applies the draft in his own terminal:
+   `roles.yaml` already exists, so applying keeps it. Steven applies the draft in his own terminal:
 
    ```bash
    sdlc adopt --apply
@@ -409,7 +409,7 @@ shows a healthy installation.
    ✓ cli on PATH      `sdlc` is on PATH (hooks, plugin and skills call `sdlc`)
    ✓ verify commands  build, lint, test
    ✓ review policy    REVIEW.md
-   ✓ git              identity Sergey <sergey@northwind.example>
+   ✓ git              identity Steven <steven@northwind.example>
    ✓ git hook         prepare-commit-msg in .git/hooks/prepare-commit-msg: commits made in agent sessions get an …
    ```
 
@@ -438,7 +438,7 @@ shows a healthy installation.
 
 ## Lesson 1.5 — Enforcement modes and the license line            (video: ~6 min)
 
-**Role:** Sergey; Olga for the license decision   **Project:** tasklet (billing-api for contrast)
+**Role:** Steven; Laura for the license decision   **Project:** tasklet (billing-api for contrast)
 **You need:** lesson 1.4
 
 **Goal.** You can choose `off`, `warn` or `block` for a project and change it later. You know which license the
@@ -467,7 +467,7 @@ project uses sdlc under and how to record a commercial one.
    In `warn` mode the same text arrives as a reminder, and the file is written.
 
 3. Explain when to choose which:
-   - **`block` for a new project.** `tasklet` has no old habits and no code yet, so Sergey starts strict.
+   - **`block` for a new project.** `tasklet` has no old habits and no code yet, so Steven starts strict.
    - **`warn` first for an existing project.** `billing-api` has work in progress. The team starts in `warn`, reads
      the reminders and the hook entries in `sdlc health`, then switches to `block`.
    - **`off`** only to pause the guard for a short time. `sdlc health` reports it as a configuration finding.
@@ -495,9 +495,9 @@ project uses sdlc under and how to record a commercial one.
 
    The Community License is free for noncommercial use, for public open source projects, and for a 30-day
    evaluation. `tasklet` is a private company project, so `sdlc doctor` warns. Northwind signs a commercial
-   agreement (Olga owns that decision).
+   agreement (Laura owns that decision).
 
-6. Sergey records the agreement in his own terminal:
+6. Steven records the agreement in his own terminal:
 
    ```bash
    sdlc license set commercial --agreement NWL-2026-014 --licensee "Northwind Labs"
@@ -531,14 +531,14 @@ project uses sdlc under and how to record a commercial one.
 
 ## Lesson 1.6 — Commit the setup, bring in the team, and update after an upgrade            (video: ~7 min)
 
-**Role:** Sergey; then Oleg and the approvers   **Project:** tasklet   **You need:** lessons 1.1 to 1.5
+**Role:** Steven; then Oliver and the approvers   **Project:** tasklet   **You need:** lessons 1.1 to 1.5
 
 **Goal.** The setup is in git and shared by the team. Each person has a working installation. You can upgrade sdlc
 and regenerate the files without losing local edits.
 
 ### Steps
 
-1. Sergey commits everything init and he wrote, from his own terminal:
+1. Steven commits everything init and he wrote, from his own terminal:
 
    ```bash
    git add -A
@@ -554,13 +554,13 @@ and regenerate the files without losing local edits.
 
    ```bash
    git clone git@github.com:northwind-labs/tasklet.git && cd tasklet
-   git config user.email maria@northwind.example
+   git config user.email megan@northwind.example
    sdlc doctor
    ```
 
-   The approvers need only the CLI and git. Oleg also needs Claude Code.
+   The approvers need only the CLI and git. Oliver also needs Claude Code.
 
-3. Oleg starts Claude Code in the project:
+3. Oliver starts Claude Code in the project:
 
    ```bash
    claude
@@ -574,7 +574,7 @@ and regenerate the files without losing local edits.
    - The status line shows the active change, its stage and who acts, for example
      `add-due-dates · Plan (intent) · next: person`. With no active change it stays empty.
 
-4. Months later a new sdlc release comes out. Sergey upgrades and previews the update:
+4. Months later a new sdlc release comes out. Steven upgrades and previews the update:
 
    ```bash
    npm install -g https://github.com/marin-ai-tech/sdlc/releases/latest/download/sdlc.tgz
@@ -589,7 +589,7 @@ and regenerate the files without losing local edits.
 
    Here someone had edited a generated file. `update` keeps it. `--force` would overwrite it.
 
-5. Sergey runs the update and commits the result in one commit:
+5. Steven runs the update and commits the result in one commit:
 
    ```bash
    sdlc update
@@ -602,7 +602,7 @@ and regenerate the files without losing local edits.
 
 ### Check yourself
 
-- `git log -1` shows Sergey's setup commit with **no** `SDLC-Agent` trailer.
+- `git log -1` shows Steven's setup commit with **no** `SDLC-Agent` trailer.
 - On each machine, `sdlc doctor` shows `generated files  49 tracked, 0 missing, 0 edited locally` and the same
   sdlc version.
 
@@ -619,5 +619,5 @@ and regenerate the files without losing local edits.
 ### On screen (for the video)
 
 - `git status` before the commit: a long list of new files, grouped by folder.
-- Oleg's first Claude Code session: the MCP approval prompt, the session summary, the status line.
+- Oliver's first Claude Code session: the MCP approval prompt, the session summary, the status line.
 - The dry run with the "kept … edited locally" warning; highlight `--force`.
