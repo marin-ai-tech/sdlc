@@ -11,6 +11,8 @@ the task manager, pull requests, Actions as the build server), a **knowledge** s
 skills), **Telegram** (notifications) and **sdlc** itself. Module 10 shows the same process in Cursor, Codex CLI,
 Qwen Code, GigaCode and OpenCode.
 
+This is the video version. To read the same material as a book, open [the sdlc handbook](../handbook/README.md).
+
 Every lesson has the same parts: the role, the goal, the steps with real commands and real output, a self-check,
 the pitfalls and notes for the video. A lesson is one short video (about 5–8 minutes).
 
