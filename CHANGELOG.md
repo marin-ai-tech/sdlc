@@ -10,7 +10,7 @@ All notable changes to sdlc. Versions follow [Semantic Versioning](https://semve
 
 ### Fixed
 - **`sdlc help` knows every supported tool.** `sdlc help --json` gives each workflow's invocation for Claude Code, OpenCode, Cursor, Codex CLI, Qwen Code and GigaCode; the text help shows the invocations of the tools the project is set up for. Help never fails on a broken `openspec/sdlc.yaml`.
-- **The health and team workflows have a title and a description** in `sdlc help`, in English and Russian, instead of their key names.
+- **The health and team workflows have a title and a description** in `sdlc help`, in English and other languages, instead of their key names.
 - **The documentation covers every supported tool** where it still spoke of Claude Code and OpenCode only.
 
 ## 0.14.4 — 2026-10-09
@@ -77,7 +77,7 @@ All notable changes to sdlc. Versions follow [Semantic Versioning](https://semve
 ### Added
 - **People answer the open questions.** `sdlc answer <n> --change <id> --text "…"` records a person's answer to an open question of intent.md, proposal.md or design.md, in the artifact and in the change record; `sdlc answer --list` shows them. The intent and spec gates cannot be approved while a question has no recorded answer; an answer written into the file by hand or by an agent does not count, and a reworded question needs a new answer. `questions.required: false` turns it off; approvals given before are not touched. A change record with answers is format version 3, so an older sdlc refuses it instead of dropping the answers.
 - **Participation of people, planned vs actual.** `sdlc audit` and the dashboard compare, per change and for the project, the decisions the track plans (gates and approvals, counting `min_approvals`) with what happened: approvals, reworks, takeovers, waivers, answers and the hours gates waited for a person.
-- **A guided tour.** `sdlc guide tour [step]` walks a newcomer through the calculator demo in seven short steps, in English and Russian.
+- **A guided tour.** `sdlc guide tour [step]` walks a newcomer through the calculator demo in seven short steps, in English and other languages.
 
 ### Fixed
 - **A policy waiver stays as it was.** The first evaluation by a person's command that applies an `auto_waive` policy records the waiver on the change (an agent's session never does), so removing the policy later does not un-waive it, and archived changes are never waived by a policy.
@@ -114,7 +114,7 @@ All notable changes to sdlc. Versions follow [Semantic Versioning](https://semve
 ## 0.11.0 — 2026-10-07
 
 ### Added
-- **The agent team.** Role agents — analyst, architect, developer, tester and reviewer — defined in `docs/agents/<role>.md` and generated as subagents for Claude Code and OpenCode, wired to their stages. sdlc adds to every role where it writes (the artifacts of its stages) and the facts of the project (checks, protected and test paths, people and separation rules, language, documents, context packs and MCP servers of its stages), so roles follow the project. The built-in roles (en, ru) are written for sdlc's artifacts and boundaries.
+- **The agent team.** Role agents — analyst, architect, developer, tester and reviewer — defined in `docs/agents/<role>.md` and generated as subagents for Claude Code and OpenCode, wired to their stages. sdlc adds to every role where it writes (the artifacts of its stages) and the facts of the project (checks, protected and test paths, people and separation rules, language, documents, context packs and MCP servers of its stages), so roles follow the project. The built-in roles (in several languages) are written for sdlc's artifacts and boundaries.
 - **Where roles come from:** `sdlc team sync` takes them from the team's MCP registry (`team.registry`: list_roles, get_role, list_skills, get_skill, checked by checksum), then from packs (`packs`: a git repository at a pinned ref or an npm package; no code of a pack runs), then from the built-in set; everything arrives as drafts. The team workflow (`/sdlc:team`) drafts a Project rules section into each role from the code, or from the idea of an empty project.
 - **A person accepts.** `sdlc team accept <role>` (a person's command) makes a draft the role, says whether it differs from its source, and records it in `openspec/.sdlc/team.json`; a role edited afterwards is not generated until accepted again. Skills install with a matching checksum only, and skills with scripts only after `sdlc team accept --skill <id>`; `sdlc team check` reports every skill. Accepted tester and reviewer roles replace `sdlc-verifier` and `sdlc-reviewer`.
 - **Guide topic** `sdlc guide team`, and a documentation chapter with user cases: [The agent team](docs/en/12-agent-team.md).
@@ -133,7 +133,7 @@ All notable changes to sdlc. Versions follow [Semantic Versioning](https://semve
 ## 0.9.1 — 2026-10-07
 
 ### Added
-- **Ask the agent how sdlc works.** A guide workflow (`/sdlc:guide`, `/sdlc-guide`, or a plain question) answers how to work with sdlc for your project: stages, gates and approvals, roles, tracks, bug fixes, the backlog, rework and takeover, verification, review, MCP, configuration and hook denials. The material ships with sdlc in English and Russian (`sdlc guide [topic[#section]]`), so it always matches the installed version; the session start mentions it; every hook denial names the section that explains it (`sdlc guide denials#<rule>`); the sdlc MCP server offers it as the `guide` tool.
+- **Ask the agent how sdlc works.** A guide workflow (`/sdlc:guide`, `/sdlc-guide`, or a plain question) answers how to work with sdlc for your project: stages, gates and approvals, roles, tracks, bug fixes, the backlog, rework and takeover, verification, review, MCP, configuration and hook denials. The material ships with sdlc in English and other languages (`sdlc guide [topic[#section]]`), so it always matches the installed version; the session start mentions it; every hook denial names the section that explains it (`sdlc guide denials#<rule>`); the sdlc MCP server offers it as the `guide` tool.
 - **`sdlc next --me`**: every gate across the active changes that you may take now, with the command.
 - **`sdlc approve <gate> --change <id> --preview`**: what you are about to approve — the artifacts, what changed since the last approval, the approvals so far and needed, open findings and verification for review and release, and whether you may approve. It writes nothing.
 
@@ -235,13 +235,13 @@ All notable changes to sdlc. Versions follow [Semantic Versioning](https://semve
 - CONTRIBUTING.md explains how to add a language: copy `assets/locales/en.json`, translate the values, add the code to `LOCALES` and run the tests, which check completeness and placeholders.
 
 ### Fixed
-- The Russian catalog no longer leaves English words in its messages (owner, workflow, branch, drift and others); a test keeps it that way.
+- A translated catalog no longer leaves English words in its messages (owner, workflow, branch, drift and others); a test keeps it that way.
 
 ## 0.6.3 — 2026-10-04
 
 ### Added
-- **Every command speaks the locale.** Besides help, status, hints, the wizard, hook reasons and reports, the text output of every command, all error messages with their fixes and all warnings now follow `--locale`, `SDLC_LOCALE`, `locale:` in `sdlc.yaml` or the system locale (English and Russian). JSON output and error codes stay English and identical in every locale.
-- The demo scenario runs in the deck's language, so the Russian deck shows Russian CLI output.
+- **Every command speaks the locale.** Besides help, status, hints, the wizard, hook reasons and reports, the text output of every command, all error messages with their fixes and all warnings now follow `--locale`, `SDLC_LOCALE`, `locale:` in `sdlc.yaml` or the system locale (in every shipped language). JSON output and error codes stay English and identical in every locale.
+- The demo scenario runs in the deck's language, so a deck in another language shows the CLI output in that language.
 
 ### Fixed
 - `/sdlc:explore`, `/sdlc:intent` and `/sdlc:triage` started without a subject now ask for it instead of inventing one.
@@ -261,7 +261,7 @@ All notable changes to sdlc. Versions follow [Semantic Versioning](https://semve
 - Hints no longer say `npm install -g sdlc` or `npx sdlc`: an unrelated package named `sdlc` is on the npm registry. Project-local installs use `cli: npx --no-install sdlc`.
 
 ### Added
-- **English and Russian.** Help, `Next:` hints, `sdlc status`, the init wizard, hook reasons, the session context, the Markdown report and the dashboard follow the locale: `--locale <code>`, then `SDLC_LOCALE`, then `locale:` in `openspec/sdlc.yaml`, then the system locale; English when there is no translation. JSON output, the log and change records stay English.
+- **English and other languages.** Help, `Next:` hints, `sdlc status`, the init wizard, hook reasons, the session context, the Markdown report and the dashboard follow the locale: `--locale <code>`, then `SDLC_LOCALE`, then `locale:` in `openspec/sdlc.yaml`, then the system locale; English when there is no translation. JSON output, the log and change records stay English.
 - **Interactive `sdlc init`, like `openspec init`.** Run in a terminal with no flags, it welcomes you, asks for the tools (detected ones preselected), enforcement mode, Claude Code status line, OpenSpec `/opsx` workflows, artifact language and an optional starter `openspec/roles.yaml`, and writes nothing until you confirm the summary. Re-running it offers the current settings. Flags, `--json`, non-terminals and agent sessions never prompt.
 - **Interactive `sdlc init` offers the OpenSpec CLI and codegraph.** When either is missing, it asks to install it (OpenSpec pinned to the version sdlc ships, codegraph from npm) and offers to index the project with `codegraph init`; installs run only after a yes, once the settings are written, and a failed install warns with the command to run by hand. Agents, scripts and flag runs never install anything. `sdlc doctor` reports both tools and whether the project is indexed.
 
@@ -290,7 +290,7 @@ All notable changes to sdlc. Versions follow [Semantic Versioning](https://semve
   - every change to `roles.yaml` must be signed by a maintainer of the version before it.
 
   `warn` reports problems; `required` fails, for CI.
-- **The calculator demo**: `test/e2e-calculator.test.ts` runs every CLI command on a small project with three people and agents and records a transcript. `npm run demo:deck` turns the transcript into a PowerPoint deck in English and Russian (`scripts/demo/`).
+- **The calculator demo**: `test/e2e-calculator.test.ts` runs every CLI command on a small project with three people and agents and records a transcript. `npm run demo:deck` turns the transcript into a PowerPoint deck in English and other languages (`scripts/demo/`).
 - **Example background process** `scripts/examples/dashboard-watch.mjs`: rebuilds the dashboard page when `openspec/` changes and can serve it on localhost with an auto-refresh. Examples run it as a Windows task, a systemd or launchd service, or a CI step.
 
 ## 0.5.0 — 2026-09-30

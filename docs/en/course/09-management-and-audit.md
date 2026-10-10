@@ -85,7 +85,8 @@ a file.
 
    The viewer sees `Written to …\tasklet\reports\october.md`.
 
-5. Read the report in Russian if a reader needs it: `sdlc report --locale ru`. JSON never changes with the locale.
+5. Read the report in the locale you choose if a reader needs it: `sdlc report --locale <code>`.
+   JSON never changes with the locale.
 
 ### Check yourself
 

@@ -120,9 +120,9 @@ At any point, `/sdlc:next` (`/sdlc-next`, `$sdlc-next` in Codex) runs the next s
 
 ### Getting around
 
-- Language: help, hints, `status`, the init wizard, hook reasons and reports follow `--locale`, `SDLC_LOCALE`, `locale:` in `sdlc.yaml` or the system locale, in that order; English when there is no translation (English and Russian ship). JSON never changes with the locale.
+- Language: help, hints, `status`, the init wizard, hook reasons and reports follow `--locale`, `SDLC_LOCALE`, `locale:` in `sdlc.yaml` or the system locale, in that order; English when there is no translation (other languages ship). JSON never changes with the locale.
 - `sdlc help [topic] [--json]` and `/sdlc:help` (`/sdlc-help`, `$sdlc-help`) list workflows and CLI commands and say who runs each one (agent or person).
-- **Ask the agent how sdlc works.** "How do I send this back?", "why did the hook say no?", "who approves the plan?": the agent answers for your project with the guide workflow (`/sdlc:guide`, `/sdlc-guide`, `$sdlc-guide` in Codex, or just ask). The material ships with sdlc in English and Russian, so it matches the installed version: `sdlc guide` lists the topics (start, lifecycle, gates, roles, team, tracks, bugfix, backlog, rework, verify, review, health, mcp, config, denials, faq), and `sdlc guide <topic>` prints one. Every hook denial ends with the section that explains it, for example `sdlc guide denials#plan-gate`. The sdlc MCP server offers the same as its `guide` tool.
+- **Ask the agent how sdlc works.** "How do I send this back?", "why did the hook say no?", "who approves the plan?": the agent answers for your project with the guide workflow (`/sdlc:guide`, `/sdlc-guide`, `$sdlc-guide` in Codex, or just ask). The material ships with sdlc in English and other languages, so it matches the installed version: `sdlc guide` lists the topics (start, lifecycle, gates, roles, team, tracks, bugfix, backlog, rework, verify, review, health, mcp, config, denials, faq), and `sdlc guide <topic>` prints one. Every hook denial ends with the section that explains it, for example `sdlc guide denials#plan-gate`. The sdlc MCP server offers the same as its `guide` tool.
 - **What is waiting for me:** `sdlc next --me` lists every gate, across the active changes, that you (your git identity, matched in `roles.yaml`) may take now, with the command. Without `roles.yaml` it lists every gate waiting for a person.
 - **What am I approving:** `sdlc approve <gate> --change <id> --preview` shows the gate's artifacts, what changed since the last approval, the approvals so far and needed, open findings and verification for review and release, and whether you may approve. It writes nothing.
 - After a state-changing command, the CLI prints a `Next:` hint (who acts next and how; the exact command when a person must act) and adds `next` to JSON. With no active change, session-start context names the next ready backlog item.
@@ -250,7 +250,7 @@ Run `sdlc import bmad <path> --to-backlog [--dry-run]` to load BMAD into `opensp
 version: 1
 schema: sdlc                  # schema for sdlc new
 cli: sdlc                     # or "npx --no-install sdlc"
-locale: ru                    # optional: language for people (default: the system locale, else en)
+locale: <code>                # optional: language for people (default: the system locale, else en)
 tools: [claude, opencode]   # also: cursor, codex, qwen, gigacode
 gates:
   intent:  { required: true,  approvers: [product-owner] }

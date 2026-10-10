@@ -50,7 +50,7 @@ On top of OpenSpec, `sdlc` adds the process parts the playbook asks for:
   Code's `todo_write`). In Claude Code and OpenCode, `/sdlc:status`, `/sdlc:next` and `/sdlc:help` show live CLI
   output; in the other tools the agent runs the same command. An answer in chat is never an approval — people run
   human decisions in their own terminal.
-- **Ask the agent how sdlc works.** The guide workflow answers questions about working with sdlc for your project, from short articles that ship with sdlc in English and Russian (`sdlc guide [topic]`); every hook denial names the section that explains it. `sdlc next --me` lists what waits for you, and `sdlc approve --preview` shows what you are about to approve.
+- **Ask the agent how sdlc works.** The guide workflow answers questions about working with sdlc for your project, from short articles that ship with sdlc in English and other languages (`sdlc guide [topic]`); every hook denial names the section that explains it. `sdlc next --me` lists what waits for you, and `sdlc approve --preview` shows what you are about to approve.
 - **Help and Next hints.** `sdlc help [topic]` and `/sdlc:help` catalog workflows and CLI commands with who runs them (agent or person). State-changing commands print a `Next:` hint (who acts next and how; the exact command when a person must act) and add `next` to JSON.
 - **Progress drawing.** `sdlc status --change <id>` shows a stage stepper and a task bar; `sdlc backlog list` shows a bar per epic; the markdown report includes Mermaid diagrams with sanitized labels.
 - **Claude Code status line.** `sdlc statusline` prints one line (change · stage · who acts); opt in with `sdlc init --statusline`. A user-defined status line is never replaced; `sdlc uninstall` removes only the sdlc one.
@@ -175,7 +175,7 @@ Everything sdlc writes records the sdlc version and the license the project uses
 | `sdlc backlog add \| epic add \| epic edit \| list \| next \| edit \| start \| move \| drop \| done` | manage planned changes in `openspec/backlog.md` (order = priority; `move`/`drop` are human-only) |
 | `sdlc import bmad <path> (--change <id> \| --to-backlog) [--dry-run]` | import BMAD planning into an unapproved change, or epics/tickets (or a PRD/SPEC) into the backlog |
 | `sdlc status [--change] [--markdown] [--json]` / `sdlc next` | stages, gates, approvals, evidence, who acts next (with `--change`, a stage stepper and task bar); with no active change, the next ready backlog item |
-| `sdlc guide [topic[#section]] [--json]` | how sdlc works: short articles (en, ru) the guide workflow answers from; `denials#<rule>` explains a hook denial |
+| `sdlc guide [topic[#section]] [--json]` | how sdlc works: short articles (in several languages) the guide workflow answers from; `denials#<rule>` explains a hook denial |
 | `sdlc next --me [--json]` / `sdlc approve <gate> --change <id> --preview` | what waits for me, with the commands; what I am about to approve (writes nothing) |
 | `sdlc help [topic] [--json]` | catalog of workflows and CLI commands with who runs them (agent or person) |
 | `sdlc statusline` | one-line Claude Code status (change · stage · who acts); reads JSON on stdin |
@@ -222,7 +222,7 @@ Every command except `statusline`, `dashboard`, `hook` and the `openspec` pass-t
 version: 1
 schema: sdlc
 cli: sdlc                                  # "npx --no-install sdlc" for a project-local install
-locale: ru                                 # optional: language of help, hints and reports (default: system, else en)
+locale: <code>                             # optional: language of help, hints and reports (default: system, else en)
 tools: [claude, opencode]                  # also: cursor, codex, qwen, gigacode
 gates:
   intent:  { required: true,  approvers: [product-owner] }
@@ -256,7 +256,7 @@ Project context and per-artifact rules stay where OpenSpec keeps them (`openspec
 
 ### Language
 
-Help, `Next:` hints, `status`, the init wizard, hook reasons, the report and the dashboard follow the locale: `--locale <code>` on any command, then `SDLC_LOCALE`, then `locale:` in `openspec/sdlc.yaml`, then the system locale (`LC_ALL`, `LC_MESSAGES`, `LANG`, the OS). Without a translation the text is English. Shipped: English and Russian. JSON output, the project log and change records are always English, so agents and CI read the same thing everywhere.
+Help, `Next:` hints, `status`, the init wizard, hook reasons, the report and the dashboard follow the locale: `--locale <code>` on any command, then `SDLC_LOCALE`, then `locale:` in `openspec/sdlc.yaml`, then the system locale (`LC_ALL`, `LC_MESSAGES`, `LANG`, the OS). Without a translation the text is English. Translations ship with sdlc. JSON output, the project log and change records are always English, so agents and CI read the same thing everywhere.
 
 ### People and roles (`openspec/roles.yaml`, optional)
 
@@ -264,7 +264,7 @@ People, their emails and signing keys, the roles they hold and the separation ru
 
 ### Examples
 
-- **The calculator demo**: `test/e2e-calculator.test.ts` runs every command on a small project and records a transcript; `npm run demo:deck` turns it into a deck (English and Russian). See [docs/en/09-demo-and-automation.md](docs/en/09-demo-and-automation.md).
+- **The calculator demo**: `test/e2e-calculator.test.ts` runs every command on a small project and records a transcript; `npm run demo:deck` turns it into a deck in every shipped language. See [docs/en/09-demo-and-automation.md](docs/en/09-demo-and-automation.md).
 - **A background process that keeps the dashboard current**: [`scripts/examples/`](scripts/examples/README.md).
 
 ## Compatibility with OpenSpec

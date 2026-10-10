@@ -20,14 +20,14 @@ The scenario covers every step of the product:
 
 The test fails if any CLI command is missing from the story.
 
-Each step is recorded with who ran it, the command, the exit code, an excerpt of the output and a note. The deck is built from that transcript. The team's surnames follow the deck's language (`SDLC_DEMO_PEOPLE=en` gives Alice Walker, Bob Turner and Carol Hughes; `ru` gives Alice Ivanova, Bob Petrov and Carol Smirnova), so `npm run demo:deck` runs the scenario once per language and every output on the slides stays real:
+Each step is recorded with who ran it, the command, the exit code, an excerpt of the output and a note. The deck is built from that transcript. The team's surnames follow the deck's language (`SDLC_DEMO_PEOPLE` selects them), so `npm run demo:deck` runs the scenario once per language and every output on the slides stays real:
 
 ```bash
 npm run demo:deck                  # per language: runs the scenario, then builds the deck
 node scripts/demo/build-deck.mjs --transcript docs/demo/calculator-transcript.en.json --lang en --out deck.pptx
 ```
 
-The story (which steps each slide shows, the words in English and Russian) is in `scripts/demo/deck-content.mjs`; `scripts/demo/build-deck.mjs` renders it with pptxgenjs. The English deck is `docs/demo/sdlc-calculator-demo.en.pptx` (20 slides), built from `docs/demo/calculator-transcript.en.json`.
+The story (which steps each slide shows, the words in every shipped language) is in `scripts/demo/deck-content.mjs`; `scripts/demo/build-deck.mjs` renders it with pptxgenjs. The English deck is `docs/demo/sdlc-calculator-demo.en.pptx` (20 slides), built from `docs/demo/calculator-transcript.en.json`.
 
 ## 9.2. A background process that keeps the dashboard current
 

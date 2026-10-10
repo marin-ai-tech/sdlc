@@ -167,7 +167,7 @@ sdlc guide tour 3        # intent, spec and plan
 ```
 
 Seven short steps follow the calculator demo: setup, the backlog, the three planning gates, build and verify, review,
-release and archive, and keeping an eye on the process. Each names the real commands, in English or Russian.
+release and archive, and keeping an eye on the process. Each names the real commands, in English or another language.
 
 ## 13.3. What health looks at
 
