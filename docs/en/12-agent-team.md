@@ -129,9 +129,12 @@ A pack holds `roles/<id>.md` (or `roles/<locale>/<id>.md`) and `skills/<id>/…`
 
 The skills a role lists are installed when the role is accepted, and only with a matching checksum.
 
-- **Where they go.** Into `.claude/skills/<id>/`, or `.opencode/skills/<id>/` in a project without Claude Code. A
-  project with neither Claude Code nor OpenCode among its tools gets the roles, but not the team's skills: the skill is
-  reported as not installed (no skills folder).
+- **Where they go.** Into the skills folder of every tool the project is set up for: `.claude/skills/<id>/` (Claude
+  Code; OpenCode reads it too, so with Claude Code there is no `.opencode` copy), `.opencode/skills/<id>/` (a project
+  with OpenCode but without Claude Code), `.cursor/skills/<id>/` (Cursor), `.agents/skills/<id>/` (Codex CLI),
+  `.qwen/skills/<id>/` (Qwen Code) and `.gigacode/skills/<id>/` (GigaCode). The hook guards every copy, and
+  `sdlc team check` checks every copy. `openspec/.sdlc/team.json` records all the folders of a skill (`dirs`); an
+  older record with only `dir` is still read.
 
 - **A skill that carries more than Markdown** (scripts, binaries) waits for a person: `sdlc team accept --skill <id>`.
 - **`sdlc team check`** lists every skill with:

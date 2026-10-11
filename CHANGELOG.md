@@ -2,6 +2,14 @@
 
 All notable changes to sdlc. Versions follow [Semantic Versioning](https://semver.org/); while the major version is 0, a minor version may change behavior.
 
+## 0.14.7 — 2026-10-11
+
+### Added
+- **Team skills for every configured tool.** When a person accepts a role, its vetted skills are installed into the skills folder of every tool the project is set up for: `.claude/skills/<id>` (Claude Code; OpenCode reads it too, so with Claude Code there is no `.opencode` copy), `.opencode/skills/<id>` (a project with OpenCode but without Claude Code), `.cursor/skills/<id>` (Cursor), `.agents/skills/<id>` (Codex CLI), `.qwen/skills/<id>` (Qwen Code) and `.gigacode/skills/<id>` (GigaCode). Before, only Claude Code and OpenCode projects got the team's skills. The hook guards every copy, and `sdlc team check` checks every copy. `openspec/.sdlc/team.json` records all the folders of a skill (`dirs`); older records with only `dir` are still read.
+
+### Fixed
+- **Cursor's user-level hooks are the guard's configuration.** An agent's edits and shell writes of `~/.cursor/hooks.json` are denied (rule `guard-config`), as for the user settings of Claude Code, OpenCode, Codex CLI, Qwen Code and GigaCode: they can switch the guard's hooks off. This is a security fix of the guard.
+
 ## 0.14.6 — 2026-10-11
 
 ### Changed

@@ -9,10 +9,13 @@ import { ROLE_ID } from './role-file.js';
  * Where the agent team lives (B69, B70, B71, B74): accepted roles in `docs/agents/<role>.md`, drafts in
  * `docs/agents/drafts/<role>.md`, and the record of what a person accepted in `openspec/.sdlc/team.json`, written
  * only by the CLI: `{ version: 1, roles: { <id>: { digest, source, version?, server?, checksum?, by, at } },
- * skills: { <id>: { version, checksum, source, server, by, at, dir, files: { <path>: <sha256> }, scripts } },
+ * skills: { <id>: { version, checksum, source, server, by, at, dir, dirs?, files: { <path>: <sha256> }, scripts } },
  * drafts: { <id>: { kind, server?, version?, checksum?, text } } }`. `drafts` keeps each draft as its source gave
  * it, so accepting shows what was changed in it since. A role, a skill or a draft from a pack (B76) also keeps
  * `pack: { pack, git | npm, ref, commit | version, integrity? }`.
+ *
+ * A skill is installed for every configured tool (B86), so it may live in several folders: `dirs` lists them all and
+ * `dir` is the first. A record written before 0.14.7 has only `dir`; it reads as that one folder.
  */
 export const AGENTS_DIR = 'docs/agents';
 export const DRAFTS_DIR = 'docs/agents/drafts';
@@ -36,8 +39,10 @@ export interface SkillEntry {
   server: string;
   by: string;
   at: string;
-  /** The skill's folder, root-relative (`.claude/skills/<id>`). */
+  /** The skill's first folder, root-relative (`.claude/skills/<id>`); a record before 0.14.7 has only this one. */
   dir: string;
+  /** Every folder the skill was written to (B86), root-relative; absent in an older record. */
+  dirs?: string[];
   /** Each file, relative to `dir`, and the sha256 of its content (newlines normalized) as installed. */
   files: Record<string, string>;
   /** The files that are not Markdown. */
@@ -76,8 +81,13 @@ export function roleDigest(text: string): string {
 }
 
 type Raw = Record<string, unknown>;
-/** Where an installed skill may live: a folder of a skills root. */
-const SKILL_DIR = /^\.(?:claude|opencode)\/skills\/[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/;
+/** Where an installed skill may live: a folder of a tool's skills root (B86: every tool's). */
+const SKILL_DIR = /^\.(?:claude|opencode|cursor|agents|qwen|gigacode)\/skills\/[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/;
+
+/** Every folder of an installed skill: its `dirs`, or the one `dir` of an older record. */
+export function skillDirs(entry: Pick<SkillEntry, 'dir' | 'dirs'>): string[] {
+  return entry.dirs && entry.dirs.length > 0 ? [...entry.dirs] : [entry.dir];
+}
 
 function object(value: unknown): Raw | undefined {
   return value && typeof value === 'object' && !Array.isArray(value) ? (value as Raw) : undefined;
@@ -117,6 +127,14 @@ function fileMap(value: unknown): Record<string, string> {
   return Object.fromEntries(pairs);
 }
 
+/** The `dirs` of a record: each a skill folder, the first being `dir`; none when absent or not so. */
+function dirsField(value: unknown, dir: string): { dirs?: string[] } {
+  if (!Array.isArray(value)) return {};
+  const dirs = [...new Set(value.filter((item): item is string => typeof item === 'string'))];
+  const valid = dirs.length > 0 && dirs[0] === dir && dirs.every((item) => SKILL_DIR.test(item));
+  return valid ? { dirs } : {};
+}
+
 function skillEntry(value: unknown): SkillEntry | undefined {
   const raw = object(value);
   const text = (key: string) => (typeof raw?.[key] === 'string' ? (raw[key] as string) : '');
@@ -124,7 +142,8 @@ function skillEntry(value: unknown): SkillEntry | undefined {
   const scripts = Array.isArray(raw.scripts) ? raw.scripts.filter((item) => typeof item === 'string') : [];
   return {
     version: text('version'), checksum: text('checksum'), source: text('source'), server: text('server'),
-    by: text('by'), at: text('at'), dir: text('dir'), files: fileMap(raw.files), scripts, ...packField(raw.pack),
+    by: text('by'), at: text('at'), dir: text('dir'), ...dirsField(raw.dirs, text('dir')), files: fileMap(raw.files),
+    scripts, ...packField(raw.pack),
   };
 }
 

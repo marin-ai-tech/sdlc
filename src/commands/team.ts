@@ -58,7 +58,9 @@ function identity(root: string): string {
 }
 
 function printSkills(skills: SkillsOutcome): void {
-  for (const item of skills.installed) line(t('team.accept.skillInstalled', { ...item, path: item.dir }));
+  for (const item of skills.installed) {
+    line(t('team.accept.skillInstalled', { id: item.id, version: item.version, path: item.dirs.join(', ') }));
+  }
   for (const id of skills.unchanged) line(t('team.accept.skillUnchanged', { id }));
   for (const item of skills.needsAcceptance) {
     line(t('team.accept.skillNeedsAcceptance', { id: item.id, scripts: item.scripts.join(', ') }));
@@ -87,7 +89,8 @@ async function acceptSkillCommand(id: string, opts: Options): Promise<void> {
   assertHuman(ctx.config, 'team accept');
   const result = await acceptSkill(ctx.root, ctx.config, id, identity(ctx.root));
   if (opts.json) return printJson(result);
-  line(t('team.acceptSkill.done', { id: result.skill, version: result.version, path: result.dir, team: result.team }));
+  const where = result.dirs.join(', ');
+  line(t('team.acceptSkill.done', { id: result.skill, version: result.version, path: where, team: result.team }));
   if (result.scripts.length > 0) line(t('team.acceptSkill.scripts', { list: result.scripts.join(', ') }));
 }
 

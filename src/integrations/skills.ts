@@ -2,7 +2,7 @@ import { generatedNotice, LICENSE_SUMMARY, LICENSOR } from '../core/license.js';
 import { loadWorkflow, WORKFLOW_IDS, type WorkflowId, type WorkflowTemplate } from './assets.js';
 import { appendNotice, renderBody, yamlString, type Surface } from './render.js';
 import { stageAllowedTools, stageResources, stageSection, type StageResources } from './stage-resources.js';
-import type { GeneratedFile, RenderContext, ToolId } from './types.js';
+import { TOOL_IDS, type GeneratedFile, type RenderContext, type ToolId } from './types.js';
 import { agentNames } from '../team/render.js';
 
 /**
@@ -18,6 +18,32 @@ export function skillsRoot(tools: ToolId[]): string | undefined {
   if (tools.includes('claude')) return '.claude/skills';
   if (tools.includes('opencode')) return '.opencode/skills';
   return undefined;
+}
+
+/** Where each tool reads the skills of the agent team from (B86). */
+export const TEAM_SKILL_ROOTS: Readonly<Record<ToolId, string>> = {
+  claude: '.claude/skills',
+  opencode: '.opencode/skills',
+  cursor: '.cursor/skills',
+  codex: '.agents/skills',
+  qwen: '.qwen/skills',
+  gigacode: '.gigacode/skills',
+};
+
+/** True when the tool reads its skills from a folder another configured tool's copy already fills. */
+function readsAnotherCopy(tool: ToolId, tools: readonly ToolId[]): boolean {
+  return tool === 'opencode' && tools.includes('claude');
+}
+
+/**
+ * The folders an accepted team skill is installed into (B86): one per configured tool, in the order of the tools.
+ * OpenCode reads `.claude/skills` too, so with Claude Code it gets no copy of its own (no duplicate skill name).
+ * The generated sdlc workflow skills keep `skillsRoot`.
+ */
+export function teamSkillRoots(tools: readonly ToolId[]): string[] {
+  const configured = TOOL_IDS.filter((tool) => tools.includes(tool));
+  const own = configured.filter((tool) => !readsAnotherCopy(tool, configured));
+  return own.map((tool) => TEAM_SKILL_ROOTS[tool]);
 }
 
 export function allowedToolsFor(cli: string): string {

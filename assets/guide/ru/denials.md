@@ -43,8 +43,9 @@ Codex CLI, Qwen Code и GigaCode или плагин OpenCode. Отказ наз
 Жёсткое правило. Файл настраивает сам контроль: `openspec/sdlc.yaml`, `.claude/settings*.json`, плагин OpenCode,
 `.mcp.json`, `opencode.json`, `.cursor/hooks.json`, `.cursor/mcp.json`, `.codex/hooks.json`, `.codex/config.toml`,
 `.codex/rules/sdlc.rules`, `.qwen/settings.json`, `.gigacode/settings.json`, манифест, пользовательские настройки
-агентов, принятые роли команды в `docs/agents/`, файлы, которые sdlc генерирует для агентов (субагенты `sdlc-*`,
-навыки и команды процессов), политика ревью (`REVIEW.md` или `review.policy`), схема sdlc и `openspec/config.yaml`.
+агентов (среди них пользовательские хуки Cursor `~/.cursor/hooks.json`), принятые роли команды в `docs/agents/`,
+файлы, которые sdlc генерирует для агентов (субагенты `sdlc-*`, навыки и команды процессов), политика ревью
+(`REVIEW.md` или `review.policy`), схема sdlc и `openspec/config.yaml`.
 **Что делать:** попросить человека внести изменение; `sdlc update` восстанавливает сгенерированные файлы.
 
 ## separation-of-duties

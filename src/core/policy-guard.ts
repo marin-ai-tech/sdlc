@@ -25,8 +25,9 @@ import { linkedFiles, shellWrites, writeSegments, type ProtectedSet } from './po
  *
  * The installed skills of the agent team (the ones openspec/.sdlc/team.json records, B74) are guard files too: a
  * skill is what the agent follows, and it was checked against the registry before it was installed. Their folders
- * (`.claude/skills/<id>`, `.opencode/skills/<id>`) and every file in them; team.json is read cheaply, and a missing
- * or broken file means no team skills.
+ * in every tool's skills folder (B86: `.claude/skills/<id>`, `.opencode/skills/<id>`, `.cursor/skills/<id>`,
+ * `.agents/skills/<id>`, `.qwen/skills/<id>`, `.gigacode/skills/<id>`) and every file in them; team.json is read
+ * cheaply, and a missing or broken file means no team skills.
  */
 /** An accepted role of the agent team: a `.md` file directly in docs/agents/ (not in docs/agents/drafts/). */
 const ROLE_NAME = String.raw`docs/agents/[^/\s'"]+\.md`;
@@ -123,7 +124,11 @@ const GUARD_VAR_TEXT = new RegExp(String.raw`\$\{?\w+\}?/(${GUARD_NAMES})${PATH_
 
 const TEAM_FILE = 'openspec/.sdlc/team.json';
 const SKILL_ID = /^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/;
-const SKILL_ROOTS = ['.claude/skills', '.opencode/skills'];
+/** The skills folders of every tool a team skill is installed for (B86). */
+const SKILL_ROOTS = ['.claude/skills', '.opencode/skills', '.cursor/skills', '.agents/skills', '.qwen/skills',
+  '.gigacode/skills'];
+/** The same as a pattern: `.claude/skills`, ..., `.agents/skills`. */
+const SKILL_ROOT_NAME = String.raw`\.(?:claude|opencode|cursor|agents|qwen|gigacode)/skills`;
 
 /** The ids of the installed team skills in team.json; none when the file is missing or broken. */
 function teamSkillIds(root: string): string[] {
@@ -148,7 +153,7 @@ const STATIC_PATTERNS: GuardPatterns = { file: GUARD_FILE, text: GUARD_TEXT, var
 let cached: { key: string; patterns: GuardPatterns } | undefined;
 
 function skillPatterns(ids: string[]): GuardPatterns {
-  const names = `${GUARD_NAMES}|${String.raw`\.(?:claude|opencode)/skills/(?:${ids.join('|')})/[^\s'"]+`}`;
+  const names = `${GUARD_NAMES}|${SKILL_ROOT_NAME}/(?:${ids.join('|')})/${String.raw`[^\s'"]+`}`;
   return {
     file: new RegExp(`^(?:${names})$`, 'i'),
     text: new RegExp(`${PATH_START}(${names})${PATH_END}`, 'i'),
@@ -297,8 +302,8 @@ export function shellGuardWrites(command: string, root: string, cwd: string, ext
   ];
 }
 
-/** A path in a team skill's folder (not a generated `sdlc-*` skill). */
-const TEAM_SKILL_PATH = /^\.(?:claude|opencode)\/skills\/(?!sdlc-)[^/]+(?:\/|$)/i;
+/** A path in a team skill's folder, in any tool's skills folder (not a generated `sdlc-*` skill). */
+const TEAM_SKILL_PATH = new RegExp(String.raw`^${SKILL_ROOT_NAME}/(?!sdlc-)[^/]+(?:/|$)`, 'i');
 
 /** The denial of a write to the guard's configuration, naming the first path hit. */
 export function guardDenial(hits: string[]): { decision: 'deny'; rule: string; reason: string } | undefined {

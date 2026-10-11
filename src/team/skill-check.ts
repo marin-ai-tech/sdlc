@@ -5,14 +5,16 @@ import { listFilesRecursive, normalizeNewlines, readText } from '../core/fs-util
 import { t } from '../core/i18n.js';
 import { sha256 } from '../integrations/manifest.js';
 import { acceptedRoles } from './accepted.js';
-import { readTeam, type SkillEntry } from './record.js';
-import { fetchSkills, type SkillFetch } from './skills.js';
+import { readTeam, skillDirs, type SkillEntry } from './record.js';
+import { fetchSkills, teamSkillTargets, type SkillFetch } from './skills.js';
 import { scriptsOf, unsafeSkillPath, type SkillFile } from './vetting.js';
 
 /**
  * `sdlc team check` (B74): every skill the accepted roles list (and every installed one), with its version, source,
  * whether its files are still what was checked, whether it is installed or waits for a person, its scripts, the tools
  * its `allowed-tools` grants and the URLs it names. A grant of unrestricted shell or file writes is a warning.
+ * Since B86 a skill counts as installed when it is installed for every configured tool: each of their skills folders
+ * has its recorded copy, and every copy is checked.
  */
 export interface SkillCheck {
   id: string;
@@ -85,26 +87,52 @@ function described(id: string, files: readonly SkillFile[], state: State, proble
   return { id, ...state, scripts: scriptsOf(files), allowedTools, urls: urlsOf(files), warnings };
 }
 
-/** Files in the skill's folder that team.json does not list. */
-function extraFiles(root: string, entry: SkillEntry): string[] {
-  const found = listFilesRecursive(path.join(root, entry.dir)).map((rel) => rel.replace(/\\/g, '/'));
+/** Files in the skill's folder `dir` that team.json does not list. */
+function extraFiles(root: string, dir: string, entry: SkillEntry): string[] {
+  const found = listFilesRecursive(path.join(root, dir)).map((rel) => rel.replace(/\\/g, '/'));
   return found.filter((rel) => !(rel in entry.files)).sort();
 }
 
-function installedCheck(root: string, id: string, entry: SkillEntry): SkillCheck {
-  const files: SkillFile[] = [];
+/** The path of a file of a copy in a message: as before for a single copy, with its folder for several. */
+function shown(dir: string, rel: string, several: boolean): string {
+  return several ? `${dir}/${rel}` : rel;
+}
+
+/** One copy of the skill checked against team.json: its problems; its files go to `files` for the first copy. */
+function copyProblems(root: string, id: string, entry: SkillEntry, copy: { dir: string; several: boolean },
+  files: SkillFile[] | undefined): string[] {
   const problems: string[] = [];
   for (const rel of Object.keys(entry.files).sort()) {
-    const content = unsafeSkillPath(rel) ? undefined : readText(path.join(root, entry.dir, rel));
-    if (content === undefined) problems.push(t('team.check.missing', { id, path: rel }));
-    else if (sha256(content) !== entry.files[rel]) problems.push(t('team.check.edited', { id, path: rel }));
-    if (content !== undefined) files.push({ path: rel, content });
+    const content = unsafeSkillPath(rel) ? undefined : readText(path.join(root, copy.dir, rel));
+    const where = shown(copy.dir, rel, copy.several);
+    if (content === undefined) problems.push(t('team.check.missing', { id, path: where }));
+    else if (sha256(content) !== entry.files[rel]) problems.push(t('team.check.edited', { id, path: where }));
+    if (content !== undefined) files?.push({ path: rel, content });
   }
-  const extra = extraFiles(root, entry);
+  const extra = extraFiles(root, copy.dir, entry).map((rel) => shown(copy.dir, rel, copy.several));
   if (extra.length > 0) problems.push(t('team.check.extra', { id, list: extra.join(', ') }));
-  const state = { version: entry.version, source: entry.source, checksumOk: problems.length === 0, installed: true,
-    needsAcceptance: false };
-  return described(id, files, state, problems);
+  return problems;
+}
+
+/** The copies to check: the recorded folders of the configured tools; the recorded ones if no tool is configured. */
+function checkedDirs(entry: SkillEntry, targets: string[]): string[] {
+  const recorded = skillDirs(entry);
+  if (targets.length === 0) return recorded;
+  return targets.filter((dir) => recorded.includes(dir));
+}
+
+function installedCheck(root: string, id: string, entry: SkillEntry, targets: string[]): SkillCheck {
+  const files: SkillFile[] = [];
+  const dirs = checkedDirs(entry, targets);
+  const several = dirs.length > 1;
+  const problems = dirs.flatMap((dir, index) =>
+    copyProblems(root, id, entry, { dir, several }, index === 0 ? files : undefined));
+  const installed = dirs.length > 0 && targets.every((dir) => dirs.includes(dir));
+  const state = { version: entry.version, source: entry.source, checksumOk: problems.length === 0,
+    installed, needsAcceptance: false };
+  const missing = targets.filter((dir) => !dirs.includes(dir));
+  const reason = missing.length > 0 ? { reason: `not installed in ${missing.join(', ')}` } : {};
+  return { ...described(id, files, state, problems), ...reason };
 }
 
 function remoteCheck(id: string, fetched: SkillFetch): SkillCheck {
@@ -129,7 +157,7 @@ export async function checkTeamSkills(root: string, config: SdlcConfig): Promise
   const fetched = missing.length > 0 ? await fetchSkills(root, config, missing) : none;
   const check = (id: string) => {
     const entry = team.skills[id];
-    return entry ? installedCheck(root, id, entry) : remoteCheck(id, fetched);
+    return entry ? installedCheck(root, id, entry, teamSkillTargets(config, id)) : remoteCheck(id, fetched);
   };
   const skills = ids.map(check);
   const warnings = skills.flatMap((skill) => skill.warnings);

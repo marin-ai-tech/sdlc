@@ -2,14 +2,14 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import type { SdlcConfig } from '../core/config.js';
 import { SdlcError } from '../core/errors.js';
-import { readText, writeTextAtomic } from '../core/fs-utils.js';
+import { listFilesRecursive, readText, writeTextAtomic } from '../core/fs-utils.js';
 import { refreshGeneratedFiles } from '../integrations/install.js';
 import { sha256, type ApplyReport } from '../integrations/manifest.js';
-import { skillsRoot } from '../integrations/skills.js';
+import { teamSkillRoots } from '../integrations/skills.js';
 import { TOOL_IDS, type ToolId } from '../integrations/types.js';
 import type { PackSource } from './pack-config.js';
 import { packSkills } from './packs.js';
-import { readTeam, TEAM_PATH, writeTeam, type SkillEntry, type TeamRecord } from './record.js';
+import { readTeam, skillDirs, TEAM_PATH, writeTeam, type SkillEntry, type TeamRecord } from './record.js';
 import {
   failure, listed, RegistryItemError, registryServer, withRegistry, type RegistryCall,
 } from './registry-client.js';
@@ -18,10 +18,12 @@ import { isSkillId, scriptsOf, unsafeSkillPath, vetSkill, type RegistrySkill, ty
 
 /**
  * Vetted skills (B74). The skills an accepted role lists are fetched from the team registry, checked (checksum,
- * paths, size) and installed into the skills root (`.claude/skills/<id>/`, or `.opencode/skills/<id>/` for
- * OpenCode-only projects), recorded in team.json and owned through the manifest like the generated files. A skill
- * with anything but Markdown (scripts, binaries) waits until a person runs `sdlc team accept --skill <id>`. Since
- * B76 a skill the registry does not give (or gives refused) comes from the first pack that has it, by the same rules.
+ * paths, size) and installed into the skills folder of every configured tool (B86: `.claude/skills/<id>/`,
+ * `.opencode/skills/<id>/` only without Claude Code, `.cursor/skills/<id>/`, `.agents/skills/<id>/` for Codex CLI,
+ * `.qwen/skills/<id>/`, `.gigacode/skills/<id>/`), recorded in team.json and owned through the manifest like the
+ * generated files. A skill with anything but Markdown (scripts, binaries) waits until a person runs
+ * `sdlc team accept --skill <id>`. Since B76 a skill the registry does not give (or gives refused) comes from the
+ * first pack that has it, by the same rules.
  */
 export interface SkillOrigin {
   source: 'registry' | 'pack';
@@ -38,7 +40,7 @@ export interface SkillFetch {
 }
 
 export interface SkillsOutcome {
-  installed: Array<{ id: string; version: string; dir: string }>;
+  installed: Array<{ id: string; version: string; dir: string; dirs: string[] }>;
   unchanged: string[];
   needsAcceptance: Array<{ id: string; version: string; scripts: string[] }>;
   refused: Refused[];
@@ -50,14 +52,22 @@ interface Place {
   team: TeamRecord;
   by: string;
   origins: Record<string, SkillOrigin>;
-  base: string | undefined;
+  /** The skills folders of the configured tools (B86), root-relative. */
+  roots: string[];
 }
 
 const NO_REGISTRY = 'no team registry: set team.registry in openspec/sdlc.yaml';
 
-/** The skills folder of the project's tools, or undefined without Claude Code and OpenCode. */
-export function teamSkillsRoot(config: SdlcConfig): string | undefined {
-  return skillsRoot(config.tools.filter((tool): tool is ToolId => (TOOL_IDS as readonly string[]).includes(tool)));
+const NO_FOLDER = 'no skills folder: no tool is configured in this project';
+
+/** The skills folders of the project's configured tools (B86); empty without a tool. */
+export function teamSkillFolders(config: SdlcConfig): string[] {
+  return teamSkillRoots(config.tools.filter((tool): tool is ToolId => (TOOL_IDS as readonly string[]).includes(tool)));
+}
+
+/** The folders `id` goes to in this project: one per configured tool's skills folder. */
+export function teamSkillTargets(config: SdlcConfig, id: string): string[] {
+  return teamSkillFolders(config).map((root) => `${root}/${id}`);
 }
 
 async function listedChecksums(call: RegistryCall): Promise<Map<string, unknown>> {
@@ -126,42 +136,109 @@ function escapesRoot(root: string, target: string): boolean {
   return rel === '..' || rel.startsWith(`..${path.sep}`) || path.isAbsolute(rel);
 }
 
+/** The folders the skill was recorded in; none when it is not installed. */
+function recordedDirs(place: Place, id: string): string[] {
+  const previous = place.team.skills[id];
+  return previous ? skillDirs(previous) : [];
+}
+
 function folderProblem(place: Place, dir: string, skill: RegistrySkill): string | undefined {
   const abs = path.join(place.root, dir);
-  if (!place.team.skills[skill.id] && fs.existsSync(abs)) {
+  if (!recordedDirs(place, skill.id).includes(dir) && fs.existsSync(abs)) {
     return `${dir} exists and sdlc did not install it; move it away first`;
   }
   const outside = skill.files.find((file) => escapesRoot(place.root, path.join(abs, file.path)));
   return outside ? `${dir}/${outside.path} resolves outside the project` : undefined;
 }
 
-/** Removes the files of the installed version the new one does not have, unless someone edited them. */
-function removeOld(root: string, previous: SkillEntry, keep: Set<string>): void {
+/** The first reason any of the skill's folders may not be written. */
+function foldersProblem(place: Place, dirs: string[], skill: RegistrySkill): string | undefined {
+  for (const dir of dirs) {
+    const problem = folderProblem(place, dir, skill);
+    if (problem) return problem;
+  }
+  return undefined;
+}
+
+/** Removes the files in `dir` of the installed version that `keep` does not have, unless someone edited them. */
+function removeOldIn(root: string, dir: string, previous: SkillEntry, keep: Set<string>): void {
   for (const [rel, digest] of Object.entries(previous.files)) {
     if (keep.has(rel) || unsafeSkillPath(rel)) continue;
-    const abs = path.join(root, previous.dir, rel);
+    const abs = path.join(root, dir, rel);
     const current = readText(abs);
     if (current !== undefined && sha256(current) === digest) fs.rmSync(abs, { force: true });
   }
 }
 
-/** Writes a checked skill into the skills root and records it; a reason when it may not be written. */
-function installSkill(place: Place, skill: RegistrySkill): string | undefined {
-  if (!place.base) return 'no skills folder: neither Claude Code nor OpenCode is installed in this project';
-  const dir = `${place.base}/${skill.id}`;
-  const problem = folderProblem(place, dir, skill);
-  if (problem) return problem;
+/** Removes a folder the skill no longer goes to when nothing of a person's own is left in it. */
+function pruneDir(root: string, dir: string): void {
+  try {
+    const abs = path.join(root, dir);
+    if (listFilesRecursive(abs).length === 0) fs.rmSync(abs, { recursive: true, force: true });
+  } catch {
+    // Best effort: a folder that cannot be read or removed stays.
+  }
+}
+
+/**
+ * In every recorded folder (B86), the files of the installed version the new one does not have; in a folder the
+ * skill no longer goes to (its tool was removed), all of them, and the folder when it is left empty.
+ */
+function removeOld(place: Place, previous: SkillEntry, dirs: string[], skill: RegistrySkill): void {
+  const keep = new Set(skill.files.map((file) => file.path));
+  for (const dir of skillDirs(previous)) {
+    const wanted = dirs.includes(dir);
+    removeOldIn(place.root, dir, previous, wanted ? keep : new Set());
+    if (!wanted) pruneDir(place.root, dir);
+  }
+}
+
+/** The folders to write: all for a new version; for the installed one, those without their copy on disk yet. */
+function foldersToWrite(place: Place, dirs: string[], skill: RegistrySkill): string[] {
   const previous = place.team.skills[skill.id];
-  if (previous) removeOld(place.root, previous, new Set(skill.files.map((file) => file.path)));
-  for (const file of skill.files) writeTextAtomic(path.join(place.root, dir, file.path), file.content);
+  if (previous?.checksum !== skill.checksum) return dirs;
+  const recorded = skillDirs(previous);
+  return dirs.filter((dir) => !recorded.includes(dir) || !fs.existsSync(path.join(place.root, dir)));
+}
+
+function skillRecord(place: Place, skill: RegistrySkill, dirs: string[]): SkillEntry {
   const files = Object.fromEntries(skill.files.map((file) => [file.path, sha256(file.content)]));
   const origin: SkillOrigin = place.origins[skill.id] ?? { source: 'registry' };
   const pack = origin.pack ? { pack: origin.pack } : {};
-  place.team.skills[skill.id] = {
+  return {
     version: skill.version, checksum: skill.checksum, source: origin.source, server: origin.server ?? '',
-    by: place.by, at: new Date().toISOString(), dir, files, scripts: scriptsOf(skill.files), ...pack,
+    by: place.by, at: new Date().toISOString(), dir: dirs[0], dirs, files, scripts: scriptsOf(skill.files), ...pack,
   };
+}
+
+/**
+ * Writes a checked skill into the skills folder of every configured tool (B86) and records them all; a reason when
+ * it may not be written.
+ */
+function installSkill(place: Place, skill: RegistrySkill): string | undefined {
+  if (place.roots.length === 0) return NO_FOLDER;
+  const dirs = place.roots.map((root) => `${root}/${skill.id}`);
+  const problem = foldersProblem(place, dirs, skill);
+  if (problem) return problem;
+  const write = foldersToWrite(place, dirs, skill);
+  const previous = place.team.skills[skill.id];
+  if (previous) removeOld(place, previous, dirs, skill);
+  for (const dir of write) {
+    for (const file of skill.files) writeTextAtomic(path.join(place.root, dir, file.path), file.content);
+  }
+  place.team.skills[skill.id] = skillRecord(place, skill, dirs);
   return undefined;
+}
+
+/** True when the installed version is in every folder the skill goes to. */
+function installedEverywhere(place: Place, skill: RegistrySkill): boolean {
+  const previous = place.team.skills[skill.id];
+  if (previous?.checksum !== skill.checksum) return false;
+  return foldersToWrite(place, place.roots.map((root) => `${root}/${skill.id}`), skill).length === 0;
+}
+
+function installedItem(entry: SkillEntry, id: string): SkillsOutcome['installed'][number] {
+  return { id, version: entry.version, dir: entry.dir, dirs: skillDirs(entry) };
 }
 
 function sortSkill(place: Place, id: string, fetched: SkillFetch, outcome: SkillsOutcome): void {
@@ -169,12 +246,12 @@ function sortSkill(place: Place, id: string, fetched: SkillFetch, outcome: Skill
   if (!vetted) return void outcome.unavailable.push({ id, reason: fetched.error ?? 'not fetched' });
   if (!('ok' in vetted)) return void outcome.refused.push({ id, reason: vetted.reason });
   const skill = vetted.ok;
-  if (place.team.skills[id]?.checksum === skill.checksum) return void outcome.unchanged.push(id);
+  if (installedEverywhere(place, skill)) return void outcome.unchanged.push(id);
   const scripts = scriptsOf(skill.files);
   if (scripts.length > 0) return void outcome.needsAcceptance.push({ id, version: skill.version, scripts });
   const problem = installSkill(place, skill);
   if (problem) outcome.refused.push({ id, reason: problem });
-  else outcome.installed.push({ id, version: skill.version, dir: place.team.skills[id].dir });
+  else outcome.installed.push(installedItem(place.team.skills[id], id));
 }
 
 /** After a role is accepted: its Markdown-only skills installed, the others reported. */
@@ -188,7 +265,7 @@ export async function installRoleSkills(
   if (ids.length === 0) return outcome;
   const fetched = await fetchSkills(root, config, ids);
   const team = readTeam(root);
-  const place = { root, team, by, origins: fetched.origins, base: teamSkillsRoot(config) };
+  const place = { root, team, by, origins: fetched.origins, roots: teamSkillFolders(config) };
   for (const id of [...new Set(ids)]) sortSkill(place, id, fetched, outcome);
   if (outcome.installed.length === 0) return outcome;
   writeTeam(root, team);
@@ -200,6 +277,8 @@ export interface AcceptSkillResult {
   skill: string;
   version: string;
   dir: string;
+  /** Every folder the skill was written to (B86). */
+  dirs: string[];
   scripts: string[];
   team: string;
   entry: SkillEntry;
@@ -229,7 +308,7 @@ export async function acceptSkill(
   const vetted = fetched.skills[id];
   if (!vetted || !('ok' in vetted)) throw skillError(config, id, fetched);
   const team = readTeam(root);
-  const place = { root, team, by, origins: fetched.origins, base: teamSkillsRoot(config) };
+  const place = { root, team, by, origins: fetched.origins, roots: teamSkillFolders(config) };
   const problem = installSkill(place, vetted.ok);
   if (problem) {
     throw new SdlcError('skill_refused', { key: 'error.skill_x_refused', params: { id, reason: problem } });
@@ -237,5 +316,7 @@ export async function acceptSkill(
   writeTeam(root, team);
   const files = refreshGeneratedFiles(root, config);
   const entry = team.skills[id];
-  return { skill: id, version: entry.version, dir: entry.dir, scripts: entry.scripts, team: TEAM_PATH, entry, files };
+  const dirs = skillDirs(entry);
+  return { skill: id, version: entry.version, dir: entry.dir, dirs, scripts: entry.scripts, team: TEAM_PATH, entry,
+    files };
 }
