@@ -295,7 +295,7 @@ All outputs are real, from a trial run of `tasklet` with sdlc 0.14.4, unless a s
 | Problem | Likely cause | What to do |
 |---|---|---|
 | The agent edits code before the plan is approved, with no denial | `sdlc` is not on the PATH of the tool's shell (the hooks let the call through), the hooks are not trusted (Codex, Qwen Code), or the mode is `off` | `sdlc doctor`; fix `cli on PATH`; trust the hooks; check `enforcement.mode` |
-| The agent edits code of one change while another change has an approved plan | the plan gate opens code edits once any active change has an approved plan | keep one active change per checkout, or review the diff against the plan (`sdlc review context`) |
+| The plan gate denies an agent's code edit although its change has an approved plan | several changes are active, and the file is not listed under `## Files that change` in an approved plan, or `plan.md` was edited after its approval | add the file to the plan and have the plan approved again, or finish the other change first |
 | `sdlc: command not found` in hooks | sdlc installed per project, or only Git Bash finds it | install globally, or set `cli: npx --no-install sdlc` and run `sdlc update` |
 | Codex ignores the hooks | the hooks are not trusted, or changed since | open `/hooks` in Codex and trust sdlc's hooks |
 | Qwen Code or GigaCode ignores the hooks | folder trust is off (the default) | turn folder trust on and trust the project folder |
@@ -557,8 +557,6 @@ What this course needed and sdlc 0.14.4 does not offer, or does differently from
   Claude Code, OpenCode and Cursor tool names only).
 - `sdlc guide denials` says "The Claude Code hook and the OpenCode plugin check every edit"; it does not mention Cursor,
   Codex, Qwen Code and GigaCode, which apply the same rules.
-- The plan gate is project-wide: once any active change has an approved plan, the agent may edit any code file, also for
-  another change that has no plan (seen in a trial; not documented).
 - `sdlc next --me` does not list a gate that waits for a person's answers to open questions, although that person is the
   one who must act.
 - `sdlc explain` names the missing role ("Approval still missing from: product-owner") but not the people, while

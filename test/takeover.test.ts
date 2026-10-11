@@ -49,6 +49,36 @@ describe('sdlc takeover and release-control', () => {
     expect(next.next ?? next).toMatchObject({ actor: 'human', action: 'taken-over' });
   }, 180000);
 
+  it('0.14.6: plan paths written without backticks are held too', () => {
+    const p = project();
+    const plain = PLAN.replace('- `src/greet.js` (modified)', '- src/greet.js (modified)')
+      .replace('- `test/greet.test.js` (new)', '* test/greet.test.js — new');
+    write(path.join(p.dir, 'plan.md'), plain);
+    expect(p.cli(['takeover', '--change', 'add-farewell', '--note', 'mine', '--json']).code).toBe(0);
+    for (const file of ['src/greet.js', 'test/greet.test.js']) {
+      expect(p.decide(file), file).toMatchObject({ decision: 'deny', rule: 'takeover' });
+    }
+    expect(p.decide('src/other.js').decision).not.toBe('deny');
+  }, 180000);
+
+  it('0.14.6: a glob in the plan (`src/legacy/**`) is held next to plain paths, as before', () => {
+    const p = project();
+    write(path.join(p.dir, 'plan.md'), PLAN.replace('- `test/greet.test.js` (new)', '- `src/legacy/**` (moved)'));
+    expect(p.cli(['takeover', '--change', 'add-farewell', '--note', 'mine', '--json']).code).toBe(0);
+    for (const file of ['src/greet.js', 'src/legacy/old.js', 'src/legacy/deep/x.js']) {
+      expect(p.decide(file), file).toMatchObject({ decision: 'deny', rule: 'takeover' });
+    }
+    expect(p.decide('src/other.js').decision).not.toBe('deny');
+  }, 180000);
+
+  it('0.14.6: a plan whose file list names no path holds the whole project, as without plan.md', () => {
+    const p = project();
+    const vague = PLAN.replace(/## Files that change\n[\s\S]*?\n\n/, '## Files that change\nThe greeting module and its test.\n\n');
+    write(path.join(p.dir, 'plan.md'), vague);
+    expect(p.cli(['takeover', '--change', 'add-farewell', '--note', 'mine', '--json']).code).toBe(0);
+    expect(p.decide('src/other.js')).toMatchObject({ decision: 'deny', rule: 'takeover' });
+  }, 180000);
+
   it('without plan.md the agent is paused in the whole project for this change', () => {
     const p = project(false);
     expect(p.cli(['takeover', '--change', 'add-farewell', '--note', 'pause', '--json']).code).toBe(0);

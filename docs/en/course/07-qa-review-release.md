@@ -599,9 +599,6 @@ cannot approve.
 
 ### Pitfalls
 
-- In 0.14.4 the `Next:` line printed right after `sdlc approve review` (and after a later `sdlc verify`) can still
-  say "Paul (code-owner) must ... approve the review gate". `sdlc status` and `sdlc next` show the truth:
-  the review is approved and the agent prepares the release.
 - The review approval is bound to the code and `review.md`. A change to either after the approval makes it stale.
 - With `min_approvals: 2` on the review gate, two different code owners must approve.
 - `review suggest` matches a CODEOWNERS entry to a person by email, or a `@handle` to a person id in `roles.yaml`

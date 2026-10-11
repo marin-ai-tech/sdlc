@@ -103,8 +103,6 @@ what happened overnight. He turns on the status line.
 - Inbox items from CI reach Oliver's checkout only after CI commits them (`openspec/.sdlc/inbox/`). Pull first.
 - The agent cannot edit the inbox files or the log. A try is denied with `[sdlc:state-integrity]`
   (`sdlc guide denials#state-integrity`).
-- The status line in 0.14.4 can lag behind after a review approval: it may say `next: person` while
-  `sdlc next` already says the agent prepares the release. Trust `sdlc next` (see "Known limitations" in Chapter 8).
 
 
 <a id="s6-2"></a>
@@ -268,6 +266,8 @@ an edit, and how to read any denial in two steps.
   `[sdlc:plan-gate] No SDLC change covers this edit (src/invoice.js). ...`, and the edit goes through.
 - With no active change at all, the reason says "No SDLC change covers this edit". Start a change with
   `/sdlc:intent` or `sdlc new <name>`.
+- With several active changes, the agent may edit only the code files that an approved plan lists under
+  `## Files that change`; any other file meets the plan gate. Editing `plan.md` after its approval voids the approval.
 - Do not ask the agent to "find a way around" a denial. Every bypass the hook knows about is denied too, and the log
   records each try.
 
@@ -405,10 +405,9 @@ something by hand.
 ### Pitfalls
 
 - `takeover` and `release-control` are a person's commands. The agent proposes them and gives the command.
-- The takeover rule protects the files that `plan.md` lists **in backticks** under `## Files that change`, for
-  example ``- `src/tasks.js` (modified)``. In 0.14.4 a path written without backticks is not covered, and the agent
-  can still edit it during a takeover (plan drift reads both spellings). Ask the agent to write planned paths in
-  backticks. Without a `plan.md`, the takeover covers the whole project.
+- The takeover holds every path that `plan.md` lists under `## Files that change`: paths in backticks, plain list
+  items such as `- src/tasks.js (modified)`, and globs such as `src/legacy/**`. If the list names no path, or there is
+  no `plan.md`, the takeover holds the whole project.
 - After `rework.max_cycles` reworks of one gate (default 3), `sdlc next` asks a person to take over or review the
   scope instead of another agent round.
 

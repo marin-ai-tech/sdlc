@@ -217,7 +217,8 @@ function evaluateApprovalGate(
   digest: string | undefined,
   blocked: LocalizedReason | undefined,
   artifacts: string[],
-  trustRecorded = false
+  trustRecorded = false,
+  ignoreBlockedWithApproval = trustRecorded
 ): GateEvaluation {
   const required = config.gates[id].required && !(state.track === 'lite' && (id === 'intent' || id === 'spec'));
   const all = gateState?.approvals ?? [];
@@ -241,7 +242,7 @@ function evaluateApprovalGate(
       info,
     );
   }
-  if (blocked && !(trustRecorded && valid.length > 0)) {
+  if (blocked && !(ignoreBlockedWithApproval && valid.length > 0)) {
     return withLocalizedReason(
       { ...base, status: 'blocked' as const, satisfied: !required, ...open },
       blocked,
@@ -451,14 +452,15 @@ export function evaluateChange(
       .update(digestFiles(ref.dir, files))
       .digest('hex')}`;
   };
-  const fastModeReason = options.skipFingerprint ? lr('gate.fastMode') : undefined;
+  // Fast readers cannot check freshness. Keep recorded approvals provisional, while still honoring current blockers.
+  const trustRecorded = ref.archived || options.skipFingerprint === true;
   const reviewEval = evaluateApprovalGate('review', config, state, decided.review,
-    codeDigest(['review.md']), fastModeReason ?? reviewBlocked, [], ref.archived);
+    codeDigest(['review.md']), reviewBlocked, [], trustRecorded, ref.archived);
   gates.push(reviewEval);
   if (!reviewEval.satisfied && !upstreamOpen) upstreamOpen = lr('gate.waitingOn', { gate: 'review' });
 
   const releaseEval = evaluateApprovalGate('release', config, state, decided.release,
-    codeDigest(['review.md', 'release.md']), fastModeReason ?? upstreamOpen, [], ref.archived);
+    codeDigest(['review.md', 'release.md']), upstreamOpen, [], trustRecorded, ref.archived);
   gates.push(releaseEval);
 
   if (!fingerprint && !options.skipFingerprint && !ref.archived) {

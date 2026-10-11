@@ -15,7 +15,10 @@ Produce the implementation plan - Stage 3 (Build). Nothing is implemented withou
 
 1. **Check the gate.** `sdlc status --change <id> --json`: the `spec` gate must be `approved`, `waived` or `n/a` (a `lite` change skips intent and spec). Otherwise stop and report.
 2. **Stay read-only while planning.** {{plan-mode}} Read intent.md, proposal.md, specs/ and design.md from disk; explore the codebase (use the `sdlc-researcher` subagent for broad searches).
-3. **Draft `plan.md`**: `sdlc instructions plan --change <id> --json`, then fill every section - files that change, order of work (mark independent steps `[parallel]`), risks, alternatives considered, proof (tests per spec scenario, the `sdlc verify` checks, visual evidence), rollback.
+3. **Draft `plan.md`**: `sdlc instructions plan --change <id> --json`, then fill every section - files that change,
+   order of work (mark independent steps `[parallel]`), risks, alternatives considered, proof (tests per spec scenario,
+   the `sdlc verify` checks, visual evidence), rollback. Under "Files that change", write paths in backticks, one per
+   list item.
 4. **Interrogate the plan with the engineer.** Ask: what could this change break? Which step is riskiest? Which options were rejected and why? Iterate until an engineer who never saw this conversation could implement the change from plan.md alone.
 5. **Write `tasks.md`**: `sdlc instructions tasks --change <id> --json`. For a bug fix the first task writes the failing test that reproduces the bug.
 6. **Stop at the gate.** Present the plan and give the engineer the approval command: `sdlc approve plan --change <id>` (`risk: high` also needs `--as tech-lead`). Implementation starts with {{cmd:build}} only after approval.

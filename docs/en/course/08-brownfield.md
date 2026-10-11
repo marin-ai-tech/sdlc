@@ -735,11 +735,6 @@ no surprise.
 
 Found while writing Modules 6–8 against sdlc 0.14.4 (temporary copies of `tasklet` and `billing-api`):
 
-- The `Next:` hint after `sdlc approve review`, `sdlc approve release` and a later `sdlc verify`, and the status line,
-  still say the review waits for the code owner after it was approved; `sdlc next`/`status` are right (both
-  evaluate with `skipFingerprint: true`, so a code-bound approval does not count).
-- The takeover rule covers only paths in backticks under `## Files that change`; plan drift also reads plain paths,
-  and the plan template does not ask for backticks, so a plan with plain paths leaves the code open during a takeover.
 - With `design.debate: true`, `sdlc next`, `next --me` and `status` name the product owner for the spec gate before
   `## Debate` exists; the approval is then refused with `debate_required`.
 - `sdlc verify --list` (also `--json`) lists only `verify.commands`, not the `verify.mcp` checks.

@@ -1072,8 +1072,6 @@ addresses his note, and Paul approves.
 - After `sdlc reject`, `sdlc next` still points at Paul, not at the agent. Tell the agent to read the note, as in
   step 8. When the agent must clearly do more work, `sdlc rework review --reason … --note "…"` hands the change back
   with the reason in `sdlc next`.
-- The `Next:` line printed by `sdlc approve review` in the trial still asked for a review approval. Run `sdlc next`
-  after an approval to see the real next step (here: the agent prepares the release).
 - A finding marked `deferred (D<n>)` must link to an open item in `openspec/deferred-work.md`, or the review check
   fails.
 - Every code change after the verification makes the evidence stale, and the review gate waits for a new
@@ -1213,8 +1211,6 @@ approval waits for the release checks in GitHub.
 
 ### Pitfalls
 
-- The `Next:` line printed by `sdlc approve release` in the trial pointed at the review gate. `sdlc next` right after
-  it was correct: "All gates are satisfied: archive the change".
 - The release approval is bound to the code. A code change after it makes it stale, and production is denied again.
 - `release.commands` are patterns on the command text. A deploy script with another name is not caught; list it.
 - `SDLC_RELEASE_APPROVAL` in the environment of the session also lets a release command through. It is a person's
@@ -1379,8 +1375,6 @@ seen in the trial run unless the item says otherwise.
   empty for the approver, and no `gate.<gate>.awaiting` event is sent.
 - After `sdlc reject review`, `sdlc next` names the reviewer again instead of handing the change to the agent with
   the note.
-- The `Next:` line printed by `sdlc approve review` (when it completes the gate) and by `sdlc approve release`
-  names the review gate again; `sdlc next` right after is correct.
 - With `min_approvals: 2`, the `Next:` hint lists people who already approved and reads "A or B" though two
   approvals are needed (seen in a first trial with two review roles).
 - `min_approvals` cannot require one approval per role (for example code owner and QA) outside

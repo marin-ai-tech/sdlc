@@ -2,6 +2,16 @@
 
 All notable changes to sdlc. Versions follow [Semantic Versioning](https://semver.org/); while the major version is 0, a minor version may change behavior.
 
+## 0.14.6 — 2026-10-11
+
+### Changed
+- **The plan gate opens only the files of the plan when several changes are active.** With one active change, an approved plan opens code edits as before. With several, the agent may edit code, or write it through the shell, only in files that an approved plan lists under "Files that change"; any other file meets the plan gate (denied in `block` mode, a reminder in `warn` mode). An approved plan that lists no file opens nothing while another change is active. Editing plan.md after its approval voids the approval.
+
+### Fixed
+- **The takeover holds every path the plan lists.** Under "Files that change", plain list items (`- src/greet.js (modified)`) and globs (`src/legacy/**`) now count as well as paths in backticks. The takeover, rework and the warning about planned files the change did not touch read this list with one parser; plan drift in the review context still reads the whole plan.
+- **The takeover fails closed.** A plan whose "Files that change" list names no path holds the whole project, as a change without plan.md does.
+- **The `Next:` line and the status line agree with `sdlc next`** after a review or release approval, instead of naming the review gate again.
+
 ## 0.14.5 — 2026-10-09
 
 ### Added

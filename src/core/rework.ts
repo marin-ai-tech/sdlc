@@ -4,6 +4,7 @@ import { decidedAfter, orderOf, type Ordered } from './decision-order.js';
 import { SdlcError } from './errors.js';
 import { t } from './i18n.js';
 import type { GateEvaluation } from './lifecycle.js';
+export { filesThatChange } from './plan-files.js';
 
 /**
  * Rework: a person sends a change back to a gate's stage with a reason category and a note
@@ -92,19 +93,4 @@ export function gateReached(state: ChangeState, gate: GateId): boolean {
   const own = state.gates[gate];
   if ((own?.approvals?.length ?? 0) > 0 || own?.waived) return true;
   return ALL_GATES.slice(ALL_GATES.indexOf(gate) + 1).some((id) => hasDecision(state.gates[id]));
-}
-
-const FILES_SECTION = /^##[ \t]+Files that change[ \t]*$([\s\S]*?)(?=^##[ \t]|(?![\s\S]))/m;
-
-function isPlainPath(value: string): boolean {
-  if (/[*?[\]<>:\\]/.test(value) || value.endsWith('/') || value.startsWith('/')) return false;
-  if (value.split('/').includes('..')) return false;
-  return value.includes('/') || /\.[A-Za-z0-9]{1,8}$/.test(value);
-}
-
-/** Backticked file paths under "## Files that change" in plan.md. */
-export function filesThatChange(planText: string): string[] {
-  const section = FILES_SECTION.exec(planText)?.[1] ?? '';
-  const paths = [...section.matchAll(/`([^`\s]+)`/g)].map((m) => m[1].replace(/^\.\//, ''));
-  return [...new Set(paths.filter(isPlainPath))];
 }

@@ -10,6 +10,9 @@ Codex CLI, Qwen Code and GigaCode, or the OpenCode plugin. A denial names its ru
 
 ## plan-gate
 
+With several active changes, code may be written only to files listed under "## Files that change" in an approved
+plan, including matching globs; with one active change, an approved plan opens code edits as before.
+
 Process rule. Code was about to be written with no approved plan. **Do:** write `plan.md` and `tasks.md` (the plan
 workflow) and have a person run `sdlc approve plan --change <id>`. Docs and `openspec/` are exempt.
 Since 0.14.0 a shell command counts too, in every tool: the files it writes (`>`, `tee`, `cp`, `mv`,

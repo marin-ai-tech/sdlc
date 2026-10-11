@@ -30,6 +30,7 @@ import {
 } from './policy-shell.js';
 import { shellWriteDestinations } from './policy-shell-writes.js';
 import { patchFiles } from './policy-patch-files.js';
+import { planGateDenial } from './plan-gate.js';
 
 /**
  * Deterministic guardrails behind the advisory skills - the playbook's
@@ -152,6 +153,8 @@ export interface PolicyContext {
 
 interface ChangeSnapshot {
   id: string;
+  dir: string;
+  planApproved: boolean;
   view?: LifecycleView;
   testsLocked: boolean;
   kind: string;
@@ -164,11 +167,13 @@ function snapshots(ctx: PolicyContext, full = false): ChangeSnapshot[] {
       // The hook never needs the names of the people who may approve (roles.yaml lookups): skipPeople.
       const options = full ? { fingerprint, skipPeople: true } : { skipFingerprint: true, skipPeople: true };
       const view = evaluateChange(ctx.paths.root, ref, ctx.config, options);
-      return { id: ref.id, view, testsLocked: view.testsLocked, kind: view.kind };
+      return { id: ref.id, dir: ref.dir, planApproved: gateOk(view, 'plan'),
+        view, testsLocked: view.testsLocked, kind: view.kind };
     } catch {
       // A broken change must not wedge every edit in the repo; surface it via `sdlc doctor`.
       const state = safeState(ref.dir);
-      return { id: ref.id, testsLocked: state?.tests_locked === true, kind: state?.kind ?? 'feature' };
+      return { id: ref.id, dir: ref.dir, planApproved: false,
+        testsLocked: state?.tests_locked === true, kind: state?.kind ?? 'feature' };
     }
   });
 }
@@ -341,17 +346,6 @@ function testsLockedDenial(rels: string[], changes: ChangeSnapshot[], isTest: (p
   const reason = t('hook.testsLocked', { change: locking.id, path: testHit });
   const denial: Decision = { decision: 'deny', rule: 'tests-locked', reason };
   return denial;
-}
-
-/** The plan gate: code (a path that is not exempt) written while no change has an approved plan. */
-function planGateDenial(code: string[], changes: ChangeSnapshot[], soft: Soft): Decision | undefined {
-  if (code.length === 0) return undefined;
-  if (changes.some((c) => gateOk(c.view, 'plan'))) return undefined;
-  const pending = changes.map((c) => c.id);
-  const reason = pending.length === 0
-    ? t('hook.planGateNone', { path: code[0] })
-    : t('hook.planGatePending', { changes: pending.join(', '), path: code[0] });
-  return soft('plan-gate', reason);
 }
 
 /**

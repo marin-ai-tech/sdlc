@@ -167,8 +167,16 @@ describe('sdlc CLI end to end (with the bundled OpenSpec)', () => {
     expect(cli(['approve', 'review', '--change', 'add-farewell', '--json']).json().status[0].code).toBe('gate_blocked');
     write(path.join(changeDir(), 'review.md'), read(path.join(changeDir(), 'review.md')).replace('Status**: open', 'Status**: fixed (default name)'));
     expect(cli(['review', 'check', '--change', 'add-farewell']).code).toBe(0);
-    expect(cli(['approve', 'review', '--change', 'add-farewell']).code).toBe(0);
+    const approved = cli(['approve', 'review', '--change', 'add-farewell']);
+    expect(approved.code).toBe(0);
     expect(cli(['status', '--change', 'add-farewell', '--markdown']).stdout).toMatch(/\| review \| approved \|/);
+    // 0.14.6: the Next: hint and the status line agree with `sdlc next` once the review is approved.
+    const next = cli(['next', '--change', 'add-farewell', '--json']).json().next;
+    expect(next.cli ?? '').not.toContain('approve review');
+    const hint = approved.stdout.split('\n').find((line) => line.startsWith('Next:')) ?? '';
+    expect(hint).not.toContain('approve review');
+    const line = cli(['statusline'], {}, JSON.stringify({ cwd: root, workspace: { current_dir: root } })).stdout;
+    expect(line).not.toMatch(/approve review|review: waiting/i);
   });
 
   it('archives through OpenSpec, merging the delta into the living spec', () => {

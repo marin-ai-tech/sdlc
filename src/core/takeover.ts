@@ -49,7 +49,9 @@ function heldChanges(paths: ProjectPaths): HeldChange[] {
       continue;
     }
     const folder = toPosix(path.relative(paths.root, ref.dir)).toLowerCase();
-    held.push({ id: ref.id, folder, takeover, files: readPlanFiles(ref.dir) });
+    const planned = readPlanFiles(ref.dir, true);
+    const files = planned && planned.length > 0 ? planned : undefined;
+    held.push({ id: ref.id, folder, takeover, files });
   }
   return held;
 }
