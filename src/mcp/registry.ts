@@ -32,6 +32,8 @@ export interface McpCheck {
   tool: string;
   args: Record<string, unknown>;
   expect: unknown;
+  wait_while?: Record<string, unknown>;
+  wait_seconds: number;
   required: boolean;
 }
 
@@ -52,6 +54,11 @@ function mapping(value: unknown, where: string): Raw | undefined {
   if (value === undefined || value === null) return undefined;
   if (typeof value !== 'object' || Array.isArray(value)) throw invalid('error.x_must_be_a_mapping', where);
   return value as Raw;
+}
+
+function requiredMapping(value: unknown, where: string): Raw {
+  if (value === null) throw invalid('error.x_must_be_a_mapping', where);
+  return mapping(value, where) ?? {};
 }
 
 function text(value: unknown, where: string): string {
@@ -108,12 +115,18 @@ function parseCheck(value: unknown, where: string, index: number): McpCheck {
   const raw = mapping(value, where) ?? {};
   const required = raw.required ?? true;
   if (typeof required !== 'boolean') throw invalid('error.x_must_be_true_or_false', `${where}.required`);
+  const waitSeconds = raw.wait_seconds === undefined ? 0 : raw.wait_seconds;
+  if (!Number.isInteger(waitSeconds) || (waitSeconds as number) < 0 || (waitSeconds as number) > 3600) {
+    throw invalid('error.x_must_be_x', `${where}.wait_seconds`, { p2: 'an integer from 0 to 3600' });
+  }
   return {
     name: raw.name === undefined ? `mcp-${index + 1}` : text(raw.name, `${where}.name`),
     server: text(raw.server, `${where}.server`),
     tool: text(raw.tool, `${where}.tool`),
     args: mapping(raw.args, `${where}.args`) ?? {},
     expect: raw.expect ?? {},
+    wait_while: raw.wait_while === undefined ? undefined : requiredMapping(raw.wait_while, `${where}.wait_while`),
+    wait_seconds: waitSeconds as number,
     required,
   };
 }
@@ -128,6 +141,13 @@ export function parseMcpChecks(value: unknown, where: (key: string) => string, k
 /** The values a server is given through its configuration: `env` (stdio) or `headers` (http). */
 export function secretCarriers(server: McpServer): Record<string, string> {
   return server.type === 'stdio' ? server.env : server.headers;
+}
+
+/** Unique `${VAR}` names used by a server's secret carriers, without reading the environment. */
+export function referencedVariables(server: McpServer): string[] {
+  const names = Object.values(secretCarriers(server)).flatMap((value) =>
+    [...value.matchAll(REFERENCE)].map((match) => match[1]));
+  return [...new Set(names)];
 }
 
 /** A value that holds a secret literal: the patterns of B16, on the value alone and as `key = "value"`. */

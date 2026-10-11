@@ -1374,8 +1374,6 @@ seen in the trial run unless the item says otherwise.
 
 - No built-in GitHub Issues sync: the agent reads issues through the `github` MCP server and runs
   `sdlc backlog add`; nothing keeps the two lists in step.
-- `sdlc backlog add` does not detect an item with the same `--source-ref` (a second item for
-  `northwind/tasklet#12` was added as B8).
 - `sdlc backlog add` has no `--source-url` (only `sdlc new` has one), so an issue link is kept as a ref string.
 - Archiving a change marks its backlog item done but does not close or comment on the linked GitHub issue.
 - Running `sdlc import bmad --to-backlog` twice adds a second epic with the same items; there is no repeat check.

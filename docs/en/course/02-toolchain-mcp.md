@@ -106,7 +106,9 @@ writes them into the agent tool's own configuration.
    fix: Write a reference instead (e.g. `${VAR}`) under mcp.servers.github and set the variable in the environment.
    ```
 
-   The message names the server and the key, never the value. Nothing was written.
+    The message names the server and the key, never the value. Nothing was written.
+    `sdlc doctor` also warns about an unset registry `${VAR}` in `env` or `headers` ("mcp variables"),
+    naming the server and variable, never the value.
 
 6. Commit `openspec/sdlc.yaml`, `.mcp.json` and the updated workflow files in one commit.
 
@@ -187,7 +189,7 @@ behind the guard's back.
 
 ### Pitfalls
 
-- `sdlc mcp check` always exits 0. Read the output, or check `available` in the JSON.
+- Use `sdlc mcp check --strict` in CI: an unreachable registry server makes it exit 1. Without `--strict`, it exits 0.
 - The file-write warning is a guess from tool names. A server that writes files under another name is not flagged.
   Read a server's documentation before you add it.
 - `sdlc mcp check` lists tool names, not their arguments. Take the argument names from the server's documentation.
@@ -327,9 +329,11 @@ reach the agent through the inbox.
            workflow_id: ci.yml
            head_sha: "${HEAD}"
            per_page: 1
-         expect:
-           workflow_runs:
-             - { status: completed, conclusion: success }
+          expect:
+            workflow_runs:
+              - { status: completed, conclusion: success }
+          wait_while: { workflow_runs: [{ status: [queued, in_progress] }] }
+          wait_seconds: 600
    ```
 
    | Key | Meaning |
@@ -337,6 +341,7 @@ reach the agent through the inbox.
    | `server`, `tool` | the registry server and the tool the CLI calls |
    | `args` | the tool's arguments; `${HEAD}` becomes the head commit, `${CHANGE}` the change id |
    | `expect` | what the answer must contain (a deep subset: objects by key, lists item by item) |
+   | `wait_while`, `wait_seconds` | retry pending answers for up to 600 seconds here; default is no wait |
    | `required` | `true` by default; a failing required check fails the verification |
 
 3. Explain the run. Oliver's agent finishes the build, commits, and Oliver pushes the branch. CI runs on that commit.
@@ -388,7 +393,7 @@ reach the agent through the inbox.
 ### Pitfalls
 
 - Commit and push before you verify. `${HEAD}` is the last commit; uncommitted code is not what CI tested.
-- A CI run that is still in progress fails the check (`status` is not `completed`). Wait for CI, then verify again.
+- With `wait_while`, a queued or in-progress CI run is polled until it finishes or the wait limit expires.
 - `expect` compares lists item by item and by length. A tool that returns a list of runs needs a filter that
   returns exactly the run you mean (here `head_sha` and `per_page: 1`).
 - `sdlc verify --only ci-green` runs only that check. It records evidence but never passes the gate.
@@ -731,10 +736,7 @@ Things this scenario wanted that sdlc 0.14.4 does not do. One line each, for the
 1. No sync between GitHub Issues or Projects and `openspec/backlog.md`; only `--source-ref` links and the agent.
 2. No built-in CI check: `verify.mcp` needs the GitHub server's tool and argument names; sdlc does not validate them.
 3. `expect` matches lists by exact length; a list of runs needs a filter that returns one item ("any item" is missing).
-4. `verify.mcp` and `release.mcp` do not wait for a CI run in progress; a pending run fails and must be rerun.
 5. `sdlc mcp check` lists tool names only, not their input arguments.
-6. `sdlc mcp check` always exits 0; a CI step must parse the JSON to fail on an unreachable server.
-7. `sdlc doctor` does not check that the registry's `${VAR}` references are set in the environment.
 8. A registry server cannot be marked CLI-only (event receiver, check target); every one is laid out for the agents.
 9. `stages: []` means "not checked", not "never"; the agent cannot be forbidden a server outright.
 10. An open change is never at `maintain`, so a `maintain`-only server is out of stage during `/sdlc:triage`.

@@ -2,7 +2,7 @@ import type { SdlcConfig } from '../core/config.js';
 import { t } from '../core/i18n.js';
 import { findSecrets } from '../core/policy-secrets.js';
 import type { McpCheckOutcome, VerificationRun } from '../core/verify.js';
-import { callServerTool, McpTimeout } from './client.js';
+import { McpTimeout, parseAnswer, withServer, type ToolAnswer } from './client.js';
 import { expandedSecrets, type McpCheck, type McpServer } from './registry.js';
 
 /**
@@ -93,6 +93,54 @@ function errorText(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
 
+/** A list in a pending condition accepts any of its values. */
+function pendingMatch(expected: unknown, actual: unknown): boolean {
+  if (Array.isArray(expected)) return expected.some((item) => pendingMatch(item, actual));
+  if (isObject(expected)) {
+    if (!isObject(actual)) return false;
+    return Object.entries(expected).every(([key, value]) => pendingMatch(value, actual[key]));
+  }
+  return Object.is(expected, actual);
+}
+
+function pause(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+interface FinalAnswer {
+  answer: ToolAnswer;
+  pending: boolean;
+}
+
+/** Retry pending results on the same connection, within the configured wait and the overall connection limit. */
+async function finalAnswer(
+  check: McpCheck,
+  server: McpServer,
+  args: Record<string, unknown>,
+): Promise<FinalAnswer> {
+  const waitMs = check.wait_seconds * 1000;
+  const started = Date.now();
+  const limit = CHECK_TIMEOUT_MS + waitMs;
+  return withServer(server, limit, async (client) => {
+    let delay = 1000;
+    while (true) {
+      const raw = await client.callTool(
+        { name: check.tool, arguments: args },
+        undefined,
+        { timeout: CHECK_TIMEOUT_MS },
+      );
+      const answer = parseAnswer(raw as Record<string, unknown>);
+      const pending = !answer.isError && check.wait_while !== undefined &&
+        pendingMatch(check.wait_while, answer.result);
+      if (!pending) return { answer, pending: false };
+      const remaining = waitMs - (Date.now() - started);
+      if (remaining <= 0) return { answer, pending: true };
+      await pause(Math.min(delay, remaining));
+      delay = Math.min(delay * 2, 15_000);
+    }
+  });
+}
+
 interface Verdict {
   ok: boolean;
   reason?: string;
@@ -102,9 +150,13 @@ interface Verdict {
 async function callCheck(check: McpCheck, server: McpServer, vars: CheckVars): Promise<Verdict> {
   const args = expandArgs(check.args, vars) as Record<string, unknown>;
   try {
-    const answer = await callServerTool(server, check.tool, args, CHECK_TIMEOUT_MS);
+    const { answer, pending } = await finalAnswer(check, server, args);
     if (answer.isError) {
       return { ok: false, reason: t('verify.mcpToolError', { text: answer.text ?? '' }), result: answer.result };
+    }
+    if (pending) {
+      const reason = `Still pending after ${check.wait_seconds} seconds`;
+      return { ok: false, reason, result: answer.result };
     }
     const miss = subsetMismatch(check.expect, answer.result);
     if (!miss) return { ok: true, result: answer.result };

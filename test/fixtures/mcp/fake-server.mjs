@@ -31,9 +31,21 @@ if (eventsFile) {
   });
 }
 
+/**
+ * FAKE_PENDING_FILE=<path> with FAKE_PENDING_COUNT=<n>: the first n calls answer `in_progress` (a CI run that has not
+ * finished), the later ones FAKE_STATUS. The count lives in the file, so it survives a restart of this server.
+ */
+function pendingStatus() {
+  const file = process.env.FAKE_PENDING_FILE;
+  if (!file) return undefined;
+  const seen = fs.existsSync(file) ? Number(fs.readFileSync(file, 'utf8')) || 0 : 0;
+  fs.writeFileSync(file, String(seen + 1));
+  return seen < Number(process.env.FAKE_PENDING_COUNT ?? 0) ? 'in_progress' : undefined;
+}
+
 function pipelineStatus(args) {
   const answer = {
-    status: process.env.FAKE_STATUS ?? 'success',
+    status: pendingStatus() ?? process.env.FAKE_STATUS ?? 'success',
     ref: args?.ref ?? null,
     token: process.env.CI_TOKEN ? 'present' : 'absent',
   };

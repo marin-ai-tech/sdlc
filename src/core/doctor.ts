@@ -22,6 +22,7 @@ import { CODEX_RULES_PATH } from '../integrations/codex.js';
 import { CODEX_HOOKS_PATH, codexHooksInstalled } from '../integrations/codex-hooks.js';
 import { qwenSettingsInstalled, qwenSettingsPath } from '../integrations/qwen-settings.js';
 import { CHAIN_LINE, CHAIN_SUFFIX, inspectGitHook } from '../integrations/git-hook.js';
+import { referencedVariables } from '../mcp/registry.js';
 
 /**
  * The checks of `sdlc doctor`, as a function `sdlc health` reuses (config.doctor). Same checks in the same order,
@@ -229,7 +230,25 @@ function cursorCheck(out: Checks, root: string): void {
   out.add('cursor', 'warn', parts.join('; '), fix);
 }
 
-function projectConfigChecks(out: Checks, root: string, paths: ProjectPaths, config: SdlcConfig): void {
+function mcpVariablesCheck(out: Checks, config: SdlcConfig, env: NodeJS.ProcessEnv): void {
+  const servers = config.mcp?.servers ?? [];
+  const references = servers.flatMap((server) =>
+    referencedVariables(server).map((variable) => ({ server: server.name, variable })));
+  if (references.length === 0) return;
+  const missing = references.filter(({ variable }) => env[variable] === undefined);
+  const message = missing.length === 0
+    ? out.tt('doctor.mcpVariablesSet')
+    : missing.map(({ server, variable }) => out.tt('doctor.mcpVariableMissing', { server, variable })).join('; ');
+  out.add('mcp variables', missing.length === 0 ? 'ok' : 'warn', message);
+}
+
+function projectConfigChecks(
+  out: Checks,
+  root: string,
+  paths: ProjectPaths,
+  config: SdlcConfig,
+  env: NodeJS.ProcessEnv,
+): void {
   const { tt } = out;
   const license = assessLicense(config.license, detectProjectLicense(root), out.loc);
   out.add('license', license.status, license.message, license.fix);
@@ -237,6 +256,7 @@ function projectConfigChecks(out: Checks, root: string, paths: ProjectPaths, con
     ? tt('doctor.logEntries', { count: readLog(root).length, path: LOG_PATH })
     : tt('doctor.logOff');
   out.add('project log', 'ok', logMessage);
+  mcpVariablesCheck(out, config, env);
   integrationChecks(out, root, config);
   const names = config.verify.commands.map((v) => v.name).join(', ');
   const verify = config.verify.commands.length > 0 ? 'ok' : 'warn';
@@ -292,7 +312,7 @@ function gitHookCheck(out: Checks, root: string): void {
   out.add('git hook', 'warn', tt(`doctor.gitHook.${hook.status}`, { path: shown }), fix);
 }
 
-function projectChecks(out: Checks, root: string): void {
+function projectChecks(out: Checks, root: string, env: NodeJS.ProcessEnv): void {
   const paths = projectPaths(root);
   out.add('project', 'ok', out.tt('doctor.root', { root }));
   const roles = readRolesFile(root);
@@ -300,7 +320,7 @@ function projectChecks(out: Checks, root: string): void {
   const config = configCheck(out, paths);
   openspecChecks(out, root, paths);
   generatedFilesCheck(out, root, config);
-  if (config) projectConfigChecks(out, root, paths, config);
+  if (config) projectConfigChecks(out, root, paths, config, env);
   gitCheck(out, root);
 }
 
@@ -315,13 +335,14 @@ export interface DoctorOptions {
 /** Every check of `sdlc doctor`, in order. Throws only what the checks themselves throw (e.g. a bad roles.yaml). */
 export function doctorChecks(options: DoctorOptions): DoctorCheck[] {
   const loc = options.locale;
+  const env = options.env ?? process.env;
   const out = new Checks((key, params) => t(key, params, loc), loc);
   runtimeChecks(out, options.root);
   dependencyChecks(out, options.root);
   if (!options.root) out.add('project', 'error', out.tt('doctor.noProject'), out.tt('doctor.fix.init'));
-  else projectChecks(out, options.root);
+  else projectChecks(out, options.root, env);
   // A disabled hook cannot say so itself (B42): the user's and the project's settings files.
-  for (const file of hooksDisabledFiles(options.root, options.env ?? process.env)) {
+  for (const file of hooksDisabledFiles(options.root, env)) {
     const fix = out.tt('doctor.fix.hooksDisabled', { path: file });
     out.add('hooks disabled', 'warn', out.tt('doctor.hooksDisabled', { path: file }), fix);
   }

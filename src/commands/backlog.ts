@@ -131,7 +131,7 @@ export function backlogAdd(title: string, opts: Options): void {
         acceptance: values(opts.accept),
         dependsOn: values(opts.depends),
         source: sourceType ? `${sourceType} ${sourceRef}` : undefined,
-      });
+      }, { allowDuplicate: opts.allowDuplicate === true });
     },
     'backlog.added'
   );

@@ -217,7 +217,7 @@ into backlog items that Megan orders.
    ```
 
 2. Read a finding. Each one has a level (`bad`, `warn`, `info`), an id in brackets, the facts, and a recommendation.
-   There is no single score on purpose: a number hides what to do. The command always exits 0. It advises; it never
+   There is no single score on purpose: a number hides what to do. The command returns exit code 0. It advises; it never
    blocks.
 
    | Area | Finding ids |

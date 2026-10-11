@@ -14,8 +14,10 @@ const AGENT_VARS = ['CLAUDECODE', 'OPENCODE', 'AGENT', 'SDLC_AGENT', 'CLAUDE_PRO
   // 0.14.1 adds qwen and gigacode (shared marker).
   'QWEN_CODE', 'QWEN_CODE_SESSION_ID'];
 
+/** A fresh folder inside the run's temporary root (test/global-setup.ts), which the run removes at its end. */
 export function tempDir(prefix = 'sdlc-test-'): string {
-  return fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), prefix)));
+  const base = process.env.SDLC_TEST_TMP ?? os.tmpdir();
+  return fs.realpathSync(fs.mkdtempSync(path.join(base, prefix)));
 }
 
 /** Environment for a person at a terminal (no agent markers), isolated from the user's OpenSpec data. */

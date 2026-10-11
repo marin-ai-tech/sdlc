@@ -131,6 +131,7 @@ export function buildProgram(): Command {
       (value, previous: string[]) => [...previous, value], [] as string[])
     .option('--source-type <type>', 'origin type')
     .option('--source-ref <ref>', 'origin reference')
+    .option('--allow-duplicate', 'allow another backlog item with the same source')
     .option('--json', 'output JSON')
     .action((title, opts) => backlogAdd(title, opts));
   backlog.command('edit <B-id>').description(cmdDesc('cmd.backlog.edit'))
@@ -319,6 +320,7 @@ export function buildProgram(): Command {
     .action((opts) => mcpServeCommand(opts));
   mcp.command('check').description(cmdDesc('cmd.mcp.check'))
     .option('--json', 'output JSON')
+    .option('--strict', 'exit non-zero when a server is unavailable')
     .action((opts) => mcpCheckCommand(opts));
   const inbox = program.command('inbox').description(cmdDesc('cmd.inbox'));
   inbox.command('list').description(cmdDesc('cmd.inbox.list'))

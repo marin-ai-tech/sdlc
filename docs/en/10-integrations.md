@@ -77,6 +77,9 @@ sdlc remembers which entries it wrote. A server removed from the registry disapp
 
 **Secrets only as references.** A literal key or token in `env` or `headers` is a configuration error (`mcp_secret_literal`). Nothing is written, and the message names the server and the key, never the value.
 
+`sdlc doctor` checks "mcp variables". An unset `${VAR}` in a registry server's `env` or `headers` produces a warning
+that names the server and variable, never its value.
+
 **Check before you rely on it.**
 
 ```bash
@@ -84,6 +87,7 @@ sdlc mcp check --json
 ```
 
 It connects to every server, lists its tools and marks the unreachable ones. It also warns about a server whose tools can write files: such a server could change files behind the hook's back, so keep it out of the registry.
+Use `sdlc mcp check --strict` in CI: it exits 1 if a registry server cannot be reached. Without `--strict`, it exits 0.
 
 ## 10.3. CI status as gate evidence
 
@@ -95,16 +99,22 @@ verify:
     - { name: test, run: npm test }
   mcp:
     - name: ci-green
-      server: build
-      tool: pipeline_status
-      args: { ref: "${HEAD}" }
-      expect: { status: success }
+      server: github
+      tool: list_workflow_runs
+      args: { head_sha: "${HEAD}", per_page: 1 }
+      expect: { workflow_runs: [{ conclusion: success }] }
+      wait_while: { workflow_runs: [{ status: [queued, in_progress] }] }
+      wait_seconds: 600
 ```
 
 `sdlc verify` calls the tool itself; the CLI is the MCP client:
 
 - `${HEAD}` becomes the head commit and `${CHANGE}` the change id.
 - The answer must contain `expect` (a deep subset).
+- Use the tool and argument names your GitHub server exposes. `wait_while` uses the same deep subset shape as
+  `expect`; a list value matches any listed value. While it matches, the CLI asks again, pausing from 1 to 15 seconds.
+  `wait_seconds` accepts 0..3600 and defaults to 0 (no wait). After the limit, the check fails with
+  `Still pending after N seconds`. The same options work in `release.mcp`.
 - A mismatch, a tool error, a timeout or an unreachable server fails the check with the reason (for a mismatch: the key, the expected and the actual value).
 - A required MCP check that fails fails the verification, just like a failing command.
 - Results go into the evidence next to the commands' results. The JSON answer lists them under `mcp`.

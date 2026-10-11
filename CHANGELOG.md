@@ -2,6 +2,17 @@
 
 All notable changes to sdlc. Versions follow [Semantic Versioning](https://semver.org/); while the major version is 0, a minor version may change behavior.
 
+## 0.15.1 — 2026-10-11
+
+### Added
+- `verify.mcp` and `release.mcp` checks can wait for a pending answer with `wait_while` and `wait_seconds`.
+- `sdlc mcp check --strict` exits 1 when a registry server cannot be reached, for CI use.
+- `sdlc doctor` warns when a registry `${VAR}` in `env` or `headers` is unset, naming the server and variable.
+- `sdlc backlog add` refuses an open item with the same source type and ref; `--allow-duplicate` overrides this.
+
+### Fixed
+- The test suite uses one temporary root per run and removes it, leaving no temporary folders behind.
+
 ## 0.15.0 — 2026-10-11
 
 ### Added

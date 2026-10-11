@@ -31,15 +31,18 @@ function printServer(report: ServerReport): void {
 }
 
 /**
- * `sdlc mcp check [--json]` (B11): connects to each registry server and lists its tools. It reports and exits 0;
- * a registry with a literal secret is refused before any server is reached.
+ * `sdlc mcp check [--json] [--strict]` (B11): connects to each registry server and lists its tools.
+ * With --strict, an unavailable server sets exit code 1; a registry with a literal secret is refused first.
  */
-export async function mcpCheckCommand(opts: { json?: boolean }): Promise<void> {
+export async function mcpCheckCommand(opts: { json?: boolean; strict?: boolean }): Promise<void> {
   try {
     const ctx = loadProject();
     const servers = ctx.config.mcp?.servers ?? [];
     assertNoSecretLiterals(servers);
     const reports = await checkServers(servers);
+    if (opts.strict && reports.some((report) => !report.available)) {
+      process.exitCode = 1;
+    }
     if (opts.json) return printJson({ servers: reports });
     if (reports.length === 0) line(t('mcp.noServers'));
     for (const report of reports) printServer(report);

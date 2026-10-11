@@ -5,6 +5,7 @@
  * actionable sentence or command. The shape mirrors OpenSpec's diagnostic
  * envelope (severity/code/message/fix) so agents that already parse OpenSpec
  * JSON can read ours the same way.
+ * Backlog additions use `duplicate_item` when an active item has the same source.
  *
  * Message and fix may be plain strings or { key, params } locale refs. English
  * (via t(..., 'en')) is always stored on message/fix for JSON and

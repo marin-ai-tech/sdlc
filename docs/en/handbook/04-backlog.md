@@ -257,15 +257,14 @@ Bring the planned GitHub issues of `northwind/tasklet` into the backlog, each on
    The item in `backlog.md` now carries `- **Source**: ticket northwind/tasklet#12`. When the item starts, the change
    inherits the link: the draft intent says `Source: backlog B1 (ticket northwind/tasklet#12)`.
 
-5. See why the duplicate check matters. sdlc does not compare sources. Adding the same issue a second time creates a
-   second item (real output from the trial):
+5. The trial added the same issue twice; it printed this second item:
 
    ```text
    B8 Add due dates to tasks
    ```
 
-   `sdlc backlog list --json` then shows two items with `"source": "ticket northwind/tasklet#12"`. Megan removes the
-   extra one with `sdlc backlog drop B8 --note "Duplicate of B1"` in her own terminal.
+   Since 0.15.1, `sdlc backlog add` refuses a second open item with the same `--source-type` and `--source-ref`.
+   It reports `duplicate_item` and names the existing item. Use `--allow-duplicate` if one issue needs several items.
 
 6. See the stage rule. The `github` server is allowed at the stages `plan, build, test, deploy`. While an active
    change is at the design stage, an agent's call to it is denied in `block` mode (real reason):

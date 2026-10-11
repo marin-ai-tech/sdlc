@@ -91,6 +91,10 @@ export interface BacklogItemInput {
   source?: string;
 }
 
+export interface AddBacklogItemOptions {
+  allowDuplicate?: boolean;
+}
+
 export type BacklogMove =
   | { top: true }
   | { before: string }
@@ -222,9 +226,24 @@ function insertIndexForNewItem(backlog: Backlog, epic: string | undefined): numb
  * `unknown_epic`, `unknown_backlog_item` (a dependency), `dependency_cycle`,
  * `invalid_option` (empty or multi-line text).
  */
-export function addBacklogItem(root: string, input: BacklogItemInput): BacklogItem {
+export function addBacklogItem(
+  root: string,
+  input: BacklogItemInput,
+  options: AddBacklogItemOptions = {}
+): BacklogItem {
   validateItemInput(input);
   const backlog = readBacklog(root);
+  if (input.source && !options.allowDuplicate) {
+    const duplicate = backlog.items.find((item) =>
+      item.source === input.source && item.status !== 'done' && item.status !== 'dropped'
+    );
+    if (duplicate) {
+      throw new SdlcError('duplicate_item', {
+        key: 'error.duplicate_backlog_source_x',
+        params: { id: duplicate.id, source: input.source },
+      });
+    }
+  }
   if (input.epic) {
     epicOrThrow(backlog, input.epic);
   }

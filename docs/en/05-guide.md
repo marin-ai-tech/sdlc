@@ -12,6 +12,9 @@ sdlc init --tools claude,opencode      # any comma-separated set of: claude, ope
 sdlc doctor                            # check the installation
 ```
 
+`sdlc doctor` also checks "mcp variables": if a `${VAR}` in a registry server's `env` or `headers` is unset,
+it warns with the server and variable names, never the value.
+
 Examples: `--tools cursor`, `--tools claude,codex`, `--tools qwen`, `--tools gigacode`. Without `--tools`, `sdlc init`
 uses the tools it finds in the project (for example a `.claude/`, `.cursor/`, `.codex/` or `.qwen/` folder), else
 Claude Code and OpenCode. The tools are compared in [Supported tools](#supported-tools) at the end of this section.
@@ -158,6 +161,9 @@ Goal: policyholders see claim status without calling support.
 Commands: `sdlc backlog epic add <title> [--goal]`, `sdlc backlog epic edit <E-id> [--title --goal --clear-goal]` (changes an epic's title or goal, never the order), `sdlc backlog add <title> [--epic --kind --risk --outcome --accept --depends --source-type --source-ref]`, `list [--epic --status --ready]`, `next`, `edit <B-id> [--title --outcome --accept --add-accept --depends --clear-depends --kind --risk]` (changes an open or in-progress item's text, never its place or status; `--accept` and `--depends` replace the list), `start <B-id> [--change <id>]` (creates the change and a draft `intent.md`, sets the item to `in-progress`), `move <B-id> (--top | --before | --after | --epic)` and `drop <B-id> --note` (human-only), `done <B-id> --note`. Flow: ready item → `backlog start` → change lifecycle → `sdlc archive` marks the item `done`. With no active change, `sdlc next` proposes the next ready item.
 
 People edit `openspec/backlog.md` by hand as well — notes under items and epics, extra fields and sections stay when a command writes the file — and agents change it only through these commands — the hook denies an agent's direct edit, so order and removal stay a person's decision. In every supported tool, the backlog workflow (`/sdlc:backlog`, `/sdlc-backlog`, `$sdlc-backlog` in Codex) works with the backlog: without input it shows the list, the next ready item and what blocks the others; with an epic or an idea it proposes items with an outcome and acceptance criteria and adds only those you confirm; with `B<n>` it brings the item to ready and offers to start it. For a reorder or a drop it gives you the command to run.
+
+`sdlc backlog add` refuses a second open item with the same `--source-type` and `--source-ref`.
+The `duplicate_item` error names the existing item. Use `--allow-duplicate` when one source needs several items.
 
 ### Explore before intent
 
