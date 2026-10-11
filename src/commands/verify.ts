@@ -80,21 +80,62 @@ function printMcpChecks(run: VerificationRun): void {
   }
 }
 
+interface ListedCommand {
+  name: string;
+  run: string;
+  required: boolean;
+}
+
+interface ListedMcpCheck {
+  name: string;
+  server: string;
+  tool: string;
+  required: boolean;
+}
+
+/** `--list`: the commands of `verify.commands` as configured. */
+function listedCommands(ctx: ProjectContext): ListedCommand[] {
+  return ctx.config.verify.commands.map((v) => ({ name: v.name, run: v.run, required: v.required }));
+}
+
+/** `--list`: the MCP checks of `verify.mcp` as configured; no server is called. */
+function listedMcpChecks(ctx: ProjectContext): ListedMcpCheck[] {
+  const checks = ctx.config.verify.mcp ?? [];
+  return checks.map(({ name, server, tool, required }) => ({ name, server, tool, required: required !== false }));
+}
+
+function printListedCommands(commands: ListedCommand[]): void {
+  if (commands.length === 0) {
+    line(t('verify.noCommands'));
+    return;
+  }
+  for (const cmd of commands) {
+    line(`${cmd.name.padEnd(10)} ${cmd.run}${cmd.required ? '' : c.dim(t('verify.optional'))}`);
+  }
+}
+
+function printListedMcpChecks(checks: ListedMcpCheck[]): void {
+  if (checks.length === 0) return;
+  line(c.bold(t('verify.listMcpHeading')));
+  for (const check of checks) {
+    const required = check.required ? t('verify.listRequired') : c.dim(t('verify.listOptional'));
+    line(`${check.name.padEnd(10)} ${check.server} / ${check.tool}   ${required}`);
+  }
+}
+
+/** `sdlc verify --list`: every check the verify gate runs - the commands, then the MCP checks. Runs nothing. */
+function listChecks(ctx: ProjectContext, json?: boolean): void {
+  const commands = listedCommands(ctx);
+  const mcp = listedMcpChecks(ctx);
+  if (json) return printJson({ commands, mcp });
+  printListedCommands(commands);
+  printListedMcpChecks(mcp);
+}
+
 export async function verifyCommand(opts: VerifyOptions): Promise<void> {
   try {
     const ctx = loadProject();
-    if (opts.list) {
-      const commands = ctx.config.verify.commands.map((v) => ({ name: v.name, run: v.run, required: v.required }));
-      if (opts.json) return printJson({ commands });
-      if (commands.length === 0) {
-        line(t('verify.noCommands'));
-        return;
-      }
-      for (const cmd of commands) {
-        line(`${cmd.name.padEnd(10)} ${cmd.run}${cmd.required ? '' : c.dim(t('verify.optional'))}`);
-      }
-      return;
-    }
+    if (opts.list) return listChecks(ctx, opts.json);
     const ref = resolveChange(ctx.paths, opts.change);
     if (opts.check) {
       const coverage = uncoveredScenarios(ref.dir);

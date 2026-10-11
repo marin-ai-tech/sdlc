@@ -1,14 +1,15 @@
 import { ALL_GATES, type GateId, type SdlcConfig } from './config.js';
+import { awaitingReason, quorum } from './approval-quorum.js';
 import type { ChangeState, GateState } from './change-state.js';
-import { decidedAfter, orderOf, type Ordered } from './decision-order.js';
+import { decidedAfter, decidedAfterAll, orderOf, type Ordered } from './decision-order.js';
 import { SdlcError } from './errors.js';
 import { t } from './i18n.js';
-import type { GateEvaluation } from './lifecycle.js';
+import type { GateEvaluation, NextAction } from './lifecycle.js';
 export { filesThatChange } from './plan-files.js';
 
 /**
  * Rework: a person sends a change back to a gate's stage with a reason category and a note
- * (`sdlc rework`). The gate counts as rejected until an approval recorded after the rework, and
+ * (`sdlc rework`). The gate counts as rejected until its artifacts change or an approval follows, and
  * approvals and waivers of that gate and of every later gate made before the rework stop counting.
  */
 export const REWORK_GATES = ['intent', 'spec', 'plan', 'review'] as const;
@@ -33,7 +34,49 @@ function cutoffs(state: ChangeState): Partial<Record<GateId, Ordered>> {
 function reworkRejection(gate: GateState): GateState['rejection'] {
   const rework = gate.rework;
   if (!rework || (gate.rejection && decidedAfter(gate.rejection, rework))) return gate.rejection;
-  return { by: rework.by, ...orderOf(rework), note: rework.note };
+  return { by: rework.by, ...orderOf(rework), note: rework.note, digest: rework.digest };
+}
+
+/** A changed digest ends the revision phase only for decisions that recorded their artifact digest. */
+export function revisedGates(gates: GateEvaluation[], state: ChangeState, config: SdlcConfig): GateEvaluation[] {
+  return gates.map((gate) => {
+    if (gate.status !== 'rejected' || !gate.digest) return gate;
+    if (gate.id === 'verify' || gate.id === 'release') return gate;
+    const record = state.gates[gate.id];
+    const decision = record?.rework && (!record.rejection || decidedAfter(record.rework, record.rejection))
+      ? record.rework
+      : record?.rejection;
+    if (!decision?.digest || decision.digest === gate.digest) return gate;
+    const [reasonKey, reasonParams] = awaitingReason(gate.missingRoles, quorum(gate.approvals, config.gates[gate.id]));
+    return { ...gate, status: 'pending', reason: t(reasonKey, reasonParams, 'en'), reasonKey, reasonParams };
+  });
+}
+
+/** The next agent step for a gate that still needs a revision. */
+export function reviseNext(gate: GateId, artifacts: string, reason: string): NextAction {
+  const params = { gate, reason, artifacts };
+  return {
+    actor: 'agent', action: 'revise-artifact', workflow: gate, gate,
+    key: 'next.reviseArtifact', params, message: t('next.reviseArtifact', params, 'en'),
+  };
+}
+
+/** A review rejection remains an agent task even when review.md has independent coverage blockers. */
+export function activeReviewRevision(gate: GateEvaluation, state: ChangeState): string | undefined {
+  if (gate.id !== 'review' || gate.satisfied || !gate.digest) return undefined;
+  const record = state.gates.review;
+  const rework = record?.rework;
+  const rejection = record?.rejection;
+  const useRework = rework && (!rejection || decidedAfter(rework, rejection));
+  const decision = useRework ? rework : rejection;
+  if (!decision || (decision.digest && decision.digest !== gate.digest)) return undefined;
+  if (!decidedAfterAll(decision, record?.approvals ?? [])) return undefined;
+  if (useRework) {
+    return t('gate.reworkNote', { by: rework.by, reason: rework.reason, note: rework.note }, 'en');
+  }
+  return rejection?.note
+    ? t('gate.rejectedNote', { by: rejection.by, note: rejection.note }, 'en')
+    : t('gate.rejected', { by: rejection?.by ?? '' }, 'en');
 }
 
 function afterCutoff(gate: GateState, cutoff: Ordered): GateState {

@@ -75,6 +75,8 @@ export interface RejectionRecord extends Provenance {
   /** Order of the decision in the record (B39), written by the CLI; absent in records from sdlc 0.8.0 and earlier. */
   seq?: number;
   note?: string;
+  /** Gate artifact digest when rejected; absent in decisions recorded before 0.15.0. */
+  digest?: string;
 }
 
 /** A person sent the change back to this gate's stage (`sdlc rework`). */
@@ -90,6 +92,8 @@ export interface ReworkRecord extends Provenance {
   from: string;
   /** How many times this gate was sent back, this rework included (B61); absent before sdlc 0.11.2 (counts as 1). */
   cycle?: number;
+  /** Gate artifact digest when sent back; absent in decisions recorded before 0.15.0. */
+  digest?: string;
 }
 
 export interface VerifyCommandRecord {

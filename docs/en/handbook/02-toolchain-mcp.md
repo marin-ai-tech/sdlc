@@ -378,7 +378,7 @@ reach the agent through the inbox.
 - `expect` compares lists item by item and by length. A tool that returns a list of runs needs a filter that
   returns exactly the run you mean (here `head_sha` and `per_page: 1`).
 - `sdlc verify --only ci-green` runs only that check. It records evidence but never passes the gate.
-- `sdlc verify --list` lists the commands only, not the MCP checks.
+- `sdlc verify --list` shows the MCP checks (name, server, tool, required) next to the commands.
 - The agent cannot edit the evidence or the inbox files: the hook denies it (`sdlc guide denials#state-integrity`).
 - When CI produces inbox results, CI has to commit them; the inbox travels by git.
 
@@ -461,8 +461,8 @@ for the commit she is releasing. Anyone can run the checks beforehand.
 <a id="s2-6"></a>
 ## 2.6 Events to Telegram: waits, approvals, overdue gates
 
-*Steven configures; Megan and Laura receive  ·  tasklet  · needs: [lesson 2.1](#s2-1); a team Telegram bot server whose
-tool accepts sdlc's `event` argument*
+*Steven configures; Megan and Laura receive  ·  tasklet  · needs: [lesson 2.1](#s2-1); a Telegram bot MCP server with
+a `send_message(chat_id, text)` tool*
 
 The team's Telegram chat learns when a gate waits for someone, when a gate is approved or sent back, and
 when a wait is overdue, without anyone asking `sdlc next`.
@@ -474,7 +474,7 @@ when a wait is overdue, without anyone asking `sdlc next`.
    ```yaml
    events:
      - server: telegram
-       tool: report_event             # the tool name your server exposes
+       tool: send_message             # the tool name your server exposes
        on:
          - "gate.*.awaiting"
          - "gate.*.overdue"
@@ -483,7 +483,8 @@ when a wait is overdue, without anyone asking `sdlc next`.
          - "gate.*.rework"
          - "verify.failed"
          - "change.archived"
-       args: { chat: tasklet-team }
+       args: { chat_id: "-1001234567890" }
+       message: text                  # send one line of text instead of the event object
    gates:
      intent: { required: true, approvers: [product-owner], overdue_hours: 24 }
      review: { required: true, approvers: [code-owner], overdue_hours: 8 }
@@ -494,12 +495,16 @@ when a wait is overdue, without anyone asking `sdlc next`.
    | `server`, `tool` | a registry server and the tool sdlc calls for each event |
    | `on` | patterns of event names; `*` stands for any text. Without `on`: `gate.*`, `verify.*`, `change.created`, `change.archived`, `backlog.*`, `health.degraded`, `health.recovered` |
    | `args` | static arguments sent with every event |
+   | `message` | the argument that gets the event as one line of text; the `event` object is then not sent |
    | `gates.<g>.overdue_hours` | a wait longer than this raises `gate.<g>.overdue` once |
 
    Hook events (`hook.denied`, …) are sent only when a pattern names them.
 
-2. Understand what the bot receives. After each sdlc command, sdlc calls the tool with the static `args` and an `event`
-   object. Real example, from `sdlc events list --json`:
+2. Understand what the bot receives. After each sdlc command, sdlc calls `send_message` with the static `args` plus
+   `text`: one line that names the project, the change, the gate and the people by their names from `roles.yaml`, in
+   the locale of the command. sdlc builds the line when the event is queued, so an event that waits in the outbox
+   reads the same later. The trial ran sdlc 0.14.4, without `message`; this real event is from
+   `sdlc events list --json`:
 
    ```json
    {
@@ -514,9 +519,10 @@ when a wait is overdue, without anyone asking `sdlc next`.
    }
    ```
 
-   `waitingFor` holds the person ids from `roles.yaml`; an approval carries `by` instead. An event never carries an
-   email, a command, its output or a note. The bot turns it into a message such as "add-due-dates waits for Megan:
-   intent". Mapping `megan` to her Telegram account is the bot's job.
+   `waitingFor` holds the person ids from `roles.yaml`; an approval carries `by` instead. Neither the event nor the
+   text ever carries an email, a command, its output or a note. Without `message`, sdlc sends this `event` object
+   instead of the text, and the bot's tool must accept it. The text names people by name only; mapping `megan` to
+   her Telegram account is still the bot's job.
 
 3. See the queue. Delivery takes at most five seconds after a command and never fails the command. What could not
    be sent waits in `.git/sdlc/outbox/`, which is never committed:
@@ -532,6 +538,9 @@ when a wait is overdue, without anyone asking `sdlc next`.
      2026-10-09T20:27:17.643Z  verify.failed  add-due-dates
      2026-10-09T20:34:17.743Z  gate.intent.approved  add-due-dates
    ```
+
+   This real output is from the trial, whose receiver used a `report_event` tool. With the configuration above, the
+   first line names `telegram/send_message`.
 
 4. Deliver now, for example after the bot was down:
 
@@ -571,7 +580,7 @@ when a wait is overdue, without anyone asking `sdlc next`.
 
 ### You are done when
 
-- After Megan's approval, the chat shows `gate.intent.approved` for `add-due-dates` by `megan`.
+- After Megan's approval, the chat shows one line about the approved intent of `add-due-dates` that names Megan.
 - `sdlc events list` shows "No events wait for delivery." on a machine with the token set.
 - 24 hours after an unanswered intent, the chat gets one `gate.intent.overdue` message naming Megan.
 
@@ -583,8 +592,8 @@ when a wait is overdue, without anyone asking `sdlc next`.
   again and miss an overdue gate. Use a clone that keeps its log, as in step 5.
 - Several clones can each announce the same wait before their logs are merged. The event ids then differ, so the
   bot cannot drop such repeats by `id`; it can by change, gate and event name.
-- A generic Telegram server with only `send_message(chat_id, text)` cannot take sdlc's `event` object. The team's
-  bot server needs a tool that accepts it.
+- A generic Telegram server with only `send_message(chat_id, text)` takes events through `message: text`. Without
+  `message`, sdlc sends the `event` object, and the tool must accept it.
 - `events` must name a server of `mcp.servers`; an unknown name is a configuration error.
 
 

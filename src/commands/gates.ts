@@ -273,6 +273,7 @@ export async function rejectCommand(gateArg: string, opts: DecisionOptions): Pro
     const roles = readRolesFile(ctx.root);
     const identity = approvalIdentity(ctx.root, roles, opts.by);
     if (roles) roleDecision(ctx.root, ctx.config, roles, gate, state, opts.as, false);
+    const digest = evaluateChange(ctx.root, ref, ctx.config).gates.find((item) => item.id === gate)?.digest;
     state.gates[gate] = {
       ...(state.gates[gate] ?? {}),
       rejection: {
@@ -281,6 +282,7 @@ export async function rejectCommand(gateArg: string, opts: DecisionOptions): Pro
         at: new Date().toISOString(),
         seq: nextSeq(state),
         note: opts.note,
+        ...(digest ? { digest } : {}),
         ...provenance(ctx.stamp),
       },
     };

@@ -59,16 +59,19 @@ what the team's Telegram chat receives.
    ```yaml
    events:
      - server: telegram
-       tool: report_event             # the tool name your server exposes
+       tool: send_message             # the tool name your server exposes
        on: ["gate.*.awaiting", "gate.*.overdue", "gate.*.approved", "gate.*.rejected", "gate.*.rework",
             "verify.failed", "change.archived"]
-       args: { chat: tasklet-team }
+       args: { chat_id: "-1001234567890" }
+       message: text
    gates:
      intent: { required: true, approvers: [product-owner], overdue_hours: 24 }
    ```
 
-   After a command, sdlc calls the tool with the static `args` and an `event`. This is the first call the Telegram
-   server received in the trial, when the intent started to wait for Megan:
+   After a command, sdlc calls `send_message` with the static `args` plus `text`: one line that names the project,
+   the change, the gate and the people by their names from `roles.yaml`. The trial ran sdlc 0.14.4, before
+   `message`, so the first call the Telegram server received, when the intent started to wait for Megan, still
+   carried the `event` object:
 
    ```json
    {"chat":"tasklet-team","event":{"id":"7db8a1d5f45a4b0d3220a23d","project":"tasklet",
@@ -77,7 +80,7 @@ what the team's Telegram chat receives.
    ```
 
    `waitingFor` holds the people from `roles.yaml` who may take the gate, so the bot can mention Megan. A decision
-   event carries `by` instead.
+   event carries `by` instead. With `message: text`, the same event arrives as one line of text that names Megan.
 
 3. See the whole sequence the chat received during this module, in order (event, then `waitingFor` or `by`):
 
@@ -94,7 +97,8 @@ what the team's Telegram chat receives.
    ```
 
    Read the left column first, then the right one. Passing verifications are not sent: the `on` list names only
-   `verify.failed`.
+   `verify.failed`. The trial ran sdlc 0.14.4. Since 0.15.0 the chat also gets `gate.spec.awaiting` (`["megan"]`)
+   once the agent has revised the spec that Ethan sent back.
 
 4. Understand delivery. It takes at most 5 seconds and never fails a command. An event that could not be sent waits in
    `.git/sdlc/outbox/` and goes with the next command:
@@ -107,6 +111,9 @@ what the team's Telegram chat receives.
    Receiver telegram/report_event: gate.*.awaiting, gate.*.overdue, gate.*.approved, gate.*.rejected, gate.*.rework, verify.failed, change.archived
    No events wait for delivery.
    ```
+
+   This real output is from the trial, whose receiver used a `report_event` tool. With the configuration above, the
+   first line names `telegram/send_message`.
 
    `sdlc events flush` sends the waiting events now. A gate that waits longer than its `overdue_hours` raises
    `gate.<gate>.overdue` once; sdlc notices it at the next command, so Steven runs `sdlc events flush` from a
@@ -128,8 +135,8 @@ what the team's Telegram chat receives.
 
 ### Pitfalls
 
-- sdlc sends a structured `event`, not a chat message. A Telegram MCP server that only accepts a `text` argument
-  needs a small adapter tool that turns the event into a message.
+- With `message: text`, sdlc sends one line of text, which a Telegram MCP server's `send_message` takes as it is.
+  Without `message`, sdlc sends a structured `event`, and the server needs a tool that accepts it.
 - An event never carries an email, a note or command output. The rework note, for example, is not in
   `gate.spec.rework`; the bot can link to `sdlc explain` instead.
 - Events are sent by the CLI, not by the agent. But `telegram` is a registry server like the others, so it is also
@@ -543,7 +550,9 @@ Send an approved gate back with a reason, let the agent fix it, approve it again
    - **THEN** reading the task returns no `dueDate`
    ```
 
-   It then tells Oliver that the spec is ready for Megan and gives her command.
+   It then tells Oliver that the spec is ready for Megan and gives her command. sdlc tells her too: once the agent
+   has changed the spec's artifacts, the spec gate waits for Megan again, `sdlc next` names her, her
+   `sdlc next --me` lists it, and Telegram receives `gate.spec.awaiting`.
 
 4. Megan previews. The preview lists exactly what changed since her first approval:
 
@@ -603,13 +612,14 @@ Send an approved gate back with a reason, let the agent fix it, approve it again
 
 - `sdlc status` shows `spec ✓ approved` and `plan ✓ approved`.
 - `sdlc audit --change add-due-dates` lists `reworks 1: spec (missing-requirement, …)`.
-- Telegram shows `gate.spec.rework`, then `gate.spec.approved`, then `gate.plan.approved`.
+- Telegram shows `gate.spec.rework`, then `gate.spec.awaiting` for Megan, then `gate.spec.approved`, then
+  `gate.plan.approved`.
 
 ### Pitfalls
 
-- After the agent has revised the spec, `sdlc next` still says "agent: … Revise …", Megan's `sdlc next --me` says
-  "Nothing is waiting for you.", and Telegram sends no new `gate.spec.awaiting`. The agent must tell Megan that the
-  spec is ready; she checks with `--preview`.
+- Until the agent has changed the spec's artifacts, `sdlc next` says "agent: … Revise …" and Megan's
+  `sdlc next --me` says "Nothing is waiting for you.". After the change, the gate waits for her again; she checks
+  with `--preview` what changed.
 - Approving again with nothing changed since the approval before the rework needs `--note` (why nothing had to
   change).
 - After `rework.max_cycles` reworks of one gate (default 3), `sdlc next` asks a person to take the change over or
@@ -649,6 +659,9 @@ the agent inside the rules.
    lint       npm run lint
    test       npm test
    ```
+
+   This output is from the trial with sdlc 0.14.4. Since 0.15.0 the list also shows the `verify.mcp` checks (here
+   `ci-green`) with their server, tool and whether they are required.
 
 3. It works the tasks in order: writes the four failing tests first, runs them, implements `src/tasks.js` until they
    pass, and ticks `- [x]` only when a task's check passed. The write to `src/tasks.js` is now allowed: the hook
@@ -856,7 +869,7 @@ behavioural verification, and let Grace confirm that every scenario was exercise
   `sdlc verify --check`, which is not part of the gate. Grace (or CI) runs it with `--strict`.
 - `${HEAD}` is the head commit. If the agent verifies uncommitted work, CI answers for an older commit. Commit, push,
   let CI finish, then run `sdlc verify`.
-- `sdlc verify --list` shows only the commands, not the `verify.mcp` checks.
+- `sdlc verify --list` shows the `verify.mcp` checks (name, server, tool, required) next to the commands.
 - `sdlc verify --only <names>` runs some checks for a quick look but never passes the gate.
 - Editing the evidence block by hand changes nothing: the gate reads the result that `sdlc verify` stored in the
   change record (`.sdlc.yaml`, which only the CLI writes), and the next run rewrites the block.
@@ -985,6 +998,9 @@ addresses his note, and Paul approves.
    ✗ review gate rejected by Paul <paul@northwind.example>: README has no word about due dates. Document dueDate and the overdue filter.
    Next: person — Paul (code-owner) must read review.md and the diff, then approve the review gate: sdlc approve review --change add-due-dates
    ```
+
+   This output is from the trial with sdlc 0.14.4. Since 0.15.0 the `Next:` line hands the change to the agent
+   instead: it fixes what review.md and the note ask, and after its fix the review gate waits for Paul again.
 
    `sdlc status` shows the note on the review line:
 

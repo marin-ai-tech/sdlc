@@ -27,7 +27,7 @@ import { checkCoverage, parseCoverage, parseFindings, summarizeFindings, type Fi
 import { parseTasks, type TaskProgress } from './tasks.js';
 import { awaitedRoles, awaitingReason, quorum } from './approval-quorum.js';
 import { nameApprovers, type NamedApprover } from './named-approvers.js';
-import { effectiveGates, markReworks } from './rework.js';
+import { activeReviewRevision, effectiveGates, markReworks, revisedGates, reviseNext } from './rework.js';
 import { markAutoWaived, withAutoWaive } from './auto-waive.js';
 import { reworkLimitNext } from './rework-limit.js';
 import { questionsNext } from './questions-next.js';
@@ -467,7 +467,7 @@ export function evaluateChange(
     warnings.push('not a git repository: verification and review freshness cannot be checked');
   }
 
-  const evaluated = markAutoWaived(markReworks(gates, state), state, config);
+  const evaluated = markAutoWaived(markReworks(revisedGates(gates, state, config), state), state, config);
   const stage = deriveStage(ref, evaluated, tasks);
   const view: LifecycleView = {
     change: ref.id,
@@ -498,7 +498,7 @@ export function evaluateChange(
   // A change a person has taken over waits for them; otherwise the next step names the people who may act.
   const held = ref.archived ? undefined : takeoverNext(state, ref.id);
   const limit = held ? undefined : reworkLimitNext(root, config, view, state, options.skipPeople);
-  const next = held ?? limit ?? questionsNext(view, config, state, nextAction(view, config, mapping));
+  const next = held ?? limit ?? questionsNext(view, config, state, nextAction(view, config, mapping, state));
   view.next = held || options.skipPeople ? next : nameApprovers(root, config, view, state, next);
   return view;
 }
@@ -535,7 +535,8 @@ export function approveCli(change: string, gateId: GateId, role?: string): strin
 function nextAction(
   view: LifecycleView,
   config: SdlcConfig,
-  mapping: Record<'intent' | 'spec' | 'plan', string[]>
+  mapping: Record<'intent' | 'spec' | 'plan', string[]>,
+  state: ChangeState,
 ): NextAction {
   const withKey = (
     action: Omit<NextAction, 'message' | 'key' | 'params'>,
@@ -569,11 +570,7 @@ function nextAction(
       );
     }
     if (g.status === 'rejected') {
-      return withKey(
-        { actor: 'agent', action: 'revise-artifact', workflow, gate: id },
-        'next.reviseArtifact',
-        { gate: id, reason: g.reason ?? '', artifacts: mapping[id].join(', ') },
-      );
+      return reviseNext(id, mapping[id].join(', '), g.reason ?? '');
     }
     const awaited = awaitedRoles(g.missingRoles, config.gates[id]);
     const role = awaited[0]?.split(' | ')[0];
@@ -617,6 +614,8 @@ function nextAction(
 
   const review = gate(view, 'review');
   if (!review.satisfied) {
+    const revision = activeReviewRevision(review, state);
+    if (revision) return reviseNext('review', 'review.md', revision);
     if (!view.review) {
       return withKey(
         { actor: 'agent', action: 'review', workflow: 'review' },

@@ -5,7 +5,8 @@ import type { SdlcConfig } from '../core/config.js';
 import { git } from '../core/git.js';
 import type { LogEntry } from '../core/log.js';
 import { personByEmail, readRolesFile } from '../core/roles.js';
-import { receiverKey, receiversFor } from './event-config.js';
+import { receiverKey, receiversFor, type EventReceiver } from './event-config.js';
+import { eventMessage, peopleNames } from './event-message.js';
 
 /**
  * The event queue (B45): a log entry that some receiver wants is written to `<git dir>/sdlc/outbox/<id>.json`
@@ -13,6 +14,9 @@ import { receiverKey, receiversFor } from './event-config.js';
  * the git directory, so it never reaches a commit; outside a git repository nothing is queued. An event carries
  * the entry's name, change, gate, time, sdlc version, the person id of its identity (roles.yaml) and, for a waiting
  * gate, the ids of the people it waits for. Never an email, never the entry's detail, never command text or output.
+ * When a receiver asks for a ready message (`message`), the one-line text is built here, when the event is queued,
+ * in the locale of the command that caused it and with the names roles.yaml has at that moment: a later delivery
+ * (`sdlc events flush` from another shell, CI or locale; roles.yaml edited since) still reads as the event happened.
  */
 export interface EventBody {
   /** Stable for the entry (a hash of at, event, change and gate), so a receiver can drop repeats. */
@@ -32,6 +36,8 @@ export interface QueuedEvent {
   event: EventBody;
   /** The receivers (`server/tool`) that have not taken the event yet. */
   receivers: string[];
+  /** The ready one-line text for receivers with `message`; built when queued, from the event's fields only. */
+  message?: string;
 }
 
 export interface QueuedFile {
@@ -94,6 +100,12 @@ export function eventBody(root: string, config: QueueConfig, entry: LogEntry): E
   };
 }
 
+/** The ready text when some receiver asks for one; nothing otherwise. */
+function messageFor(root: string, receivers: EventReceiver[], event: EventBody): Pick<QueuedEvent, 'message'> {
+  if (!receivers.some((receiver) => receiver.message)) return {};
+  return { message: eventMessage(event, peopleNames(root)) };
+}
+
 /**
  * Queues the entry for every receiver whose `on` matches it. Without receivers it returns at once: no file, no
  * process. Never throws: a notification that cannot be queued never fails a command or a hook.
@@ -105,7 +117,7 @@ export function queueEvent(root: string, config: QueueConfig, entry: LogEntry): 
     const dir = outboxDir(root);
     if (!dir) return;
     const event = eventBody(root, config, entry);
-    const item: QueuedEvent = { event, receivers: receivers.map(receiverKey) };
+    const item: QueuedEvent = { event, receivers: receivers.map(receiverKey), ...messageFor(root, receivers, event) };
     fs.mkdirSync(dir, { recursive: true });
     const file = path.join(dir, `${event.id}.json`);
     fs.writeFileSync(file, `${JSON.stringify(item, null, 2)}\n`, { encoding: 'utf-8', flag: 'wx' });

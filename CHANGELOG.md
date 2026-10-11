@@ -2,6 +2,15 @@
 
 All notable changes to sdlc. Versions follow [Semantic Versioning](https://semver.org/); while the major version is 0, a minor version may change behavior.
 
+## 0.15.0 — 2026-10-11
+
+### Added
+- **Events as a ready message.** A receiver in `events` may set `message: <argument>` (for example `message: text`). sdlc then calls the tool with the static `args` plus that argument set to one line of text, and without the `event` object, so a Telegram bot's `send_message(chat_id, text)` takes events directly, with no adapter. The text names the project, the change, the gate and the people by their names from `roles.yaml`, in the locale of the command; it never carries an email, a note, a command or its output. The text is built when the event is queued, so an event that waits in the outbox reads the same when it is sent.
+- **`sdlc verify --list` shows the MCP checks.** The `verify.mcp` checks are listed with their name, server, tool and whether they are required, next to the commands.
+
+### Fixed
+- **After a rework or a rejection, the gate waits for a person again.** Before, `sdlc next` kept asking the agent to revise. Now, once the agent has changed the gate's artifacts, `sdlc next` names the person, `sdlc next --me` lists the gate for them, and the `gate.<g>.awaiting` event is sent. Until then the agent revises. A rejected review works the same way: the agent fixes what review.md asks, then the reviewer decides again.
+
 ## 0.14.7 — 2026-10-11
 
 ### Added

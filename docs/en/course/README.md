@@ -75,7 +75,6 @@ The course says so where it matters. The main points:
 
 - There is no built-in sync between GitHub Issues and the sdlc backlog: the agent reads issues through the GitHub
   MCP server and adds backlog items (Lesson 4.3); archiving a change does not close its issue.
-- Events go to an MCP server as structured data; a Telegram server that only takes text needs a small adapter tool
-  (Lesson 2.6). The daily summary example writes a file; sending it is a scheduler's job (Lesson 9.7).
+- The daily summary example writes a file; sending it is a scheduler's job (Lesson 9.7).
 - CI evidence calls the tool your GitHub server exposes; a run that is still in progress fails the check until it is
   run again (Lesson 2.4).

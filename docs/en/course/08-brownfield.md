@@ -737,7 +737,6 @@ Found while writing Modules 6–8 against sdlc 0.14.4 (temporary copies of `task
 
 - With `design.debate: true`, `sdlc next`, `next --me` and `status` name the product owner for the spec gate before
   `## Debate` exists; the approval is then refused with `debate_required`.
-- `sdlc verify --list` (also `--json`) lists only `verify.commands`, not the `verify.mcp` checks.
 - `sdlc adopt` text output omits unresolved CODEOWNERS `@handles`; only `--json` has `owners_unresolved`.
 - CODEOWNERS `@handle` matches a person only when the `roles.yaml` id equals the handle; this is not documented, there
   is no handle field in `roles.yaml`, and team handles never match.

@@ -5,14 +5,18 @@ import { SdlcError } from '../core/errors.js';
  * names a registry server (`mcp.servers`) and the tool sdlc calls on it for every log event whose name matches one
  * of its `on` patterns (`*` stands for any text). Parsed into types here; config.ts only calls `parseEvents`.
  * Hook events (`hook.*`) reach a receiver only through a pattern that names them (`hook.denied`, `hook.*`).
+ * With `message: <argument>` (0.15.0) the tool gets that argument set to a ready one-line text instead of `event`
+ * (src/mcp/event-message.ts), for a plain send-message tool such as a chat bot's `send_message(chat_id, text)`.
  */
 export interface EventReceiver {
   server: string;
   tool: string;
   /** Patterns of log event names. */
   on: string[];
-  /** Static arguments passed next to `event`. */
+  /** Static arguments passed next to `event` (or next to the message). */
   args: Record<string, unknown>;
+  /** The argument that takes a ready one-line message instead of `event`; absent = the event object. */
+  message?: string;
 }
 
 /** The events a receiver gets when its `on` is absent. */
@@ -21,6 +25,7 @@ export const DEFAULT_EVENT_PATTERNS = [
 ];
 
 const HOOK_PREFIX = 'hook.';
+const ARGUMENT_NAME = /^[A-Za-z_][A-Za-z0-9_]*$/;
 
 type Raw = Record<string, unknown>;
 
@@ -48,15 +53,24 @@ function patterns(value: unknown, where: string): string[] {
   return value as string[];
 }
 
+function argumentName(value: unknown, where: string): string | undefined {
+  if (value === undefined || value === null) return undefined;
+  const valid = typeof value === 'string' && ARGUMENT_NAME.test(value);
+  if (!valid) throw invalid('error.x_must_be_an_argument_name', where);
+  return value;
+}
+
 function parseReceiver(value: unknown, where: string, servers: string[]): EventReceiver {
   const raw = mapping(value, where) ?? {};
   const server = text(raw.server, `${where}.server`);
   if (!servers.includes(server)) throw invalid('error.events_unknown_server', `${where}.server`, { server });
+  const message = argumentName(raw.message, `${where}.message`);
   return {
     server,
     tool: text(raw.tool, `${where}.tool`),
     on: patterns(raw.on, `${where}.on`),
     args: mapping(raw.args, `${where}.args`) ?? {},
+    ...(message ? { message } : {}),
   };
 }
 

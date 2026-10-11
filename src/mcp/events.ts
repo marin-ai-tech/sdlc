@@ -3,11 +3,13 @@ import { loadConfig, type SdlcConfig } from '../core/config.js';
 import { findProjectRoot, projectPaths } from '../core/project.js';
 import { withServer } from './client.js';
 import { receiverKey, type EventReceiver } from './event-config.js';
+import { eventMessage, peopleNames } from './event-message.js';
 import { readOutbox, settleQueued, type QueuedFile } from './outbox.js';
 import type { McpServer } from './registry.js';
 
 /**
- * Delivery of queued events (B45) with the MCP client: each receiver's tool is called with `{ ...args, event }`.
+ * Delivery of queued events (B45) with the MCP client: each receiver's tool is called with `{ ...args, event }`,
+ * or, for a receiver with `message`, with `{ ...args, [message]: text }` and no `event` (the text of the queue).
  * After a CLI command (not inside `sdlc hook`, not inside `sdlc mcp serve`) the whole delivery has 5 s; `sdlc events
  * flush` has no total limit and 10 s per call. A delivered event leaves the queue, anything else waits for the next
  * command. A failure is never an error and never changes the exit code; with SDLC_DEBUG set it is named on stderr.
@@ -61,8 +63,28 @@ function deliveriesFor(server: string, queued: QueuedFile[], receivers: EventRec
     .map((receiver) => ({ queued: item, receiver, delivered: false })));
 }
 
+/**
+ * Events queued without a text (before a receiver asked for one) get it now, in the locale of this command;
+ * kept in memory only, the queued file stays as it is until the event is delivered.
+ */
+function fillMessages(root: string, queued: QueuedFile[], receivers: EventReceiver[]): void {
+  const wanting = new Set(receivers.filter((receiver) => receiver.message).map(receiverKey));
+  const missing = queued.filter((item) => item.item.message === undefined
+    && item.item.receivers.some((key) => wanting.has(key)));
+  if (missing.length === 0) return;
+  const names = peopleNames(root);
+  for (const item of missing) item.item.message = eventMessage(item.item.event, names);
+}
+
+/** The tool's arguments: the static args and the event, or the static args and the text in the named argument. */
+function toolArguments(delivery: Delivery): Record<string, unknown> {
+  const { receiver, queued } = delivery;
+  if (!receiver.message) return { ...receiver.args, event: queued.item.event };
+  return { ...receiver.args, [receiver.message]: queued.item.message ?? '' };
+}
+
 async function deliverOne(client: Client, delivery: Delivery, ms: number): Promise<void> {
-  const args = { ...delivery.receiver.args, event: delivery.queued.item.event };
+  const args = toolArguments(delivery);
   const tool = delivery.receiver.tool;
   try {
     const answer = await client.callTool({ name: tool, arguments: args }, undefined, { timeout: ms });
@@ -111,6 +133,7 @@ export async function deliverPending(root: string, config: EventsConfig, limits:
   const queued = receivers.length > 0 ? readOutbox(root) : [];
   if (queued.length === 0) return { delivered: 0, failed: 0 };
   dropRemoved(queued, receivers);
+  fillMessages(root, queued, receivers);
   const deadline = limits.totalMs === undefined ? undefined : Date.now() + limits.totalMs;
   const all: Delivery[] = [];
   for (const server of serversOf(config, receivers)) {

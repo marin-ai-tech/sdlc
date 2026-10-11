@@ -232,9 +232,10 @@ Find out why a change is stuck and unblock it: open questions, a stale approval,
 
 4. A rework. A person sent a gate back (`sdlc rework <gate> --reason ... --note ...`). The gate counts as rejected
    until it is approved again, and the approvals of the later gates stop counting too. The agent revises the
-   artifacts; the person approves again. Approving the same content again after a rework needs `--note`
-   (`unchanged_after_rework`). After `rework.max_cycles` reworks of one gate (default 3), `sdlc next` asks a person to
-   take the change over or review its scope.
+   artifacts. Then the gate waits for the person again: `sdlc next` names them, `next --me` lists it, and
+   `gate.<gate>.awaiting` is sent; the person approves again. Approving the same content again after a rework
+   needs `--note` (`unchanged_after_rework`). After `rework.max_cycles` reworks of one gate (default 3),
+   `sdlc next` asks a person to take the change over or review its scope.
 
 5. A held change. Ethan took the change over:
 
@@ -531,8 +532,6 @@ What this handbook needed and sdlc 0.14.4 does not offer, or does differently fr
   package (`files` lists no `scripts/`), so users must copy it from the repository.
 - The daily summary only writes a file; sdlc has no built-in delivery to Telegram (or any channel) and no "daily
   summary" event.
-- Event receivers get `{ ...args, event }` with no message template; a typical Telegram MCP server's send tool (chat id
-  and text) cannot take it without an adapter tool.
 - `sdlc mcp serve` has no `health`, `report` or `explain` tool, so a portfolio view of health over MCP is not possible;
   it needs the CLI per repository.
 - `sdlc report --out` and `sdlc dashboard --out` must stay inside the project, and a file written there (untracked, not

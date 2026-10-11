@@ -155,7 +155,7 @@ It then merges the answers. `sdlc dashboard` builds the HTML page per repository
 
 *Who:* the verify gate.
 
-*How:* describe the CI server in `mcp.servers` and add a `verify.mcp` check (chapter 10.3). `sdlc verify` asks the CI server about the exact head commit and fails if the pipeline is not green.
+*How:* describe the CI server in `mcp.servers` and add a `verify.mcp` check (chapter 10.3). `sdlc verify` asks the CI server about the exact head commit and fails if the pipeline is not green. `sdlc verify --list` shows these MCP checks (name, server, tool, required) next to the commands.
 
 *What you get:* "CI is green" becomes recorded evidence, obtained by the CLI, not a claim by the agent. The same pattern works for any system that can answer a yes/no question about a commit or a change:
 
@@ -232,6 +232,21 @@ gates:
 - A gate waiting past its `overdue_hours` raises `gate.<g>.overdue` once.
 - Delivery takes at most 5 seconds and never fails a command. An event that could not be sent waits in `.git/sdlc/outbox/` (never committed) and goes with the next command or `sdlc events flush`, which a CI job or a scheduler can run. `sdlc events list` shows what waits.
 - An event never carries an email, the text of a command, its output or a note. Hook decisions are sent only when a pattern names them.
+
+*A ready message* (since 0.15.0). A receiver may set `message: <argument>`, for example `message: text`. sdlc then calls the tool with the static `args` plus that argument set to one line of text, and without the `event` object. So a Telegram bot's `send_message(chat_id, text)` takes events directly, with no adapter:
+
+```yaml
+events:
+  - server: telegram
+    tool: send_message
+    on: ["gate.*", "verify.*", "change.archived"]
+    args: { chat_id: "-1001234567890" }
+    message: text
+```
+
+- The text names the project, the change, the gate and the people by their names from `roles.yaml`, in the locale of the command.
+- It never carries an email, a note, a command or its output.
+- sdlc builds the text when the event is queued, so an event that waits in the outbox reads the same when it is sent.
 
 *What you get:* the central picture updates within minutes, and the people who must act are told.
 

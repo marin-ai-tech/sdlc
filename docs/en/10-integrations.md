@@ -108,6 +108,7 @@ verify:
 - A mismatch, a tool error, a timeout or an unreachable server fails the check with the reason (for a mismatch: the key, the expected and the actual value).
 - A required MCP check that fails fails the verification, just like a failing command.
 - Results go into the evidence next to the commands' results. The JSON answer lists them under `mcp`.
+- `sdlc verify --list` shows the MCP checks (name, server, tool, required) next to the commands.
 
 *Why it is safe.* The agent never reports the result: the CLI calls the server and records what it got. An agent cannot edit the evidence or `openspec/sdlc.yaml`, because the hook denies both.
 
@@ -246,6 +247,17 @@ In an agent session, `sdlc init` and `sdlc update` refuse to weaken the guard: a
 - The server offers read-only resources: context packs, living specs, change artifacts, documents for agents.
 - `release.mcp` checks hold the release approval until an outside system agrees; `sdlc release check` runs them beforehand.
 - `events` push process events to an MCP server, with the people a gate waits for and overdue gates.
+
+Since 0.15.0 a receiver may ask for a ready message. With `message: text`, sdlc calls the tool with the static `args` plus `text`: one line that names the project, the change, the gate and the people by their names from `roles.yaml`, in the locale of the command, and never an email, a note, a command or its output. The `event` object is then not sent, so a Telegram bot's `send_message(chat_id, text)` takes events directly. The text is built when the event is queued, so an event that waits in the outbox reads the same.
+
+```yaml
+events:
+  - server: telegram
+    tool: send_message
+    on: ["gate.*", "verify.*", "change.archived"]
+    args: { chat_id: "-1001234567890" }
+    message: text
+```
 
 Chapter 11 shows the use cases.
 

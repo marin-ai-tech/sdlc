@@ -213,8 +213,8 @@ commit is green. The CLI asks GitHub itself; the agent never reports the result.
 
 ### Pitfalls
 
-- `sdlc verify --list` in 0.14.4 lists only `verify.commands`, not the `verify.mcp` checks. Read `openspec/sdlc.yaml`
-  to see them.
+- Since 0.15.0, `sdlc verify --list` shows the `verify.mcp` checks (name, server, tool, required) next to the
+  commands. In 0.14.4 it listed only `verify.commands`.
 - CI writes inbox files on its own machine. They reach the developer only when CI commits them.
 - A server that cannot be reached fails a required check. That is on purpose: "could not ask" is not "green".
 - The CLI's own `verify.mcp` call is not an agent call, so the stage rule (`[sdlc:mcp-stage]`) does not apply to it.

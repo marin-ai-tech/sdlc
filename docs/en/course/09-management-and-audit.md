@@ -608,8 +608,8 @@ Steven)
 events (a gate waits for Megan, an approval, an overdue gate, health degraded) as they happen.
 
 sdlc itself sends nothing to Telegram. It gives two pieces: an example script that writes the summary to a file, and
-`events` that call a tool of an MCP server. The sending is done by the team's own script and the team's Telegram MCP
-server.
+`events` that call a tool of an MCP server, with a ready one-line message if the receiver asks for one. The sending is
+done by the team's own script and the team's Telegram MCP server.
 
 ### Steps
 
@@ -692,9 +692,10 @@ server.
    project: { name: tasklet }
    events:
      - server: telegram                 # a server of mcp.servers
-       tool: report_event               # the tool name your server exposes for events
+       tool: send_message               # the send tool of your Telegram MCP server
        on: ["gate.*.awaiting", "gate.*.approved", "gate.*.overdue", "health.degraded"]
-       args: { chat: northwind-tasklet }
+       args: { chat_id: "-1001234567890" }
+       message: text                    # one line of text instead of the event object
    ```
 
    Without `on`, a receiver gets `gate.*`, `verify.*`, `change.created`, `change.archived`, `backlog.*`,
@@ -711,12 +712,17 @@ server.
    No events wait for delivery.
    ```
 
-6. Know what the tool receives. After a command, sdlc calls the tool with your static `args` plus one `event`
-   object: `{ id, project, event, change, gate, at, sdlc, by, waitingFor }`. `waitingFor` names the people from
-   `roles.yaml` who may take a waiting gate, so the bot can write "Megan, the intent of fix-empty-title waits for
-   you". `id` is stable, so the bot can drop repeats. An event never carries an email address, a command, its output
-   or a note. A Telegram server whose send tool takes only a chat id and a text cannot use this directly: Steven adds
-   a small tool to the team's server that turns the `event` object into a message.
+   This real output is from a trial whose receiver used a `report_event` tool. With the configuration above, the
+   first line names `telegram/send_message`.
+
+6. Know what the tool receives. Without `message`, sdlc calls the tool after a command with your static `args` plus
+   one `event` object: `{ id, project, event, change, gate, at, sdlc, by, waitingFor }`. `waitingFor` names the
+   people from `roles.yaml` who may take a waiting gate. `id` is stable, so a bot can drop repeats. With
+   `message: text`, as above, sdlc sends no `event` object: it calls `send_message` with your `args` plus `text`, one
+   line that names the project, the change, the gate and the people by their names from `roles.yaml`, in the locale
+   of the command. So the chat learns that the intent of fix-empty-title waits for Megan, and the plain send tool
+   needs no extra code. Neither the event nor the text ever carries an email address, a command, its output or a
+   note. The text is built when the event is queued, so an event that waited in the outbox reads the same.
 
 7. Make overdue gates arrive on time. Add `overdue_hours` to a gate in `openspec/sdlc.yaml`, inside its existing
    entry:

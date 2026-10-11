@@ -392,7 +392,7 @@ reach the agent through the inbox.
 - `expect` compares lists item by item and by length. A tool that returns a list of runs needs a filter that
   returns exactly the run you mean (here `head_sha` and `per_page: 1`).
 - `sdlc verify --only ci-green` runs only that check. It records evidence but never passes the gate.
-- `sdlc verify --list` lists the commands only, not the MCP checks.
+- `sdlc verify --list` shows the MCP checks (name, server, tool, required) next to the commands.
 - The agent cannot edit the evidence or the inbox files: the hook denies it (`sdlc guide denials#state-integrity`).
 - When CI produces inbox results, CI has to commit them; the inbox travels by git.
 
@@ -487,7 +487,7 @@ for the commit she is releasing. Anyone can run the checks beforehand.
 ## Lesson 2.6 — Events to Telegram: waits, approvals, overdue gates            (video: ~8 min)
 
 **Role:** Steven configures; Megan and Laura receive   **Project:** tasklet
-**You need:** lesson 2.1; a team Telegram bot server whose tool accepts sdlc's `event` argument
+**You need:** lesson 2.1; a Telegram bot MCP server with a `send_message(chat_id, text)` tool
 
 **Goal.** The team's Telegram chat learns when a gate waits for someone, when a gate is approved or sent back, and
 when a wait is overdue, without anyone asking `sdlc next`.
@@ -499,7 +499,7 @@ when a wait is overdue, without anyone asking `sdlc next`.
    ```yaml
    events:
      - server: telegram
-       tool: report_event             # the tool name your server exposes
+       tool: send_message             # the tool name your server exposes
        on:
          - "gate.*.awaiting"
          - "gate.*.overdue"
@@ -508,7 +508,8 @@ when a wait is overdue, without anyone asking `sdlc next`.
          - "gate.*.rework"
          - "verify.failed"
          - "change.archived"
-       args: { chat: tasklet-team }
+       args: { chat_id: "-1001234567890" }
+       message: text                  # send one line of text instead of the event object
    gates:
      intent: { required: true, approvers: [product-owner], overdue_hours: 24 }
      review: { required: true, approvers: [code-owner], overdue_hours: 8 }
@@ -519,12 +520,16 @@ when a wait is overdue, without anyone asking `sdlc next`.
    | `server`, `tool` | a registry server and the tool sdlc calls for each event |
    | `on` | patterns of event names; `*` stands for any text. Without `on`: `gate.*`, `verify.*`, `change.created`, `change.archived`, `backlog.*`, `health.degraded`, `health.recovered` |
    | `args` | static arguments sent with every event |
+   | `message` | the argument that gets the event as one line of text; the `event` object is then not sent |
    | `gates.<g>.overdue_hours` | a wait longer than this raises `gate.<g>.overdue` once |
 
    Hook events (`hook.denied`, …) are sent only when a pattern names them.
 
-2. Explain what the bot receives. After each sdlc command, sdlc calls the tool with the static `args` and an `event`
-   object. Real example, from `sdlc events list --json`:
+2. Explain what the bot receives. After each sdlc command, sdlc calls `send_message` with the static `args` plus
+   `text`: one line that names the project, the change, the gate and the people by their names from `roles.yaml`, in
+   the locale of the command. sdlc builds the line when the event is queued, so an event that waits in the outbox
+   reads the same later. The trial ran sdlc 0.14.4, without `message`; this real event is from
+   `sdlc events list --json`:
 
    ```json
    {
@@ -539,9 +544,10 @@ when a wait is overdue, without anyone asking `sdlc next`.
    }
    ```
 
-   `waitingFor` holds the person ids from `roles.yaml`; an approval carries `by` instead. An event never carries an
-   email, a command, its output or a note. The bot turns it into a message such as "add-due-dates waits for Megan:
-   intent". Mapping `megan` to her Telegram account is the bot's job.
+   `waitingFor` holds the person ids from `roles.yaml`; an approval carries `by` instead. Neither the event nor the
+   text ever carries an email, a command, its output or a note. Without `message`, sdlc sends this `event` object
+   instead of the text, and the bot's tool must accept it. The text names people by name only; mapping `megan` to
+   her Telegram account is still the bot's job.
 
 3. Show the queue. Delivery takes at most five seconds after a command and never fails the command. What could not
    be sent waits in `.git/sdlc/outbox/`, which is never committed:
@@ -557,6 +563,9 @@ when a wait is overdue, without anyone asking `sdlc next`.
      2026-10-09T20:27:17.643Z  verify.failed  add-due-dates
      2026-10-09T20:34:17.743Z  gate.intent.approved  add-due-dates
    ```
+
+   This real output is from the trial, whose receiver used a `report_event` tool. With the configuration above, the
+   first line names `telegram/send_message`.
 
 4. Deliver now, for example after the bot was down:
 
@@ -596,7 +605,7 @@ when a wait is overdue, without anyone asking `sdlc next`.
 
 ### Check yourself
 
-- After Megan's approval, the chat shows `gate.intent.approved` for `add-due-dates` by `megan`.
+- After Megan's approval, the chat shows one line about the approved intent of `add-due-dates` that names Megan.
 - `sdlc events list` shows "No events wait for delivery." on a machine with the token set.
 - 24 hours after an unanswered intent, the chat gets one `gate.intent.overdue` message naming Megan.
 
@@ -608,14 +617,14 @@ when a wait is overdue, without anyone asking `sdlc next`.
   again and miss an overdue gate. Use a clone that keeps its log, as in step 5.
 - Several clones can each announce the same wait before their logs are merged. The event ids then differ, so the
   bot cannot drop such repeats by `id`; it can by change, gate and event name.
-- A generic Telegram server with only `send_message(chat_id, text)` cannot take sdlc's `event` object. The team's
-  bot server needs a tool that accepts it.
+- A generic Telegram server with only `send_message(chat_id, text)` takes events through `message: text`. Without
+  `message`, sdlc sends the `event` object, and the tool must accept it.
 - `events` must name a server of `mcp.servers`; an unknown name is a configuration error.
 
 ### On screen (for the video)
 
 - The `events` block; highlight `on` and `overdue_hours`.
-- The JSON event next to the Telegram message it becomes.
+- The `message: text` line next to the Telegram message it produces.
 - `events list`, the bot coming back, `events flush`, the chat filling up.
 - The scheduled job and the daily summary file in the chat.
 
@@ -723,20 +732,18 @@ Things this scenario wanted that sdlc 0.14.4 does not do. One line each, for the
 2. No built-in CI check: `verify.mcp` needs the GitHub server's tool and argument names; sdlc does not validate them.
 3. `expect` matches lists by exact length; a list of runs needs a filter that returns one item ("any item" is missing).
 4. `verify.mcp` and `release.mcp` do not wait for a CI run in progress; a pending run fails and must be rerun.
-5. `sdlc verify --list` lists the commands only, not the `verify.mcp` checks.
-6. `sdlc mcp check` lists tool names only, not their input arguments.
-7. `sdlc mcp check` always exits 0; a CI step must parse the JSON to fail on an unreachable server.
-8. `sdlc doctor` does not check that the registry's `${VAR}` references are set in the environment.
-9. A registry server cannot be marked CLI-only (event receiver, check target); every one is laid out for the agents.
-10. `stages: []` means "not checked", not "never"; the agent cannot be forbidden a server outright.
-11. An open change is never at `maintain`, so a `maintain`-only server is out of stage during `/sdlc:triage`.
-12. Events carry person ids; `roles.yaml` has no chat handle, so each receiver keeps its own mapping.
-13. Events are a structured `event` argument with no message template; a plain `send_message` server cannot receive.
-14. Events are sent only from the clone where the command ran; every person needs the receiver's secret.
-15. A scheduled `events flush` in a fresh CI checkout can repeat waits and miss overdue gates; it needs a kept clone.
-16. Several clones can announce one wait with different event ids, so a receiver cannot deduplicate by `id`.
-17. The daily summary example only writes a file; sending it to a chat is outside sdlc.
-18. `sdlc mcp serve` is stdio only; no remote endpoint for a chat client on another machine.
-19. Context packs come only from local `docs/context/`; sdlc does not pull documents from the knowledge server.
-20. `sdlc init` with flags cannot create a starter `roles.yaml`; only the wizard (or `sdlc adopt --apply`) does.
-21. Doc gap: 10-integrations.md (10.1) lists six `sdlc mcp serve` tools; the server also has `guide`.
+5. `sdlc mcp check` lists tool names only, not their input arguments.
+6. `sdlc mcp check` always exits 0; a CI step must parse the JSON to fail on an unreachable server.
+7. `sdlc doctor` does not check that the registry's `${VAR}` references are set in the environment.
+8. A registry server cannot be marked CLI-only (event receiver, check target); every one is laid out for the agents.
+9. `stages: []` means "not checked", not "never"; the agent cannot be forbidden a server outright.
+10. An open change is never at `maintain`, so a `maintain`-only server is out of stage during `/sdlc:triage`.
+11. Events carry person ids; `roles.yaml` has no chat handle, so each receiver keeps its own mapping.
+12. Events are sent only from the clone where the command ran; every person needs the receiver's secret.
+13. A scheduled `events flush` in a fresh CI checkout can repeat waits and miss overdue gates; it needs a kept clone.
+14. Several clones can announce one wait with different event ids, so a receiver cannot deduplicate by `id`.
+15. The daily summary example only writes a file; sending it to a chat is outside sdlc.
+16. `sdlc mcp serve` is stdio only; no remote endpoint for a chat client on another machine.
+17. Context packs come only from local `docs/context/`; sdlc does not pull documents from the knowledge server.
+18. `sdlc init` with flags cannot create a starter `roles.yaml`; only the wizard (or `sdlc adopt --apply`) does.
+19. Doc gap: 10-integrations.md (10.1) lists six `sdlc mcp serve` tools; the server also has `guide`.

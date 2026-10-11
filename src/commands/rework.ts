@@ -39,6 +39,7 @@ interface Rework {
   by: string;
   from: string;
   role?: string;
+  digest?: string;
 }
 
 function toPosix(file: string): string {
@@ -82,6 +83,7 @@ function recordRework(ctx: ProjectContext, ref: ChangeRef, state: ChangeState, r
       note: rework.note,
       from: rework.from,
       cycle,
+      ...(rework.digest ? { digest: rework.digest } : {}),
       ...provenance(ctx.stamp),
     },
   };
@@ -136,7 +138,9 @@ export async function reworkCommand(gateArg: string, opts: ReworkOptions): Promi
     const state = readChangeState(ref.dir);
     const decision = decide(ctx, gate, opts, state);
     const scope = opts.reset ? resetScope(ctx, ref, gate) : undefined;
-    const rework = { ...decision, from: evaluateChange(ctx.root, ref, ctx.config).stage };
+    const view = evaluateChange(ctx.root, ref, ctx.config);
+    const digest = view.gates.find((item) => item.id === gate)?.digest;
+    const rework = { ...decision, from: view.stage, ...(digest ? { digest } : {}) };
     recordRework(ctx, ref, state, rework);
     const restored = scope ? restoreFromCheckpoint(scope) : undefined;
     report(ctx, ref, rework, restored, opts.json);
