@@ -9,8 +9,13 @@ export interface GitResult {
   stderr: string;
 }
 
-export function git(cwd: string, args: string[]): GitResult {
-  const result = spawnSync('git', args, { cwd, encoding: 'utf-8', maxBuffer: 64 * 1024 * 1024 });
+export interface GitOptions {
+  /** Environment of the git process; the current environment when omitted. */
+  env?: NodeJS.ProcessEnv;
+}
+
+export function git(cwd: string, args: string[], options: GitOptions = {}): GitResult {
+  const result = spawnSync('git', args, { cwd, env: options.env, encoding: 'utf-8', maxBuffer: 64 * 1024 * 1024 });
   return {
     ok: result.status === 0,
     stdout: (result.stdout ?? '').trim(),

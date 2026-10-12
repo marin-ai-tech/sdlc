@@ -348,6 +348,10 @@ every change to `roles.yaml` is signed by a maintainer. Check it locally and in 
    | `bad-signature` | the signature does not verify against the keys sdlc knows |
    | `not-committed` | the approval record is not in a commit yet |
    | `not-maintainer` | a `roles.yaml` commit signed by someone who was not a maintainer in the version before |
+   | `pre-signing` | a keyless commit before any signing key existed; passes (✓) |
+   | `bootstrap` | the first key-adding commit, signed by a maintainer in that version; passes (✓) |
+   | `merge` | a merge from a branch based on a version with keys; passes (✓) |
+   | `bootstrap-conflict` | more than one first-key bootstrap in history; fails (✗) |
 
    A change to `roles.yaml` is checked against the maintainers **of the previous version**. Nobody can add
    themselves as a maintainer and sign that commit with their own key.
@@ -358,6 +362,9 @@ every change to `roles.yaml` is signed by a maintainer. Check it locally and in 
    ```bash
    sdlc approvals verify --mode required
    ```
+
+   Since 0.16.3, CI needs the full history. For GitHub Actions use
+   `actions/checkout` with `fetch-depth: 0`.
 
    It exits 1 when any approval is invalid. Steven adds it as a required check on the default branch, together with
    branch protection.
@@ -372,10 +379,10 @@ every change to `roles.yaml` is signed by a maintainer. Check it locally and in 
 
 ### Pitfalls
 
-- Since 0.16.2, bootstrap with `signing: off` and no keys, then a signed key-adding commit and a
-  separate signed `signing: warn` commit. The observed results were `bad-signature` for the key
-  commit, `unsigned` for the initial commit and `valid` for the last commit; the summary said
-  `2 invalid (warn: not blocking)`. Record and review the expected bootstrap findings.
+- Since 0.16.3, keyless commits before signing pass as `pre-signing`. Add all maintainer and approver
+  keys in one commit signed by a maintainer listed there; it passes as `bootstrap`. Switch to
+  `signing: warn`, then `signing: required`, in signed commits. A second bootstrap fails as
+  `bootstrap-conflict`. Protect the main branch from force pushes and keep `roles.yaml` under CODEOWNERS.
 - Commit the change folder after `sdlc archive`. Since 0.15.4, approvals committed while the change was active keep
   their status before the archive move is committed.
 - With `signing: off`, `sdlc approvals verify` prints "Approval signing is off." and checks nothing. Use

@@ -1,19 +1,22 @@
 import { loadProject } from '../cli/context.js';
-import { line, printJson, reportFailure } from '../cli/output.js';
+import { line, printJson, reportFailure, warn } from '../cli/output.js';
 import { approvalTrailers } from '../core/approval-hygiene.js';
 import {
-  allChanges, approvalSignature, approvalSites, rolesSignatures, trailerStatus, withAllowedSigners,
-  type SignatureStatus,
+  allChanges, approvalSignature, approvalSites, hasRolesHistory, rolesSignatures, trailerStatus, withAllowedSigners,
+  withSignersFile, type SignatureStatus,
 } from '../core/approval-signatures.js';
-import { SdlcError } from '../core/errors.js';
+import { SdlcError, toDiagnostic, type Diagnostic } from '../core/errors.js';
+import { historyErrors } from '../core/history-trust.js';
 import type { ProjectPaths } from '../core/project.js';
 import { readRolesFile, SIGNING_MODES, type RolesFile, type SigningMode } from '../core/roles.js';
 import { t } from '../core/i18n.js';
 
 interface Result { status: SignatureStatus; commit?: string; signer?: string }
 
-function verify(root: string, paths: ProjectPaths, roles: RolesFile, signers: string) {
-  const results: Array<Record<string, unknown> & Result> = [];
+type Results = Array<Record<string, unknown> & Result>;
+
+function verify(root: string, paths: ProjectPaths, roles: RolesFile, signers: string): Results {
+  const results: Results = [];
   const trailers = approvalTrailers(root);
   for (const site of approvalSites(root, allChanges(paths))) {
     const { ref, gate, record } = site;
@@ -21,44 +24,93 @@ function verify(root: string, paths: ProjectPaths, roles: RolesFile, signers: st
     const base = { change: ref.id, gate, role: record.role, by: record.by, person: record.person, trailer };
     results.push({ ...base, ...approvalSignature(root, roles, signers, site) });
   }
-  results.push(...rolesSignatures(root, roles, signers));
+  results.push(...rolesSignatures(root, signers));
   return results;
+}
+
+function passing(status: SignatureStatus): boolean {
+  return status === 'valid' || status === 'pre-signing' || status === 'bootstrap' || status === 'merge';
 }
 
 function printResults(results: ReturnType<typeof verify>, mode: string): void {
   for (const result of results) {
     const subject = result.file ?? `${result.change}/${result.gate}`;
-    const mark = result.status === 'valid' ? '✓' : '✗';
+    const mark = passing(result.status) ? '✓' : '✗';
     const status = t(`approvals.status.${result.status}`);
     const trailer = typeof result.trailer === 'string' ? ` ${t('approvals.trailer', { status: result.trailer })}` : '';
     const commit = result.commit?.slice(0, 8) ?? '-';
     line(`${mark} ${subject} ${result.person ?? result.by} ${status} ${commit}${trailer}`);
   }
   const approvals = results.filter((result) => result.change).length;
-  const failures = results.filter((result) => result.status !== 'valid');
+  const failures = results.filter((result) => !passing(result.status));
   const blocking = mode === 'warn' ? t('approvals.warnNotBlocking') : '';
   line(t('approvals.summary', { approvals, invalid: failures.length, blocking }));
   if (failures.length) line(t('approvals.signHint'));
+}
+
+function signingMode(flag: string | undefined, roles: RolesFile | undefined): SigningMode {
+  const mode = flag ?? roles?.signing ?? 'off';
+  if (!SIGNING_MODES.includes(mode as SigningMode)) {
+    throw new SdlcError('invalid_mode', { key: 'error.unknown_signing_mode_x', params: { mode: mode } });
+  }
+  return mode as SigningMode;
+}
+
+/**
+ * B114: a shallow clone or grafts make the history untrustworthy. Required verification refuses (the first problem
+ * is thrown); warn mode returns the problems, reported as warnings, and goes on.
+ */
+function trustProblems(root: string, mode: SigningMode): SdlcError[] {
+  const problems = historyErrors(root);
+  if (mode === 'required' && problems.length) throw problems[0];
+  return problems;
+}
+
+function asWarning(problem: SdlcError): Diagnostic {
+  return { ...toDiagnostic(problem), severity: 'warning' };
+}
+
+/** B114: roles.yaml is deleted at HEAD, so only its history is checked (no current roles to check approvals with). */
+function verifyRolesHistory(root: string): Results {
+  return withSignersFile('', (signers) => rolesSignatures(root, signers));
+}
+
+function printOff(mode: SigningMode, json: boolean | undefined): void {
+  if (json) printJson({ mode, ok: true, results: [] });
+  else line(t('approvals.off'));
+}
+
+function printWarnings(problems: SdlcError[]): void {
+  for (const problem of problems) warn(`${problem.localizedMessage()} ${problem.localizedFix() ?? ''}`.trimEnd());
+}
+
+function printOutcome(mode: SigningMode, results: Results, problems: SdlcError[], json: boolean | undefined): void {
+  const ok = results.every((result) => passing(result.status));
+  const warnings = problems.length ? { warnings: problems.map(asWarning) } : {};
+  if (json) {
+    printJson({ mode, ok, results, ...warnings });
+  } else {
+    printWarnings(problems);
+    printResults(results, mode);
+  }
+  if (mode === 'required' && !ok) process.exitCode = 1;
 }
 
 export function approvalsVerify(opts: { mode?: string; json?: boolean }): void {
   try {
     const ctx = loadProject();
     const roles = readRolesFile(ctx.root);
-    const mode = opts.mode ?? roles?.signing ?? 'off';
-    if (!SIGNING_MODES.includes(mode as SigningMode)) {
-      throw new SdlcError('invalid_mode', { key: 'error.unknown_signing_mode_x', params: { mode: mode } });
-    }
-    if (mode === 'off' || !roles) {
-      if (opts.json) printJson({ mode, ok: true, results: [] });
-      else line(t('approvals.off'));
+    const mode = signingMode(opts.mode, roles);
+    const checking = mode !== 'off' && (roles !== undefined || mode === 'required');
+    const problems = checking ? trustProblems(ctx.root, mode) : [];
+    if (!checking || (!roles && !hasRolesHistory(ctx.root))) {
+      printOff(mode, opts.json);
       return;
     }
-    const results = withAllowedSigners(roles, (signers) => verify(ctx.root, ctx.paths, roles, signers));
-    const ok = results.every((result) => result.status === 'valid');
-    if (opts.json) printJson({ mode, ok, results });
-    else printResults(results, mode);
-    if (mode === 'required' && !ok) process.exitCode = 1;
+    const results = roles
+      ? withAllowedSigners(roles, (signers) => verify(ctx.root, ctx.paths, roles, signers))
+      : verifyRolesHistory(ctx.root);
+    printOutcome(mode, results, problems, opts.json);
   } catch (error) {
     reportFailure(error, opts.json);
   }

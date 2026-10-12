@@ -43,6 +43,18 @@ function headLines(index: EvidenceIndex): string[] {
   ];
 }
 
+function rolesLines(index: EvidenceIndex): string[] {
+  const lines = ['', '## Roles history', ''];
+  if (index.rolesCommits.length === 0) return [...lines, 'No roles commits checked.'];
+  lines.push('| Commit | By | Signer | Signature |');
+  lines.push('| --- | --- | --- | --- |');
+  for (const commit of index.rolesCommits) {
+    const cells = [commit.commit, commit.by, commit.signer ?? '-', commit.status];
+    lines.push(`| ${cells.map(cell).join(' | ')} |`);
+  }
+  return lines;
+}
+
 export function evidenceIndexMarkdown(index: EvidenceIndex): string {
   const lines = headLines(index);
   if (index.changes.length === 0) {
@@ -50,5 +62,6 @@ export function evidenceIndexMarkdown(index: EvidenceIndex): string {
     lines.push('No changes.');
   }
   for (const change of index.changes) lines.push(...changeSection(change, index.approvals));
+  lines.push(...rolesLines(index));
   return `${lines.join('\n')}\n`;
 }

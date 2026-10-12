@@ -2,6 +2,16 @@
 
 All notable changes to sdlc. Versions follow [Semantic Versioning](https://semver.org/); while the major version is 0, a minor version may change behavior.
 
+## 0.16.3 — 2026-10-12
+
+### Fixed
+- `signing: required` can pass after a signed first-key bootstrap in an existing `roles.yaml` history.
+- A stale branch merge, deleted `roles.yaml`, shallow clone or graft can no longer make required verification pass.
+
+### Changed
+- Roles history reports `pre-signing`, `bootstrap`, `merge` and `bootstrap-conflict` statuses.
+- Required verification needs the full git history. CI should check out with `fetch-depth: 0`.
+
 ## 0.16.2 — 2026-10-12
 
 ### Added

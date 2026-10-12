@@ -2,7 +2,7 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { approvalTrailers } from './approval-hygiene.js';
 import {
-  allChanges, approvalSignature, approvalSites, trailerStatus, withAllowedSigners,
+  allChanges, approvalSignature, approvalSites, rolesSignatures, trailerStatus, withAllowedSigners,
   type ApprovalSite, type SignatureStatus, type TrailerStatus,
 } from './approval-signatures.js';
 import { resolveChange, type ChangeRef } from './changes.js';
@@ -46,6 +46,7 @@ export interface EvidenceIndex {
   harness: HarnessStamp;
   changes: string[];
   approvals: ExportApproval[];
+  rolesCommits: ReturnType<typeof rolesSignatures>;
 }
 
 export interface ExportSummary {
@@ -190,6 +191,10 @@ export function periodLog(root: string, since: string | undefined, change: Chang
 }
 
 function buildIndex(project: ExportProject, refs: ChangeRef[], since: string | undefined): EvidenceIndex {
+  const roles = signingRoles(project.root);
+  const rolesCommits = roles
+    ? withAllowedSigners(roles, (signers) => rolesSignatures(project.root, signers))
+    : [];
   return {
     generatedAt: new Date().toISOString(),
     ...(since ? { since } : {}),
@@ -197,6 +202,7 @@ function buildIndex(project: ExportProject, refs: ChangeRef[], since: string | u
     harness: project.stamp,
     changes: refs.map(bundleId),
     approvals: exportApprovals(project.root, refs),
+    rolesCommits,
   };
 }
 

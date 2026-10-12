@@ -77,7 +77,10 @@ A git email is easy to fake. Signing closes that gap: every approval must arrive
 
 `--mode` overrides the file, so CI can require signatures while local work only warns: `sdlc approvals verify --mode required`.
 
-Statuses of an approval: `valid`, `unsigned`, `wrong-signer` (signed by someone other than the approver — for example Bob signing a commit that claims Alice's approval), `bad-signature`, `not-committed` (the record is not in a commit yet). For `roles.yaml` commits: `valid`, `unsigned`, `not-maintainer`. A change to `roles.yaml` is checked against the maintainers in the version before it, so nobody can make themselves a maintainer and sign that with their own key.
+Statuses of an approval: `valid`, `unsigned`, `wrong-signer`, `bad-signature`, `not-committed`.
+For `roles.yaml` commits: `valid`, `unsigned`, `not-maintainer`, `pre-signing`, `bootstrap`, `merge`,
+`bootstrap-conflict`. Since 0.16.3, each commit is checked against the version before it once that version
+has keys. A person cannot add themselves as maintainer and sign that change with their own key.
 
 After `sdlc archive`, committed approvals retain their status even before you commit the archive move.
 
@@ -91,19 +94,36 @@ git config commit.gpgsign true
 
 Then put the public key into `signing_key` in `roles.yaml` (a maintainer commits that change).
 
-Bootstrap the keys before requiring signatures. In a temporary two-person repository, these steps were checked:
+Since 0.16.3, a commit before any key exists passes as `pre-signing` if it adds no key. The first key-adding
+commit is checked against its own version. It passes as `bootstrap` when signed by a maintainer listed there.
+Only one bootstrap is allowed: if history has more than one, every bootstrap gets `bootstrap-conflict` and fails.
+Removing all keys and adding new ones cannot start a new bootstrap.
 
-1. Commit `roles.yaml` with Alice as maintainer, Alice and Bob as people, no `signing_key` fields, and `signing: off`.
-2. Generate each person's SSH key with `ssh-keygen -q -t ed25519 -N '' -C <email> -f <key>`.
-3. Add both public keys to `signing_key`. Alice signs that commit with `git -c gpg.format=ssh
-   -c user.signingkey=<alice.pub> commit -S -m 'add signing keys'`.
-4. Change to `signing: warn` in another Alice-signed commit. Run `sdlc approvals verify` and review the findings.
+Verification reads `git log --full-history`. A merge whose `roles.yaml` matches a parent's version passes as
+`merge` only if the branch it takes grew from a base that already had keys. Otherwise the merge is checked
+against a parent with keys. An unsigned merge that drops keys fails; normal pull-request merges of signed
+changes pass. If `roles.yaml` is deleted at HEAD, `--mode required` still checks its history, so an unsigned
+deletion fails.
 
-The observed text was `valid` for the `signing: warn` commit, `bad-signature` for the signed key-adding
-commit, and `unsigned` for the initial roles commit. It ended with
-`0 approvals checked, 2 invalid (warn: not blocking)` and exited 0. The JSON had `mode: "warn"`, `ok: false`
-and the same three statuses. The key-adding commit cannot verify against the preceding version, which has
-no keys. Record this expected bootstrap finding; require signatures in CI after the bootstrap is reviewed.
+To bootstrap an existing `roles.yaml`:
+
+1. Add every maintainer's and approver's `signing_key` in one commit signed by a maintainer listed in that
+   new version. The earlier keyless commits pass as `pre-signing`; this commit passes as `bootstrap`.
+2. Switch to `signing: warn`, then `signing: required`, in signed commits.
+3. Run `sdlc approvals verify --mode required` in CI on a full clone:
+
+   ```yaml
+   - uses: actions/checkout@v4
+     with:
+       fetch-depth: 0
+   - run: sdlc approvals verify --mode required
+   ```
+
+A shallow clone is refused as `shallow_history`; grafts are refused as `rewritten_history`. Both are warnings
+in warn mode. Replace objects are ignored. A git error is `history_unreadable`, never an empty history.
+
+A force-pushed history is a different history. Verification cannot know which keys were first in the history
+you lost. Protect the main branch against force pushes and keep `roles.yaml` under CODEOWNERS.
 
 The approver commits their own approval: `sdlc approve …`, then `git commit -S`.
 

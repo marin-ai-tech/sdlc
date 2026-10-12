@@ -532,7 +532,9 @@ evidence of a quarter.
 
 2. Read the statuses. For an approval: `valid`, `unsigned`, `wrong-signer` (someone else signed a commit that claims
    this approval), `bad-signature`, `not-committed`. For a commit to `roles.yaml`: `valid`, `unsigned`,
-   `not-maintainer`. The JSON (`sdlc approvals verify --json`) also gives `trailer: found | missing` for each
+   `not-maintainer`, `pre-signing` (passes), `bootstrap` (passes), `merge` (passes), and
+   `bootstrap-conflict` (fails). The JSON (`sdlc approvals verify --json`) also gives
+   `trailer: found | missing` for each
    approval: whether the commit with its `SDLC-Approval` trailer exists.
 
 3. Choose the mode. `signing` in `roles.yaml` is `off`, `warn` or `required`; `--mode` overrides it for one run:
@@ -541,7 +543,11 @@ evidence of a quarter.
    sdlc approvals verify --mode required     # exits 1 on any problem: use it in CI
    ```
 
-   Without `roles.yaml` or with `signing: off`, the command prints `Approval signing is off.`
+   Since 0.16.3, this needs full git history. Use `actions/checkout` with `fetch-depth: 0` in CI.
+   A shallow clone reports `shallow_history`; grafts report `rewritten_history`.
+
+   With no `roles.yaml` in history, or with `signing: off` and no mode override, the command prints
+   `Approval signing is off.` If the file was deleted at HEAD, `--mode required` still checks its history.
 
 4. Export the evidence bundle for the quarter. Laura runs it in her terminal and writes it next to the repository, not
    inside it:

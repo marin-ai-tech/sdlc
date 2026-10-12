@@ -103,6 +103,8 @@ describe('sdlc approvals verify', () => {
     const r = p.cli(['approvals', 'verify', '--mode', 'required', '--json']);
     expect(r.code).toBe(1);
     expect(r.json().results).toEqual(expect.arrayContaining([expect.objectContaining({ file: 'openspec/roles.yaml', status: 'not-maintainer' })]));
-    expect(r.json().results).toEqual(expect.arrayContaining([expect.objectContaining({ file: 'openspec/roles.yaml', status: 'valid' })]));
+    // B114 (0.16.3, trust on first keys): the first roles.yaml commit, which brings the keys and is signed by Alice,
+    // a maintainer in its own version, is `bootstrap` — a pass, no longer checked against today's roles.yaml.
+    expect(r.json().results).toEqual(expect.arrayContaining([expect.objectContaining({ file: 'openspec/roles.yaml', status: 'bootstrap' })]));
   });
 });
