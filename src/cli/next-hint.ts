@@ -37,7 +37,7 @@ function backlogHint(ctx: ProjectContext): NextHint | undefined {
 
 /** The change's next step; a gate that now waits for a person is recorded in the project log. */
 function changeNext(ctx: ProjectContext, ref: ChangeRef): NextHint | undefined {
-  const view = evaluateChange(ctx.root, ref, ctx.config, { skipFingerprint: true });
+  const view = evaluateChange(ctx.root, ref, ctx.config);
   recordAwaiting(ctx.root, ctx.config, view, ctx.stamp);
   if (view.next.actor === 'none') return undefined;
   return view.next;

@@ -400,42 +400,53 @@ function recordInstructions(ctx: ProjectContext, ref: ChangeRef, artifact: strin
   line(`\n<template>\n${template}</template>\n</artifact>`);
 }
 
+/**
+ * The lifecycle view as fresh as `sdlc next` (B88): evaluated with the real worktree fingerprint,
+ * so a code change after verification shows the verification and the review approval as stale.
+ */
+function freshView(ctx: ProjectContext, ref: ChangeRef): LifecycleView {
+  return evaluateChange(ctx.root, ref, ctx.config);
+}
+
+/** `sdlc instructions <artifact>` (text): OpenSpec's instructions, the context pack and the lifecycle view. */
+function printOpenSpecInstructions(ctx: ProjectContext, ref: ChangeRef, artifact: string): void {
+  const r = runOpenSpec(['instructions', artifact, '--change', ref.id], { cwd: ctx.root, inherit: true });
+  const view = freshView(ctx, ref);
+  printContextPack(readContextPack(ctx.root, artifactStage(artifact, view.gates)));
+  line(c.dim(`\n[sdlc] stage: ${view.stageTitle}; next: ${view.next.message}`));
+  if (!r.ok) process.exitCode = r.exitCode ?? 1;
+}
+
+/** The `sdlc` block of `sdlc instructions <artifact> --json`: the stage and the gate of the artifact. */
+function instructionsSdlcJson(view: LifecycleView, artifact: string): Record<string, unknown> {
+  const gate = view.gates.find((g) => g.artifacts.includes(artifact));
+  return {
+    stage: view.stage,
+    kind: view.kind,
+    risk: view.risk,
+    track: view.track,
+    ...(gate ? { gate: gate.id, gateStatus: gate.status } : {}),
+    note: gate && (gate.status === 'approved' || gate.status === 'waived')
+      ? `The ${gate.id} gate is ${gate.status}: editing ${artifact} invalidates that approval and needs re-approval.`
+      : undefined,
+  };
+}
+
 export async function instructionsCommand(artifact: string, opts: { change?: string; json?: boolean }): Promise<void> {
   try {
     const ctx = loadProject();
     const ref = resolveChange(ctx.paths, opts.change);
     if (artifact in RECORD_INSTRUCTIONS) return recordInstructions(ctx, ref, artifact, opts.json);
     // Planning artifacts and `apply` are OpenSpec's: delegate, then add the lifecycle view.
-    if (!opts.json) {
-      const r = runOpenSpec(['instructions', artifact, '--change', ref.id], { cwd: ctx.root, inherit: true });
-      const view = evaluateChange(ctx.root, ref, ctx.config, { skipFingerprint: true });
-      printContextPack(readContextPack(ctx.root, artifactStage(artifact, view.gates)));
-      line(c.dim(`\n[sdlc] stage: ${view.stageTitle}; next: ${view.next.message}`));
-      if (!r.ok) process.exitCode = r.exitCode ?? 1;
-      return;
-    }
+    if (!opts.json) return printOpenSpecInstructions(ctx, ref, artifact);
     const result = runOpenSpecJson<Record<string, unknown>>(['instructions', artifact, '--change', ref.id], ctx.root);
     if (!result.data) throw new SdlcError(
       'openspec_instructions_failed',
       { key: 'error.openspec_failure_detail', params: { detail: openspecFailure(result.data, result.raw) } }
     );
-    const view = evaluateChange(ctx.root, ref, ctx.config, { skipFingerprint: true });
-    const gate = view.gates.find((g) => g.artifacts.includes(artifact));
+    const view = freshView(ctx, ref);
     const pack = readContextPack(ctx.root, artifactStage(artifact, view.gates));
-    printJson({
-      ...result.data,
-      sdlc: {
-        stage: view.stage,
-        kind: view.kind,
-        risk: view.risk,
-        track: view.track,
-        ...(gate ? { gate: gate.id, gateStatus: gate.status } : {}),
-        note: gate && (gate.status === 'approved' || gate.status === 'waived')
-          ? `The ${gate.id} gate is ${gate.status}: editing ${artifact} invalidates that approval and needs re-approval.`
-          : undefined,
-      },
-      ...contextPackJson(pack),
-    });
+    printJson({ ...result.data, sdlc: instructionsSdlcJson(view, artifact), ...contextPackJson(pack) });
     if (!result.ok) process.exitCode = 1;
   } catch (error) {
     reportFailure(error, opts.json);

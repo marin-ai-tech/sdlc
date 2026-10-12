@@ -2,7 +2,7 @@ import { listActiveChanges } from '../core/changes.js';
 import { t } from '../core/i18n.js';
 import { readBacklog, nextBacklogItem } from '../core/backlog.js';
 import { loadConfig } from '../core/config.js';
-import { evaluateChange } from '../core/lifecycle.js';
+import { evaluateChange, sharedFingerprint } from '../core/lifecycle.js';
 import { findProjectRoot, projectPaths } from '../core/project.js';
 
 async function input(): Promise<string> {
@@ -20,8 +20,10 @@ export async function statuslineCommand(): Promise<void> {
     if (!root) return;
     const paths = projectPaths(root);
     const config = loadConfig(paths.sdlcConfig);
-    const views = listActiveChanges(paths).map((ref) =>
-      evaluateChange(root, ref, config, { skipFingerprint: true }));
+    const refs = listActiveChanges(paths);
+    // One worktree fingerprint for all changes, so the line is as fresh as `sdlc status` (B88); none without changes.
+    const fingerprint = refs.length ? sharedFingerprint(root) : null;
+    const views = refs.map((ref) => evaluateChange(root, ref, config, { fingerprint }));
     if (views.length) {
       const view = views.find((item) => item.next.actor === 'human') ?? views[0];
       const prefix = views.length > 1 ? t('statusline.changesPrefix', { count: views.length }) : '';

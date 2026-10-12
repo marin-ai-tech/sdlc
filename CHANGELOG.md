@@ -2,6 +2,14 @@
 
 All notable changes to sdlc. Versions follow [Semantic Versioning](https://semver.org/); while the major version is 0, a minor version may change behavior.
 
+## 0.15.3 — 2026-10-12
+
+### Fixed
+- The `Next:` line after a command, the status line, `sdlc instructions` and the waits recorded by `sdlc events` now
+  check whether the code changed after verification, as `sdlc next` and `sdlc status` do. Before, after a later code
+  change and a new `sdlc verify`, the `Next:` line said "archive" while a code owner had to re-approve the review,
+  and the status line said "Done" while the code was unverified. The status line takes about 0.3 s longer.
+
 ## 0.15.2 — 2026-10-12
 
 ### Fixed

@@ -3,7 +3,7 @@ import { c, line, printJson, reportFailure } from '../cli/output.js';
 import { recordAwaiting } from '../core/awaiting.js';
 import { listActiveChanges } from '../core/changes.js';
 import { t } from '../core/i18n.js';
-import { evaluateChange, type LifecycleView } from '../core/lifecycle.js';
+import { evaluateChange, sharedFingerprint, type LifecycleView } from '../core/lifecycle.js';
 import { deliverPending, FLUSH_CALL_MS } from '../mcp/events.js';
 import { readOutbox, type EventBody } from '../mcp/outbox.js';
 
@@ -47,9 +47,11 @@ export async function eventsListCommand(opts: { json?: boolean }): Promise<void>
 
 /** Records waiting and overdue gates of the active changes (B55), as status and next do. */
 function recordWaits(ctx: ProjectContext): void {
+  // As fresh as `sdlc next` (B88): one real worktree fingerprint for every change, not the fast mode.
+  const fingerprint = sharedFingerprint(ctx.root);
   const views = listActiveChanges(ctx.paths).flatMap((ref): LifecycleView[] => {
     try {
-      return [evaluateChange(ctx.root, ref, ctx.config, { skipFingerprint: true })];
+      return [evaluateChange(ctx.root, ref, ctx.config, { fingerprint })];
     } catch {
       return [];
     }
