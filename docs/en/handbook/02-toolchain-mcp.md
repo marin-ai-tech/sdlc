@@ -189,7 +189,8 @@ behind the guard's back.
 - Use `sdlc mcp check --strict` in CI: an unreachable registry server makes it exit 1. Without `--strict`, it exits 0.
 - The file-write warning is a guess from tool names. A server that writes files under another name is not flagged.
   Read a server's documentation before you add it.
-- `sdlc mcp check` lists tool names, not their arguments. Take the argument names from the server's documentation.
+- Since 0.16.0, `sdlc mcp check --args` shows input arguments; JSON includes each tool's `args` schema.
+  The tool and argument names still come from your server.
 
 
 <a id="s2-3"></a>
@@ -314,11 +315,9 @@ reach the agent through the inbox.
            repo: tasklet
            workflow_id: ci.yml
            head_sha: "${HEAD}"
-           per_page: 1
           expect:
-            workflow_runs:
-              - { status: completed, conclusion: success }
-          wait_while: { workflow_runs: [{ status: [queued, in_progress] }] }
+            workflow_runs: { $any: { status: completed, conclusion: success } }
+          wait_while: { workflow_runs: { $any: { status: [queued, in_progress] } } }
           wait_seconds: 600
    ```
 
@@ -380,8 +379,8 @@ reach the agent through the inbox.
 
 - Commit and push before you verify. `${HEAD}` is the last commit; uncommitted code is not what CI tested.
 - With `wait_while`, a queued or in-progress CI run is polled until it finishes or the wait limit expires.
-- `expect` compares lists item by item and by length. A tool that returns a list of runs needs a filter that
-  returns exactly the run you mean (here `head_sha` and `per_page: 1`).
+- Plain lists match item by item and by exact length. Since 0.16.0, use
+  `expect: { workflow_runs: { $any: { conclusion: success } } }` to match a run in a list.
 - `sdlc verify --only ci-green` runs only that check. It records evidence but never passes the gate.
 - `sdlc verify --list` shows the MCP checks (name, server, tool, required) next to the commands.
 - The agent cannot edit the evidence or the inbox files: the hook denies it (`sdlc guide denials#state-integrity`).
@@ -698,8 +697,6 @@ Limitations observed in the sdlc 0.14.4 trial. Some were fixed later; see the ch
 
 - No sync between GitHub Issues or Projects and `openspec/backlog.md`; only `--source-ref` links and the agent.
 - No built-in CI check: `verify.mcp` needs the GitHub server's tool and argument names; sdlc does not validate them.
-- `expect` matches lists by exact length; a list of runs needs a filter that returns one item ("any item" is missing).
-- `sdlc mcp check` lists tool names only, not their input arguments.
 - A registry server cannot be marked CLI-only (event receiver, check target); every one is laid out for the agents.
 - `stages: []` means "not checked", not "never"; the agent cannot be forbidden a server outright.
 - An open change is never at `maintain`, so a `maintain`-only server is out of stage during `/sdlc:triage`.

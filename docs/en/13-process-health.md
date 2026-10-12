@@ -89,6 +89,10 @@ and release can never be waived by policy.
 
 The team lead runs `sdlc health` before the retrospective:
 
+Use `sdlc health --since <date>` or `sdlc health --days <n>` for a different window in one run.
+JSON names the window as `window: { since, days }`. A windowed run records no `health.degraded` or
+`health.recovered` signals.
+
 ```text
 Project health: 0 bad, 2 warn, 0 info
 ! warn Gates wait for people longer than 48 h (flow.wait)

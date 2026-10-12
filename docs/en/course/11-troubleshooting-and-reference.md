@@ -549,5 +549,4 @@ What this course needed and sdlc 0.14.4 does not offer, or does differently from
   Claude Code, OpenCode and Cursor tool names only).
 - `sdlc guide denials` says "The Claude Code hook and the OpenCode plugin check every edit"; it does not mention Cursor,
   Codex, Qwen Code and GigaCode, which apply the same rules.
-- The health thresholds can be set only in `openspec/sdlc.yaml`; `sdlc health` has no `--since` or window option for a
-  one-off look.
+- The health thresholds can be set only in `openspec/sdlc.yaml`.

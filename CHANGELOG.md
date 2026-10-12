@@ -2,6 +2,13 @@
 
 All notable changes to sdlc. Versions follow [Semantic Versioning](https://semver.org/); while the major version is 0, a minor version may change behavior.
 
+## 0.16.0 — 2026-10-12
+
+### Added
+- `$any` matches at least one item in an MCP check's answer list for `expect` and `wait_while`.
+- `sdlc mcp check` shows tool argument schemas in JSON and with `--args` in text.
+- `sdlc log` filters by event and date; `sdlc health` supports one-run windows with `--since` or `--days`.
+
 ## 0.15.4 — 2026-10-12
 
 ### Fixed

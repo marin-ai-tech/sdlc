@@ -192,7 +192,8 @@ behind the guard's back.
 - Use `sdlc mcp check --strict` in CI: an unreachable registry server makes it exit 1. Without `--strict`, it exits 0.
 - The file-write warning is a guess from tool names. A server that writes files under another name is not flagged.
   Read a server's documentation before you add it.
-- `sdlc mcp check` lists tool names, not their arguments. Take the argument names from the server's documentation.
+- Since 0.16.0, `sdlc mcp check --args` shows input arguments; JSON includes each tool's `args` schema.
+  The tool and argument names still come from your server.
 
 ### On screen (for the video)
 
@@ -328,11 +329,9 @@ reach the agent through the inbox.
            repo: tasklet
            workflow_id: ci.yml
            head_sha: "${HEAD}"
-           per_page: 1
           expect:
-            workflow_runs:
-              - { status: completed, conclusion: success }
-          wait_while: { workflow_runs: [{ status: [queued, in_progress] }] }
+            workflow_runs: { $any: { status: completed, conclusion: success } }
+          wait_while: { workflow_runs: { $any: { status: [queued, in_progress] } } }
           wait_seconds: 600
    ```
 
@@ -394,8 +393,8 @@ reach the agent through the inbox.
 
 - Commit and push before you verify. `${HEAD}` is the last commit; uncommitted code is not what CI tested.
 - With `wait_while`, a queued or in-progress CI run is polled until it finishes or the wait limit expires.
-- `expect` compares lists item by item and by length. A tool that returns a list of runs needs a filter that
-  returns exactly the run you mean (here `head_sha` and `per_page: 1`).
+- Plain lists match item by item and by exact length. Since 0.16.0, use
+  `expect: { workflow_runs: { $any: { conclusion: success } } }` to match a run in a list.
 - `sdlc verify --only ci-green` runs only that check. It records evidence but never passes the gate.
 - `sdlc verify --list` shows the MCP checks (name, server, tool, required) next to the commands.
 - The agent cannot edit the evidence or the inbox files: the hook denies it (`sdlc guide denials#state-integrity`).
@@ -735,17 +734,15 @@ Things this scenario wanted that sdlc 0.14.4 does not do. One line each, for the
 
 1. No sync between GitHub Issues or Projects and `openspec/backlog.md`; only `--source-ref` links and the agent.
 2. No built-in CI check: `verify.mcp` needs the GitHub server's tool and argument names; sdlc does not validate them.
-3. `expect` matches lists by exact length; a list of runs needs a filter that returns one item ("any item" is missing).
-4. `sdlc mcp check` lists tool names only, not their input arguments.
-5. A registry server cannot be marked CLI-only (event receiver, check target); every one is laid out for the agents.
-6. `stages: []` means "not checked", not "never"; the agent cannot be forbidden a server outright.
-7. An open change is never at `maintain`, so a `maintain`-only server is out of stage during `/sdlc:triage`.
-8. Events carry person ids; `roles.yaml` has no chat handle, so each receiver keeps its own mapping.
-9. Events are sent only from the clone where the command ran; every person needs the receiver's secret.
-10. A scheduled `events flush` in a fresh CI checkout can repeat waits and miss overdue gates; it needs a kept clone.
-11. Several clones can announce one wait with different event ids, so a receiver cannot deduplicate by `id`.
-12. The daily summary example only writes a file; sending it to a chat is outside sdlc.
-13. `sdlc mcp serve` is stdio only; no remote endpoint for a chat client on another machine.
-14. Context packs come only from local `docs/context/`; sdlc does not pull documents from the knowledge server.
-15. `sdlc init` with flags cannot create a starter `roles.yaml`; only the wizard (or `sdlc adopt --apply`) does.
-16. Doc gap: 10-integrations.md (10.1) lists six `sdlc mcp serve` tools; the server also has `guide`.
+3. A registry server cannot be marked CLI-only (event receiver, check target); every one is laid out for the agents.
+4. `stages: []` means "not checked", not "never"; the agent cannot be forbidden a server outright.
+5. An open change is never at `maintain`, so a `maintain`-only server is out of stage during `/sdlc:triage`.
+6. Events carry person ids; `roles.yaml` has no chat handle, so each receiver keeps its own mapping.
+7. Events are sent only from the clone where the command ran; every person needs the receiver's secret.
+8. A scheduled `events flush` in a fresh CI checkout can repeat waits and miss overdue gates; it needs a kept clone.
+9. Several clones can announce one wait with different event ids, so a receiver cannot deduplicate by `id`.
+10. The daily summary example only writes a file; sending it to a chat is outside sdlc.
+11. `sdlc mcp serve` is stdio only; no remote endpoint for a chat client on another machine.
+12. Context packs come only from local `docs/context/`; sdlc does not pull documents from the knowledge server.
+13. `sdlc init` with flags cannot create a starter `roles.yaml`; only the wizard (or `sdlc adopt --apply`) does.
+14. Doc gap: 10-integrations.md (10.1) lists six `sdlc mcp serve` tools; the server also has `guide`.

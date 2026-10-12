@@ -61,6 +61,26 @@ function requiredMapping(value: unknown, where: string): Raw {
   return mapping(value, where) ?? {};
 }
 
+/** Validate operators throughout a check pattern, including patterns nested in lists. */
+function validatePattern(value: unknown, where: string): void {
+  if (Array.isArray(value)) {
+    value.forEach((item, index) => validatePattern(item, `${where}[${index}]`));
+    return;
+  }
+  if (value === null || typeof value !== 'object') return;
+  const entries = Object.entries(value);
+  for (const [key, item] of entries) {
+    const path = `${where}.${key}`;
+    if (key.startsWith('$') && key !== '$any') {
+      throw invalid('error.x_must_be_x', path, { p2: '$any' });
+    }
+    if (key === '$any' && entries.length !== 1) {
+      throw invalid('error.mcp_any_only_key', path);
+    }
+    validatePattern(item, path);
+  }
+}
+
 function text(value: unknown, where: string): string {
   if (typeof value !== 'string' || value.trim() === '') throw invalid('error.x_must_be_a_non_empty_string', where);
   return value;
@@ -113,6 +133,8 @@ export function parseMcpServers(value: unknown, where: (key: string) => string):
 
 function parseCheck(value: unknown, where: string, index: number): McpCheck {
   const raw = mapping(value, where) ?? {};
+  validatePattern(raw.expect, `${where}.expect`);
+  validatePattern(raw.wait_while, `${where}.wait_while`);
   const required = raw.required ?? true;
   if (typeof required !== 'boolean') throw invalid('error.x_must_be_true_or_false', `${where}.required`);
   const waitSeconds = raw.wait_seconds === undefined ? 0 : raw.wait_seconds;

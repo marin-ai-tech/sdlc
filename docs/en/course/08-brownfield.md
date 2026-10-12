@@ -668,8 +668,8 @@ no surprise.
   (`agent_cannot_weaken_guard`), and the hook denies edits of `openspec/sdlc.yaml`.
 - Paths the team really wants open before a plan go under `enforcement.exempt_paths`, decided by a person. Do not
   return to `warn` for a single folder.
-- In 0.14.4 `sdlc log` has no filter by event. To count reminders per rule, use `sdlc log --json` and a small script,
-  or read the `discipline` findings of `sdlc health` (`denials`, default 5 per rule).
+- This output is from the trial with sdlc 0.14.4. Since 0.16.0, use `sdlc log --event hook.warned --json`
+  to inspect reminders before switching to block. Count them per rule in the filtered output.
 
 ### On screen (for the video)
 
@@ -741,8 +741,6 @@ Found while writing Modules 6–8 against sdlc 0.14.4 (temporary copies of `task
   is no handle field in `roles.yaml`, and team handles never match.
 - No built-in GitHub Issues sync: issues reach the backlog only through the agent and the GitHub MCP server; archiving
   does not close the linked issue.
-- `sdlc log` has no filter by event, so counting `hook.warned` per rule before switching to block needs `--json` and a
-  script.
 - No ready GitHub Actions workflow (or documented snippet) runs the sdlc checks (`validate`, `review check`,
   `approvals verify`) in CI.
 - sdlc has no alert intake: `/sdlc:triage` from Telegram depends on pasted text or a read tool of the team's own

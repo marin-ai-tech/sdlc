@@ -52,6 +52,11 @@ function childKey(key: string, child: string | number): string {
 /** The first place where `actual` does not contain `expected`: objects by key, arrays item by item, else equal. */
 export function subsetMismatch(expected: unknown, actual: unknown, key = ''): Mismatch | undefined {
   if (isObject(expected)) {
+    if (Object.hasOwn(expected, '$any')) {
+      const matches = Array.isArray(actual) &&
+        actual.some((item) => subsetMismatch(expected.$any, item) === undefined);
+      return matches ? undefined : { key: key || '(answer)', expected, actual };
+    }
     if (!isObject(actual)) return { key: key || '(answer)', expected, actual };
     for (const [name, value] of Object.entries(expected)) {
       const found = subsetMismatch(value, actual[name], childKey(key, name));
@@ -94,9 +99,12 @@ function errorText(error: unknown): string {
 }
 
 /** A list in a pending condition accepts any of its values. */
-function pendingMatch(expected: unknown, actual: unknown): boolean {
+export function pendingMatch(expected: unknown, actual: unknown): boolean {
   if (Array.isArray(expected)) return expected.some((item) => pendingMatch(item, actual));
   if (isObject(expected)) {
+    if (Object.hasOwn(expected, '$any')) {
+      return Array.isArray(actual) && actual.some((item) => pendingMatch(expected.$any, item));
+    }
     if (!isObject(actual)) return false;
     return Object.entries(expected).every(([key, value]) => pendingMatch(value, actual[key]));
   }

@@ -92,18 +92,70 @@ export async function withServer<T>(
   }
 }
 
-/** The names of the server's tools. */
-export async function listToolNames(server: McpServer, ms: number): Promise<string[]> {
+/** One argument of a tool, taken from its input schema. */
+export interface ToolArg {
+  name: string;
+  /** JSON Schema `type` when it is a string, or several joined with `|`; omitted when absent. */
+  type?: string;
+  required: boolean;
+}
+
+/** A tool listed by the server, with arguments from its input schema. */
+export interface ListedTool {
+  name: string;
+  args: ToolArg[];
+}
+
+/** JSON Schema `type` as a string, or several joined with `|`; undefined when absent. */
+function schemaType(prop: unknown): string | undefined {
+  if (!prop || typeof prop !== 'object') return undefined;
+  const value = (prop as { type?: unknown }).type;
+  if (typeof value === 'string') return value;
+  if (Array.isArray(value) && value.every((item) => typeof item === 'string')) {
+    return value.join('|');
+  }
+  return undefined;
+}
+
+/** Arguments from a tool's input schema, in property order; empty when there are no properties. */
+export function argsFromSchema(schema: unknown): ToolArg[] {
+  if (!schema || typeof schema !== 'object') return [];
+  const record = schema as { properties?: Record<string, unknown>; required?: unknown };
+  const properties = record.properties;
+  if (!properties || typeof properties !== 'object') return [];
+  const required = new Set(
+    Array.isArray(record.required)
+      ? record.required.filter((name): name is string => typeof name === 'string')
+      : [],
+  );
+  return Object.entries(properties).map(([name, prop]) => {
+    const type = schemaType(prop);
+    const arg: ToolArg = { name, required: required.has(name) };
+    if (type !== undefined) arg.type = type;
+    return arg;
+  });
+}
+
+/** The server's tools and their arguments (one `tools/list` session, paged). */
+export async function listTools(server: McpServer, ms: number): Promise<ListedTool[]> {
   return withServer(server, ms, async (client) => {
-    const names: string[] = [];
+    const tools: ListedTool[] = [];
     let cursor: string | undefined;
     do {
       const page = await client.listTools(cursor ? { cursor } : undefined, { timeout: ms });
-      names.push(...page.tools.map((tool) => tool.name));
+      for (const tool of page.tools) {
+        tools.push({ name: tool.name, args: argsFromSchema(tool.inputSchema) });
+      }
       cursor = page.nextCursor;
     } while (cursor);
-    return names;
+    return tools;
   });
+}
+
+/** The names of the server's tools. */
+export async function listToolNames(server: McpServer, ms: number): Promise<string[]> {
+  const tools = await listTools(server, ms);
+  return tools.map((tool) => tool.name);
 }
 
 /** What one tool call answered. */

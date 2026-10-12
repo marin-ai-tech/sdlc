@@ -87,6 +87,9 @@ sdlc mcp check --json
 ```
 
 It connects to every server, lists its tools and marks the unreachable ones. It also warns about a server whose tools can write files: such a server could change files behind the hook's back, so keep it out of the registry.
+JSON gives each server an `args` map from tool name to `[{ name, type, required }]`, taken from the tool's input schema.
+Use `sdlc mcp check --args` for text such as `name(arg: type, opt?: type)`, one tool per line.
+Without `--args`, the text output is unchanged.
 Use `sdlc mcp check --strict` in CI: it exits 1 if a registry server cannot be reached. Without `--strict`, it exits 0.
 
 ## 10.3. CI status as gate evidence
@@ -101,9 +104,9 @@ verify:
     - name: ci-green
       server: github
       tool: list_workflow_runs
-      args: { head_sha: "${HEAD}", per_page: 1 }
-      expect: { workflow_runs: [{ conclusion: success }] }
-      wait_while: { workflow_runs: [{ status: [queued, in_progress] }] }
+      args: { head_sha: "${HEAD}" }
+      expect: { workflow_runs: { $any: { conclusion: success } } }
+      wait_while: { workflow_runs: { $any: { status: [queued, in_progress] } } }
       wait_seconds: 600
 ```
 
@@ -111,6 +114,9 @@ verify:
 
 - `${HEAD}` becomes the head commit and `${CHANGE}` the change id.
 - The answer must contain `expect` (a deep subset).
+- In `expect` and `wait_while`, `{ $any: <pattern> }` matches when at least one answer-list item contains the
+  pattern; patterns can nest. Plain lists still match item by item and by exact length. Another `$` key, or `$any`
+  beside another key, is invalid configuration.
 - Use the tool and argument names your GitHub server exposes. `wait_while` uses the same deep subset shape as
   `expect`; a list value matches any listed value. While it matches, the CLI asks again, pausing from 1 to 15 seconds.
   `wait_seconds` accepts 0..3600 and defaults to 0 (no wait). After the limit, the check fails with

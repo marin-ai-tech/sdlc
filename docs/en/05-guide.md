@@ -334,9 +334,14 @@ sdlc validate --all --json            # deltas + cross-change overlaps
 sdlc status --json                    # stages and gates of all changes
 sdlc review check --change <id>       # exit 1 if important findings are open
 sdlc audit --json                     # playbook metrics (lead times, first-pass, waits on people, rework reasons)
-sdlc log --json                       # project log with the sdlc version and license of each entry
+  sdlc log --json                       # project log with the sdlc version and license of each entry
 sdlc approvals verify --mode required # every approval in a commit signed by the approver (roles.yaml)
-```
+  ```
+
+  Use `sdlc log --event hook.warned --json` to inspect warnings before switching enforcement to block.
+  `--event` accepts `*` as any text, for example `hook.*` or `gate.*.approved`.
+  `sdlc log --since <date>` filters by date; both filters work with `--change` and `--limit`.
+  In JSON, `total` counts the filtered entries.
 
 For `claude -p`, allow the required tools in advance: `--allowedTools "Bash(sdlc *),Read,Write,Edit"`. In CI, it is convenient to add `sdlc status --markdown` to the PR description.
 

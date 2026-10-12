@@ -2,9 +2,13 @@ import { loadProject } from '../cli/context.js';
 import { c, line, printJson, reportFailure } from '../cli/output.js';
 import { healthReport, runHealth, type Finding, type HealthReport } from '../core/health/index.js';
 import { recordHealthSignals } from '../core/health/signal.js';
+import { healthThresholds } from '../core/health/thresholds.js';
 import { currentLocale, t, type Locale } from '../core/i18n.js';
+import { daysWindow, requestedWindow, windowJson, type WindowOptions } from './health-window.js';
 
-interface Options { json?: boolean }
+interface Options extends WindowOptions {
+  json?: boolean;
+}
 
 function badge(finding: Finding): string {
   const word = t(`health.level.${finding.level}`);
@@ -28,17 +32,24 @@ function printText(report: HealthReport): void {
   for (const finding of report.findings) printFinding(finding);
 }
 
-/** `sdlc health [--json]`: advice, not a gate. Exit 0 always; an invalid configuration is the usual failure. */
+/**
+ * `sdlc health [--since <date> | --days <n>] [--json]`: advice, not a gate. Exit 0 always; an invalid configuration
+ * or option is the usual failure.
+ */
 export function healthCommand(opts: Options): void {
   try {
     const ctx = loadProject();
     // JSON payloads stay English in every locale; text uses the active locale.
     const locale: Locale = opts.json ? 'en' : currentLocale();
-    const run = runHealth(ctx.root, ctx.paths, ctx.config, { locale });
+    const now = new Date();
+    const requested = requestedWindow(opts, now);
+    const window = requested ?? daysWindow(healthThresholds(ctx.config).windowDays, now);
+    const run = runHealth(ctx.root, ctx.paths, ctx.config, { locale, now, window });
     // B67: a bad finding that appears is logged as health.degraded, one that is gone as health.recovered.
-    recordHealthSignals(ctx.root, ctx.config, run, ctx.stamp);
+    // B106: a one-off window (--since, --days) records nothing, so a look at another period never flaps them.
+    if (!requested) recordHealthSignals(ctx.root, ctx.config, run, ctx.stamp);
     const report = healthReport(run.drafts, locale);
-    if (opts.json) printJson({ ...report, harness: ctx.stamp });
+    if (opts.json) printJson({ ...report, window: windowJson(window), harness: ctx.stamp });
     else printText(report);
   } catch (error) {
     reportFailure(error, opts.json, { findings: null });

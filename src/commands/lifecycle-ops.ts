@@ -16,6 +16,7 @@ import { readOpenSpecMetadata } from '../core/openspec-schema.js';
 import { isFile, readText, writeTextAtomic } from '../core/fs-utils.js';
 import { stampText, stampTextLocalized } from '../core/license.js';
 import { appendLog, readLog } from '../core/log.js';
+import { filterLog } from '../core/log-filter.js';
 import { changeMarkdown, tryStampArtifacts } from '../core/stamp.js';
 import { aggregateMetrics, changeMetrics } from '../core/metrics.js';
 import { agentCommits } from '../core/agent-commits.js';
@@ -26,6 +27,7 @@ import {
 import { readBacklog, setBacklogStatus } from '../core/backlog.js';
 import { auditExportCommand, type AuditExportOptions } from './audit-export.js';
 import { closeDeferred, readDeferred } from '../core/deferred.js';
+import { parseSince } from '../report/model.js';
 
 interface ValidationIssue {
   source: 'openspec' | 'sdlc';
@@ -349,16 +351,30 @@ export async function auditCommand(opts: { change?: string; json?: boolean } & A
   }
 }
 
-/** Prints the project log (`openspec/.sdlc/log.jsonl`), newest last. */
-export async function logCommand(opts: { change?: string; limit?: string; json?: boolean }): Promise<void> {
+interface LogOptions {
+  change?: string;
+  event?: string;
+  since?: string;
+  limit?: string;
+  json?: boolean;
+}
+
+function parseLogLimit(value: string | undefined): number {
+  const limit = value === undefined ? 50 : Number(value);
+  if (!Number.isInteger(limit) || limit <= 0) throw new SdlcError(
+    'invalid_option',
+    { key: 'error.limit_must_be_a_positive_whole_number' }
+  );
+  return limit;
+}
+
+/** Prints the project log (`openspec/.sdlc/log.jsonl`), newest last; B106: `--event` and `--since` filter it. */
+export async function logCommand(opts: LogOptions): Promise<void> {
   try {
     const ctx = loadProject();
-    const limit = opts.limit === undefined ? 50 : Number(opts.limit);
-    if (!Number.isInteger(limit) || limit <= 0) throw new SdlcError(
-      'invalid_option',
-      { key: 'error.limit_must_be_a_positive_whole_number' }
-    );
-    const entries = readLog(ctx.root).filter((e) => !opts.change || e.change === opts.change);
+    const limit = parseLogLimit(opts.limit);
+    const since = parseSince(opts.since);
+    const entries = filterLog(readLog(ctx.root), { change: opts.change, event: opts.event, since });
     const shown = entries.slice(-limit);
     if (opts.json) return printJson({ entries: shown, total: entries.length, harness: ctx.stamp });
     if (entries.length === 0) {

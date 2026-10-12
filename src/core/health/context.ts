@@ -17,6 +17,12 @@ export interface ChangeInfo {
   view?: LifecycleView;
 }
 
+/** The period health looks at (B106): from `since` (ms) to now, `days` whole days long. */
+export interface HealthWindow {
+  since: number;
+  days: number;
+}
+
 export interface HealthOptions {
   /** Skip the expensive collectors (doctor, plan drift, trace), e.g. on the dashboard. */
   light?: boolean;
@@ -27,6 +33,8 @@ export interface HealthOptions {
   now?: Date;
   /** Locale of the facts collectors take from other modules (doctor messages). */
   locale?: Locale;
+  /** Another window than `health.window_days` for one run (`sdlc health --since/--days`). */
+  window?: HealthWindow;
 }
 
 export interface HealthContext {
@@ -38,7 +46,7 @@ export interface HealthContext {
   badOnly: boolean;
   locale: Locale;
   now: number;
-  /** Start of the window (ms): `health.window_days` before now. */
+  /** Start of the window (ms): `health.window_days` before now, or the start of the window asked for. */
   since: number;
   /** The whole project log. */
   log: LogEntry[];
@@ -82,9 +90,11 @@ function loadChanges(root: string, paths: ProjectPaths, config: SdlcConfig, arch
 export function loadHealthContext(
   root: string, paths: ProjectPaths, config: SdlcConfig, options: HealthOptions = {},
 ): HealthContext {
-  const thresholds = healthThresholds(config);
+  const configured = healthThresholds(config);
   const now = (options.now ?? new Date()).getTime();
-  const since = now - thresholds.windowDays * DAY_MS;
+  const window = options.window ?? { since: now - configured.windowDays * DAY_MS, days: configured.windowDays };
+  const thresholds = { ...configured, windowDays: window.days };
+  const since = window.since;
   const log = options.log ?? readLog(root);
   const recent = log.filter((entry) => inWindow(entry.ts, since));
   const badOnly = options.badOnly === true;

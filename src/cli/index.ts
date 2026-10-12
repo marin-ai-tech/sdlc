@@ -321,6 +321,7 @@ export function buildProgram(): Command {
   mcp.command('check').description(cmdDesc('cmd.mcp.check'))
     .option('--json', 'output JSON')
     .option('--strict', 'exit non-zero when a server is unavailable')
+    .option('--args', 'list each tool with its arguments from the input schema')
     .action((opts) => mcpCheckCommand(opts));
   const inbox = program.command('inbox').description(cmdDesc('cmd.inbox'));
   inbox.command('list').description(cmdDesc('cmd.inbox.list'))
@@ -502,6 +503,8 @@ export function buildProgram(): Command {
     .command('log')
     .description(cmdDesc('cmd.log'))
     .option('--change <id>', 'only entries for this change')
+    .option('--event <name>', 'only entries of this event; * matches any text (gate.*, hook.*)')
+    .option('--since <date>', 'only entries from this date on (YYYY-MM-DD or ISO timestamp)')
     .option('--limit <n>', 'show the last n entries (default 50)')
     .option('--json', 'output JSON')
     .action((opts) => logCommand(opts));
@@ -523,6 +526,8 @@ export function buildProgram(): Command {
   program
     .command('health')
     .description(cmdDesc('cmd.health'))
+    .option('--since <date>', 'from this date on instead of health.window_days (days: whole days to now, rounded down)')
+    .option('--days <n>', 'look at the last n days instead of health.window_days')
     .option('--json', 'output JSON')
     .action((opts) => healthCommand(opts));
 

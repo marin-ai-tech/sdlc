@@ -3,6 +3,7 @@ import { c, line, printJson, reportFailure, warn } from '../cli/output.js';
 import { t } from '../core/i18n.js';
 import { assertNoSecretLiterals } from '../mcp/registry.js';
 import { checkServers, type ServerReport } from '../mcp/server-check.js';
+import type { ToolArg } from '../mcp/client.js';
 import { serveStdio } from '../mcp/server.js';
 
 /**
@@ -18,23 +19,41 @@ export async function mcpServeCommand(opts: { project?: string[] } = {}): Promis
   }
 }
 
+/** One tool line for `--args`: `name(arg: type, opt?: type)`. */
+function formatToolWithArgs(name: string, args: ToolArg[]): string {
+  const parts = args.map((arg) => {
+    const mark = arg.required ? '' : '?';
+    const type = arg.type ?? 'any';
+    return `${arg.name}${mark}: ${type}`;
+  });
+  return `${name}(${parts.join(', ')})`;
+}
+
 /** One server's lines: available or not, its tools, its warnings. */
-function printServer(report: ServerReport): void {
+function printServer(report: ServerReport, showArgs: boolean): void {
   const label = `${report.name} (${report.type})`;
   if (!report.available) {
     line(`${c.red('✗')} ${t('mcp.unavailable', { server: label, error: report.error ?? '' })}`);
     return;
   }
   line(`${c.green('✓')} ${t('mcp.available', { server: label, count: report.tools.length })}`);
-  if (report.tools.length > 0) line(c.dim(`    ${report.tools.join(', ')}`));
+  if (showArgs) {
+    for (const name of report.tools) {
+      line(c.dim(`    ${formatToolWithArgs(name, report.args[name] ?? [])}`));
+    }
+  } else if (report.tools.length > 0) {
+    line(c.dim(`    ${report.tools.join(', ')}`));
+  }
   for (const warning of report.warnings) warn(warning);
 }
 
 /**
- * `sdlc mcp check [--json] [--strict]` (B11): connects to each registry server and lists its tools.
+ * `sdlc mcp check [--json] [--strict] [--args]` (B11, B96): connects to each registry server and lists its tools.
  * With --strict, an unavailable server sets exit code 1; a registry with a literal secret is refused first.
  */
-export async function mcpCheckCommand(opts: { json?: boolean; strict?: boolean }): Promise<void> {
+export async function mcpCheckCommand(
+  opts: { json?: boolean; strict?: boolean; args?: boolean },
+): Promise<void> {
   try {
     const ctx = loadProject();
     const servers = ctx.config.mcp?.servers ?? [];
@@ -45,7 +64,7 @@ export async function mcpCheckCommand(opts: { json?: boolean; strict?: boolean }
     }
     if (opts.json) return printJson({ servers: reports });
     if (reports.length === 0) line(t('mcp.noServers'));
-    for (const report of reports) printServer(report);
+    for (const report of reports) printServer(report, opts.args === true);
   } catch (error) {
     reportFailure(error, opts.json);
   }

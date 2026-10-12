@@ -1,5 +1,5 @@
 import { t } from '../core/i18n.js';
-import { listToolNames, McpTimeout } from './client.js';
+import { listTools, McpTimeout, type ToolArg } from './client.js';
 import { maskSecrets } from './checks.js';
 import { expandedSecrets, type McpServer } from './registry.js';
 
@@ -17,6 +17,8 @@ export interface ServerReport {
   type: McpServer['type'];
   available: boolean;
   tools: string[];
+  /** Per tool name: arguments from the input schema (property order). Empty object when unavailable. */
+  args: Record<string, ToolArg[]>;
   warnings: string[];
   error?: string;
 }
@@ -35,12 +37,22 @@ function failure(error: unknown): string {
 async function checkServer(server: McpServer, ms: number): Promise<ServerReport> {
   const base = { name: server.name, type: server.type };
   try {
-    const tools = await listToolNames(server, ms);
+    const listed = await listTools(server, ms);
+    const tools = listed.map((tool) => tool.name);
+    // fromEntries defines own keys, so a tool named `__proto__` cannot change the object.
+    const args: Record<string, ToolArg[]> = Object.fromEntries(listed.map((tool) => [tool.name, tool.args]));
     const warnings = tools.filter(writesFiles).map((tool) => t('mcp.writesFiles', { tool }));
-    return { ...base, available: true, tools, warnings };
+    return { ...base, available: true, tools, args, warnings };
   } catch (error) {
     const text = String(maskSecrets(failure(error), expandedSecrets(server, process.env)));
-    return { ...base, available: false, tools: [], warnings: [], error: text || t('mcp.checkFailed') };
+    return {
+      ...base,
+      available: false,
+      tools: [],
+      args: {},
+      warnings: [],
+      error: text || t('mcp.checkFailed'),
+    };
   }
 }
 

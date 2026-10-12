@@ -1,6 +1,7 @@
 // A small MCP server for the tests (stdio). Its answers come from the environment, so a test can make a check pass
 // or fail: FAKE_STATUS (default "success"), FAKE_FILES=1 adds a file-writing tool, FAKE_EXIT=1 exits at once,
 // FAKE_EVENTS_FILE=<path> adds `report_event`, which appends each call's arguments as one JSON line to that file.
+// FAKE_RUNS=<JSON list> adds `workflow_runs` to the `pipeline_status` answer.
 import * as fs from 'node:fs';
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
@@ -48,6 +49,8 @@ function pipelineStatus(args) {
     status: pendingStatus() ?? process.env.FAKE_STATUS ?? 'success',
     ref: args?.ref ?? null,
     token: process.env.CI_TOKEN ? 'present' : 'absent',
+    // FAKE_RUNS=<JSON list>: a list of runs, as a CI server answers for several workflows (0.16.0, `$any`).
+    ...(process.env.FAKE_RUNS ? { workflow_runs: JSON.parse(process.env.FAKE_RUNS) } : {}),
   };
   return { structuredContent: answer, content: [{ type: 'text', text: JSON.stringify(answer) }] };
 }
