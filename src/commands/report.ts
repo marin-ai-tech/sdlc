@@ -4,6 +4,7 @@ import { line, printJson, reportFailure } from '../cli/output.js';
 import { SdlcError } from '../core/errors.js';
 import { isWithin, writeTextAtomic } from '../core/fs-utils.js';
 import { buildReport } from '../report/model.js';
+import { warnStaleOutput } from './out-inside-warning.js';
 import { renderReportMarkdown } from '../report/markdown.js';
 import { renderReportHtml } from '../report/html.js';
 import { t } from '../core/i18n.js';
@@ -26,6 +27,7 @@ export function reportCommand(opts: { format?: string; json?: boolean; since?: s
       );
       writeTextAtomic(target, `${content}\n`);
       line(t('report.written', { path: target }));
+      warnStaleOutput(ctx.root, target);
     } else if (format === 'json') printJson(model);
     else line(content);
   } catch (error) { reportFailure(error, format === 'json' && !opts.out); }

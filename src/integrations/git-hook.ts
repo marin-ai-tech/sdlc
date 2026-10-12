@@ -28,50 +28,63 @@ export const CHAIN_LINE = `sh "$(dirname "$0")/${HOOK_NAME}${CHAIN_SUFFIX}" "$@"
 /**
  * The script. The agent markers and their order mirror agentEnvironment() in src/core/agent-env.ts; change both
  * together (test/git-hook-sync.test.ts compares them).
+ *
+ * B89: when `tools` includes gigacode and not qwen, the Qwen marker branch names `gigacode` (GigaCode shells
+ * carry QWEN_CODE). With both tools, Qwen only, or neither, it names `qwen`. `renderGitHook()` with no argument
+ * keeps today's script.
  */
-const SCRIPT_LINES = [
-  '#!/bin/sh',
-  HOOK_MARKER,
-  '# Written by `sdlc init` and `sdlc update`, removed by `sdlc uninstall`.',
-  '# It never runs sdlc and never fails a commit: a commit made outside an agent session is left unchanged.',
-  'agent=""',
-  'if [ -n "${SDLC_AGENT:-}" ]; then',
-  '  agent="$SDLC_AGENT"',
-  'elif [ "${CLAUDECODE:-}" = "1" ]; then',
-  '  agent="claude-code"',
-  'elif [ "${OPENCODE:-}" = "1" ]; then',
-  '  agent="opencode"',
-  'elif [ "${AGENT:-}" = "1" ]; then',
-  '  agent="agent"',
-  'elif [ "${CURSOR_AGENT:-}" = "1" ]; then',
-  '  agent="cursor"',
-  'elif [ "${CODEX_CI:-}" = "1" ] || [ -n "${CODEX_SESSION_ID:-}" ]; then',
-  '  agent="codex"',
-  'elif [ "${QWEN_CODE:-}" = "1" ] || [ -n "${QWEN_CODE_SESSION_ID:-}" ]; then',
-  '  agent="qwen"',
-  'fi',
-  '[ -n "$agent" ] || exit 0',
-  '# Only a plain name goes into the trailer (the same rule as agent-env.ts).',
-  'case "$agent" in *[!A-Za-z0-9._-]*) agent="agent" ;; esac',
-  '[ ${#agent} -le 64 ] || agent="agent"',
-  '# A commit git replays (rebase, cherry-pick) or amends keeps its author: it is not marked as the agent\'s.',
-  '[ "$2" = "commit" ] && exit 0',
-  'gitdir="$(git rev-parse --git-dir 2>/dev/null)"',
-  'if [ -n "$gitdir" ] && { [ -e "$gitdir/CHERRY_PICK_HEAD" ] || [ -d "$gitdir/rebase-merge" ] \\',
-  '  || [ -d "$gitdir/rebase-apply" ]; }; then',
-  '  exit 0',
-  'fi',
-  '[ -f "$1" ] || exit 0',
-  'if grep -qi "^SDLC-Agent:" "$1"; then',
-  '  exit 0',
-  'fi',
-  'git interpret-trailers --in-place --trailer "SDLC-Agent: $agent" "$1" || true',
-  'exit 0',
-];
+function scriptLines(qwenAgent: string): string[] {
+  return [
+    '#!/bin/sh',
+    HOOK_MARKER,
+    '# Written by `sdlc init` and `sdlc update`, removed by `sdlc uninstall`.',
+    '# It never runs sdlc and never fails a commit: a commit made outside an agent session is left unchanged.',
+    'agent=""',
+    'if [ -n "${SDLC_AGENT:-}" ]; then',
+    '  agent="$SDLC_AGENT"',
+    'elif [ "${CLAUDECODE:-}" = "1" ]; then',
+    '  agent="claude-code"',
+    'elif [ "${OPENCODE:-}" = "1" ]; then',
+    '  agent="opencode"',
+    'elif [ "${AGENT:-}" = "1" ]; then',
+    '  agent="agent"',
+    'elif [ "${CURSOR_AGENT:-}" = "1" ]; then',
+    '  agent="cursor"',
+    'elif [ "${CODEX_CI:-}" = "1" ] || [ -n "${CODEX_SESSION_ID:-}" ]; then',
+    '  agent="codex"',
+    'elif [ "${QWEN_CODE:-}" = "1" ] || [ -n "${QWEN_CODE_SESSION_ID:-}" ]; then',
+    `  agent="${qwenAgent}"`,
+    'fi',
+    '[ -n "$agent" ] || exit 0',
+    '# Only a plain name goes into the trailer (the same rule as agent-env.ts).',
+    'case "$agent" in *[!A-Za-z0-9._-]*) agent="agent" ;; esac',
+    '[ ${#agent} -le 64 ] || agent="agent"',
+    '# A commit git replays (rebase, cherry-pick) or amends keeps its author: it is not marked as the agent\'s.',
+    '[ "$2" = "commit" ] && exit 0',
+    'gitdir="$(git rev-parse --git-dir 2>/dev/null)"',
+    'if [ -n "$gitdir" ] && { [ -e "$gitdir/CHERRY_PICK_HEAD" ] || [ -d "$gitdir/rebase-merge" ] \\',
+    '  || [ -d "$gitdir/rebase-apply" ]; }; then',
+    '  exit 0',
+    'fi',
+    '[ -f "$1" ] || exit 0',
+    'if grep -qi "^SDLC-Agent:" "$1"; then',
+    '  exit 0',
+    'fi',
+    'git interpret-trailers --in-place --trailer "SDLC-Agent: $agent" "$1" || true',
+    'exit 0',
+  ];
+}
 
-/** The hook script, LF line endings. */
-export function renderGitHook(): string {
-  return `${SCRIPT_LINES.join('\n')}\n`;
+/** Name written for the QWEN_CODE marker: gigacode only when tools has gigacode and not qwen. */
+function qwenHookName(tools?: readonly string[]): string {
+  if (tools === undefined) return 'qwen';
+  if (tools.includes('gigacode') && !tools.includes('qwen')) return 'gigacode';
+  return 'qwen';
+}
+
+/** The hook script, LF line endings. Optional tools (B89) pick the Qwen-marker agent name. */
+export function renderGitHook(tools?: readonly string[]): string {
+  return `${scriptLines(qwenHookName(tools)).join('\n')}\n`;
 }
 
 /** Whether a hook's text is sdlc's: it has the marker line. */
@@ -156,12 +169,15 @@ function applyHook(file: string, script: string, dryRun: boolean): GitHookResult
  * Installs or refreshes sdlc's hook. Outside a git repository it does nothing (`absent`); a hook of the project's
  * own is left as it is (`kept`); an error is returned as `failed`, never thrown, so init and update go on.
  */
-export function installGitHook(root: string, options: { dryRun?: boolean } = {}): GitHookResult {
+export function installGitHook(
+  root: string,
+  options: { dryRun?: boolean; tools?: readonly string[] } = {},
+): GitHookResult {
   const file = gitHookPath(root);
   if (!file) return { state: 'absent' };
   if (!hookPathOwned(root, file)) return { state: 'shared', path: file };
   try {
-    return applyHook(file, renderGitHook(), options.dryRun === true);
+    return applyHook(file, renderGitHook(options.tools), options.dryRun === true);
   } catch (error) {
     return failure(file, error);
   }
@@ -193,7 +209,10 @@ export function removeGitHook(root: string, options: { dryRun?: boolean } = {}):
 export type GitHookStatus = 'current' | 'outdated' | 'missing' | 'foreign' | 'chained' | 'no-git' | 'shared';
 
 /** What `sdlc doctor` reports about the hook. Read-only. */
-export function inspectGitHook(root: string): { status: GitHookStatus; path?: string } {
+export function inspectGitHook(
+  root: string,
+  tools?: readonly string[],
+): { status: GitHookStatus; path?: string } {
   const file = gitHookPath(root);
   if (!file) return { status: 'no-git' };
   const current = readText(file);
@@ -202,7 +221,7 @@ export function inspectGitHook(root: string): { status: GitHookStatus; path?: st
   }
   if (current === undefined) return { status: 'missing', path: file };
   if (isSdlcHook(current)) {
-    const status = current === renderGitHook() ? 'current' : 'outdated';
+    const status = current === renderGitHook(tools) ? 'current' : 'outdated';
     return { status, path: file };
   }
   const chained = current.includes(`${HOOK_NAME}${CHAIN_SUFFIX}`);

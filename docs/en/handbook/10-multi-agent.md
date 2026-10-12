@@ -284,7 +284,7 @@ made by agents are marked.
    | OpenCode | `OPENCODE=1`, `AGENT=1`; the plugin adds `SDLC_AGENT=opencode` | `opencode` |
    | Cursor | `CURSOR_AGENT=1` (documented for the Cursor CLI, not confirmed for the IDE) | `cursor` |
    | Codex CLI | `CODEX_CI=1` and `CODEX_SESSION_ID` | `codex` |
-   | Qwen Code, GigaCode | `QWEN_CODE=1` or `QWEN_CODE_SESSION_ID` | `qwen` |
+   | Qwen Code, GigaCode | `QWEN_CODE=1` or `QWEN_CODE_SESSION_ID` | `qwen`, or `gigacode` when only GigaCode is configured |
    | any other tool | `SDLC_AGENT=<name>`, set by you | `<name>` |
 
 2. See the CLI refuse in an agent's shell. A person's command run there fails (real output from a Claude Code shell):
@@ -325,7 +325,8 @@ made by agents are marked.
 ### Pitfalls
 
 - A commit made outside the agent's shell is a person's commit, even if the agent wrote the code.
-- Commits from GigaCode carry `SDLC-Agent: qwen`: the audit cannot tell GigaCode from Qwen Code.
+- Since 0.15.4, GigaCode-only projects mark commits `SDLC-Agent: gigacode`. With both tools configured, the marker
+  remains `qwen`; set `SDLC_AGENT=gigacode` in GigaCode's environment and run `sdlc update` after changing `tools`.
 - If a Cursor build sets no `CURSOR_AGENT`, the CLI treats the agent's terminal as a person's. The hooks still deny a
   person's commands by their text, and the agent's commits are not marked.
 

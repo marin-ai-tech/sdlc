@@ -279,7 +279,7 @@ function changeChecks(out: Checks, root: string, paths: ProjectPaths, config: Sd
   }
 }
 
-function gitCheck(out: Checks, root: string): void {
+function gitCheck(out: Checks, root: string, tools?: readonly string[]): void {
   const { tt } = out;
   if (!isGitRepo(root)) {
     out.add('git', 'warn', tt('doctor.gitNotRepo'), tt('doctor.fix.gitInit'));
@@ -290,13 +290,13 @@ function gitCheck(out: Checks, root: string): void {
     ? tt('doctor.gitIdentity', { name: id.name ?? '', email: id.email })
     : tt('doctor.gitNoEmail');
   out.add('git', id.email ? 'ok' : 'warn', message, tt('doctor.fix.gitEmail'));
-  gitHookCheck(out, root);
+  gitHookCheck(out, root, tools);
 }
 
 /** sdlc's prepare-commit-msg hook (B24); a hook of the project's own is a warning with how to chain sdlc's. */
-function gitHookCheck(out: Checks, root: string): void {
+function gitHookCheck(out: Checks, root: string, tools?: readonly string[]): void {
   const { tt } = out;
-  const hook = inspectGitHook(root);
+  const hook = inspectGitHook(root, tools);
   if (hook.status === 'no-git' || hook.path === undefined) return;
   const shown = path.relative(root, hook.path).split(path.sep).join('/');
   if (hook.status === 'current' || hook.status === 'chained') {
@@ -321,7 +321,7 @@ function projectChecks(out: Checks, root: string, env: NodeJS.ProcessEnv): void 
   openspecChecks(out, root, paths);
   generatedFilesCheck(out, root, config);
   if (config) projectConfigChecks(out, root, paths, config, env);
-  gitCheck(out, root);
+  gitCheck(out, root, config?.tools);
 }
 
 export interface DoctorOptions {

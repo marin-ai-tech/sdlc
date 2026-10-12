@@ -1282,7 +1282,8 @@ record the change leaves behind.
    The gaps are honest: the tests of task 1.1 went into the same commit as task 1.2, and task 2.1 has no code. A gap
    is a question for the reviewer, not a failure.
 
-6. Check the approvals. The commit with the archive move must be committed first:
+6. Check the approvals. This output is from the trial with sdlc 0.14.4. Since 0.15.4, approvals committed while the
+   change was active retain their status before the archive move is committed:
 
    ```bash
    sdlc approvals verify --mode warn
@@ -1314,7 +1315,7 @@ record the change leaves behind.
   `sdlc health` counts forced archives.
 - `--skip-specs` archives without touching the living specs; use it only for tooling or docs changes.
 - Since 0.15.2, the trace shows a deferred finding as `deferred (D2)`.
-- Commit the archive move before running `sdlc approvals verify`; until then every approval shows `not-committed`.
+- Commit the archive move for a complete history; since 0.15.4, `sdlc approvals verify` also works before that commit.
 
 
 <a id="known-limitations"></a>
@@ -1326,8 +1327,6 @@ Limitations observed in the sdlc 0.14.4 trial. Some were fixed later; see the ch
   `sdlc backlog add`; nothing keeps the two lists in step.
 - `sdlc backlog add` has no `--source-url` (only `sdlc new` has one), so an issue link is kept as a ref string.
 - Archiving a change marks its backlog item done but does not close or comment on the linked GitHub issue.
-- `sdlc import bmad` with a path outside the project says "No BMAD artifacts found." instead of naming the path
-  problem.
 - `min_approvals` cannot require one approval per role (for example code owner and QA) outside
   `high_risk_approvers`.
 - The `missing_role` hint ("ask Paul, Ethan, …") can name people whom `distinct_approvers` excludes (seen in the
@@ -1345,5 +1344,3 @@ Limitations observed in the sdlc 0.14.4 trial. Some were fixed later; see the ch
   server without `stages` is not governed by the stage rule; there is no "CLI only" server.
 - The first `roles.yaml` commit that adds the maintainers' signing keys shows `bad-signature` (the previous version
   has no keys); there is no documented bootstrap step.
-- Until the archive move is committed, `sdlc approvals verify` reports every approval of that change as
-  `not-committed`.

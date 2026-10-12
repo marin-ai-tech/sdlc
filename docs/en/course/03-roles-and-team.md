@@ -374,8 +374,8 @@ every change to `roles.yaml` is signed by a maintainer. Check it locally and in 
 
 - The commit that first adds the maintainers' keys cannot be verified: the version before it has no keys, so it
   shows `bad-signature`. Plan this first commit and record why it is expected.
-- Commit the change folder after `sdlc archive`. Until the move is committed, every approval of that change shows
-  `not-committed`.
+- Commit the change folder after `sdlc archive`. Since 0.15.4, approvals committed while the change was active keep
+  their status before the archive move is committed.
 - With `signing: off`, `sdlc approvals verify` prints "Approval signing is off." and checks nothing. Use
   `--mode warn` to see the state before you switch it on.
 - Signing does not protect against someone who can disable CI. Protect the default branch.

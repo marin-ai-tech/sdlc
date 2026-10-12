@@ -4,6 +4,7 @@ import { SdlcError } from '../core/errors.js';
 import { writeEvidenceBundle } from '../core/evidence-export.js';
 import { t } from '../core/i18n.js';
 import { parseSince, projectName } from '../report/model.js';
+import { staleOutputWarnings, warnStaleOutput } from './out-inside-warning.js';
 
 export interface AuditExportOptions {
   export?: string;
@@ -23,10 +24,12 @@ export function auditExportCommand(opts: AuditExportOptions): void {
     const since = parseSince(opts.since);
     const summary = writeEvidenceBundle(project, { dir: opts.export, since, change: opts.change });
     if (opts.json) {
-      printJson({ export: summary });
+      const warnings = staleOutputWarnings(ctx.root, summary.dir, { folder: true, locale: 'en' });
+      printJson({ export: summary, warnings });
       return;
     }
     line(t('audit.exported', { ...summary }));
+    warnStaleOutput(ctx.root, summary.dir, { folder: true });
   } catch (error) {
     reportFailure(error, opts.json, { export: null });
   }

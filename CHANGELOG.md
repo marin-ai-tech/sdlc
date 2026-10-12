@@ -2,6 +2,14 @@
 
 All notable changes to sdlc. Versions follow [Semantic Versioning](https://semver.org/); while the major version is 0, a minor version may change behavior.
 
+## 0.15.4 — 2026-10-12
+
+### Fixed
+- Git hooks installed by `sdlc init` and `sdlc update` mark GigaCode-only commits as `SDLC-Agent: gigacode`.
+- `report --out`, `dashboard --out` and `audit --export` warn when an unignored project output makes verification stale.
+- `import bmad` rejects paths outside the project, including links; `--change` used to read and import such folders.
+- `approvals verify` keeps committed approvals' status after `archive`, before the archive move is committed.
+
 ## 0.15.3 — 2026-10-12
 
 ### Fixed

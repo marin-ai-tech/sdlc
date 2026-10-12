@@ -724,6 +724,7 @@
   "warn.approvalProvenance": "approval recorded, but the provenance line was not written: {error}",
   "warn.archiveOverlap": "\"{requirement}\" ({capability}) is changed by {changes} - reconcile before archiving the second one.",
   "warn.provenanceNotWritten": "provenance lines were not written: {error}",
+  "warn.outputMakesVerificationStale": "{path} is inside the project and not ignored by git: it makes the verification of the active changes stale. Add {path} to .gitignore.",
   "license.assess.commercialOk": "commercial license, agreement {agreement}{licensee}",
   "license.assess.licenseePart": " ({licensee})",
   "license.assess.commercialNoAgreement": "commercial license declared without an agreement id",

@@ -24,6 +24,7 @@ import {
   detectBmadDocs,
   requirementsFromPrd,
   requirementsFromSpec,
+  resolveInsideProject,
   sections,
   type BmadDoc,
 } from './import-bmad.js';
@@ -63,16 +64,6 @@ function isSymlink(target: string): boolean {
   } catch {
     return false;
   }
-}
-
-function resolveInside(root: string, input: string): string {
-  const start = path.resolve(root, input);
-  const rootResolved = path.resolve(root);
-  const rel = path.relative(rootResolved, start);
-  if (rel.startsWith('..') || path.isAbsolute(rel)) {
-    throw new SdlcError('no_bmad_artifacts', { key: 'error.no_bmad_artifacts_found' });
-  }
-  return start;
 }
 
 function frontmatter(body: string): { meta: Record<string, string>; rest: string } {
@@ -331,7 +322,7 @@ function hasTicketsToml(start: string): boolean {
  * Nothing is written. No BMAD artifacts → `no_bmad_artifacts`.
  */
 export function planBmadBacklog(root: string, input: string): BacklogImportPlan {
-  const start = resolveInside(root, input);
+  const start = resolveInsideProject(root, input);
   try {
     if (hasTicketsToml(start)) return planFromTickets(root, start);
   } catch (error) {

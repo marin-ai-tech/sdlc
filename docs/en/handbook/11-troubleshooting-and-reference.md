@@ -534,16 +534,11 @@ What this handbook needed and sdlc 0.14.4 does not offer, or does differently fr
   summary" event.
 - `sdlc mcp serve` has no `health`, `report` or `explain` tool, so a portfolio view of health over MCP is not possible;
   it needs the CLI per repository.
-- `sdlc report --out` and `sdlc dashboard --out` must stay inside the project, and a file written there (untracked, not
-  ignored) makes the verification of active changes stale; sdlc does not warn or suggest `.gitignore`.
-- `sdlc audit --export` into a folder inside the project (outside `openspec/`) also makes verification stale, with no
-  warning.
 - `sdlc audit --since` works only with `--export`; the plain audit has no period filter for its metrics.
 - After a change is archived, `sdlc audit --change <id>` lists only the commits after the folder moved ("commits
   touching the change folder" does not follow the rename).
 - The agents' share of commits is project-wide only; there is no per-change or per-tool share in `sdlc audit`.
 - `sdlc doctor` has no option to apply its fixes; every fix is manual.
-- Commits from GigaCode carry `SDLC-Agent: qwen`; the audit cannot tell GigaCode from Qwen Code.
 - The documentation does not say whether the `mcp-stage` rule works in Codex CLI, Qwen Code and GigaCode (it names
   Claude Code, OpenCode and Cursor tool names only).
 - `sdlc guide denials` says "The Claude Code hook and the OpenCode plugin check every edit"; it does not mention Cursor,

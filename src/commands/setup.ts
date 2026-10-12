@@ -456,7 +456,7 @@ async function setupProject(
   const schemaDefaulted = openspecCreated ? setDefaultSchema(paths, config.schema) : false;
   const result = installIntegrations(root, config, tools, { force: opts.force, hooks: opts.hooks });
   // Not a project file: outside a git repository nothing happens, and a failure only warns.
-  const gitHook = installGitHook(root);
+  const gitHook = installGitHook(root, { tools });
   const reviewCreated = ensureReviewPolicy(root, config);
   let opsx: 'installed' | 'failed' | undefined;
   if (opts.opsx && tools.length > 0) {
@@ -562,7 +562,7 @@ export async function updateCommand(target: string | undefined, opts: UpdateOpti
       saveConfig(paths.sdlcConfig, config);
     }
     const result = installIntegrations(root, config, tools, { force: opts.force, dryRun: opts.dryRun });
-    const gitHook = installGitHook(root, { dryRun: opts.dryRun });
+    const gitHook = installGitHook(root, { dryRun: opts.dryRun, tools });
     if (!opts.dryRun) logSetup(root, config, 'harness.updated', tools);
     const stamp = harnessStamp(config);
     if (opts.json) {

@@ -32,6 +32,11 @@ export interface ApprovalSite {
   record: ApprovalRecord;
 }
 
+function approvalFile(root: string, ref: ChangeRef, beforeArchive = false): string {
+  const dir = beforeArchive ? path.join(path.dirname(path.dirname(ref.dir)), ref.id) : ref.dir;
+  return path.relative(root, path.join(dir, '.sdlc.yaml')).replaceAll('\\', '/');
+}
+
 function commitSignature(root: string, sha: string, signers: string): { status: SignatureStatus; signer?: string } {
   const result = git(root, ['-c', `gpg.ssh.allowedSignersFile=${signers}`, 'log', '-1', '--format=%G?%x1f%GS', sha]);
   const [code, principal] = result.stdout.split('\x1f');
@@ -57,7 +62,7 @@ export function withAllowedSigners<T>(roles: RolesFile, work: (signers: string) 
 export function approvalSites(root: string, refs: ChangeRef[]): ApprovalSite[] {
   const sites: ApprovalSite[] = [];
   for (const ref of refs) {
-    const file = path.relative(root, path.join(ref.dir, '.sdlc.yaml')).replaceAll('\\', '/');
+    const file = approvalFile(root, ref);
     const state = readChangeState(ref.dir);
     for (const [gate, value] of Object.entries(state.gates)) {
       for (const record of value?.approvals ?? []) sites.push({ ref, file, gate, record });
@@ -89,7 +94,13 @@ export function approvalSignature(root: string, roles: RolesFile, signers: strin
   const history = git(root, ['log', '--reverse', '--format=%H', `-S${record.at}`, '--', 'openspec/changes']);
   const sha = history.ok ? history.stdout.split('\n')[0] : '';
   const committed = git(root, ['show', `HEAD:${file}`]);
-  if (!sha || !committed.ok || !committed.stdout.includes(record.at)) {
+  const fallback = site.ref.archived && !committed.ok
+    ? git(root, ['show', `HEAD:${approvalFile(root, site.ref, true)}`])
+    : undefined;
+  const inHead = committed.ok
+    ? committed.stdout.includes(record.at)
+    : fallback?.ok === true && fallback.stdout.includes(record.at);
+  if (!sha || !inHead) {
     return { status: 'not-committed', commit: sha || undefined, signer: undefined };
   }
   const checked = commitSignature(root, sha, signers);

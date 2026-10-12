@@ -75,9 +75,11 @@ plan is denied (see 17.4).
   When sdlc's pre-tool hook fails to load or throws, the sdlc command answers a JSON `deny` itself, so the call is
   blocked. `sdlc` missing from the PATH of the tool's shell (`sdlc doctor` checks it) and a timeout still let the
   call through.
-- **The GigaCode marker.** GigaCode's own session variable is not documented. sdlc treats `QWEN_CODE=1` as the agent's
-  marker for both tools, so commits from GigaCode carry `SDLC-Agent: qwen`. If a GigaCode build sets no marker, the CLI
-  cannot tell the agent's shell from yours; the hooks and deny rules still refuse a person's commands by their text.
+- **The GigaCode marker.** GigaCode's own session variable is not documented. Its shell carries `QWEN_CODE=1`.
+  With `gigacode` but not `qwen` in `tools`, the git hook writes `SDLC-Agent: gigacode`. With both tools it writes
+  `SDLC-Agent: qwen`; set `SDLC_AGENT=gigacode` in GigaCode's environment to tell them apart. Run `sdlc update` after
+  changing `tools`; `sdlc doctor` checks the hook. If a GigaCode build sets no marker, the CLI cannot tell the agent's
+  shell from yours; the hooks and deny rules still refuse a person's commands by their text.
 - **Windows.** Qwen Code runs hooks through cmd.exe; sdlc's hook commands work there.
 - **Checking GigaCode yourself.** After `sdlc init --tools gigacode`, trust the folder, start a change with
   `sdlc new demo` and ask the agent to create `src/demo.txt`: the edit must be denied with `[sdlc:plan-gate]`. Ask it

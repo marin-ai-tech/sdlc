@@ -603,8 +603,8 @@ approving anything.
 
 ### Pitfalls
 
-- The path must be inside the project. A folder outside it gives the same message as an empty folder:
-  `No BMAD artifacts found.`
+- The path must be inside the project. This output is from the trial with sdlc 0.14.4. Since 0.15.4, an outside path
+  or a link to one is refused with `path_outside_project` (`Path outside project: …`), also with `--change`.
 - Since 0.15.2, `--dry-run` prints a text summary unless `--json` is given. Read it before importing.
 - Repeating the import skips matching BMAD epics and items and reports `Already imported: …`.
 - In `--change` mode, sdlc recognises the documents by their content: a PRD starts with `# PRD:`, an architecture

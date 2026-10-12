@@ -724,6 +724,7 @@
   "warn.approvalProvenance": "утверждение записано, но строка происхождения не записана: {error}",
   "warn.archiveOverlap": "\"{requirement}\" ({capability}) меняется в {changes} — согласуйте перед архивацией второго.",
   "warn.provenanceNotWritten": "строки происхождения не записаны: {error}",
+  "warn.outputMakesVerificationStale": "{path} лежит внутри проекта и не игнорируется git: из-за него проверка активных изменений устареет. Добавьте {path} в .gitignore.",
   "license.assess.commercialOk": "коммерческая лицензия, соглашение {agreement}{licensee}",
   "license.assess.licenseePart": " ({licensee})",
   "license.assess.commercialNoAgreement": "объявлена коммерческая лицензия без id соглашения",

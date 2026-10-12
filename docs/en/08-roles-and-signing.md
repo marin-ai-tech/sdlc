@@ -70,6 +70,8 @@ A git email is easy to fake. Signing closes that gap: every approval must arrive
 
 Statuses of an approval: `valid`, `unsigned`, `wrong-signer` (signed by someone other than the approver — for example Bob signing a commit that claims Alice's approval), `bad-signature`, `not-committed` (the record is not in a commit yet). For `roles.yaml` commits: `valid`, `unsigned`, `not-maintainer`. A change to `roles.yaml` is checked against the maintainers in the version before it, so nobody can make themselves a maintainer and sign that with their own key.
 
+After `sdlc archive`, committed approvals retain their status even before you commit the archive move.
+
 Set up signing once per person (git ≥ 2.34):
 
 ```bash

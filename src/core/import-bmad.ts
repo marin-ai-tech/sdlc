@@ -1,7 +1,7 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { SdlcError } from './errors.js';
-import { toPosix } from './fs-utils.js';
+import { isWithin, toPosix } from './fs-utils.js';
 import {
   note, renderDelta, renderDesign, renderIntent, renderProposal, section, slug,
   type Requirement, type Sections,
@@ -31,6 +31,33 @@ export interface BmadImportPlan {
   warnings: string[];
 }
 
+function pathOutsideProject(root: string, start: string, input: string): never {
+  const rel = toPosix(path.relative(root, start)) || input;
+  throw new SdlcError('path_outside_project', {
+    key: 'error.path_outside_project_x',
+    params: { rel },
+  });
+}
+
+/**
+ * Resolves `input` under `root` and refuses a path outside the project
+ * (lexical, then realpath when the target exists so a junction/symlink that
+ * points outside is caught before any read).
+ */
+export function resolveInsideProject(root: string, input: string): string {
+  const start = path.resolve(root, input);
+  if (!isWithin(root, start)) pathOutsideProject(root, start, input);
+  if (!fs.existsSync(start)) return start;
+  try {
+    const realRoot = fs.realpathSync(root);
+    const realStart = fs.realpathSync(start);
+    if (!isWithin(realRoot, realStart)) pathOutsideProject(root, start, input);
+  } catch (error) {
+    if (error instanceof SdlcError) throw error;
+  }
+  return start;
+}
+
 function walkMarkdown(target: string, files: string[]): void {
   if (fs.lstatSync(target).isSymbolicLink()) return;
   if (fs.statSync(target).isDirectory()) {
@@ -56,7 +83,7 @@ function identifyDoc(root: string, file: string): BmadDoc[] {
 
 /** Finds BMAD artifacts by content, recursively in a file or folder. */
 export function detectBmadDocs(root: string, input: string): BmadDoc[] {
-  const start = path.resolve(root, input);
+  const start = resolveInsideProject(root, input);
   const files: string[] = [];
   try {
     walkMarkdown(start, files);

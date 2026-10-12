@@ -159,7 +159,9 @@ Build the HTML dashboard of a project and keep it fresh while the team works.
 ### Pitfalls
 
 - `--out` must stay inside the project, as for the report. Keep `reports/` in `.gitignore`, or the page makes the
-  verification of an active change stale ([Section 9.1](#s9-1)).
+  verification of an active change stale ([Section 9.1](#s9-1)). Since 0.15.4, `report --out`, `dashboard --out` and
+  `audit --export` warn about such output outside `openspec/` and suggest `.gitignore`. JSON audit exports include
+  a top-level `warnings` array with `audit --export --json`.
 - Keep `--out` of the watcher outside `openspec/`, or every rebuild triggers the next one.
 - `--serve` serves on the host you give. `127.0.0.1` keeps it on your machine; the page shows names and email
   addresses of the team.
