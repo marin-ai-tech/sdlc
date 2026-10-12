@@ -6,6 +6,11 @@ Without `openspec/roles.yaml`, nothing changes: the `roles:` allow-lists in `ope
 
 ## 8.1. `openspec/roles.yaml`
 
+Since 0.16.1, a person can run `sdlc init --roles` to create a starter file from the current git identity.
+That identity holds every role until the team edits the file. An existing file is kept; text and JSON report
+whether it was created or kept. In an agent session the CLI refuses with `agent_cannot_edit_roles`, and the hook
+denies the command, as it does `sdlc roles migrate`.
+
 ```yaml
 version: 1
 signing: warn                 # off | warn | required

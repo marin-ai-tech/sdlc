@@ -6,9 +6,11 @@ import type { EventBody } from './outbox.js';
 /**
  * The ready message of an event (0.15.0) for a receiver with `message: <argument>`: one line of text built only
  * from the event's fields - the project, the change, the gate, the kind of event and the people by their names
- * from roles.yaml (`people.<id>.name`; the id when roles.yaml has no such person). Never an email, a note, a
- * command or its output: the event carries none of them. The text is in the given locale (default: the current
- * one, as every other output); the outbox builds it when the event is queued (src/mcp/outbox.ts).
+ * from roles.yaml (`people.<id>.name`; the id when roles.yaml has no such person). Never an email, a command or
+ * its output: the event carries none of them. The note of a rejection or a rework is not part of the text either;
+ * only a receiver with `include_note: true` (0.16.1) gets it, appended at delivery by `withNote`. The text is in
+ * the given locale (default: the current one, as every other output); the outbox builds it when the event is
+ * queued (src/mcp/outbox.ts).
  */
 type Param = MessageParams[string];
 
@@ -79,4 +81,12 @@ export function eventMessage(event: EventBody, names: Map<string, string>, local
     people: peopleParam(event, names),
   };
   return oneLine(t(templateKey(event), params, locale));
+}
+
+/** Between the ready text and the note of a receiver with `include_note`. */
+const NOTE_SEPARATOR = ' \u2014 ';
+
+/** The ready text followed by the note; the text alone without a note. */
+export function withNote(text: string, note: string | undefined): string {
+  return note ? `${text}${NOTE_SEPARATOR}${note}` : text;
 }

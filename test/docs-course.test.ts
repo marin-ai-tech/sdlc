@@ -54,6 +54,22 @@ describe('the user course and the handbook', () => {
     expect(empty).toEqual([]);
   });
 
+  // 0.16.1: a wording pass had turned `scripts/examples/dashboard-watch.mjs` into a file that does not exist.
+  it('name only repository files that exist', () => {
+    const missing: string[] = [];
+    // Only paths of the sdlc repository itself; the course's projects (tasklet, billing-api) have src/ and test/ too.
+    const reference = /`((?:scripts\/examples|docs\/en|assets)\/[A-Za-z0-9_./-]+\.[a-z]{2,4})`/g;
+    for (const dir of [COURSE, HANDBOOK]) {
+      for (const file of modules(dir)) {
+        const text = fs.readFileSync(path.join(dir, file), 'utf8');
+        for (const match of text.matchAll(reference)) {
+          if (!fs.existsSync(path.join(REPO_ROOT, match[1]))) missing.push(`${file}: ${match[1]}`);
+        }
+      }
+    }
+    expect([...new Set(missing)]).toEqual([]);
+  });
+
   it('number the items of a numbered gaps list without holes', () => {
     const holes: string[] = [];
     for (const dir of [COURSE, HANDBOOK]) {

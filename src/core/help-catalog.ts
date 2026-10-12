@@ -24,6 +24,7 @@ const EXAMPLES: Record<string, string> = {
   uninstall: 'sdlc uninstall --dry-run',
   adopt: 'sdlc adopt --json',
   'adopt --apply': 'sdlc adopt --apply',
+  'init --roles': 'sdlc init --roles --tools none',
   'review suggest': 'sdlc review suggest --change add-export',
   'backlog epic add': 'sdlc backlog epic add "Checkout" --goal "Customers pay without calling support" --json',
   'backlog epic edit': 'sdlc backlog epic edit E1 --title "0.8.0 Checkout" --json',
@@ -103,6 +104,7 @@ const ACTION_VARIANTS: Record<string, string> = {
   'tests unlock': 'sdlc tests unlock --change <id>',
   'license set': 'sdlc license set <community|commercial> [--agreement <id>] [--licensee <name>]',
   'adopt --apply': 'sdlc adopt --apply',
+  'init --roles': 'sdlc init --roles',
 };
 
 /** Read-only actions any actor may run, listed on their own so an agent finds them: name -> usage. */

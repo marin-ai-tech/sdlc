@@ -76,6 +76,7 @@ export interface InitOptions {
   gitInit?: boolean;
   /** Register `sdlc mcp serve` for the configured tools (`mcp.serve` in sdlc.yaml, B13). */
   mcp?: boolean;
+  roles?: boolean;
 }
 
 function assertDelivery(value: string | undefined): Delivery | undefined {
@@ -145,7 +146,8 @@ function setDefaultSchema(paths: ProjectPaths, schema: string): boolean {
   return true;
 }
 
-function ensureReviewPolicy(root: string, config: SdlcConfig): boolean {
+/** The starter REVIEW.md when the project has none (init, and `sdlc doctor --fix`); an existing one is kept. */
+export function ensureReviewPolicy(root: string, config: SdlcConfig): boolean {
   const file = path.join(root, config.review.policy);
   if (exists(file)) return false;
   writeTextAtomic(file, readAsset('project', 'REVIEW.md'));
@@ -225,7 +227,7 @@ async function resolveWizard(
   };
   const io = deps.io ?? terminal;
   if (!shouldPrompt(opts, io)) {
-    return { opts, roles: false, install: [], index: false };
+    return { opts, roles: opts.roles === true, install: [], index: false };
   }
   const probe = deps.probe ?? defaultProbe;
   const defaults = { ...initDefaults(root, detectTools(root), probe), folder };
@@ -312,6 +314,12 @@ interface InitOutcome {
 
 export async function initCommand(target: string | undefined, opts: InitOptions, deps?: InitDeps): Promise<void> {
   try {
+    const agent = deps?.io ? deps.io.agent : agentEnvironment();
+    if (opts.roles && agent) throw new SdlcError(
+      'agent_cannot_edit_roles',
+      { key: 'error.only_a_person_may_create_roles' },
+      humanCommandFix('init --roles')
+    );
     // Refused before anything is written: a value the configuration cannot load would break every later command.
     if (opts.cli !== undefined) assertCliValue(opts.cli, '--cli');
     const root = path.resolve(target ?? process.cwd());
@@ -329,7 +337,6 @@ export async function initCommand(target: string | undefined, opts: InitOptions,
     if (!resolved) return;
     const chosen = resolved.opts;
     // The terminal seam (deps.io) names the agent session in tests; the CLI reads the environment.
-    const agent = deps?.io ? deps.io.agent : agentEnvironment();
     const request = checkLayoutRequest(root, chosen, agent);
     assertInitKeepsGuard(root, chosen, agent);
     const runInit = (dir: string) => setupProject(dir, chosen, resolved, deps);
@@ -536,6 +543,27 @@ export interface UpdateOptions {
   json?: boolean;
 }
 
+/** The configured tools sdlc has an adapter for. */
+export function configuredTools(config: SdlcConfig): ToolId[] {
+  return config.tools.filter((t) => t in ADAPTERS) as ToolId[];
+}
+
+/**
+ * What `sdlc update` writes: the generated files (an edited one is kept without --force), the harness stamp, sdlc's
+ * git hook and the log line. `sdlc doctor --fix` reuses it, so it writes nothing more than update does.
+ */
+export function applyUpdate(
+  root: string,
+  config: SdlcConfig,
+  tools: ToolId[],
+  opts: { force?: boolean; dryRun?: boolean } = {},
+): { result: InstallResult; gitHook: GitHookResult } {
+  const result = installIntegrations(root, config, tools, { force: opts.force, dryRun: opts.dryRun });
+  const gitHook = installGitHook(root, { dryRun: opts.dryRun, tools });
+  if (!opts.dryRun) logSetup(root, config, 'harness.updated', tools);
+  return { result, gitHook };
+}
+
 export async function updateCommand(target: string | undefined, opts: UpdateOptions): Promise<void> {
   try {
     const root = findProjectRoot(path.resolve(target ?? process.cwd()));
@@ -553,7 +581,7 @@ export async function updateCommand(target: string | undefined, opts: UpdateOpti
     );
     }
     const config = loadConfig(paths.sdlcConfig);
-    const tools = parseTools(opts.tools, config.tools.filter((t) => t in ADAPTERS) as ToolId[]);
+    const tools = parseTools(opts.tools, configuredTools(config));
     if (opts.tools !== undefined && !opts.dryRun) {
       // An agent may restore the configured tools, not drop one (B41); before anything is written.
       const fix = humanCommandFix('update', config.cli);
@@ -561,9 +589,7 @@ export async function updateCommand(target: string | undefined, opts: UpdateOpti
       config.tools = tools;
       saveConfig(paths.sdlcConfig, config);
     }
-    const result = installIntegrations(root, config, tools, { force: opts.force, dryRun: opts.dryRun });
-    const gitHook = installGitHook(root, { dryRun: opts.dryRun, tools });
-    if (!opts.dryRun) logSetup(root, config, 'harness.updated', tools);
+    const { result, gitHook } = applyUpdate(root, config, tools, opts);
     const stamp = harnessStamp(config);
     if (opts.json) {
       const { files, claudeHooks } = result;

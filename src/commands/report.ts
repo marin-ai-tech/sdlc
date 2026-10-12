@@ -1,5 +1,5 @@
 import * as path from 'node:path';
-import { loadProject } from '../cli/context.js';
+import { loadProject, type ProjectContext } from '../cli/context.js';
 import { line, printJson, reportFailure } from '../cli/output.js';
 import { SdlcError } from '../core/errors.js';
 import { isWithin, writeTextAtomic } from '../core/fs-utils.js';
@@ -9,26 +9,68 @@ import { renderReportMarkdown } from '../report/markdown.js';
 import { renderReportHtml } from '../report/html.js';
 import { t } from '../core/i18n.js';
 
-export function reportCommand(opts: { format?: string; json?: boolean; since?: string; change?: string; out?: string }): void {
+export interface ReportCommandOptions {
+  format?: string;
+  json?: boolean;
+  since?: string;
+  change?: string;
+  out?: string;
+}
+
+const REPORT_FORMATS = ['md', 'json', 'html'];
+
+/** The report of the project in `ctx`, rendered as md, json or html. */
+export function renderReport(ctx: ProjectContext, opts: ReportCommandOptions, format: string): string {
+  const model = buildReport(ctx, { since: opts.since, change: opts.change });
+  if (format === 'json') return JSON.stringify(model, null, 2);
+  if (format === 'html') return renderReportHtml(model);
+  return renderReportMarkdown(model);
+}
+
+/** The absolute path `--out` names, resolved against the project root; it must stay inside the project. */
+export function reportTarget(root: string, out: string): string {
+  const target = path.resolve(root, out);
+  if (!isWithin(root, target)) {
+    throw new SdlcError('invalid_option', { key: 'error.out_must_stay_inside_the_project' });
+  }
+  return target;
+}
+
+/**
+ * Renders the report and writes it to `out`; returns the absolute path written. It prints nothing: the caller
+ * reports the write and warns about output inside the project (B103: `dashboard --watch` warns once).
+ */
+export function writeReport(
+  ctx: ProjectContext,
+  opts: ReportCommandOptions & { out: string },
+  format: string
+): string {
+  const content = renderReport(ctx, opts, format);
+  const target = reportTarget(ctx.root, opts.out);
+  writeTextAtomic(target, `${content}\n`);
+  return target;
+}
+
+function checkFormat(format: string): void {
+  if (REPORT_FORMATS.includes(format)) return;
+  throw new SdlcError('invalid_option', { key: 'error.unknown_report_format_x', params: { format: format } });
+}
+
+export function reportCommand(opts: ReportCommandOptions): void {
   const format = opts.json ? 'json' : opts.format ?? 'md';
   try {
-    if (!(['md', 'json', 'html'] as string[]).includes(format)) throw new SdlcError(
-      'invalid_option',
-      { key: 'error.unknown_report_format_x', params: { format: format } }
-    );
+    checkFormat(format);
     const ctx = loadProject();
-    const model = buildReport(ctx, { since: opts.since, change: opts.change });
-    const content = format === 'json' ? JSON.stringify(model, null, 2) : format === 'html' ? renderReportHtml(model) : renderReportMarkdown(model);
     if (opts.out) {
-      const target = path.resolve(ctx.root, opts.out);
-      if (!isWithin(ctx.root, target)) throw new SdlcError(
-        'invalid_option',
-        { key: 'error.out_must_stay_inside_the_project' }
-      );
-      writeTextAtomic(target, `${content}\n`);
+      const target = writeReport(ctx, { ...opts, out: opts.out }, format);
       line(t('report.written', { path: target }));
       warnStaleOutput(ctx.root, target);
-    } else if (format === 'json') printJson(model);
-    else line(content);
-  } catch (error) { reportFailure(error, format === 'json' && !opts.out); }
+    } else if (format === 'json') {
+      printJson(buildReport(ctx, { since: opts.since, change: opts.change }));
+    } else {
+      line(renderReport(ctx, opts, format));
+    }
+  } catch (error) {
+    reportFailure(error, format === 'json' && !opts.out);
+  }
 }

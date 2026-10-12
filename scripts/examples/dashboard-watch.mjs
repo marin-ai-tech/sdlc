@@ -4,6 +4,7 @@
  * Watches openspec/ and runs `<cli> dashboard --out <file>` after changes.
  * Optionally serves the page on localhost with an auto-refresh.
  * Everything stays local. How to run it in the background: README.md next to this file.
+ * Since sdlc 0.16.1 the CLI does this itself: `sdlc dashboard --watch [--serve <host:port>]` (see README.md).
  */
 import { spawn } from 'node:child_process';
 import fs from 'node:fs';

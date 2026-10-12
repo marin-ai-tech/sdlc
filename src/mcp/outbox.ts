@@ -5,7 +5,8 @@ import type { SdlcConfig } from '../core/config.js';
 import { git } from '../core/git.js';
 import type { LogEntry } from '../core/log.js';
 import { personByEmail, readRolesFile } from '../core/roles.js';
-import { receiverKey, receiversFor, type EventReceiver } from './event-config.js';
+import { maskSecrets } from './checks.js';
+import { patternMatches, receiverKey, receiversFor, type EventReceiver } from './event-config.js';
 import { eventMessage, peopleNames } from './event-message.js';
 
 /**
@@ -13,7 +14,11 @@ import { eventMessage, peopleNames } from './event-message.js';
  * when it is appended to the project log, and delivered after the command (src/mcp/events.ts). The queue lives in
  * the git directory, so it never reaches a commit; outside a git repository nothing is queued. An event carries
  * the entry's name, change, gate, time, sdlc version, the person id of its identity (roles.yaml) and, for a waiting
- * gate, the ids of the people it waits for. Never an email, never the entry's detail, never command text or output.
+ * gate, the ids of the people it waits for. Never an email, never command text or output, and never the entry's
+ * detail, with one opt-in exception (0.16.1): the detail of `gate.<g>.rejected` and `gate.<g>.rework` is the note,
+ * and when at least one receiver of the event has `include_note: true` the queue stores it once, cleaned (one line,
+ * at most 200 characters, secrets masked) next to the event, never inside it; delivery hands it only to the
+ * receivers that opted in (src/mcp/events.ts).
  * When a receiver asks for a ready message (`message`), the one-line text is built here, when the event is queued,
  * in the locale of the command that caused it and with the names roles.yaml has at that moment: a later delivery
  * (`sdlc events flush` from another shell, CI or locale; roles.yaml edited since) still reads as the event happened.
@@ -38,6 +43,8 @@ export interface QueuedEvent {
   receivers: string[];
   /** The ready one-line text for receivers with `message`; built when queued, from the event's fields only. */
   message?: string;
+  /** The cleaned note of a rejection or a rework; stored only when a receiver of the event has `include_note`. */
+  note?: string;
 }
 
 export interface QueuedFile {
@@ -50,6 +57,9 @@ export type QueueConfig = Partial<Pick<SdlcConfig, 'events' | 'project'>>;
 
 const GATE_EVENT = /^gate\.([^.]+)\./;
 const EMAIL_IN_IDENTITY = /<([^>]+)>/;
+const NOTE_EVENT = /^gate\.[^.]+\.(rejected|rework)$/;
+const NOTE_MAX = 200;
+const ELLIPSIS = '\u2026';
 
 /** `<git dir>/sdlc/outbox`, or undefined outside a git repository. */
 export function outboxDir(root: string): string | undefined {
@@ -106,6 +116,29 @@ function messageFor(root: string, receivers: EventReceiver[], event: EventBody):
   return { message: eventMessage(event, peopleNames(root)) };
 }
 
+/** One line with the secrets masked (the masking of src/mcp/checks.ts), cut to NOTE_MAX ending with an ellipsis. */
+export function cleanNote(detail: string): string {
+  const masked = String(maskSecrets(detail, []));
+  const line = masked.replace(/\s+/g, ' ').trim();
+  const chars = Array.from(line);
+  if (chars.length <= NOTE_MAX) return line;
+  return `${chars.slice(0, NOTE_MAX - 1).join('').trimEnd()}${ELLIPSIS}`;
+}
+
+/** Whether a receiver that takes the event opted in; every receiver counts, also two on one server and tool. */
+function noteWanted(config: QueueConfig, event: string): boolean {
+  const takes = (receiver: EventReceiver) => receiver.on.some((pattern) => patternMatches(pattern, event));
+  return (config.events ?? []).some((receiver) => receiver.includeNote === true && takes(receiver));
+}
+
+/** The cleaned note of a rejection or a rework when some receiver opted in to it; nothing otherwise. */
+function noteFor(config: QueueConfig, entry: LogEntry): Pick<QueuedEvent, 'note'> {
+  if (!entry.detail || !NOTE_EVENT.test(entry.event)) return {};
+  if (!noteWanted(config, entry.event)) return {};
+  const note = cleanNote(entry.detail);
+  return note ? { note } : {};
+}
+
 /**
  * Queues the entry for every receiver whose `on` matches it. Without receivers it returns at once: no file, no
  * process. Never throws: a notification that cannot be queued never fails a command or a hook.
@@ -117,7 +150,12 @@ export function queueEvent(root: string, config: QueueConfig, entry: LogEntry): 
     const dir = outboxDir(root);
     if (!dir) return;
     const event = eventBody(root, config, entry);
-    const item: QueuedEvent = { event, receivers: receivers.map(receiverKey), ...messageFor(root, receivers, event) };
+    const item: QueuedEvent = {
+      event,
+      receivers: receivers.map(receiverKey),
+      ...messageFor(root, receivers, event),
+      ...noteFor(config, entry),
+    };
     fs.mkdirSync(dir, { recursive: true });
     const file = path.join(dir, `${event.id}.json`);
     fs.writeFileSync(file, `${JSON.stringify(item, null, 2)}\n`, { encoding: 'utf-8', flag: 'wx' });

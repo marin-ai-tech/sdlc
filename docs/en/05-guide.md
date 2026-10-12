@@ -15,6 +15,10 @@ sdlc doctor                            # check the installation
 `sdlc doctor` also checks "mcp variables": if a `${VAR}` in a registry server's `env` or `headers` is unset,
 it warns with the server and variable names, never the value.
 
+Since 0.16.1, `sdlc doctor --fix` applies only fixes sdlc owns: missing generated files, an outdated stamp, a missing
+or older sdlc git hook, and a missing starter `REVIEW.md`. It keeps edited generated files. Other findings are left to
+you. JSON output separates `fixed` from `manual`.
+
 Examples: `--tools cursor`, `--tools claude,codex`, `--tools qwen`, `--tools gigacode`. Without `--tools`, `sdlc init`
 uses the tools it finds in the project (for example a `.claude/`, `.cursor/`, `.codex/` or `.qwen/` folder), else
 Claude Code and OpenCode. The tools are compared in [Supported tools](#supported-tools) at the end of this section.
@@ -28,6 +32,10 @@ trust the project folder.
 From git, install the `release` branch, which carries the built code: `npm install -g github:marin-ai-tech/sdlc#release`. Never `npm install -g sdlc`: the registry package of that name is unrelated.
 
 With no flags in a terminal, `sdlc init` guides you through the setup (tools, enforcement mode, status line, /opsx, language, roles) and shows a summary before writing. The wizard also offers to install the OpenSpec CLI and codegraph when they are missing. Scripts, `--json`, non-terminals and agent sessions never prompt.
+
+Since 0.16.1, `sdlc init --roles` also creates the starter `openspec/roles.yaml` using the current git identity for
+every role. It keeps an existing file and reports created or kept in text and JSON. Only a person may run this option:
+the CLI returns `agent_cannot_edit_roles` in an agent session, and the hook denies it as it does `roles migrate`.
 
 **AI-ready from the start.** In an empty folder (nothing but `.git`, `.gitignore`, `LICENSE`, `README`) the wizard creates the agent documents right away and offers `git init` when there is no repository. In an existing project it first shows how the project differs from the AI-ready layout — missing documents and documents under other names — and offers three choices: build the AI-ready project in a new git worktree in a folder you name (the whole setup happens there, in one commit on the `sdlc/ai-ready` branch; your working copy is not touched), adapt in place (`layout adapt`), or skip. Without the wizard: `--layout scaffold|adapt|worktree|none` with `--worktree <path>`, and `--git-init`; without `--layout` init only reports the differences. Only a person may create the worktree, because it commits on their behalf.
 
@@ -347,7 +355,11 @@ For `claude -p`, allow the required tools in advance: `--allowedTools "Bash(sdlc
 
 ## 5.6. Keeping the dashboard current
 
-`scripts/examples/dashboard-watch.mjs` rebuilds `reports/dashboard.html` whenever `openspec/` changes and can serve it on localhost with an auto-refresh; examples run it as a Windows task, a systemd or launchd service, or a CI step. See [the demo and automation](09-demo-and-automation.md).
+Since 0.16.1, `sdlc dashboard --watch [--out <file>] [--serve <host:port>] [--debounce <ms>]
+[--min-interval <ms>]` builds the page, then rebuilds it when `openspec/` changes. The default output is
+`reports/dashboard.html`. With `--serve`, it serves the page with auto-refresh; port 0 selects a free port.
+Stop it with Ctrl+C. `scripts/examples/dashboard-watch.mjs` remains for Windows Task Scheduler setups.
+See [the demo and automation](09-demo-and-automation.md).
 
 ## 5.7. Updating and uninstalling
 

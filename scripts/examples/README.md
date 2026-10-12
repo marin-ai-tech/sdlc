@@ -1,5 +1,11 @@
 # Dashboard watch examples
 
+> Since sdlc 0.16.1 the CLI does this itself:
+> `sdlc dashboard --watch [--out <file>] [--serve <host:port>] [--debounce <ms>] [--min-interval <ms>]`
+> builds the page (default `reports/dashboard.html`), rebuilds it after `openspec/` changes and, with
+> `--serve`, serves it with an auto-refresh. Prefer the command; the script below stays as an example to copy
+> or adapt (for instance to run it from Windows Task Scheduler with `register-dashboard-task.ps1`).
+
 Keep the sdlc HTML dashboard (`sdlc dashboard --out …`) fresh while you edit
 specs under `openspec/`. These files are **examples** — copy or adapt them; they
 are not part of the published `sdlc` CLI package surface.

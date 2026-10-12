@@ -81,8 +81,9 @@ Run `sdlc doctor`, read each line, and apply the fix it names.
    | `git` | a git repository, and `user.email` set (needed to record approvals) | `git init`; `git config user.email you@example.com` |
    | `git hook` | the `prepare-commit-msg` hook: current, chained, the project's own, missing, outdated, or a shared hooks folder | `sdlc update`, or add the one chain line to your hook |
 
-3. Apply the fixes. Configuration fixes are a person's work: `openspec/sdlc.yaml` and the tools' settings are protected
-   from the agent. After a fix, run `sdlc doctor` again.
+3. Since 0.16.1, run `sdlc doctor --fix` for fixes sdlc owns. Its JSON output lists `fixed` and `manual`.
+   A person handles the remaining configuration findings: `openspec/sdlc.yaml` and tool settings are protected
+   from the agent. After the fixes, run `sdlc doctor` again.
 
 ### You are done when
 
@@ -528,8 +529,6 @@ Claude Code spelling; in Cursor, OpenCode, Qwen Code and GigaCode use `/sdlc-<na
 
 What this handbook needed and sdlc 0.14.4 does not offer, or does differently from its documentation. One line each.
 
-- `sdlc dashboard` has no read or serve mode; `scripts/examples/dashboard-read.mjs` does it, but it is not in the npm
-  package (`files` lists no `scripts/`), so users must copy it from the repository.
 - The daily summary only writes a file; sdlc has no built-in delivery to Telegram (or any channel) and no "daily
   summary" event.
 - `sdlc mcp serve` has no `health`, `report` or `explain` tool, so a portfolio view of health over MCP is not possible;
@@ -538,7 +537,6 @@ What this handbook needed and sdlc 0.14.4 does not offer, or does differently fr
 - After a change is archived, `sdlc audit --change <id>` lists only the commits after the folder moved ("commits
   touching the change folder" does not follow the rename).
 - The agents' share of commits is project-wide only; there is no per-change or per-tool share in `sdlc audit`.
-- `sdlc doctor` has no option to apply its fixes; every fix is manual.
 - The documentation does not say whether the `mcp-stage` rule works in Codex CLI, Qwen Code and GigaCode (it names
   Claude Code, OpenCode and Cursor tool names only).
 - `sdlc guide denials` says "The Claude Code hook and the OpenCode plugin check every edit"; it does not mention Cursor,

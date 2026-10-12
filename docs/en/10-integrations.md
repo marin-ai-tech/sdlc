@@ -264,15 +264,21 @@ In an agent session, `sdlc init` and `sdlc update` refuse to weaken the guard: a
 - `release.mcp` checks hold the release approval until an outside system agrees; `sdlc release check` runs them beforehand.
 - `events` push process events to an MCP server, with the people a gate waits for and overdue gates.
 
-Since 0.15.0 a receiver may ask for a ready message. With `message: text`, sdlc calls the tool with the static `args` plus `text`: one line that names the project, the change, the gate and the people by their names from `roles.yaml`, in the locale of the command, and never an email, a note, a command or its output. The `event` object is then not sent, so a Telegram bot's `send_message(chat_id, text)` takes events directly. The text is built when the event is queued, so an event that waits in the outbox reads the same.
+Since 0.15.0 a receiver may ask for a ready message. With `message: text`, sdlc calls the tool with the static
+`args` plus `text`: one line naming the project, change, gate and people by name from `roles.yaml`, in the command's
+locale. The `event` object is then not sent. The text is built when queued, so an outbox event keeps the same text.
+By default, it contains no email, note, command or output. Since 0.16.1, `include_note: true` opts a receiver into
+rejection and rework notes. The note is one line, at most 200 characters, with secrets masked. An event object gains
+`note`; a ready message appends ` — <note>` after its text. The default is off.
 
 ```yaml
 events:
   - server: telegram
     tool: send_message
-    on: ["gate.*", "verify.*", "change.archived"]
-    args: { chat_id: "-1001234567890" }
+    on: ["gate.*"]
+    args: { chat_id: "${TELEGRAM_CHAT_ID}" }
     message: text
+    include_note: true
 ```
 
 Chapter 11 shows the use cases.

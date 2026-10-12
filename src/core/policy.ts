@@ -124,6 +124,7 @@ const HUMAN_NAMES = HUMAN_COMMANDS.map((name) => name.replace(/ /g, '\\s+')).joi
 // Case-insensitive: `SDLC.CMD approve` runs the same command on Windows.
 const APPROVAL_COMMAND = new RegExp(`${CLI_BINARY}${GLOBAL_OPTIONS}\\s+(?:${HUMAN_NAMES})\\b`, 'i');
 const ADOPT_APPLY_COMMAND = new RegExp(`${CLI_BINARY}${GLOBAL_OPTIONS}\\s+adopt\\b[^;&|\\r\\n]*--apply\\b`, 'i');
+const INIT_ROLES_COMMAND = new RegExp(`${CLI_BINARY}${GLOBAL_OPTIONS}\\s+init\\b[^;&|\\r\\n]*--roles\\b`, 'i');
 
 /** Joins `\`-newline (sh) and backtick-newline (PowerShell) continuations, so a split command reads as one. */
 function joinContinuations(command: string): string {
@@ -222,7 +223,7 @@ function evaluateCommand(
     return { decision: 'deny', rule: 'agent-marker', reason: t('hook.agentMarker') };
   }
   if (ctx.config.enforcement.forbidAgentApprovals &&
-      (APPROVAL_COMMAND.test(cmd) || ADOPT_APPLY_COMMAND.test(cmd))) {
+      (APPROVAL_COMMAND.test(cmd) || ADOPT_APPLY_COMMAND.test(cmd) || INIT_ROLES_COMMAND.test(cmd))) {
     return {
       decision: 'deny',
       rule: 'separation-of-duties',

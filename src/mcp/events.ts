@@ -3,13 +3,15 @@ import { loadConfig, type SdlcConfig } from '../core/config.js';
 import { findProjectRoot, projectPaths } from '../core/project.js';
 import { withServer } from './client.js';
 import { receiverKey, type EventReceiver } from './event-config.js';
-import { eventMessage, peopleNames } from './event-message.js';
-import { readOutbox, settleQueued, type QueuedFile } from './outbox.js';
+import { eventMessage, peopleNames, withNote } from './event-message.js';
+import { readOutbox, settleQueued, type EventBody, type QueuedFile } from './outbox.js';
 import type { McpServer } from './registry.js';
 
 /**
  * Delivery of queued events (B45) with the MCP client: each receiver's tool is called with `{ ...args, event }`,
  * or, for a receiver with `message`, with `{ ...args, [message]: text }` and no `event` (the text of the queue).
+ * The note of a rejection or a rework goes only to a receiver with `include_note: true` (0.16.1): as `event.note`,
+ * or after the text (`<text> — <note>`); every other receiver gets exactly the event or the text, without it.
  * After a CLI command (not inside `sdlc hook`, not inside `sdlc mcp serve`) the whole delivery has 5 s; `sdlc events
  * flush` has no total limit and 10 s per call. A delivered event leaves the queue, anything else waits for the next
  * command. A failure is never an error and never changes the exit code; with SDLC_DEBUG set it is named on stderr.
@@ -76,11 +78,25 @@ function fillMessages(root: string, queued: QueuedFile[], receivers: EventReceiv
   for (const item of missing) item.item.message = eventMessage(item.item.event, names);
 }
 
-/** The tool's arguments: the static args and the event, or the static args and the text in the named argument. */
+/** The queued note for a receiver that opted in to it; undefined for every other receiver. */
+function noteOf(delivery: Delivery): string | undefined {
+  return delivery.receiver.includeNote === true ? delivery.queued.item.note : undefined;
+}
+
+/** The event a receiver gets: with `note` only when the receiver opted in and the queue has one. */
+function eventFor(event: EventBody, note: string | undefined): EventBody & { note?: string } {
+  return note ? { ...event, note } : event;
+}
+
+/**
+ * The tool's arguments: the static args and the event, or the static args and the text in the named argument;
+ * the note is added only for a receiver with `include_note`.
+ */
 function toolArguments(delivery: Delivery): Record<string, unknown> {
   const { receiver, queued } = delivery;
-  if (!receiver.message) return { ...receiver.args, event: queued.item.event };
-  return { ...receiver.args, [receiver.message]: queued.item.message ?? '' };
+  const note = noteOf(delivery);
+  if (!receiver.message) return { ...receiver.args, event: eventFor(queued.item.event, note) };
+  return { ...receiver.args, [receiver.message]: withNote(queued.item.message ?? '', note) };
 }
 
 async function deliverOne(client: Client, delivery: Delivery, ms: number): Promise<void> {

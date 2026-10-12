@@ -137,8 +137,9 @@ what the team's Telegram chat receives.
 
 - With `message: text`, sdlc sends one line of text, which a Telegram MCP server's `send_message` takes as it is.
   Without `message`, sdlc sends a structured `event`, and the server needs a tool that accepts it.
-- An event never carries an email, a note or command output. The rework note, for example, is not in
-  `gate.spec.rework`; the bot can link to `sdlc explain` instead.
+- Events omit emails and command output. Since 0.16.1, a receiver can opt into a masked, one-line rework or
+  rejection note with `include_note: true` (default off). The note is at most 200 characters; it appears as
+  `note` in an event or after the ready message text.
 - Events are sent by the CLI, not by the agent. But `telegram` is a registry server like the others, so it is also
   laid out for Claude Code, and a server without `stages` is not governed by the stage rule
   (`sdlc guide denials#mcp-stage`): the agent could post to the chat too. Give the bot server only the event tool.
@@ -1339,7 +1340,6 @@ Limitations observed in the sdlc 0.14.4 trial. Some were fixed later; see the ch
   gate.
 - QA has no gate of its own: Grace's acceptance of the evidence is not recorded by sdlc.
 - `${HEAD}` in `verify.mcp` is the head commit even when the evidence covers uncommitted changes.
-- Events never include the rework or rejection note, so the chat cannot say why a gate went back.
 - A server used only as an event receiver (`telegram`) is still laid out into the agents' MCP configuration, and a
   server without `stages` is not governed by the stage rule; there is no "CLI only" server.
 - The first `roles.yaml` commit that adds the maintainers' signing keys shows `bad-signature` (the previous version

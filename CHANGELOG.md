@@ -2,6 +2,14 @@
 
 All notable changes to sdlc. Versions follow [Semantic Versioning](https://semver.org/); while the major version is 0, a minor version may change behavior.
 
+## 0.16.1 — 2026-10-12
+
+### Added
+- `sdlc init --roles` creates or keeps the starter `openspec/roles.yaml`; only a person may run it.
+- `sdlc dashboard --watch` rebuilds on `openspec/` changes and can serve the page with auto-refresh.
+- `sdlc doctor --fix` repairs sdlc-owned files, hooks and a missing `REVIEW.md`, and lists manual work.
+- Event receivers can opt into masked rejection or rework notes with `include_note: true`.
+
 ## 0.16.0 — 2026-10-12
 
 ### Added

@@ -21,6 +21,7 @@ import { findProjectRoot } from '../core/project.js';
 import { runHook } from '../hook.js';
 import { LICENSE_TERMS, REQUIRED_NOTICE } from '../core/license.js';
 import { reportCommand } from '../commands/report.js';
+import { dashboardCommand } from '../commands/dashboard.js';
 import { layoutCommand } from '../commands/layout.js';
 import { deferAdd, deferClose, deferList } from '../commands/defer.js';
 import { trackSetCommand } from '../commands/track.js';
@@ -232,6 +233,7 @@ export function buildProgram(): Command {
     .option('--opsx', "also install OpenSpec's own /opsx workflows for the same tools")
     .option('--statusline', 'install the Claude Code status line')
     .option('--mcp', 'register sdlc as an MCP server for the chosen tools (mcp.serve in openspec/sdlc.yaml)')
+    .option('--roles', 'create a starter openspec/roles.yaml for the git identity (human only)')
     .option('--language <language>', 'artifact language for a new OpenSpec config')
     .option('--force', 'overwrite generated files even if edited locally')
     .option('--layout <action>', 'AI-ready documents: scaffold | adapt | worktree | none (default: none)')
@@ -496,8 +498,13 @@ export function buildProgram(): Command {
     .description(cmdDesc('cmd.dashboard'))
     .option('--since <date>', 'period start')
     .option('--change <id>', 'one change')
-    .option('--out <file>', 'write dashboard to file')
-    .action((opts) => reportCommand({ ...opts, format: 'html' }));
+    .option('--out <file>', 'write dashboard to file (with --watch the default is reports/dashboard.html)')
+    .option('--watch', 'keep the page up to date: rebuild it after changes under openspec/')
+    .option('--serve <host:port>', 'with --watch: serve the page with an auto-refresh (port 0 = any free port)')
+    .option('--debounce <ms>', 'with --watch: wait this many ms after the last change (default 1000)')
+    .option('--min-interval <ms>', 'with --watch: at least this many ms between two builds (default 5000)')
+    .option('--json', 'output JSON')
+    .action((opts) => dashboardCommand(opts));
 
   program
     .command('log')
@@ -520,6 +527,7 @@ export function buildProgram(): Command {
   program
     .command('doctor')
     .description(cmdDesc('cmd.doctor'))
+    .option('--fix', 'apply the fixes sdlc owns (generated files, its git hook, a starter REVIEW.md); list the rest')
     .option('--json', 'output JSON')
     .action((opts) => doctorCommand(opts));
 

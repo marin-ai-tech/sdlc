@@ -7,6 +7,9 @@ import { SdlcError } from '../core/errors.js';
  * Hook events (`hook.*`) reach a receiver only through a pattern that names them (`hook.denied`, `hook.*`).
  * With `message: <argument>` (0.15.0) the tool gets that argument set to a ready one-line text instead of `event`
  * (src/mcp/event-message.ts), for a plain send-message tool such as a chat bot's `send_message(chat_id, text)`.
+ * Events carry no note, unless a receiver opts in with `include_note: true` (0.16.1, default false): then that
+ * receiver, and only that one, gets the note of a rejection or a rework (`gate.<g>.rejected`, `gate.<g>.rework`),
+ * cleaned by src/mcp/outbox.ts. `include_note` must be true or false.
  */
 export interface EventReceiver {
   server: string;
@@ -17,6 +20,8 @@ export interface EventReceiver {
   args: Record<string, unknown>;
   /** The argument that takes a ready one-line message instead of `event`; absent = the event object. */
   message?: string;
+  /** Opt-in to the note of a rejection or a rework (`include_note: true`); absent = no note. */
+  includeNote?: boolean;
 }
 
 /** The events a receiver gets when its `on` is absent. */
@@ -60,17 +65,25 @@ function argumentName(value: unknown, where: string): string | undefined {
   return value;
 }
 
+function trueOrFalse(value: unknown, where: string): boolean | undefined {
+  if (value === undefined || value === null) return undefined;
+  if (typeof value !== 'boolean') throw invalid('error.x_must_be_true_or_false', where);
+  return value;
+}
+
 function parseReceiver(value: unknown, where: string, servers: string[]): EventReceiver {
   const raw = mapping(value, where) ?? {};
   const server = text(raw.server, `${where}.server`);
   if (!servers.includes(server)) throw invalid('error.events_unknown_server', `${where}.server`, { server });
   const message = argumentName(raw.message, `${where}.message`);
+  const includeNote = trueOrFalse(raw.include_note, `${where}.include_note`);
   return {
     server,
     tool: text(raw.tool, `${where}.tool`),
     on: patterns(raw.on, `${where}.on`),
     args: mapping(raw.args, `${where}.args`) ?? {},
     ...(message ? { message } : {}),
+    ...(includeNote ? { includeNote } : {}),
   };
 }
 

@@ -133,19 +133,16 @@ Build the HTML dashboard of a project and keep it fresh while the team works.
 
 4. Limit the page like the report: `sdlc dashboard --since 2026-10-01 --change add-task-list --out reports/x.html`.
 
-5. Keep the page current. `sdlc dashboard` has no read mode of its own. The sdlc repository ships an example script,
-   `scripts/examples/dashboard-read.mjs`, that read `openspec/` and rebuilds the page. It is not part of the
-   installed package, so Steven copies it from the sdlc repository into the team's tools folder:
+5. Keep the page current. Since 0.16.1, run `sdlc dashboard --watch` in the project folder. It builds
+   `reports/dashboard.html` and rebuilds it when `openspec/` changes. With `--serve`, it serves the page with
+   auto-refresh. Port 0 selects a free port. Stop it with Ctrl+C:
 
    ```bash
-   node dashboard-watch.mjs --once                          # build once and exit
-   node dashboard-watch.mjs                                 # watch openspec/ and rebuild
-   node dashboard-watch.mjs --serve 127.0.0.1:8123          # and serve the page with auto-refresh
+   sdlc dashboard --watch --serve 127.0.0.1:8123
    ```
 
-   Run it in the project folder. The default page is `reports/dashboard.html`. Each rebuild prints a line such as
-   `12:58:31 rebuilt reports/dashboard.html in 812 ms`. With `--serve`, open `http://127.0.0.1:8123/`: the page reloads
-   itself every 5 seconds. Stop it with Ctrl+C.
+   Open `http://127.0.0.1:8123/`. Use `--out <file>`, `--debounce <ms>` and `--min-interval <ms>` as needed.
+   The example `scripts/examples/dashboard-watch.mjs` remains an option for Windows Task Scheduler.
 
 6. Run it in the background. `scripts/examples/README.md` in the sdlc repository has a Windows Task Scheduler helper
    (`register-dashboard-task.ps1`), a `systemd --user` unit, a `launchd` agent and a CI step that keeps the page as a

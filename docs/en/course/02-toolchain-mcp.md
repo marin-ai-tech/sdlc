@@ -744,5 +744,4 @@ Things this scenario wanted that sdlc 0.14.4 does not do. One line each, for the
 10. The daily summary example only writes a file; sending it to a chat is outside sdlc.
 11. `sdlc mcp serve` is stdio only; no remote endpoint for a chat client on another machine.
 12. Context packs come only from local `docs/context/`; sdlc does not pull documents from the knowledge server.
-13. `sdlc init` with flags cannot create a starter `roles.yaml`; only the wizard (or `sdlc adopt --apply`) does.
-14. Doc gap: 10-integrations.md (10.1) lists six `sdlc mcp serve` tools; the server also has `guide`.
+13. Doc gap: 10-integrations.md (10.1) lists six `sdlc mcp serve` tools; the server also has `guide`.

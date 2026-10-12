@@ -145,6 +145,7 @@ export function shouldPrompt(opts: InitOptions, io: TerminalState): boolean {
   if (opts.json) return false;
   if (opts.layout !== undefined || opts.worktree !== undefined || opts.gitInit) return false;
   if (opts.mcp) return false;
+  if (opts.roles) return false;
   return true;
 }
 
