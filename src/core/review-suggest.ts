@@ -12,7 +12,8 @@ import { listActiveChanges, type ChangeRef } from './changes.js';
 import { SdlcError } from './errors.js';
 import { evaluateChange, sharedFingerprint } from './lifecycle.js';
 import {
-  approvalEmails, changeAuthors, checkApproval, readRolesFile, ROLES_PATH, type Person, type RolesFile,
+  approvalEmails, changeAuthors, checkApproval, personOwnsHandle, readRolesFile, ROLES_PATH,
+  type Person, type RolesFile,
 } from './roles.js';
 
 export interface ReviewCandidate {
@@ -98,7 +99,7 @@ function fileOwners(rules: OwnerRule[], file: string): string[] {
 }
 
 function ownsBy(person: Person, owner: string): boolean {
-  if (owner.startsWith('@')) return owner.slice(1).toLowerCase() === person.id.toLowerCase();
+  if (owner.startsWith('@')) return personOwnsHandle(person, owner);
   return person.emails.includes(owner.toLowerCase());
 }
 

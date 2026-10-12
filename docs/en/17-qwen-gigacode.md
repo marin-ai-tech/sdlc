@@ -1,5 +1,7 @@
 # 17. Qwen Code and GigaCode: setup, what is enforced, use cases
 
+`mcp-stage` checks MCP calls only when the tool reports `mcp__<server>__<tool>` or `<server>_<tool>`; these MCP tool names are not verified live.
+
 sdlc 0.14.1 supports Qwen Code (Alibaba) and GigaCode CLI (Sber) next to Claude Code, OpenCode, Cursor and Codex CLI.
 GigaCode CLI behaves as a fork of Qwen Code that keeps its files under `.gigacode/`, so one adapter serves both. The
 process is the same — the same workflows, subagents, gates and checks — and the tool's own hooks and deny rules hold

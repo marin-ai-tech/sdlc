@@ -29,6 +29,12 @@ function showRoles(draft: Draft): void {
   }
 }
 
+function showUnresolved(draft: Draft): void {
+  if (draft.owners_unresolved.length > 0) {
+    line(t('adopt.ownersUnresolved', { handles: draft.owners_unresolved.join(', ') }));
+  }
+}
+
 function showDraft(draft: Draft): void {
   line(t('adopt.heading'));
   line(t('adopt.stack', { value: draft.stack.map((entry) => entry.id).join(', ') || '-' }));
@@ -46,11 +52,13 @@ function showDraft(draft: Draft): void {
     line(t('adopt.person', { name: person.name, email: person.email }));
   }
   showRoles(draft);
+  showUnresolved(draft);
   line(t('adopt.apply', { command: draft.apply }));
 }
 
 function showApplied(draft: Draft, written: boolean): void {
   line(t(written ? 'adopt.applied' : 'adopt.unchanged'));
+  showUnresolved(draft);
   if (draft.proposal.roles.skip) {
     line(t('adopt.legacyRoles', { command: ROLES_MIGRATE }));
   }

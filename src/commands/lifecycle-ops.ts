@@ -6,10 +6,10 @@ import { c, line, printJson, reportFailure, warn } from '../cli/output.js';
 import { emitNextHint, resolveNext } from '../cli/next-hint.js';
 import { agentEnvironment } from '../core/agent-env.js';
 import { appendHistory, readChangeState, writeChangeState, type ChangeState, type HistoryEvent } from '../core/change-state.js';
-import { listActiveChanges, listArchivedChanges, resolveChange, type ChangeRef } from '../core/changes.js';
+import { listActiveChanges, resolveChange, type ChangeRef } from '../core/changes.js';
 import { checkDeltaTargets, findOverlaps, readChangeDeltas, type DeltaIssue } from '../core/deltas.js';
 import { SdlcError } from '../core/errors.js';
-import { commitsTouching, formatIdentity, gitIdentity } from '../core/git.js';
+import { formatIdentity, gitIdentity, type CommitInfo } from '../core/git.js';
 import { evaluateChange } from '../core/lifecycle.js';
 import { openspecFailure, runOpenSpecJson } from '../core/openspec.js';
 import { readOpenSpecMetadata } from '../core/openspec-schema.js';
@@ -20,6 +20,7 @@ import { filterLog } from '../core/log-filter.js';
 import { changeMarkdown, tryStampArtifacts } from '../core/stamp.js';
 import { aggregateMetrics, changeMetrics } from '../core/metrics.js';
 import { agentCommits } from '../core/agent-commits.js';
+import { auditChange, changesInPeriod, type ChangeAudit } from '../core/audit-change.js';
 import { changeLog } from '../core/awaiting.js';
 import {
   printChangeFlow, printChangeParticipation, printProjectFlow, printProjectParticipation,
@@ -259,98 +260,154 @@ function stampSuffix(event: HistoryEvent): string {
 }
 
 
+/** One commit line under the change's trail. */
+function printCommit(commit: CommitInfo): void {
+  line(`  ${commit.date}  ${commit.sha.slice(0, 10)}  ${commit.author}  ${commit.subject}`);
+}
+
+/** The commits touching the change folder and the agents' share of the change's commits (B104). */
+function printChangeCommits(audit: ChangeAudit, change: string): void {
+  if (audit.commits.length > 0) {
+    line(c.bold(`  ${t('audit.commits')}`));
+    for (const commit of audit.commits) printCommit(commit);
+  }
+  const share = audit.agentCommits;
+  line(`  ${t('audit.changeAgentCommits', { agent: share.agent, total: share.total, change })}`);
+}
+
+/** Lead times, verify runs, flow and participation of one change. */
+function printChangeMetrics(metrics: ReturnType<typeof changeMetrics>): void {
+  const lt = metrics.leadTimeHours;
+  line(c.bold(`  ${t('audit.leadTimes')}`));
+  line(`  ${t('audit.leadLine', {
+    a: lt.intentToSpecApproval ?? '-', b: lt.specToPlanApproval ?? '-',
+    c: lt.planToVerified ?? '-', d: lt.verifiedToReviewApproval ?? '-',
+    e: lt.createdToArchived ?? '-',
+  })}`);
+  const first = metrics.verifyFirstPass === undefined ? ''
+    : metrics.verifyFirstPass ? t('audit.firstPassed') : t('audit.firstFailed');
+  line(`  ${t('audit.verifyRuns', {
+    runs: metrics.verifyRuns, first, rejections: metrics.rejections, waivers: metrics.waivers,
+    policy: metrics.policyWaivers,
+  })}`);
+  printChangeFlow(metrics);
+  printChangeParticipation(metrics.participation);
+}
+
+/** `sdlc audit --change <id> [--since <date>]`: the trail of one change, active or archived. */
+function auditOneChange(ctx: ProjectContext, id: string, since: string | undefined, json?: boolean): void {
+  const ref = resolveChange(ctx.paths, id, { allowArchived: true });
+  const audit = auditChange(ctx.paths, ref, since);
+  const state = audit.state;
+  const metrics = changeMetrics(state, changeLog(readLog(ctx.root), ref.id), ctx.config);
+  if (json) {
+    printJson({
+      change: ref.id, archived: ref.archived, kind: state.kind, risk: state.risk, track: state.track,
+      source: state.source, ...(state.harness ? { recordedWith: state.harness } : {}), ...(since ? { since } : {}),
+      history: audit.history, commits: audit.commits, agentCommits: audit.agentCommits, metrics, harness: ctx.stamp,
+    });
+    return;
+  }
+  line(c.bold(t('audit.trail', { change: ref.id }))
+    + c.dim(t('audit.meta', { kind: state.kind, risk: state.risk, track: state.track })));
+  if (since) line(`  ${t('audit.period', { since })}`);
+  for (const h of audit.history) {
+    line(`  ${h.at}  ${h.event.padEnd(26)} ${h.by ?? ''}${h.detail ? c.dim(` - ${h.detail}`) : ''}${stampSuffix(h)}`);
+  }
+  printChangeCommits(audit, ref.id);
+  printChangeMetrics(metrics);
+}
+
+/** The per-change rows of the project audit and the sdlc versions and licenses their histories recorded. */
+function projectRows(ctx: ProjectContext, refs: ChangeRef[]) {
+  const versions = new Set<string>();
+  const licenses = new Set<string>();
+  const log = readLog(ctx.root);
+  const rows = refs.map((ref) => {
+    const state = readChangeState(ref.dir);
+    for (const h of state.history) {
+      if (h.sdlc) versions.add(h.sdlc);
+      if (h.license) licenses.add(h.license);
+    }
+    const metrics = changeMetrics(state, changeLog(log, ref.id), ctx.config);
+    return { change: ref.id, archived: ref.archived, kind: state.kind, track: state.track, ...metrics };
+  });
+  return { rows, versions: [...versions].sort(), licenses: [...licenses].sort() };
+}
+
+type ProjectAudit = ReturnType<typeof projectRows>;
+
+/** The aggregate over the rows; `since` (B104) limits the agents' commits to the period. */
+function projectAggregate(ctx: ProjectContext, audit: ProjectAudit, since: string | undefined) {
+  const rows = audit.rows;
+  return {
+    changes: rows.length,
+    archived: rows.filter((r) => r.archived).length,
+    ...aggregateMetrics(rows),
+    /** Commits reachable from HEAD and those made in agent sessions (`SDLC-Agent:` trailer, B24). */
+    agentCommits: agentCommits(ctx.root, since),
+    /** sdlc versions and licenses recorded in the change histories. */
+    recordedWith: { versions: audit.versions, licenses: audit.licenses },
+  };
+}
+
+/** The text of the project audit. */
+function printProjectAudit(
+  ctx: ProjectContext, audit: ProjectAudit, aggregate: ReturnType<typeof projectAggregate>, since: string | undefined,
+): void {
+  line(c.bold(t('audit.metrics', {
+    changes: aggregate.changes, archived: aggregate.archived,
+  })) + c.dim(` · ${stampTextLocalized(ctx.stamp)}`));
+  if (since) line(`  ${t('audit.period', { since })}`);
+  const m = aggregate.medianLeadTimeHours;
+  line(`  ${t('audit.medianHours', {
+    a: m.intentToSpecApproval ?? '-', b: m.specToPlanApproval ?? '-',
+    c: m.planToVerified ?? '-', d: m.verifiedToReviewApproval ?? '-',
+    e: m.createdToArchived ?? '-',
+  })}`);
+  line(`  ${t('audit.firstPassRate', {
+    rate: aggregate.verifyFirstPassRate ?? '-',
+    rejections: aggregate.rejections, waivers: aggregate.waivers, policy: aggregate.policyWaivers,
+  })}`);
+  const commits = aggregate.agentCommits;
+  line(`  ${t('audit.agentCommits', { agent: commits.agent, total: commits.total })}`);
+  printProjectFlow(aggregate);
+  printProjectParticipation(audit.rows, aggregate.participation);
+  if (audit.versions.length > 0) {
+    line(`  ${t('audit.recordedWith', {
+      versions: audit.versions.join(', '),
+      licenses: audit.licenses.join('; '),
+    })}`);
+  }
+}
+
+/** `sdlc audit [--since <date>]`: the metrics across the changes (B104: those with history in the period). */
+function auditProject(ctx: ProjectContext, since: string | undefined, json?: boolean): void {
+  const audit = projectRows(ctx, changesInPeriod(ctx.paths, since));
+  const aggregate = projectAggregate(ctx, audit, since);
+  if (json) {
+    printJson({ ...(since ? { since } : {}), aggregate, changes: audit.rows, harness: ctx.stamp });
+    return;
+  }
+  printProjectAudit(ctx, audit, aggregate, since);
+}
+
 export async function auditCommand(opts: { change?: string; json?: boolean } & AuditExportOptions): Promise<void> {
-  // B21: --export (and --since, which only works with it) writes the evidence bundle instead of the audit.
-  if (opts.export !== undefined || opts.since !== undefined) return auditExportCommand(opts);
+  // B21: --export writes the evidence bundle instead of the audit; --since then limits the bundle.
+  if (opts.export !== undefined) return auditExportCommand(opts);
   try {
     const ctx = loadProject();
+    // B104: without --export, --since is the audit for the period.
+    const since = parseSince(opts.since);
     if (opts.change) {
-      const ref = resolveChange(ctx.paths, opts.change, { allowArchived: true });
-      const state = readChangeState(ref.dir);
-      const commits = commitsTouching(ctx.root, [path.relative(ctx.root, ref.dir)]);
-      const metrics = changeMetrics(state, changeLog(readLog(ctx.root), ref.id), ctx.config);
-      if (opts.json) {
-        printJson({ change: ref.id, archived: ref.archived, kind: state.kind, risk: state.risk, track: state.track, source: state.source,
-          ...(state.harness ? { recordedWith: state.harness } : {}), history: state.history, commits, metrics, harness: ctx.stamp });
-        return;
-      }
-      line(c.bold(t('audit.trail', { change: ref.id }))
-        + c.dim(t('audit.meta', { kind: state.kind, risk: state.risk, track: state.track })));
-      for (const h of state.history) {
-        line(`  ${h.at}  ${h.event.padEnd(26)} ${h.by ?? ''}${h.detail ? c.dim(` - ${h.detail}`) : ''}${stampSuffix(h)}`);
-      }
-      if (commits.length > 0) {
-        line(c.bold(`  ${t('audit.commits')}`));
-        for (const cm of commits) line(`  ${cm.date}  ${cm.sha.slice(0, 10)}  ${cm.author}  ${cm.subject}`);
-      }
-      const lt = metrics.leadTimeHours;
-      line(c.bold(`  ${t('audit.leadTimes')}`));
-      line(`  ${t('audit.leadLine', {
-        a: lt.intentToSpecApproval ?? '-', b: lt.specToPlanApproval ?? '-',
-        c: lt.planToVerified ?? '-', d: lt.verifiedToReviewApproval ?? '-',
-        e: lt.createdToArchived ?? '-',
-      })}`);
-      const first = metrics.verifyFirstPass === undefined ? ''
-        : metrics.verifyFirstPass ? t('audit.firstPassed') : t('audit.firstFailed');
-      line(`  ${t('audit.verifyRuns', {
-        runs: metrics.verifyRuns, first, rejections: metrics.rejections, waivers: metrics.waivers,
-        policy: metrics.policyWaivers,
-      })}`);
-      printChangeFlow(metrics);
-      printChangeParticipation(metrics.participation);
+      auditOneChange(ctx, opts.change, since, opts.json);
       return;
     }
-    const refs = [...listActiveChanges(ctx.paths), ...listArchivedChanges(ctx.paths)];
-    const versions = new Set<string>();
-    const licenses = new Set<string>();
-    const log = readLog(ctx.root);
-    const rows = refs.map((ref) => {
-      const state = readChangeState(ref.dir);
-      for (const h of state.history) {
-        if (h.sdlc) versions.add(h.sdlc);
-        if (h.license) licenses.add(h.license);
-      }
-      const metrics = changeMetrics(state, changeLog(log, ref.id), ctx.config);
-      return { change: ref.id, archived: ref.archived, kind: state.kind, track: state.track, ...metrics };
-    });
-    const aggregate = {
-      changes: rows.length,
-      archived: rows.filter((r) => r.archived).length,
-      ...aggregateMetrics(rows),
-      /** Commits reachable from HEAD and those made in agent sessions (`SDLC-Agent:` trailer, B24). */
-      agentCommits: agentCommits(ctx.root, opts.since),
-      /** sdlc versions and licenses recorded in the change histories. */
-      recordedWith: { versions: [...versions].sort(), licenses: [...licenses].sort() },
-    };
-    if (opts.json) return printJson({ aggregate, changes: rows, harness: ctx.stamp });
-    line(c.bold(t('audit.metrics', {
-      changes: aggregate.changes, archived: aggregate.archived,
-    })) + c.dim(` · ${stampTextLocalized(ctx.stamp)}`));
-    const m = aggregate.medianLeadTimeHours;
-    line(`  ${t('audit.medianHours', {
-      a: m.intentToSpecApproval ?? '-', b: m.specToPlanApproval ?? '-',
-      c: m.planToVerified ?? '-', d: m.verifiedToReviewApproval ?? '-',
-      e: m.createdToArchived ?? '-',
-    })}`);
-    line(`  ${t('audit.firstPassRate', {
-      rate: aggregate.verifyFirstPassRate ?? '-',
-      rejections: aggregate.rejections, waivers: aggregate.waivers, policy: aggregate.policyWaivers,
-    })}`);
-    const commits = aggregate.agentCommits;
-    line(`  ${t('audit.agentCommits', { agent: commits.agent, total: commits.total })}`);
-    printProjectFlow(aggregate);
-    printProjectParticipation(rows, aggregate.participation);
-    if (versions.size > 0) {
-      line(`  ${t('audit.recordedWith', {
-        versions: [...versions].sort().join(', '),
-        licenses: [...licenses].sort().join('; '),
-      })}`);
-    }
+    auditProject(ctx, since, opts.json);
   } catch (error) {
     reportFailure(error, opts.json);
   }
 }
-
 interface LogOptions {
   change?: string;
   event?: string;

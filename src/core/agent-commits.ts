@@ -12,12 +12,40 @@ export interface AgentCommits {
 const RECORD = '\x1e';
 const FIELD = '\x1f';
 const FORMAT = '--format=%x1e%ct%x1f%(trailers:key=SDLC-Agent,valueonly,separator=%x2c)';
+const CHANGE_FORMAT = '--format=%x1e%ct'
+  + '%x1f%(trailers:key=SDLC-Agent,valueonly,separator=%x2c)'
+  + '%x1f%(trailers:key=SDLC-Change,valueonly,separator=%x2c)';
 
 /** The period start in epoch milliseconds; undefined for no (or an unreadable) start. */
 function sinceMs(since: string | undefined): number | undefined {
   if (since === undefined) return undefined;
   const at = Date.parse(since);
   return Number.isFinite(at) ? at : undefined;
+}
+
+/** One `git log` over HEAD in `format`, split into records of fields; undefined outside a repository. */
+function logRecords(root: string, format: string): string[][] | undefined {
+  const result = git(root, ['log', format, 'HEAD', '--']);
+  if (!result.ok) return undefined;
+  return result.stdout.split(RECORD).slice(1).map((record) => record.split(FIELD));
+}
+
+/** True when the commit time (epoch seconds) is at or after the period start (or there is no start). */
+function inPeriod(seconds: string | undefined, start: number | undefined): boolean {
+  if (start === undefined) return true;
+  return Number(seconds) * 1000 >= start;
+}
+
+/** The values of one trailer field (comma-separated by the format), trimmed. */
+function trailerValues(field: string | undefined): string[] {
+  const values = (field ?? '').split(',').map((value) => value.trim());
+  return values.filter((value) => value !== '');
+}
+
+/** Counts the records and how many of them name an agent (the second field). */
+function countAgent(records: string[][]): AgentCommits {
+  const agent = records.filter(([, agents]) => trailerValues(agents).length > 0).length;
+  return { total: records.length, agent };
 }
 
 /**
@@ -27,11 +55,22 @@ function sinceMs(since: string | undefined): number | undefined {
  * counts are 0.
  */
 export function agentCommits(root: string, since?: string): AgentCommits {
-  const result = git(root, ['log', FORMAT, 'HEAD', '--']);
-  if (!result.ok) return { total: 0, agent: 0 };
+  const records = logRecords(root, FORMAT);
+  if (!records) return { total: 0, agent: 0 };
   const start = sinceMs(since);
-  const records = result.stdout.split(RECORD).slice(1).map((record) => record.split(FIELD));
-  const inPeriod = records.filter(([seconds]) => start === undefined || Number(seconds) * 1000 >= start);
-  const agent = inPeriod.filter(([, trailers]) => (trailers ?? '').trim() !== '').length;
-  return { total: inPeriod.length, agent };
+  return countAgent(records.filter(([seconds]) => inPeriod(seconds, start)));
+}
+
+/**
+ * B104: the agents' share of one change's commits - the commits reachable from HEAD whose `SDLC-Change:` trailer
+ * is exactly `change`, and how many of them also have `SDLC-Agent:`. With `since`, only those at or after it.
+ */
+export function changeAgentCommits(root: string, change: string, since?: string): AgentCommits {
+  const records = logRecords(root, CHANGE_FORMAT);
+  if (!records) return { total: 0, agent: 0 };
+  const start = sinceMs(since);
+  const ofChange = records.filter(([seconds, , changes]) => {
+    return inPeriod(seconds, start) && trailerValues(changes).includes(change);
+  });
+  return countAgent(ofChange);
 }

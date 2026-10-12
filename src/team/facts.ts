@@ -82,7 +82,10 @@ function packs(root: string, stages: StageConfigId[]): string[] {
 
 function servers(config: SdlcConfig, stages: StageConfigId[]): string[] {
   const wanted: readonly string[] = stages;
-  const own = (config.mcp?.servers ?? []).filter((server) => server.stages.some((stage) => wanted.includes(stage)));
+  const own = (config.mcp?.servers ?? []).filter((server) => {
+    if (!server.agents) return false;
+    return server.stages.some((stage) => wanted.includes(stage));
+  });
   return own.map((server) => server.name);
 }
 

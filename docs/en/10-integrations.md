@@ -37,6 +37,7 @@ Any other MCP client starts the same command over stdio in the project folder. T
 | `trace` | `change` | `sdlc trace <change> --json` |
 | `audit` | `change?` | `sdlc audit [--change] --json` |
 | `help` | `topic?` | `sdlc help [topic] --json` |
+| `guide` | `topic?` | `sdlc guide [topic] --json` |
 
 Each tool runs the CLI command as a separate process and returns its JSON both as structured content and as text. A failed command becomes a tool error carrying the CLI's error code. An argument that the CLI would read as an option (one starting with `-`) is refused.
 
@@ -74,6 +75,13 @@ mcp:
 Qwen Code and GigaCode get the same servers under `mcpServers` in `.qwen/settings.json` or `.gigacode/settings.json`: stdio as `{ command, args, env }`, http as `{ httpUrl, headers }`, secrets as `${VAR}`, which the tools expand.
 
 sdlc remembers which entries it wrote. A server removed from the registry disappears on the next `update`, and a server someone added by hand is never touched.
+
+Since 0.16.2, set `agents: false` on a registry server used only by the CLI, such as an event receiver or a
+verification or release check target. The default is `true`. The CLI can still call it for events, checks and
+`sdlc mcp check`, but sdlc omits it from agent MCP settings and stage workflow text. If you change an existing
+server to `agents: false`, `sdlc update` removes entries sdlc wrote in `.mcp.json`, `opencode.json`,
+`.cursor/mcp.json` and `.codex/config.toml`; entries added by a person stay. `stages: []` still means the
+`mcp-stage` rule does not check it; use `agents: false` to keep the server away from agents.
 
 **Secrets only as references.** A literal key or token in `env` or `headers` is a configuration error (`mcp_secret_literal`). Nothing is written, and the message names the server and the key, never the value.
 
@@ -169,7 +177,12 @@ A workflow ends with a short **Stage resources** section listing its stage's ski
 
 The list is guidance for the agent. The servers are also enforced:
 
-`stages` in the registry say when a server may be used. The Claude Code hook now also sees MCP tools (`mcp__<server>__<tool>`), and the OpenCode plugin sees `<server>_<tool>`. The hooks of Cursor, Codex CLI, Qwen Code and GigaCode check a tool by the same names; Cursor's tool name does not always say the server, and then the call is not checked by stage (see [15.4](15-cursor.md#154-limits-we-accept)). A call to a registry server is checked against the stages of the active changes. If its `stages` include none of them, rule `mcp-stage` applies: the call is denied in `block` mode and the agent is reminded in `warn` mode.
+`stages` in the registry say when a server may be used. The `mcp-stage` rule recognizes Claude Code tool names
+`mcp__<server>__<tool>` and OpenCode names `<server>_<tool>`. Cursor is checked when it reports the former form;
+a bare tool name is not checked by stage (see [15.4](15-cursor.md#154-limits-we-accept)). Codex CLI, Qwen Code
+and GigaCode send every tool call to sdlc's hook, but their MCP tool names are not verified live. For these tools,
+`mcp-stage` applies only when the reported name has one of the two recognized forms. A call to a registry server
+outside the active changes' stages is denied in `block` mode and reminded in `warn` mode.
 
 These are not checked:
 

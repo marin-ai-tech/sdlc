@@ -2,6 +2,21 @@
 
 All notable changes to sdlc. Versions follow [Semantic Versioning](https://semver.org/); while the major version is 0, a minor version may change behavior.
 
+## 0.16.2 — 2026-10-12
+
+### Added
+- Registry servers can set `agents: false` to serve the CLI without being added to agent MCP settings or workflows.
+  Turning it on removes sdlc's entries and keeps entries added by a person. The default is `true`.
+- `sdlc audit --since <date>` filters the plain audit; archived change audits include active-period commits and
+  `agentCommits: { agent, total }` for commits with that change's `SDLC-Change` trailer.
+- Personal CODEOWNERS handles in `roles.yaml` resolve for reviewer suggestions and adoption drafts; adoption text
+  names unresolved handles.
+
+### Docs
+- List all seven `sdlc mcp serve` tools, including `guide`.
+- Explain where `mcp-stage` recognizes MCP tool names and where live tool names remain unverified.
+- Document the signed `roles.yaml` key bootstrap and the verification output observed in a temporary repository.
+
 ## 0.16.1 — 2026-10-12
 
 ### Added

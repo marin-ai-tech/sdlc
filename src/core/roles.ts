@@ -38,6 +38,8 @@ export interface Person {
   name: string;
   /** Lower-cased. */
   emails: string[];
+  /** GitHub personal handles, lower-cased and without `@`. */
+  handles: string[];
   /** An `ssh-…` public key (or a GPG key id) used to sign approval commits. */
   signingKey?: string;
 }
@@ -112,6 +114,20 @@ function strings(value: unknown, file: string, field: string): string[] {
   return value as string[];
 }
 
+function parseHandles(value: unknown, file: string, id: string): string[] {
+  if (value === undefined) return [];
+  const field = `people.${id}.handles`;
+  if (!Array.isArray(value)) invalid(file, field, 'must be a list of personal handles');
+  return value.map((item) => {
+    if (typeof item !== 'string') invalid(file, field, 'must contain strings');
+    const handle = item.replace(/^@/, '');
+    if (!/^[A-Za-z0-9][A-Za-z0-9-]{0,38}$/.test(handle)) {
+      invalid(file, field, `invalid personal handle ${item}`);
+    }
+    return handle.toLowerCase();
+  });
+}
+
 function gates(value: unknown, file: string, field: string): ApprovalGateId[] {
   return strings(value, file, field).map((gate) => {
     if (!(APPROVAL_GATES as readonly string[]).includes(gate)) invalid(file, field, `unknown gate ${gate}`);
@@ -141,6 +157,7 @@ function parsePeople(value: unknown, file: string): Person[] {
     const item = mapping(value, file, `people.${id}`);
     if (typeof item.name !== 'string' || !item.name.trim()) invalid(file, `people.${id}.name`, 'required');
     const emails = strings(item.emails, file, `people.${id}.emails`).map((email) => email.toLowerCase());
+    const handles = parseHandles(item.handles, file, id);
     if (!emails.length) invalid(file, `people.${id}.emails`, 'required');
     for (const email of emails) {
       if (seen.has(email)) invalid(file, `people.${id}.emails`, `duplicate email ${email}`);
@@ -149,7 +166,7 @@ function parsePeople(value: unknown, file: string): Person[] {
     if (item.signing_key !== undefined && typeof item.signing_key !== 'string') {
       invalid(file, `people.${id}.signing_key`, 'must be a string');
     }
-    return { id, name: item.name as string, emails,
+    return { id, name: item.name as string, emails, handles,
       ...(item.signing_key ? { signingKey: item.signing_key as string } : {}) };
   });
   return people;
@@ -205,6 +222,12 @@ export function readRolesFile(root: string): RolesFile | undefined {
 /** The person owning an email (case-insensitive), if any. */
 export function personByEmail(roles: RolesFile, email: string): Person | undefined {
   return roles.people.find((person) => person.emails.includes(email.toLowerCase()));
+}
+
+/** Whether a CODEOWNERS personal handle names this person. */
+export function personOwnsHandle(person: Person, owner: string): boolean {
+  const handle = owner.replace(/^@/, '').toLowerCase();
+  return person.id.toLowerCase() === handle || person.handles.includes(handle);
 }
 
 /** Applies the role and separation rules to one approval attempt. Pure. */

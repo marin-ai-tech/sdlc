@@ -17,7 +17,7 @@ signing: warn                 # off | warn | required
 people:
   alice: { name: Alice Walker, emails: [alice@corp.example], signing_key: "ssh-ed25519 AAAA… alice@corp" }
   bob:   { name: Bob Turner,   emails: [bob@corp.example],   signing_key: "ssh-ed25519 AAAA… bob@corp" }
-  carol: { name: Carol Hughes, emails: [carol@corp.example] }
+  carol: { name: Carol Hughes, emails: [carol@corp.example], handles: [carol-s] }
 roles:
   product-owner: [alice]
   release-manager: [alice]
@@ -32,6 +32,10 @@ separation:
 ```
 
 - **people**: a stable id, a name, one or more emails (matched case-insensitively), and optionally the public SSH key the person signs commits with. An email belongs to one person only.
+- Since 0.16.2, `handles` lists GitHub personal handles, with or without `@` and matched case-insensitively.
+  CODEOWNERS `@carol-s` then resolves to Carol in `sdlc review suggest` and the adoption draft. A handle equal
+  to the person id also matches. Team handles such as `org/team` are refused. `sdlc adopt` text and JSON both
+  list handles it could not resolve.
 - **roles**: role names from the gates in `sdlc.yaml` (`approvers`, `high_risk_approvers`) and the people who hold them. `maintainer` is the role that may change this file.
 - **separation** (the defaults are shown):
   - `author_cannot_approve`: gates the authors of the change's code may not approve. Authors are the commit authors and `Co-authored-by` trailers on the branch since the review base, counting only files outside `openspec/`.
@@ -86,6 +90,20 @@ git config commit.gpgsign true
 ```
 
 Then put the public key into `signing_key` in `roles.yaml` (a maintainer commits that change).
+
+Bootstrap the keys before requiring signatures. In a temporary two-person repository, these steps were checked:
+
+1. Commit `roles.yaml` with Alice as maintainer, Alice and Bob as people, no `signing_key` fields, and `signing: off`.
+2. Generate each person's SSH key with `ssh-keygen -q -t ed25519 -N '' -C <email> -f <key>`.
+3. Add both public keys to `signing_key`. Alice signs that commit with `git -c gpg.format=ssh
+   -c user.signingkey=<alice.pub> commit -S -m 'add signing keys'`.
+4. Change to `signing: warn` in another Alice-signed commit. Run `sdlc approvals verify` and review the findings.
+
+The observed text was `valid` for the `signing: warn` commit, `bad-signature` for the signed key-adding
+commit, and `unsigned` for the initial roles commit. It ended with
+`0 approvals checked, 2 invalid (warn: not blocking)` and exited 0. The JSON had `mode: "warn"`, `ok: false`
+and the same three statuses. The key-adding commit cannot verify against the preceding version, which has
+no keys. Record this expected bootstrap finding; require signatures in CI after the bootstrap is reviewed.
 
 The approver commits their own approval: `sdlc approve …`, then `git commit -S`.
 

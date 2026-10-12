@@ -6,7 +6,7 @@ import { APPROVAL_GATES, saveConfig, type SdlcConfig, type VerifyCommand } from 
 import { isFile, isWithin, listFilesRecursive, readText } from './fs-utils.js';
 import { formatIdentity, git, gitIdentity } from './git.js';
 import { appendLog } from './log.js';
-import { DEFAULT_SEPARATION, ROLES_PATH } from './roles.js';
+import { DEFAULT_SEPARATION, personOwnsHandle, readRolesFile, ROLES_PATH } from './roles.js';
 import { detectVerifyCommands } from './verify.js';
 import { writeYaml } from './yaml-io.js';
 
@@ -155,13 +155,17 @@ function noteOwner(people: Map<string, AdoptPerson>, email: string): void {
 
 function addOwners(root: string, people: Map<string, AdoptPerson>): CodeOwners {
   const paths = CODEOWNERS.filter((file) => safeFile(root, file));
+  const roles = readRolesFile(root);
   const unresolved = new Set<string>();
   const catchAll = new Set<string>();
   const scoped = new Map<string, Set<string>>();
   for (const row of ownerRows(root, paths)) {
     for (const owner of row.owners) {
-      if (owner.startsWith('@')) unresolved.add(owner);
-      else noteOwner(people, owner);
+      if (owner.startsWith('@')) {
+        if (!roles?.people.some((person) => personOwnsHandle(person, owner))) unresolved.add(owner);
+      } else {
+        noteOwner(people, owner);
+      }
       if (CATCH_ALL.has(row.pattern)) {
         catchAll.add(owner);
       } else {

@@ -3,9 +3,10 @@ import type { StageConfigId } from '../core/stage-config.js';
 import type { RoleFile } from '../team/role-file.js';
 
 /**
- * Stage resources in the generated workflows (B14). A workflow of a stage ends with the skills, subagents and MCP
+ * Stage resources in the generated workflows (B14, B97). A workflow of a stage ends with the skills, subagents and MCP
  * servers of that stage, and nothing from other stages; the Claude Code skill and command pre-allow that stage's MCP
  * tools. Skills and subagents come from `stages.<stage>`, MCP servers from the registry's `stages` (one source).
+ * CLI-only servers (`agents: false`) are omitted from these agent-facing lists.
  * A workflow without a stage, or a stage with nothing configured, renders exactly as before.
  */
 const WORKFLOW_STAGE: Record<string, StageConfigId> = {
@@ -44,7 +45,9 @@ export function stageResources(
   const stage = WORKFLOW_STAGE[workflow];
   if (!stage) return undefined;
   const own = config.stages[stage];
-  const servers = (config.mcp?.servers ?? []).filter((s) => s.stages.includes(stage)).map((s) => s.name);
+  const servers = (config.mcp?.servers ?? [])
+    .filter((s) => s.agents && s.stages.includes(stage))
+    .map((s) => s.name);
   const skills = own?.skills ?? [];
   const agents = stageAgents(own?.agents ?? [], stage, team);
   if (skills.length + agents.length + servers.length === 0) return undefined;

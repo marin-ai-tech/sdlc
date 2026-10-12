@@ -360,8 +360,10 @@ every change to `roles.yaml` is signed by a maintainer. Check it locally and in 
 
 ### Pitfalls
 
-- The commit that first adds the maintainers' keys cannot be verified: the version before it has no keys, so it
-  shows `bad-signature`. Plan this first commit and record why it is expected.
+- Since 0.16.2, bootstrap with `signing: off` and no keys, then a signed key-adding commit and a
+  separate signed `signing: warn` commit. The observed results were `bad-signature` for the key
+  commit, `unsigned` for the initial commit and `valid` for the last commit; the summary said
+  `2 invalid (warn: not blocking)`. Record and review the expected bootstrap findings.
 - Commit the change folder after `sdlc archive`. Since 0.15.4, approvals committed while the change was active keep
   their status before the archive move is committed.
 - With `signing: off`, `sdlc approvals verify` prints "Approval signing is off." and checks nothing. Use

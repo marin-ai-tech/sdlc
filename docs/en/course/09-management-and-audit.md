@@ -390,12 +390,10 @@ waits per gate, reworks, people's participation and the agents' share of commits
 
 ### Pitfalls
 
-- `sdlc audit --since` alone fails: `--since works only together with --export <dir>.` The plain audit always covers
-  all time. For a period, use `sdlc report --since` (Lesson 9.1) or the export (Lesson 9.6).
+- Since 0.16.2, `sdlc audit --since <date>` filters the plain audit for that period.
 - The agents' share counts only commits made in an agent's terminal. A person who commits what an agent wrote makes a
-  person's commit. The share is for the whole project; the audit of one change does not show it.
-- For an archived change, the "commits touching the change folder" list shows only the commits after the folder moved
-  to `openspec/changes/archive/`. Use `sdlc trace` (Lesson 9.5) for the commits of each task.
+  person's commit. `--change` shows the share for that change's commits.
+- An archived change audit also lists commits made while it was active; `--since` limits them.
 - Waits are measured from `gate.<g>.awaiting` to the decision. The log records `gate.<g>.awaiting` when a command
   (for example `sdlc status`, `sdlc next` or the approval itself) first sees the gate ready for a person. If nobody
   looks at the project for a day, the wait looks shorter than it was.

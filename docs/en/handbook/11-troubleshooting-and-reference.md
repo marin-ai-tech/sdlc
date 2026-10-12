@@ -301,7 +301,6 @@ Find out why a change is stuck and unblock it: open questions, a stale approval,
 | The agent is paused everywhere | a person took a change over that has no plan.md | the person runs `sdlc release-control --change <id> --note "…"` |
 | Plan drift says every planned file is untouched | you commit on the base branch itself (the default base is `origin/HEAD`, then `main`, then `master`) | work on a branch, or set `review.base` |
 | `--out must stay inside the project` | `sdlc report` or `sdlc dashboard` with an outside path | write inside the project (and ignore it), or redirect: `sdlc report > ../file.md` |
-| `--since works only together with --export` | `sdlc audit --since` without `--export` | use `sdlc report --since`, or add `--export <dir>` |
 | The audit export is refused | the folder exists and is not empty, or it is inside `openspec/` | choose a new folder outside the repository |
 | Events never arrive | the receiver's server is unreachable, or the tool rejects the `event` argument | `sdlc events list`; `sdlc mcp check`; `sdlc events flush` |
 | `mcp_secret_literal` | a literal token in `mcp.servers` | write `${VAR}` and keep the value in the environment |
@@ -533,12 +532,6 @@ What this handbook needed and sdlc 0.14.4 does not offer, or does differently fr
   summary" event.
 - `sdlc mcp serve` has no `health`, `report` or `explain` tool, so a portfolio view of health over MCP is not possible;
   it needs the CLI per repository.
-- `sdlc audit --since` works only with `--export`; the plain audit has no period filter for its metrics.
-- After a change is archived, `sdlc audit --change <id>` lists only the commits after the folder moved ("commits
-  touching the change folder" does not follow the rename).
-- The agents' share of commits is project-wide only; there is no per-change or per-tool share in `sdlc audit`.
-- The documentation does not say whether the `mcp-stage` rule works in Codex CLI, Qwen Code and GigaCode (it names
-  Claude Code, OpenCode and Cursor tool names only).
 - `sdlc guide denials` says "The Claude Code hook and the OpenCode plugin check every edit"; it does not mention Cursor,
   Codex, Qwen Code and GigaCode, which apply the same rules.
 - The health thresholds can be set only in `openspec/sdlc.yaml`.

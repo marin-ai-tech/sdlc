@@ -54,8 +54,14 @@ export function runCli(args: string[], cwd: string, env: NodeJS.ProcessEnv, inpu
   };
 }
 
+/**
+ * Runs git as a person. The agent markers of whoever runs the tests (an agent's shell) are removed: after `sdlc init`
+ * the prepare-commit-msg hook would otherwise mark the tests' own commits `SDLC-Agent: …` (0.16.2).
+ */
 export function git(cwd: string, args: string[]): void {
-  const r = spawnSync('git', args, { cwd, encoding: 'utf-8' });
+  const env: NodeJS.ProcessEnv = { ...process.env };
+  for (const key of AGENT_VARS) delete env[key];
+  const r = spawnSync('git', args, { cwd, encoding: 'utf-8', env });
   if (r.status !== 0) throw new Error(`git ${args.join(' ')} failed: ${r.stderr}`);
 }
 

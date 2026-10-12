@@ -1,5 +1,7 @@
 # 16. Codex CLI: setup, what is enforced, use cases
 
+`mcp-stage` checks MCP calls only when Codex reports `mcp__<server>__<tool>` or `<server>_<tool>`; Codex's MCP tool names are not verified live.
+
 sdlc 0.14.0 supports OpenAI's Codex CLI as a fourth tool next to Claude Code, OpenCode and Cursor. The process is the
 same — the same workflows, subagents, gates and checks — and Codex's own hooks and command rules hold the gates.
 It was checked live against codex-cli 0.158.0 on Windows.

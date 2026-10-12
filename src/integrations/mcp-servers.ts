@@ -10,8 +10,9 @@ import { readJson, servers as serverMap, writeJson } from './mcp-config.js';
 import type { ToolId } from './types.js';
 
 /**
- * Lays out the team's MCP registry (B10, `mcp.servers` in sdlc.yaml) for the tools, next to the `sdlc` entry of
- * 090-A and with the same merge: other servers and keys stay, a file left empty is removed.
+ * Lays out the team's MCP registry (B10, B97, `mcp.servers` in sdlc.yaml) for the tools, next to the `sdlc` entry of
+ * 090-A and with the same merge: other servers and keys stay, a file left empty is removed. Servers with
+ * `agents: false` are omitted (CLI-only); turning that on later drops sdlc-written entries like a removed server.
  * - claude: `.mcp.json` `mcpServers.<name>`: stdio `{ type, command, args, env }`, http `{ type, url, headers }`;
  * - opencode: `opencode.json` `mcp.<name>`: stdio `{ type: "local", command, environment, enabled }`, http
  *   `{ type: "remote", url, headers, enabled }`, with `${VAR}` written `{env:VAR}`;
@@ -181,6 +182,11 @@ function saveOwned(root: string, manifest: Manifest, owned: Record<string, strin
   writeManifest(root, manifest);
 }
 
+/** Registry servers laid out into agent MCP configs; CLI-only (`agents: false`) stay out (B97). */
+function forAgents(servers: McpServer[]): McpServer[] {
+  return servers.filter((server) => server.agents);
+}
+
 /** Lays out `servers` for the configured tools; a tool not configured loses sdlc's entries. Keyed by file. */
 export function applyRegistryServers(
   root: string,
@@ -188,17 +194,19 @@ export function applyRegistryServers(
   tools: ToolId[],
   dryRun = false,
 ): Record<string, ServerChanges> {
+  const agentServers = forAgents(servers);
   const manifest = readManifest(root);
   const result: Record<string, ServerChanges> = {};
   const owned: Record<string, string[]> = {};
   for (const target of TARGETS) {
-    const wanted = tools.includes(target.tool) ? servers : [];
+    const wanted = tools.includes(target.tool) ? agentServers : [];
     const layout = layOut(root, target, wanted, manifest.mcpServers?.[target.file] ?? [], dryRun);
     if (layout.owned.length > 0) owned[target.file] = layout.owned;
     if (changed(layout.changes) || layout.changes.kept.length > 0) result[target.file] = layout.changes;
   }
   const codexOwned = manifest.mcpServers?.[CODEX_CONFIG_PATH] ?? [];
-  const codex = layOutCodex(root, tools.includes('codex') ? servers : [], codexOwned, dryRun);
+  const codexWanted = tools.includes('codex') ? agentServers : [];
+  const codex = layOutCodex(root, codexWanted, codexOwned, dryRun);
   if (codex.owned.length > 0) owned[CODEX_CONFIG_PATH] = codex.owned;
   if (changed(codex.changes) || codex.changes.kept.length > 0) result[CODEX_CONFIG_PATH] = codex.changes;
   saveOwned(root, manifest, owned, dryRun);

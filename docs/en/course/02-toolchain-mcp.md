@@ -57,6 +57,7 @@ writes them into the agent tool's own configuration.
            KNOWLEDGE_TOKEN: "${KNOWLEDGE_TOKEN}"
          stages: [plan, design, build, test, deploy, maintain]
        telegram:
+         agents: false
          type: stdio
          command: [northwind-telegram-mcp]
          env:
@@ -269,8 +270,8 @@ those stages.
 ### Pitfalls
 
 - When two changes are active at different stages, a server is allowed if any of those stages is in its list.
-- `stages: []` or no `stages` means "not checked", not "never". The agent can still call `telegram`. Claude Code
-  asks the person before it uses an MCP tool that is not allowed; Oliver should not allow `mcp__telegram__*`.
+- `stages: []` or no `stages` means "not checked", not "never". Since 0.16.2, set
+  `agents: false` on `telegram` to keep it out of the agent configuration.
 - An open change is never at the `maintain` stage: its stage is plan, design, build, test or deploy. A server listed
   only for `maintain` is therefore outside its stages whenever a change is active.
 - Hook denial in this lesson: `sdlc guide denials#mcp-stage`.
@@ -734,14 +735,12 @@ Things this scenario wanted that sdlc 0.14.4 does not do. One line each, for the
 
 1. No sync between GitHub Issues or Projects and `openspec/backlog.md`; only `--source-ref` links and the agent.
 2. No built-in CI check: `verify.mcp` needs the GitHub server's tool and argument names; sdlc does not validate them.
-3. A registry server cannot be marked CLI-only (event receiver, check target); every one is laid out for the agents.
-4. `stages: []` means "not checked", not "never"; the agent cannot be forbidden a server outright.
-5. An open change is never at `maintain`, so a `maintain`-only server is out of stage during `/sdlc:triage`.
-6. Events carry person ids; `roles.yaml` has no chat handle, so each receiver keeps its own mapping.
-7. Events are sent only from the clone where the command ran; every person needs the receiver's secret.
-8. A scheduled `events flush` in a fresh CI checkout can repeat waits and miss overdue gates; it needs a kept clone.
-9. Several clones can announce one wait with different event ids, so a receiver cannot deduplicate by `id`.
-10. The daily summary example only writes a file; sending it to a chat is outside sdlc.
-11. `sdlc mcp serve` is stdio only; no remote endpoint for a chat client on another machine.
-12. Context packs come only from local `docs/context/`; sdlc does not pull documents from the knowledge server.
-13. Doc gap: 10-integrations.md (10.1) lists six `sdlc mcp serve` tools; the server also has `guide`.
+3. `stages: []` means "not checked"; use `agents: false` to keep an agent away.
+4. An open change is never at `maintain`, so a `maintain`-only server is out of stage during `/sdlc:triage`.
+5. Events carry person ids; `roles.yaml` has no chat handle, so each receiver keeps its own mapping.
+6. Events are sent only from the clone where the command ran; every person needs the receiver's secret.
+7. A scheduled `events flush` in a fresh CI checkout can repeat waits and miss overdue gates; it needs a kept clone.
+8. Several clones can announce one wait with different event ids, so a receiver cannot deduplicate by `id`.
+9. The daily summary example only writes a file; sending it to a chat is outside sdlc.
+10. `sdlc mcp serve` is stdio only; no remote endpoint for a chat client on another machine.
+11. Context packs come only from local `docs/context/`; sdlc does not pull documents from the knowledge server.

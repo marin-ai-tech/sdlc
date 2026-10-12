@@ -397,9 +397,9 @@ For `billing-api`, Ethan chose adapt: the team knows `ARCHITECTURE.md`, and link
 5. CODEOWNERS stays the source of truth for the code owner. Keep `code-owner` in `roles.yaml` equal to the owners in
    CODEOWNERS, and change both in one pull request. `sdlc review suggest` reads CODEOWNERS to put the owners of the
    changed files first. An owner written as an email matches the person with that email. An owner written as a
-   `@handle` matches the person whose id in `roles.yaml` is that handle, so give people the id of their GitHub
-   handle (for example `paul-s:` instead of `paul:`) when CODEOWNERS uses handles. A team such as
-   `@northwind/billing-reviewers` matches nobody.
+    `@handle` matches a person id or a listed `handles` value in `roles.yaml` since 0.16.2.
+    For example, `paul: { name: Paul, emails: [paul@northwind.example], handles: [paul-s] }`.
+    A team such as `@northwind/billing-reviewers` matches nobody.
 
 6. Steven commits the documents, `openspec/sdlc.yaml` and `openspec/roles.yaml`, and adds `openspec/roles.yaml` to
    CODEOWNERS with the maintainers, so a change to it needs a maintainer's review.
@@ -412,9 +412,8 @@ For `billing-api`, Ethan chose adapt: the team knows `ARCHITECTURE.md`, and link
 
 ### Pitfalls
 
-- When CODEOWNERS uses `@handles` only, the draft cannot resolve them. In 0.14.4 the text output does not list them;
-  `sdlc adopt --json` shows them under `owners_unresolved`. Resolve each handle to a person by hand (the agent can look
-  up the GitHub users through the `github` MCP server and propose the lines).
+- Since 0.16.2, `sdlc adopt` lists unresolved personal handles in text and JSON
+  `owners_unresolved`. Add `handles` to the right people; team handles are not supported.
 - People who left the company are still in the git history. Remove them from the draft before you apply it.
 - `sdlc.yaml` that still has `roles:` keeps them; the draft points to `sdlc roles migrate` (a person's command).
 - One person holding every role is a `sdlc health` finding. The draft does this on purpose, as a placeholder.
@@ -736,9 +735,6 @@ no surprise.
 
 Found while writing Modules 6–8 against sdlc 0.14.4 (temporary copies of `tasklet` and `billing-api`):
 
-- `sdlc adopt` text output omits unresolved CODEOWNERS `@handles`; only `--json` has `owners_unresolved`.
-- CODEOWNERS `@handle` matches a person only when the `roles.yaml` id equals the handle; this is not documented, there
-  is no handle field in `roles.yaml`, and team handles never match.
 - No built-in GitHub Issues sync: issues reach the backlog only through the agent and the GitHub MCP server; archiving
   does not close the linked issue.
 - No ready GitHub Actions workflow (or documented snippet) runs the sdlc checks (`validate`, `review check`,

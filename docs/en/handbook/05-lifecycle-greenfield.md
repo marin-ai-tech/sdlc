@@ -140,10 +140,8 @@ what the team's Telegram chat receives.
 - Events omit emails and command output. Since 0.16.1, a receiver can opt into a masked, one-line rework or
   rejection note with `include_note: true` (default off). The note is at most 200 characters; it appears as
   `note` in an event or after the ready message text.
-- Events are sent by the CLI, not by the agent. But `telegram` is a registry server like the others, so it is also
-  laid out for Claude Code, and a server without `stages` is not governed by the stage rule
-  (`sdlc guide denials#mcp-stage`): the agent could post to the chat too. Give the bot server only the event tool.
-
+- Events are sent by the CLI. Since 0.16.2, `agents: false` lets the CLI use `telegram`
+  without adding it to agent MCP settings. Without `stages`, the stage rule does not apply.
 
 <a id="s5-2"></a>
 ## 5.2 Intent: Megan answers a question and approves
@@ -1340,7 +1338,5 @@ Limitations observed in the sdlc 0.14.4 trial. Some were fixed later; see the ch
   gate.
 - QA has no gate of its own: Grace's acceptance of the evidence is not recorded by sdlc.
 - `${HEAD}` in `verify.mcp` is the head commit even when the evidence covers uncommitted changes.
-- A server used only as an event receiver (`telegram`) is still laid out into the agents' MCP configuration, and a
-  server without `stages` is not governed by the stage rule; there is no "CLI only" server.
-- The first `roles.yaml` commit that adds the maintainers' signing keys shows `bad-signature` (the previous version
-  has no keys); there is no documented bootstrap step.
+- Since 0.16.2, set `agents: false` for an event-only `telegram` server: the CLI sends events,
+  while agent MCP settings omit it. A server without `stages` is not checked by the stage rule.

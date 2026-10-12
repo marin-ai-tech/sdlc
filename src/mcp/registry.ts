@@ -2,8 +2,9 @@ import { SdlcError } from '../core/errors.js';
 import { findSecrets } from '../core/policy-secrets.js';
 
 /**
- * The team's MCP servers (B10): `mcp.servers.<name>` in `openspec/sdlc.yaml`, and the checks `sdlc verify` calls
+ * The team's MCP servers (B10, B97): `mcp.servers.<name>` in `openspec/sdlc.yaml`, and the checks `sdlc verify` calls
  * on them (`verify.mcp`, B12). Parsed into types here (config.ts only calls these); an error names the key.
+ * `agents: false` (default true) keeps a server for the CLI only: events, verify checks and `sdlc mcp check`.
  * Secrets are never written into the registry: `${VAR}` references only, expanded from the CLI's environment
  * when a server is reached (`expandRefs`). A literal secret is refused before anything is laid out.
  */
@@ -14,6 +15,8 @@ export interface StdioServer {
   command: string[];
   env: Record<string, string>;
   stages: string[];
+  /** When false, the CLI uses the server; agents' MCP configs do not (B97). Default true. */
+  agents: boolean;
 }
 
 export interface HttpServer {
@@ -22,6 +25,8 @@ export interface HttpServer {
   url: string;
   headers: Record<string, string>;
   stages: string[];
+  /** When false, the CLI uses the server; agents' MCP configs do not (B97). Default true. */
+  agents: boolean;
 }
 
 export type McpServer = StdioServer | HttpServer;
@@ -110,11 +115,19 @@ function stages(value: unknown, where: string): string[] {
   return list;
 }
 
+/** `agents`: true or false; absent = true (laid out for agents, as before). */
+function agentsFlag(value: unknown, where: string): boolean {
+  if (value === undefined || value === null) return true;
+  if (typeof value !== 'boolean') throw invalid('error.x_must_be_true_or_false', where);
+  return value;
+}
+
 function parseServer(name: string, value: unknown, where: string): McpServer {
   if (!SERVER_NAME.test(name) || name === RESERVED_SERVER) throw invalid('error.mcp_server_name', where);
   const raw = mapping(value, where) ?? {};
   const type = raw.type ?? 'stdio';
-  const common = { name, stages: stages(raw.stages, `${where}.stages`) };
+  const agents = agentsFlag(raw.agents, `${where}.agents`);
+  const common = { name, stages: stages(raw.stages, `${where}.stages`), agents };
   if (type === 'http') {
     const url = text(raw.url, `${where}.url`);
     return { ...common, type, url, headers: stringMap(raw.headers, `${where}.headers`) };
