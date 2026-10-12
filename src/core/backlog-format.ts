@@ -30,6 +30,7 @@ const FENCE_RE = /^\s*```/;
 const EPIC_HEADING_RE = /^## E(\d+) (.+)$/;
 const ITEM_HEADING_RE = /^### B(\d+) \[([^\]]+)\] (.+)$/;
 const GOAL_RE = /^Goal: (.+)$/;
+const EPIC_SOURCE_RE = /^Source: (.+)$/;
 const ACCEPTANCE_ITEM_RE = /^  [-*] (.+)$/;
 const FIELD_RE =
   /^[-*] \*\*(Kind|Risk|Outcome|Acceptance|Depends on|Source|Change|Closed)\*\*: ?(.*)$/;
@@ -177,11 +178,13 @@ function applyField(item: BacklogItem, name: string, value: string): void {
 
 function handleGoalLine(line: string, state: ParseState): boolean {
   const goal = GOAL_RE.exec(line);
+  const source = EPIC_SOURCE_RE.exec(line);
   const epic = state.backlog.epics.find((entry) => entry.id === state.epic);
-  if (!goal || !state.epic || !epic) {
+  if (!state.epic || !epic || (!goal && !source)) {
     return false;
   }
-  epic.goal = goal[1];
+  if (goal) epic.goal = goal[1];
+  if (source) epic.source = source[1];
   return true;
 }
 
@@ -324,6 +327,9 @@ function renderSectionLines(
   lines.push(epic ? `## ${epic.id} ${epic.title}` : `## ${UNASSIGNED}`);
   if (epic?.goal) {
     lines.push(`Goal: ${epic.goal}`);
+  }
+  if (epic?.source) {
+    lines.push(`Source: ${epic.source}`);
   }
   lines.push(...extra);
   const sectionItems = backlog.items.filter((item) => item.epic === epic?.id);

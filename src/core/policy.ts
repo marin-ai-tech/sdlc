@@ -20,7 +20,6 @@ import { secretEditDenial, shellSecretDenial } from './policy-secrets.js';
 import { mcpStageDecision } from './policy-mcp.js';
 import { inboxSessionLines } from '../mcp/inbox.js';
 import {
-  BACKLOG_FILE,
   linkedStateFiles,
   relToRoot,
   shellStateWrites,
@@ -139,9 +138,13 @@ function normalizePaths(command: string): string {
     .replace(/\/{2,}/g, '/');
 }
 
-/** The reason for a state-file denial: the backlog has its own, pointing at the backlog commands. */
-function stateReason(backlog: boolean, edit: boolean): string {
-  if (backlog) return t('hook.backlogIntegrity');
+/** Give single-purpose state files their own reason; mixed writes use the general state reason. */
+function stateReason(paths: string[], edit: boolean): string {
+  const allMatch = (pattern: RegExp) => paths.length > 0 && paths.every((file) => pattern.test(file));
+  if (allMatch(/(?:^|\/)backlog\.md$/i)) return t('hook.backlogIntegrity');
+  if (allMatch(/(?:^|\/)roles\.yaml$/i)) return t('hook.rolesIntegrity');
+  if (allMatch(/(?:^|\/)team\.json$/i)) return t('hook.teamIntegrity');
+  if (allMatch(/(?:^|\/)inbox(?:\/|$)/i)) return t('hook.inboxIntegrity');
   return t(edit ? 'hook.stateIntegrityEdit' : 'hook.stateIntegrityBash');
 }
 
@@ -194,13 +197,12 @@ function gateOk(view: LifecycleView | undefined, id: string): boolean {
 /** A shell write to a state file, by its path text or (after `cd`, by glob, through a link) by what it resolves to. */
 function stateWriteDenial(spelled: string, ctx: PolicyContext, cwd: string): Decision | undefined {
   if (STATE_FILE_WRITE.test(spelled) && WRITE_OPS.test(spelled)) {
-    const backlogOnly = spelled.toLowerCase().includes(BACKLOG_FILE) && !/\.sdlc|roles\.yaml/i.test(spelled);
-    return { decision: 'deny', rule: 'state-integrity', reason: stateReason(backlogOnly, false) };
+    const paths = spelled.match(new RegExp(STATE_FILE_WRITE.source, 'gi')) ?? [];
+    return { decision: 'deny', rule: 'state-integrity', reason: stateReason(paths, false) };
   }
   const hits = shellStateWrites(spelled, ctx.paths.root, cwd);
   if (hits.length === 0) return undefined;
-  const backlogOnly = hits.every((hit) => hit.toLowerCase() === BACKLOG_FILE);
-  return { decision: 'deny', rule: 'state-integrity', reason: stateReason(backlogOnly, false) };
+  return { decision: 'deny', rule: 'state-integrity', reason: stateReason(hits, false) };
 }
 
 /**
@@ -304,7 +306,7 @@ function evaluateRules(call: ToolCall, ctx: PolicyContext): Decision {
     return {
       decision: 'deny',
       rule: 'state-integrity',
-      reason: stateReason(stateHits.every((r) => r.toLowerCase() === BACKLOG_FILE), true),
+      reason: stateReason(stateHits, true),
     };
   }
   // User-level agent settings (B42) lie outside the project: checked on the absolute paths, before `rels` alone.

@@ -461,10 +461,11 @@ criteria. Planning documents, if the team has them in BMAD format, are imported.
 3. If the team planned with BMAD, the agent imports the documents. First a preview:
 
    ```bash
-   sdlc import bmad _bmad-output/refunds --to-backlog --dry-run
+   sdlc import bmad _bmad-output/refunds --to-backlog --dry-run --json
    ```
 
-   The preview (JSON) shows one epic named after the PRD and one item per functional requirement, with the
+   This JSON preview is from the sdlc 0.14.4 trial. Since 0.15.2, use `--json` for JSON;
+   the preview shows one epic named after the PRD and one item per functional requirement, with the
    acceptance from its testable consequences:
 
    ```text
@@ -494,8 +495,8 @@ criteria. Planning documents, if the team has them in BMAD format, are imported.
   through the GitHub MCP server when asked.
 - The `github` server is checked against `stages` only while a change is active. List `plan` in its `stages` if the
   agent reads issues while changes are open.
-- Read the imported requirement text. In 0.14.4 the importer builds "The system SHALL" + the requirement sentence,
-  which gives "The system SHALL support can refund ..." when the sentence starts with the actor.
+- Read the imported requirement text. Since 0.15.2, actor-first sentences become requirements such as
+  "The system SHALL let the policyholder see …".
 
 
 <a id="s8-6"></a>
@@ -690,3 +691,17 @@ Every person on the team knows what changed for them, which commands they run, a
 
 <a id="known-limitations"></a>
 ## Known limitations
+
+Limitations observed in the sdlc 0.14.4 trial:
+
+- `sdlc adopt` text output omits unresolved CODEOWNERS `@handles`; only `--json` has `owners_unresolved`.
+- CODEOWNERS `@handle` matches a person only when the `roles.yaml` id equals the handle; this is not documented, there
+  is no handle field in `roles.yaml`, and team handles never match.
+- No built-in GitHub Issues sync: issues reach the backlog only through the agent and the GitHub MCP server; archiving
+  does not close the linked issue.
+- `sdlc log` has no filter by event, so counting `hook.warned` per rule before switching to block needs `--json` and a
+  script.
+- No ready GitHub Actions workflow (or documented snippet) runs the sdlc checks (`validate`, `review check`,
+  `approvals verify`) in CI.
+- sdlc has no alert intake: `/sdlc:triage` from Telegram depends on pasted text or a read tool of the team's own
+  Telegram MCP server.

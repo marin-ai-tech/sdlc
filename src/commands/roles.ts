@@ -25,7 +25,9 @@ function matrix(gate: ApprovalGateId, opts: Options) {
   }
   const ref = opts.change ? resolveChange(ctx.paths, opts.change) : undefined;
   const state = ref ? readChangeState(ref.dir) : undefined;
-  const accepted = [...ctx.config.gates[gate].approvers, ...ctx.config.gates[gate].highRiskApprovers];
+  // For a change, only the roles its risk needs (the tech lead counts at high risk); without one, every role.
+  const highRisk = !state || state.risk === 'high';
+  const accepted = [...ctx.config.gates[gate].approvers, ...(highRisk ? ctx.config.gates[gate].highRiskApprovers : [])];
   const approvals = approvalEmails(state);
   const authors = ref ? changeAuthors(ctx.root, opts.base ?? ctx.config.review.base ?? defaultBaseRef(ctx.root)) : [];
   const allowed = [];
@@ -53,6 +55,7 @@ function textMatrix(result: ReturnType<typeof matrix>): void {
   const subject = `${result.gate}${result.change ? ` · ${result.change}` : ''}`;
   line(t('roles.mayApprove', { subject, who }));
   for (const item of result.refused) {
+    if (item.rules.every((rule) => rule === 'missing_role')) continue;
     const parts = item.rules.map((rule, index) => `${rule} — ${t(item.refs[index].key, item.refs[index].params)}`);
     line(`  ${item.name} (${item.person}): ${parts.join('; ')}`);
   }

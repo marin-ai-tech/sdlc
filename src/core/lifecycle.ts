@@ -31,6 +31,8 @@ import { activeReviewRevision, effectiveGates, markReworks, revisedGates, revise
 import { markAutoWaived, withAutoWaive } from './auto-waive.js';
 import { reworkLimitNext } from './rework-limit.js';
 import { questionsNext } from './questions-next.js';
+import { draftIntentNext } from './draft-intent-next.js';
+import { debateNext } from './debate-next.js';
 
 /**
  * The six stages of Anthropic's AI-native SDLC playbook, plus the two terminal
@@ -498,7 +500,9 @@ export function evaluateChange(
   // A change a person has taken over waits for them; otherwise the next step names the people who may act.
   const held = ref.archived ? undefined : takeoverNext(state, ref.id);
   const limit = held ? undefined : reworkLimitNext(root, config, view, state, options.skipPeople);
-  const next = held ?? limit ?? questionsNext(view, config, state, nextAction(view, config, mapping, state));
+  const advice = nextAction(view, config, mapping, state);
+  const next = held ?? limit ?? questionsNext(view, config, state,
+    debateNext(view, config, draftIntentNext(view, advice)));
   view.next = held || options.skipPeople ? next : nameApprovers(root, config, view, state, next);
   return view;
 }

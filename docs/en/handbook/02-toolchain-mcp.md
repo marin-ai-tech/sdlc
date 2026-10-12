@@ -693,3 +693,22 @@ data. The assistant can read, but it cannot decide anything.
 
 <a id="known-limitations"></a>
 ## Known limitations
+
+Limitations observed in the sdlc 0.14.4 trial. Some were fixed later; see the changelog.
+
+- No sync between GitHub Issues or Projects and `openspec/backlog.md`; only `--source-ref` links and the agent.
+- No built-in CI check: `verify.mcp` needs the GitHub server's tool and argument names; sdlc does not validate them.
+- `expect` matches lists by exact length; a list of runs needs a filter that returns one item ("any item" is missing).
+- `sdlc mcp check` lists tool names only, not their input arguments.
+- A registry server cannot be marked CLI-only (event receiver, check target); every one is laid out for the agents.
+- `stages: []` means "not checked", not "never"; the agent cannot be forbidden a server outright.
+- An open change is never at `maintain`, so a `maintain`-only server is out of stage during `/sdlc:triage`.
+- Events carry person ids; `roles.yaml` has no chat handle, so each receiver keeps its own mapping.
+- Events are sent only from the clone where the command ran; every person needs the receiver's secret.
+- A scheduled `events flush` in a fresh CI checkout can repeat waits and miss overdue gates; it needs a kept clone.
+- Several clones can announce one wait with different event ids, so a receiver cannot deduplicate by `id`.
+- The daily summary example only writes a file; sending it to a chat is outside sdlc.
+- `sdlc mcp serve` is stdio only; no remote endpoint for a chat client on another machine.
+- Context packs come only from local `docs/context/`; sdlc does not pull documents from the knowledge server.
+- `sdlc init` with flags cannot create a starter `roles.yaml`; only the wizard (or `sdlc adopt --apply`) does.
+- Doc gap: 10-integrations.md (10.1) lists six `sdlc mcp serve` tools; the server also has `guide`.

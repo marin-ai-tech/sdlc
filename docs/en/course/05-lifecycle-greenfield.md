@@ -269,8 +269,8 @@ what the team's Telegram chat receives.
 
 ### Pitfalls
 
-- While a question is unanswered, `sdlc next --me` tells Megan "Nothing is waiting for you.", and `sdlc next` asks
-  for an approval that would fail. Run `sdlc answer --change <id> --list` when the agent says the intent is ready.
+- Since 0.15.2, `sdlc next --me` lists the gate awaiting Megan's answer, and `sdlc next` asks her to answer first.
+  Run `sdlc answer --change <id> --list` to see the questions.
 - An answer typed into `intent.md` by hand, or by the agent, does not count. Only `sdlc answer` records it.
 - Editing `intent.md` after the approval makes it stale; Megan approves again. Every change to `intent.md` before the
   approval starts a new wait too, including the answer sdlc writes into it: the trial sent `gate.intent.awaiting`
@@ -1356,7 +1356,7 @@ record the change leaves behind.
 - `sdlc archive` refuses while a required gate is not satisfied. `--force` is a person's command and needs `--note`;
   `sdlc health` counts forced archives.
 - `--skip-specs` archives without touching the living specs; use it only for tooling or docs changes.
-- The trace shows a deferred finding as `accepted`; `review.md` and `sdlc defer list` show `deferred (D2)`.
+- Since 0.15.2, the trace shows a deferred finding as `deferred (D2)`.
 - Commit the archive move before running `sdlc approvals verify`; until then every approval shows `not-committed`.
 
 ### On screen (for the video)
@@ -1376,25 +1376,12 @@ seen in the trial run unless the item says otherwise.
   `sdlc backlog add`; nothing keeps the two lists in step.
 - `sdlc backlog add` has no `--source-url` (only `sdlc new` has one), so an issue link is kept as a ref string.
 - Archiving a change marks its backlog item done but does not close or comment on the linked GitHub issue.
-- Running `sdlc import bmad --to-backlog` twice adds a second epic with the same items; there is no repeat check.
 - `sdlc import bmad` with a path outside the project says "No BMAD artifacts found." instead of naming the path
   problem.
-- `sdlc import bmad --dry-run` prints JSON even without `--json`.
-- `sdlc next --me` stays empty while a gate waits only for that person's `sdlc answer`; it does not list the open
-  questions.
-- `sdlc next` asks for `sdlc approve intent` while an open question makes that approval fail.
-- The `Next:` line after `sdlc backlog start` asks the product owner to approve the draft intent before
-  `/sdlc:intent` has completed it.
-- With `min_approvals: 2`, the `Next:` hint lists people who already approved and reads "A or B" though two
-  approvals are needed (seen in a first trial with two review roles).
 - `min_approvals` cannot require one approval per role (for example code owner and QA) outside
   `high_risk_approvers`.
-- `sdlc roles who spec` lists the tech lead for a medium-risk spec, though only a product-owner approval satisfies
-  the gate.
 - The `missing_role` hint ("ask Paul, Ethan, …") can name people whom `distinct_approvers` excludes (seen in the
   first trial).
-- The `state-integrity` denial for an agent's edit of `openspec/roles.yaml` names `.sdlc.yaml` and the log, not
-  `roles.yaml`.
 - `sdlc team accept`, `sdlc backlog move` and `sdlc backlog drop` check that the caller is a person, not that the
   person holds a role in `roles.yaml`.
 - `sdlc team list` does not show that a newer registry draft waits next to an accepted role.
@@ -1406,7 +1393,6 @@ seen in the trial run unless the item says otherwise.
 - Events never include the rework or rejection note, so the chat cannot say why a gate went back.
 - A server used only as an event receiver (`telegram`) is still laid out into the agents' MCP configuration, and a
   server without `stages` is not governed by the stage rule; there is no "CLI only" server.
-- `sdlc trace` shows a finding with status `deferred (D<n>)` as `accepted`.
 - The first `roles.yaml` commit that adds the maintainers' signing keys shows `bad-signature` (the previous version
   has no keys); there is no documented bootstrap step.
 - Until the archive move is committed, `sdlc approvals verify` reports every approval of that change as

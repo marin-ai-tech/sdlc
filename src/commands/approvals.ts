@@ -30,7 +30,9 @@ function printResults(results: ReturnType<typeof verify>, mode: string): void {
     const subject = result.file ?? `${result.change}/${result.gate}`;
     const mark = result.status === 'valid' ? '✓' : '✗';
     const status = t(`approvals.status.${result.status}`);
-    line(`${mark} ${subject} ${result.person ?? result.by} ${status} ${result.commit?.slice(0, 8) ?? '-'}`);
+    const trailer = typeof result.trailer === 'string' ? ` ${t('approvals.trailer', { status: result.trailer })}` : '';
+    const commit = result.commit?.slice(0, 8) ?? '-';
+    line(`${mark} ${subject} ${result.person ?? result.by} ${status} ${commit}${trailer}`);
   }
   const approvals = results.filter((result) => result.change).length;
   const failures = results.filter((result) => result.status !== 'valid');

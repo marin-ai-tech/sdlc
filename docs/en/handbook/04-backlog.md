@@ -375,7 +375,7 @@ Megan sets the order and removes work in her own terminal. The agent starts the 
 
    ```text
    Started B1 as add-due-dates.
-   Next: person — Megan (product-owner) must review and approve the intent gate (intent): sdlc approve intent --change add-due-dates --as product-owner
+   Next: agent — Write intent (intent.md) for the intent gate.
    ```
 
    This creates the change folder with a draft `intent.md` built from the item (outcome and acceptance criteria) and
@@ -399,8 +399,7 @@ Megan sets the order and removes work in her own terminal. The agent starts the 
 
 ### Pitfalls
 
-- Right after `backlog start`, the `Next:` line already asks Megan to approve the intent. The intent is only a draft
-  at that point: wait until the agent has run `/sdlc:intent` and says the intent is ready.
+- After `backlog start`, the draft intent goes to the agent. Megan approves it after `/sdlc:intent` completes it.
 - `sdlc backlog move` and `drop` check that you are a person, not that you are the product owner. At Northwind only
   Megan runs them; agree on this in your team.
 - `sdlc backlog done B<n> --note "…"` marks an item done without a change. Use it for work that was finished another
@@ -530,10 +529,10 @@ approving anything.
    `epic-sharing.md` and `tickets.toml`. Megan previews the import first:
 
    ```bash
-   sdlc import bmad _bmad-output/epic-sharing --to-backlog --dry-run
+   sdlc import bmad _bmad-output/epic-sharing --to-backlog --dry-run --json
    ```
 
-   The preview prints JSON (shortened):
+   This JSON preview is from the trial with sdlc 0.14.4. Since 0.15.2, use `--json` to request it:
 
    ```json
    {
@@ -606,10 +605,8 @@ approving anything.
 
 - The path must be inside the project. A folder outside it gives the same message as an empty folder:
   `No BMAD artifacts found.`
-- `--dry-run` prints JSON even without `--json`. Read it before you import: the import adds items, and only Megan can
-  drop extra ones.
-- Running the same import twice adds a second epic with the same items (in the trial: E3 with B8 to B10). sdlc does
-  not check for repeats.
+- Since 0.15.2, `--dry-run` prints a text summary unless `--json` is given. Read it before importing.
+- Repeating the import skips matching BMAD epics and items and reports `Already imported: …`.
 - In `--change` mode, sdlc recognises the documents by their content: a PRD starts with `# PRD:`, an architecture
   spine with `# Architecture Spine —`, a SPEC has `id: SPEC-…` in its front matter.
 - Imported items keep the BMAD order. Megan reorders them with `sdlc backlog move` afterwards.

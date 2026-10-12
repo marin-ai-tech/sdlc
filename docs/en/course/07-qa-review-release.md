@@ -312,8 +312,7 @@ follow a change from intent to evidence in one command.
   and her own spot checks; it is not machine evidence like the block above it.
 - A task with no code (like "run sdlc verify") shows as a gap "task without a commit". Read the gaps, do not chase a
   zero.
-- `sdlc trace` shows a finding with `Status: deferred (D1)` as `accepted`. The link to the deferred item is in
-  `review.md` and `openspec/deferred-work.md`, not in the trace.
+- Since 0.15.2, `sdlc trace` shows `Status: deferred (D1)` as `deferred (D1)` and keeps the D1 link.
 
 ### On screen (for the video)
 
@@ -504,8 +503,8 @@ gate instead of finding design problems in review.
 - Editing `plan.md` after the plan approval makes the plan gate stale. Record plan drift in `review.md` instead, or
   ask Ethan to send the change back (`sdlc rework plan`).
 - A fix after `sdlc verify` makes the evidence stale. Run `sdlc verify` again before Paul approves.
-- With the debate lens on, `sdlc next` and `sdlc next --me` in 0.14.4 already name Megan for the spec gate before the
-  debate is written; her approval is then refused. Ask the agent to run `/sdlc:spec` first.
+- This lesson used sdlc 0.14.4. Since 0.15.2, `sdlc next` asks the agent to record the debate first;
+  `sdlc next --me` lists the spec gate for Megan once `## Debate` is complete.
 - The debate is recorded text. sdlc checks that both positions and the decision are there, not how good they are.
 
 ### On screen (for the video)

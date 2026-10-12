@@ -545,8 +545,6 @@ What this course needed and sdlc 0.14.4 does not offer, or does differently from
 - `sdlc audit --export` into a folder inside the project (outside `openspec/`) also makes verification stale, with no
   warning.
 - `sdlc audit --since` works only with `--export`; the plain audit has no period filter for its metrics.
-- `sdlc approvals verify` text output does not show `trailer: found | missing`, which docs/en/13-process-health.md says
-  it reports; only `--json` and the export show it.
 - After a change is archived, `sdlc audit --change <id>` lists only the commits after the folder moved ("commits
   touching the change folder" does not follow the rename).
 - The agents' share of commits is project-wide only; there is no per-change or per-tool share in `sdlc audit`.
@@ -556,9 +554,5 @@ What this course needed and sdlc 0.14.4 does not offer, or does differently from
   Claude Code, OpenCode and Cursor tool names only).
 - `sdlc guide denials` says "The Claude Code hook and the OpenCode plugin check every edit"; it does not mention Cursor,
   Codex, Qwen Code and GigaCode, which apply the same rules.
-- `sdlc next --me` does not list a gate that waits for a person's answers to open questions, although that person is the
-  one who must act.
-- `sdlc explain` names the missing role ("Approval still missing from: product-owner") but not the people, while
-  `sdlc next` and `sdlc status` name them from `roles.yaml`.
 - The health thresholds can be set only in `openspec/sdlc.yaml`; `sdlc health` has no `--since` or window option for a
   one-off look.

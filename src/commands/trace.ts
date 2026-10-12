@@ -28,7 +28,9 @@ function printTasks(trace: Trace): void {
 function printFindings(trace: Trace): void {
   line(t('trace.findings'));
   for (const finding of trace.findings) {
-    const status = finding.status ?? t('trace.noStatus');
+    const status = finding.deferredTo
+      ? t('trace.deferredStatus', { id: finding.deferredTo })
+      : finding.status ?? t('trace.noStatus');
     line(`  ${finding.id} ${status} — ${finding.title}`);
   }
 }

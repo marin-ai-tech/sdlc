@@ -16,7 +16,7 @@ export interface TraceEvidence { row: string; run: string; seen: string; result:
 export interface TraceScenario { name: string; evidence: TraceEvidence[] }
 export interface TraceRequirement { name: string; file: string; scenarios: TraceScenario[] }
 export interface TraceTask { id: string; text: string; done: boolean; commits: string[] }
-export interface TraceFinding { id: string; title: string; status?: string }
+export interface TraceFinding { id: string; title: string; status?: string; deferredTo?: string }
 export type GapKind = 'requirement-without-scenario' | 'scenario-without-evidence' | 'task-without-commit'
   | 'finding-without-status';
 export interface TraceGap { kind: GapKind; ref: string }
@@ -116,7 +116,10 @@ function parseTraceFindings(dir: string): TraceFinding[] {
   return parseFindings(text).map((finding, index) => ({
     id: finding.id ?? `F${index + 1}`,
     title: finding.title,
-    ...(hasStatusLine(lines, finding.line) ? { status: finding.status } : {}),
+    ...(hasStatusLine(lines, finding.line)
+      ? { status: finding.deferredTo || finding.deferredUnlinked ? 'deferred' : finding.status }
+      : {}),
+    ...(finding.deferredTo ? { deferredTo: finding.deferredTo } : {}),
   }));
 }
 

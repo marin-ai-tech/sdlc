@@ -32,13 +32,17 @@ export function nameApprovers(root: string, config: SdlcConfig, view: LifecycleV
   next: NextAction): NextAction {
   const key = next.key ? PEOPLE_KEYS[next.key] : undefined;
   const gate = view.gates.find((item) => item.id === next.gate);
-  if (next.action !== 'approve-gate' || !key || !gate || gate.id === 'verify') return next;
+  if ((next.action !== 'approve-gate' && next.action !== 'answer-questions') || !gate || gate.id === 'verify') {
+    return next;
+  }
+  if (next.action === 'approve-gate' && !key) return next;
   const roles = rolesOrNothing(root);
   if (!roles) return next;
   const people = allowedNow(root, config, roles, gate, state);
+  if (next.action === 'answer-questions') return { ...next, people };
   if (people.length === 0) return { ...next, people };
   const params = { ...next.params, people: peopleText(people, gate.missingRoles.length > 1 ? 'and' : 'or') };
-  return { ...next, people, key, params, message: t(key, params, 'en') };
+  return { ...next, people, key, params, message: t(key!, params, 'en') };
 }
 
 /**
@@ -70,7 +74,8 @@ function rolesOrNothing(root: string): RolesFile | undefined {
 function allowedNow(root: string, config: SdlcConfig, roles: RolesFile, gate: GateEvaluation,
   state: ChangeState): NamedApprover[] {
   const id = gate.id as ApprovalGateId;
-  const accepted = [...config.gates[id].approvers, ...config.gates[id].highRiskApprovers];
+  const accepted = [...config.gates[id].approvers,
+    ...(state.risk === 'high' ? config.gates[id].highRiskApprovers : [])];
   const authors = changeAuthors(root, config.review.base);
   const approvals = approvalEmails(state);
   const missing = gate.missingRoles.flatMap((entry) => entry.split(' | ')).filter((role) => accepted.includes(role));

@@ -269,8 +269,8 @@ Turn B1 into an approved `intent.md`. Megan answers the open question and approv
 
 ### Pitfalls
 
-- While a question is unanswered, `sdlc next --me` tells Megan "Nothing is waiting for you.", and `sdlc next` asks
-  for an approval that would fail. Run `sdlc answer --change <id> --list` when the agent says the intent is ready.
+- Since 0.15.2, `sdlc next --me` lists the gate awaiting Megan's answer, and `sdlc next` asks her to answer first.
+  Run `sdlc answer --change <id> --list` to see the questions.
 - An answer typed into `intent.md` by hand, or by the agent, does not count. Only `sdlc answer` records it.
 - Editing `intent.md` after the approval makes it stale; Megan approves again. Every change to `intent.md` before the
   approval starts a new wait too, including the answer sdlc writes into it: the trial sent `gate.intent.awaiting`
@@ -1313,9 +1313,37 @@ record the change leaves behind.
 - `sdlc archive` refuses while a required gate is not satisfied. `--force` is a person's command and needs `--note`;
   `sdlc health` counts forced archives.
 - `--skip-specs` archives without touching the living specs; use it only for tooling or docs changes.
-- The trace shows a deferred finding as `accepted`; `review.md` and `sdlc defer list` show `deferred (D2)`.
+- Since 0.15.2, the trace shows a deferred finding as `deferred (D2)`.
 - Commit the archive move before running `sdlc approvals verify`; until then every approval shows `not-committed`.
 
 
 <a id="known-limitations"></a>
 ## Known limitations
+
+Limitations observed in the sdlc 0.14.4 trial. Some were fixed later; see the changelog.
+
+- No built-in GitHub Issues sync: the agent reads issues through the `github` MCP server and runs
+  `sdlc backlog add`; nothing keeps the two lists in step.
+- `sdlc backlog add` has no `--source-url` (only `sdlc new` has one), so an issue link is kept as a ref string.
+- Archiving a change marks its backlog item done but does not close or comment on the linked GitHub issue.
+- `sdlc import bmad` with a path outside the project says "No BMAD artifacts found." instead of naming the path
+  problem.
+- `min_approvals` cannot require one approval per role (for example code owner and QA) outside
+  `high_risk_approvers`.
+- The `missing_role` hint ("ask Paul, Ethan, …") can name people whom `distinct_approvers` excludes (seen in the
+  first trial).
+- `sdlc team accept`, `sdlc backlog move` and `sdlc backlog drop` check that the caller is a person, not that the
+  person holds a role in `roles.yaml`.
+- `sdlc team list` does not show that a newer registry draft waits next to an accepted role.
+- No workflow calls the `sdlc-simplifier` subagent unless `stages.build.agents` lists it.
+- The verify gate passes without the behavioural table; only `sdlc verify --check --strict` checks it, outside the
+  gate.
+- QA has no gate of its own: Grace's acceptance of the evidence is not recorded by sdlc.
+- `${HEAD}` in `verify.mcp` is the head commit even when the evidence covers uncommitted changes.
+- Events never include the rework or rejection note, so the chat cannot say why a gate went back.
+- A server used only as an event receiver (`telegram`) is still laid out into the agents' MCP configuration, and a
+  server without `stages` is not governed by the stage rule; there is no "CLI only" server.
+- The first `roles.yaml` commit that adds the maintainers' signing keys shows `bad-signature` (the previous version
+  has no keys); there is no documented bootstrap step.
+- Until the archive move is committed, `sdlc approvals verify` reports every approval of that change as
+  `not-committed`.

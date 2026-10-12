@@ -66,12 +66,18 @@ export function renderDelta(title: string, items: Requirement[]): string {
   ];
   for (const item of items) {
     lines.push('### Requirement: ' + item.name);
-    lines.push('The system SHALL ' + item.intent.replace(/^[A-Z]/, (letter) => letter.toLowerCase()));
+    lines.push('The system SHALL ' + requirementAction(item.intent));
     lines.push('', 'Traceability: ' + item.id, '');
     const outcomes = item.successes.length ? item.successes : [item.intent];
     outcomes.forEach((success, index) => lines.push(renderScenario(item, success, index), ''));
   }
   return lines.join('\n');
+}
+
+function requirementAction(intent: string): string {
+  const actor = intent.match(/^([A-Z][A-Za-z]*(?:\s+[A-Z][A-Za-z]*)*) can\s+(.+)$/);
+  if (actor) return `let the ${actor[1].toLowerCase()} ${actor[2]}`;
+  return intent.replace(/^[A-Z]/, (letter) => letter.toLowerCase());
 }
 
 export function renderDesign(architecture: Sections, body: string): string {

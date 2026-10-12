@@ -263,11 +263,8 @@ they are about to approve before they approve it.
 
 ### Pitfalls
 
-- `sdlc next --me` lists a gate only when you may decide it **now**. While the intent has an open question,
-  Megan's list is empty even though the intent waits for her: `sdlc answer --change <id> --list` shows the questions
-  (lesson 5.2).
-- `roles who spec` for a medium-risk change also names Ethan, because `tech-lead` is a high-risk approver of the spec.
-  For a medium-risk change, only a `product-owner` approval satisfies the gate.
+- Since 0.15.2, `sdlc next --me` lists gates waiting for Megan's answers and gives `sdlc answer`.
+- `roles who spec --change <id>` lists the roles needed at that change's risk. The tech lead counts only at high risk.
 - With `min_approvals: 2`, `sdlc approve review` accepts any two holders of the listed roles. sdlc cannot require
   "one approval from each role" except through `high_risk_approvers` on a high-risk change.
 

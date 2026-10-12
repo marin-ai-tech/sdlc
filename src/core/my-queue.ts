@@ -54,12 +54,15 @@ export function myQueue(scope: QueueScope): MyQueue {
 /** The change's gate when it waits for a person's approval and (with roles.yaml) that person is me. */
 function waitingItem(view: LifecycleView, person: string | null): QueueItem[] {
   const next = view.next;
-  if (next.actor !== 'human' || next.action !== 'approve-gate' || !next.gate || !next.cli) return [];
+  if (next.actor !== 'human' || !['approve-gate', 'answer-questions'].includes(next.action)
+    || !next.gate || !next.cli) return [];
   const item = { change: view.change, gate: next.gate, action: next.action, cli: next.cli, message: next.message };
   if (!person) return [item];
   const named = next.people?.find((candidate) => candidate.id === person);
   if (!named) return [];
   // A planning gate's command names the role; it is the role I approve in, not the first one awaited.
-  const withRole = next.cli.includes(' --as ') ? approveCli(view.change, next.gate, named.role) : next.cli;
+  const withRole = next.action === 'approve-gate' && next.cli.includes(' --as ')
+    ? approveCli(view.change, next.gate, named.role)
+    : next.cli;
   return [{ ...item, cli: withRole }];
 }

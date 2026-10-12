@@ -2,6 +2,24 @@
 
 All notable changes to sdlc. Versions follow [Semantic Versioning](https://semver.org/); while the major version is 0, a minor version may change behavior.
 
+## 0.15.2 — 2026-10-12
+
+### Fixed
+- `next --me` lists questions awaiting my answer; `next` asks for the answer first, and `explain` names the people.
+- `backlog start` sends an incomplete draft intent to the agent before asking the product owner to approve it.
+- With `min_approvals: 2`, hints name only people who have not yet approved.
+- `roles who --change` uses the change's risk and omits people refused only for lacking the required role.
+- With `design.debate: true`, `next` sends an incomplete debate to the agent, not the product owner.
+- The `state-integrity` denial for `openspec/roles.yaml` names that file and its approval policy.
+- `trace` preserves `deferred (D1)` findings and their deferred item links.
+- `approvals verify` text output reports each approval's trailer status.
+- `import bmad --dry-run` prints a text summary unless `--json` is given.
+- Repeated `import bmad --to-backlog` skips epics and items already imported and reports them.
+- The BMAD importer renders actor-first requirements as "The system SHALL let the policyholder see …".
+
+### Changed
+- Imported backlog epics may record `Source: bmad <folder>#<key>` below `Goal:`; older files still read as before.
+
 ## 0.15.1 — 2026-10-11
 
 ### Added

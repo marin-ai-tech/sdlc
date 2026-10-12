@@ -339,8 +339,7 @@ an edit, and how to read any denial in two steps.
 
 - Hard rules deny in `warn` mode too. Only `plan-gate` and `mcp-stage` are process rules.
 - The secret patterns are fixed prefixes. A secret in an unusual format is not caught; keep a secret scanner in CI.
-- In 0.14.4 the `state-integrity` reason for `openspec/roles.yaml` names `.sdlc.yaml` and the log, not the file
-  itself. The rule is right; only the text is generic.
+- Since 0.15.2, the `state-integrity` reason names `openspec/roles.yaml` and explains that only a person may change it.
 - A team member who wants to "just switch the hook off" is asking to change `enforcement.mode` in
   `openspec/sdlc.yaml`. That is a person's decision, recorded in git, and `sdlc health` reports it.
 
