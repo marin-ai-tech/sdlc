@@ -2,6 +2,13 @@
 
 All notable changes to sdlc. Versions follow [Semantic Versioning](https://semver.org/); while the major version is 0, a minor version may change behavior.
 
+## 0.20.2 — 2026-10-13
+
+### Fixed
+- `sdlc status` shows who approved a gate in the reader's language (an English word was left in other languages), and
+  with no active change it names only the project's own tools to start one.
+- The approval line in other languages no longer assumes the approver's gender.
+
 ## 0.20.1 — 2026-10-13
 
 ### Fixed

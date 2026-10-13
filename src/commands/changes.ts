@@ -4,6 +4,9 @@ import { c, gateBadge, line, printJson, reportFailure, warn } from '../cli/outpu
 import { bar, stepper } from '../cli/progress.js';
 import { emitNextHint, resolveNext } from '../cli/next-hint.js';
 import { t } from '../core/i18n.js';
+import { ADAPTERS, renderContext } from '../integrations/install.js';
+import type { SdlcConfig } from '../core/config.js';
+import type { ToolId } from '../integrations/types.js';
 import {
   CHANGE_KINDS,
   newChangeState,
@@ -206,7 +209,7 @@ function printDetailed(view: LifecycleView, warnings: string[], invocationHint: 
   line(`  ${t('status.tasks').padEnd(10)}${taskBar}`);
   line(`  ${t('status.gates')}`);
   for (const g of view.gates) {
-    const who = g.approvals.map((a) => `${a.by} as ${a.role}`).join('; ');
+    const who = g.approvals.map((a) => t('status.approvedAs', { by: a.by, role: a.role })).join('; ');
     const reasonText = g.reasonKey ? t(g.reasonKey, g.reasonParams) : g.reason ?? '';
     const detail = g.status === 'approved' && who ? who : reasonText;
     const optional = g.required ? '' : c.dim(t('status.optional'));
@@ -260,6 +263,15 @@ export interface StatusOptions {
   markdown?: boolean;
 }
 
+/** With no active change: how to start one, in the project's own tools (0.20.2: it named every tool). */
+function noChangesHint(config: SdlcConfig): string {
+  const tools = config.tools.filter((tool): tool is ToolId => tool in ADAPTERS);
+  if (tools.length === 0) return t('status.noChangesCli');
+  const ctx = renderContext(config, tools);
+  const workflows = tools.map((tool) => `${ADAPTERS[tool].invocation('intent', ctx)} (${ADAPTERS[tool].name})`);
+  return t('status.noChangesStart', { workflows: workflows.join(', ') });
+}
+
 export async function statusCommand(opts: StatusOptions): Promise<void> {
   try {
     const ctx = loadProject();
@@ -292,7 +304,7 @@ export async function statusCommand(opts: StatusOptions): Promise<void> {
       return line(`${reports.join('\n\n---\n\n')}\n\n${reportFooter(ctx)}`);
     }
     if (views.length === 0) {
-      line(t('status.noChanges'));
+      line(noChangesHint(ctx.config));
       return;
     }
     const width = Math.max(8, ...views.map((v) => v.change.length));
