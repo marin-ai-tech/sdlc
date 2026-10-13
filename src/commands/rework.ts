@@ -138,7 +138,7 @@ export async function reworkCommand(gateArg: string, opts: ReworkOptions): Promi
     const state = readChangeState(ref.dir);
     const decision = decide(ctx, gate, opts, state);
     const scope = opts.reset ? resetScope(ctx, ref, gate) : undefined;
-    const view = evaluateChange(ctx.root, ref, ctx.config);
+    const view = evaluateChange(ctx.root, ref, ctx.config, { withQa: gate === 'qa' });
     const digest = view.gates.find((item) => item.id === gate)?.digest;
     const rework = { ...decision, from: view.stage, ...(digest ? { digest } : {}) };
     recordRework(ctx, ref, state, rework);

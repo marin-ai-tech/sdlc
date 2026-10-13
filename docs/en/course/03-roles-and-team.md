@@ -485,6 +485,11 @@ rules, and accept them as a person.
 
    Accepting also says whether the draft differs from its source, so Ethan sees what the agent added.
 
+   Since 0.18.0, with `openspec/roles.yaml` only a person who holds `maintainer` may accept a role. Without the file
+   any person may, as before; an agent never may. Ethan holds `tech-lead` and `engineer`, so before this step Steven
+   adds `ethan` to `maintainer` in `roles.yaml` and commits it signed (lesson 3.3). Without that, Ethan is refused
+   with `missing_role`, and the message names who may (Steven and Laura).
+
 6. `sdlc team list` now shows every role `accepted` with its subagent. Ethan commits `docs/agents/`,
    `openspec/.sdlc/team.json` and `.claude/agents/`.
 
@@ -514,8 +519,8 @@ rules, and accept them as a person.
 - The project facts in a role follow the project only through `sdlc update`. After Steven changes a verify command,
   he runs `sdlc update`.
 - A `Project rules` section is only as good as what the agent found. Read it before you accept.
-- `sdlc team accept` checks that you are a person, not which role you hold in `roles.yaml`. Agree in the team who
-  accepts roles (at Northwind: Ethan).
+- Since 0.18.0, `sdlc team accept` needs the `maintainer` role when `roles.yaml` exists (step 5). Agree in the team
+  who accepts roles (at Northwind: Ethan, as a maintainer).
 - Denials in this lesson: `sdlc guide denials#guard-config` and `denials#separation-of-duties`.
 
 ### On screen (for the video)
@@ -656,8 +661,8 @@ that carries a script.
 
 - A checksum proves that the content did not change on the way, not that it is good. Take roles and skills only from
   sources the team trusts, and read the scripts.
-- `sdlc team list` does not show that a newer draft waits next to an accepted role. Look in `docs/agents/drafts/`
-  after each sync.
+- Since 0.18.0, `sdlc team list` shows "a newer draft waits" (JSON `newerDraft: true`) when a draft in
+  `docs/agents/drafts/` differs from the accepted role. Read the draft and accept it when it is right.
 - `team.registry` must name a server of `mcp.servers`; otherwise `sdlc.yaml` does not load (`invalid_config`).
 - Never put a literal token in `env` or `headers`; use `${KNOWLEDGE_TOKEN}`. sdlc refuses a literal
   (`mcp_secret_literal`).

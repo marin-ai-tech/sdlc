@@ -2,7 +2,7 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import picomatch from 'picomatch';
 import type { ProjectContext } from '../cli/context.js';
-import { APPROVAL_GATES, saveConfig, type SdlcConfig, type VerifyCommand } from './config.js';
+import { saveConfig, usedApprovalGates, type SdlcConfig, type VerifyCommand } from './config.js';
 import { isFile, isWithin, listFilesRecursive, readText } from './fs-utils.js';
 import { formatIdentity, git, gitIdentity } from './git.js';
 import { appendLog } from './log.js';
@@ -218,7 +218,7 @@ function testPaths(root: string, configured: string[]): string[] {
 
 /** Every role a gate accepts (high-risk extras included), then code-owner and maintainer, each once. */
 function neededRoles(config: SdlcConfig): string[] {
-  const gates = APPROVAL_GATES.flatMap((gate) => [
+  const gates = usedApprovalGates(config).flatMap((gate) => [
     ...config.gates[gate].approvers,
     ...config.gates[gate].highRiskApprovers,
   ]);

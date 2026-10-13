@@ -10,6 +10,7 @@ import {
   type NextAction,
 } from './lifecycle.js';
 import { awaitedRoles } from './approval-quorum.js';
+import { qaRequired } from './qa-gate.js';
 
 /**
  * `sdlc explain --change <id>` (0.11.3, B53): why a change is where it is. It reads the lifecycle view (stage,
@@ -189,6 +190,7 @@ const AFTER_APPROVAL: Partial<Record<GateId, DraftStep['action']>> = {
   intent: 'write-artifact',
   spec: 'write-artifact',
   plan: 'implement',
+  qa: 'review',
   review: 'release',
   release: 'archive',
 };
@@ -205,7 +207,7 @@ function followingSteps(view: LifecycleView): DraftStep[] {
     case 'implement':
       return [verifyStep(view.change)];
     case 'verify':
-      return [agentStep('review', 'explain.then.review')];
+      return [qaRequired(view) ? approvalStep(view, 'qa') : agentStep('review', 'explain.then.review')];
     case 'review':
     case 'fix-findings':
       return [approvalStep(view, 'review')];

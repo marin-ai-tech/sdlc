@@ -264,7 +264,7 @@ export const SLIDES = [
       ru: 'Статус, отчёт с диаграммами, офлайн-дашборд, метрики и журнал. Фоновый скрипт держит страницу дашборда свежей.',
     },
     steps: ['status-all', 'audit', 'log'],
-    more: ['status-md', 'report', 'dashboard', 'statusline', 'hook', 'plugin', 'uninstall'],
+    more: ['status-md', 'report', 'dashboard', 'statusline', 'hook', 'plugin', 'ci-init', 'uninstall'],
     notes: {
       en: 'scripts/examples/dashboard-watch.mjs watches openspec/ and rebuilds reports/dashboard.html; examples run it as a Windows task, a systemd or launchd service, or a CI step.',
       ru: 'scripts/examples/dashboard-watch.mjs следит за openspec/ и пересобирает reports/dashboard.html; в примерах он запускается задачей Windows, сервисом systemd или launchd, или шагом CI.',
@@ -414,9 +414,10 @@ export const STEP_NOTE_RU = {
   'events-flush': 'Боб отправляет ждущие события сейчас; ничего не ждёт.',
   'team-sync': 'Агент приносит встроенные роли черновиками: аналитик, архитектор, разработчик, тестировщик, ревьюер.',
   'team-accept-agent': 'Что говорит роль, решает человек: агенту отказано.',
-  'team-accept': 'Боб принимает тестировщика: субагент sdlc-tester получает проверки этого проекта и заменяет sdlc-verifier.',
+  'team-accept': 'Алиса, мейнтейнер, принимает тестировщика: субагент sdlc-tester получает проверки этого проекта и заменяет sdlc-verifier.',
   'team-list': 'Команда: тестировщик принят, остальные роли пока черновики.',
   'team-check': 'Навыки принятых ролей, проверенные: контрольные суммы, скрипты и разрешённые инструменты; у встроенного тестировщика их нет.',
   plugin: 'Те же процессы как плагин Claude Code.',
+  'ci-init': 'Алиса добавляет проверки sdlc в CI: workflow на полной истории, который проверяет изменения и утверждения.',
   uninstall: 'Удаление сохраняет все файлы планирования.',
 };

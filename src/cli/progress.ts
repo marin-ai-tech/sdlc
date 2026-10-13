@@ -20,6 +20,7 @@ const STEPS = [
   'plan',
   'build',
   'verify',
+  'qa',
   'review',
   'release',
   'archive',
@@ -54,9 +55,15 @@ export function isStepDone(step: ProgressStepId, view: ProgressView): boolean {
   return DONE.has(gate.status);
 }
 
-/** Ordered lifecycle steps for this change (release omitted when unused). */
+/** Show qa when the change shows the gate: required, or a qa decision was recorded (B110). */
+export function includeQa(view: ProgressView): boolean {
+  return gateOf(view, 'qa') !== undefined;
+}
+
+/** Ordered lifecycle steps for this change (qa and release omitted when unused). */
 export function progressSteps(view: ProgressView): ProgressStepId[] {
-  return STEPS.filter((step) => step !== 'release' || includeRelease(view));
+  const used = (step: ProgressStepId) => step !== 'qa' || includeQa(view);
+  return STEPS.filter((step) => used(step) && (step !== 'release' || includeRelease(view)));
 }
 
 /**

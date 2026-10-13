@@ -33,6 +33,8 @@ import { reworkLimitNext } from './rework-limit.js';
 import { questionsNext } from './questions-next.js';
 import { draftIntentNext } from './draft-intent-next.js';
 import { debateNext } from './debate-next.js';
+import { qaDigest, qaInUse, qaNext } from './qa-gate.js';
+import { behaviourGapParams, verifyBehaviourNext } from './verify-behaviour.js';
 
 /**
  * The six stages of Anthropic's AI-native SDLC playbook, plus the two terminal
@@ -59,6 +61,7 @@ export const GATE_STAGE: Record<GateId, StageId> = {
   spec: 'design',
   plan: 'build',
   verify: 'test',
+  qa: 'test',
   review: 'deploy',
   release: 'deploy',
 };
@@ -287,6 +290,8 @@ export interface EvaluateOptions {
   fingerprint?: string | null;
   /** Leave out the names of the people who may take the next decision (the hook does not show them). */
   skipPeople?: boolean;
+  /** Show the qa gate even when the project does not require it (the qa decisions: approve, reject, rework). */
+  withQa?: boolean;
 }
 
 /** Computes the fingerprint once for callers that evaluate several changes. */
@@ -387,6 +392,8 @@ export function evaluateChange(
       info = lr('gate.tasksOpen', { remaining: tasks.remaining, file: tracks });
     } else if (verification.status === 'passed') {
       status = 'passed';
+      const gap = behaviourGapParams(ref.dir, config.verify.requireBehaviour);
+      if (gap) info = lr('gate.verifyBehaviour', gap);
     } else if (verification.status === 'stale') {
       status = 'stale';
       info = lr('gate.verifyStale');
@@ -399,7 +406,8 @@ export function evaluateChange(
         ? lr('gate.verifyNoCommands')
         : lr('gate.verifyRun');
     }
-    const satisfied = status === 'passed' || status === 'waived' || !verifyRequired;
+    const behaviourBlocks = info?.reasonKey === 'gate.verifyBehaviour';
+    const satisfied = (status === 'passed' && !behaviourBlocks) || status === 'waived' || !verifyRequired;
     const verifyBase = {
       id: 'verify' as const, stage: 'test' as const, required: verifyRequired, status, satisfied,
       artifacts: [] as string[], approvals: [], staleApprovals: [], missingRoles: [] as string[],
@@ -407,6 +415,12 @@ export function evaluateChange(
     gates.push(info ? withLocalizedReason(verifyBase, info) : verifyBase);
     if (!satisfied && !upstreamOpen) upstreamOpen = lr('gate.waitingOn', { gate: 'verify' });
   }
+  // QA gate (B110): optional; a person accepts the verification evidence (qa-gate.ts).
+  const qaEval = qaInUse(config, state, options.withQa) ? evaluateApprovalGate('qa', config, state, decided.qa,
+    qaDigest(ref.dir, state), upstreamOpen, [], ref.archived || options.skipFingerprint === true, ref.archived)
+    : undefined;
+  if (qaEval) gates.push(qaEval);
+  if (qaEval && !qaEval.satisfied && !upstreamOpen) upstreamOpen = lr('gate.waitingOn', { gate: 'qa' });
 
   // Review gate: findings in review.md + human code-owner approval bound to code + review record.
   const reviewFile = path.join(ref.dir, 'review.md');
@@ -502,7 +516,7 @@ export function evaluateChange(
   const limit = held ? undefined : reworkLimitNext(root, config, view, state, options.skipPeople);
   const advice = nextAction(view, config, mapping, state);
   const next = held ?? limit ?? questionsNext(view, config, state,
-    debateNext(view, config, draftIntentNext(view, advice)));
+    debateNext(view, config, draftIntentNext(view, verifyBehaviourNext(view, advice))));
   view.next = held || options.skipPeople ? next : nameApprovers(root, config, view, state, next);
   return view;
 }
@@ -515,6 +529,7 @@ function deriveStage(ref: ChangeRef, gates: GateEvaluation[], tasks: { remaining
   if (open.id === 'spec') return 'design';
   if (open.id === 'plan') return 'build';
   if (open.id === 'verify') return tasks.remaining > 0 || tasks.total === 0 ? 'build' : 'test';
+  if (open.id === 'qa') return 'test';
   return 'deploy';
 }
 
@@ -616,6 +631,8 @@ function nextAction(
     );
   }
 
+  const qa = qaNext(view, config);
+  if (qa) return qa;
   const review = gate(view, 'review');
   if (!review.satisfied) {
     const revision = activeReviewRevision(review, state);

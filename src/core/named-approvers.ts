@@ -25,6 +25,8 @@ const PEOPLE_KEYS: Record<string, string> = {
   'next.reviewApprove': 'next.reviewApprovePeople',
   'next.reviewReapprove': 'next.reviewReapprovePeople',
   'next.releaseApprove': 'next.releaseApprovePeople',
+  'next.qaApprove': 'next.qaApprovePeople',
+  'next.qaReapprove': 'next.qaReapprovePeople',
 };
 
 /** Adds `people` to an approve-gate hint and names them in its text. */

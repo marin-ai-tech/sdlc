@@ -11,6 +11,7 @@ interface Milestones {
   spec?: string;
   plan?: string;
   verified?: string;
+  qa?: string;
   review?: string;
   release?: string;
   archived?: string;
@@ -59,6 +60,7 @@ function milestones(history: HistoryEvent[], created: string): Milestones {
     spec: last('gate.spec.approved'),
     plan,
     verified: firstAfter('verify.passed', plan),
+    qa: last('gate.qa.approved'),
     review: last('gate.review.approved'),
     release: last('gate.release.approved'),
     archived: last('change.archived') ?? last('change.archived.forced'),

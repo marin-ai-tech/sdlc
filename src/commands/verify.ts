@@ -12,6 +12,7 @@ import { defaultBaseRef, formatIdentity, gitIdentity, headCommit } from '../core
 import { computePlanDrift } from '../core/plan-drift.js';
 import { checkCoverage, parseCoverage, parseFindings, summarizeFindings } from '../core/review.js';
 import { applyVerifyToState, runVerification, writeEvidence, type VerificationRun } from '../core/verify.js';
+import { uncoveredScenarioReport } from '../core/verify-behaviour.js';
 import { untouchedPlanned, verificationAttachments, type EvidenceExtras } from '../core/verify-extras.js';
 import { runMcpChecks, selectedChecks, uncommittedCode, withMcpChecks } from '../mcp/checks.js';
 import { keepForAgent } from '../mcp/inbox.js';
@@ -27,15 +28,6 @@ export interface VerifyOptions {
   check?: boolean;
   strict?: boolean;
   json?: boolean;
-}
-
-/** Scenarios from the change's delta specs that the behavioral table never mentions. */
-function uncoveredScenarios(changeDir: string): { scenarios: string[]; missing: string[] } {
-  const scenarios = [...new Set(readChangeDeltas(changeDir).flatMap((d) => d.scenarios))];
-  const verification = (readText(path.join(changeDir, 'verification.md')) ?? '').toLowerCase();
-  const behavioral = verification.split('## behavioral verification')[1] ?? '';
-  const missing = scenarios.filter((s) => !behavioral.includes(s.toLowerCase()));
-  return { scenarios, missing };
 }
 
 /**
@@ -142,7 +134,7 @@ export async function verifyCommand(opts: VerifyOptions): Promise<void> {
     if (opts.list) return listChecks(ctx, opts.json);
     const ref = resolveChange(ctx.paths, opts.change);
     if (opts.check) {
-      const coverage = uncoveredScenarios(ref.dir);
+      const coverage = uncoveredScenarioReport(ref.dir);
       if (opts.json) {
         printJson({ change: ref.id, scenarios: coverage.scenarios.length, uncovered: coverage.missing });
       } else if (coverage.missing.length === 0) {

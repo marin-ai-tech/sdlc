@@ -14,10 +14,15 @@ import { parseStages, type StagesConfig } from './stage-config.js';
 import { readYamlObject } from './yaml-io.js';
 import { updateYamlFile } from './yaml-update.js';
 
-export const APPROVAL_GATES = ['intent', 'spec', 'plan', 'review', 'release'] as const;
+export const APPROVAL_GATES = ['intent', 'spec', 'plan', 'qa', 'review', 'release'] as const;
 export type ApprovalGateId = (typeof APPROVAL_GATES)[number];
-export const ALL_GATES = ['intent', 'spec', 'plan', 'verify', 'review', 'release'] as const;
+export const ALL_GATES = ['intent', 'spec', 'plan', 'verify', 'qa', 'review', 'release'] as const;
 export type GateId = (typeof ALL_GATES)[number];
+
+/** The approval gates a project uses: the optional qa gate (B110) only when it is required. */
+export function usedApprovalGates(config: Pick<SdlcConfig, 'gates'>): ApprovalGateId[] {
+  return APPROVAL_GATES.filter((gate) => gate !== 'qa' || config.gates.qa.required);
+}
 
 export type EnforcementMode = 'off' | 'warn' | 'block';
 export type Delivery = 'both' | 'skills' | 'commands';
@@ -77,6 +82,8 @@ export interface SdlcConfig {
     outputLines: number;
     /** MCP checks the CLI calls during `sdlc verify` (B12); absent when sdlc.yaml has none. */
     mcp?: McpCheck[];
+    /** When true, the verify gate also needs every spec scenario in the behavioral table (B110). */
+    requireBehaviour: boolean;
   };
   review: {
     policy: string;
@@ -215,11 +222,12 @@ export function defaultConfig(): SdlcConfig {
       spec: { required: true, approvers: ['product-owner'], highRiskApprovers: ['tech-lead'] },
       plan: { required: true, approvers: ['engineer'], highRiskApprovers: ['tech-lead'] },
       verify: { required: true },
+      qa: { required: false, approvers: ['qa'], highRiskApprovers: [] },
       review: { required: true, approvers: ['code-owner'], highRiskApprovers: [] },
       release: { required: false, approvers: ['release-manager'], highRiskApprovers: [] },
     },
     roles: {},
-    verify: { commands: [], timeoutSeconds: 900, outputLines: 40 },
+    verify: { commands: [], timeoutSeconds: 900, outputLines: 40, requireBehaviour: false },
     review: { policy: 'REVIEW.md', blockOn: ['important'], passes: ['bugs', 'security', 'compliance'], lenses: ['adversarial', 'edge-cases', 'verification-gaps'], requireLensCoverage: true },
     release: { commands: [...DEFAULT_RELEASE_COMMANDS] },
     enforcement: {
@@ -372,6 +380,8 @@ export function parseConfig(raw: Raw, file = 'openspec/sdlc.yaml'): SdlcConfig {
       asNumber(verify.timeout_seconds, where('verify.timeout_seconds')) ?? config.verify.timeoutSeconds;
     config.verify.outputLines =
       asNumber(verify.output_lines, where('verify.output_lines')) ?? config.verify.outputLines;
+    config.verify.requireBehaviour =
+      asBool(verify.require_behaviour, where('verify.require_behaviour')) ?? config.verify.requireBehaviour;
     const checks = parseMcpChecks(verify.mcp, where);
     if (checks.length > 0) config.verify.mcp = checks;
     if (verify.commands !== undefined && verify.commands !== null) {
@@ -557,11 +567,19 @@ export function assertCliValue(value: string, where: string): void {
   throw new SdlcError('invalid_config', { key, params: { p1: where } });
 }
 
+/** The qa gate as the defaults have it (B110): not written, so an older project's sdlc.yaml stays as it was. */
+function isDefaultQa(gate: GateConfig): boolean {
+  const plain = !gate.artifacts && !gate.minApprovals && !gate.overdueHours && !gate.autoWaive;
+  const approvers = gate.approvers.length === 1 && gate.approvers[0] === 'qa';
+  return plain && approvers && !gate.required && gate.highRiskApprovers.length === 0;
+}
+
 /** Serializes back to the snake_case on-disk form. */
 export function serializeConfig(config: SdlcConfig): Record<string, unknown> {
   const gates: Record<string, unknown> = {};
   for (const id of APPROVAL_GATES) {
     const gate = config.gates[id];
+    if (id === 'qa' && isDefaultQa(gate)) continue;
     gates[id] = {
       required: gate.required,
       approvers: gate.approvers,
@@ -591,6 +609,7 @@ export function serializeConfig(config: SdlcConfig): Record<string, unknown> {
       })),
       timeout_seconds: config.verify.timeoutSeconds,
       output_lines: config.verify.outputLines,
+      require_behaviour: config.verify.requireBehaviour,
     },
     review: {
       policy: config.review.policy,

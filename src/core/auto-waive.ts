@@ -25,8 +25,9 @@ export interface AutoWaive {
 
 export const POLICY_WAIVER = 'policy';
 const KEYS = ['kinds', 'tracks'];
-// Verify and review are the checks of the code; release runs its own checks when a person approves it (B47).
-const NEVER: readonly string[] = ['verify', 'review', 'release'];
+// Verify and review are the checks of the code; release runs its own checks when a person approves it (B47);
+// qa is a person's acceptance of the verification evidence (B110).
+const NEVER: readonly string[] = ['verify', 'qa', 'review', 'release'];
 export const AUTO_WAIVED_EVENT = /^gate\.(\w+)\.auto_waived$/;
 
 function invalid(where: string): SdlcError {
@@ -40,7 +41,7 @@ function stringList(value: unknown, where: string, allowed: readonly string[]): 
   return value as string[];
 }
 
-/** `gates.<id>.auto_waive`, parsed; refused on verify, review and release, with other keys, or with bad lists. */
+/** `gates.<id>.auto_waive`, parsed; refused on verify, qa, review and release, with other keys, or bad lists. */
 export function parseAutoWaive(value: unknown, gate: string, where: string): AutoWaive | undefined {
   if (value === undefined || value === null) return undefined;
   if (NEVER.includes(gate)) {

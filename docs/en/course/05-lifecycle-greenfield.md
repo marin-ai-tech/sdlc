@@ -1381,11 +1381,5 @@ seen in the trial run unless the item says otherwise.
   `high_risk_approvers`.
 - The `missing_role` hint ("ask Paul, Ethan, …") can name people whom `distinct_approvers` excludes (seen in the
   first trial).
-- `sdlc team accept`, `sdlc backlog move` and `sdlc backlog drop` check that the caller is a person, not that the
-  person holds a role in `roles.yaml`.
-- `sdlc team list` does not show that a newer registry draft waits next to an accepted role.
-- The verify gate passes without the behavioural table; only `sdlc verify --check --strict` checks it, outside the
-  gate.
-- QA has no gate of its own: Grace's acceptance of the evidence is not recorded by sdlc.
 - Since 0.16.2, set `agents: false` for an event-only `telegram` server: the CLI sends events,
   while agent MCP settings omit it. A server without `stages` is not checked by the stage rule.

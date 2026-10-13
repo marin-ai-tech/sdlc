@@ -25,6 +25,7 @@ roles:
   engineer: [bob, carol]
   tech-lead: [bob]
   code-owner: [bob, carol]
+  qa: [carol]                 # the optional qa gate (0.18.0)
 separation:
   author_cannot_approve: [review, release]
   distinct_approvers: [[spec, review], [plan, review]]
@@ -36,7 +37,7 @@ separation:
   CODEOWNERS `@carol-s` then resolves to Carol in `sdlc review suggest` and the adoption draft. A handle equal
   to the person id also matches. Team handles such as `org/team` are refused. `sdlc adopt` text and JSON both
   list handles it could not resolve.
-- **roles**: role names from the gates in `sdlc.yaml` (`approvers`, `high_risk_approvers`) and the people who hold them. `maintainer` is the role that may change this file.
+- **roles**: role names from the gates in `sdlc.yaml` (`approvers`, `high_risk_approvers`) and the people who hold them. `maintainer` is the role that may change this file. Since 0.18.0, `maintainer` also accepts agent roles, and `qa` approves the optional `qa` gate.
 - **separation** (the defaults are shown):
   - `author_cannot_approve`: gates the authors of the change's code may not approve. Authors are the commit authors and `Co-authored-by` trailers on the branch since the review base, counting only files outside `openspec/`.
   - `distinct_approvers`: pairs of gates that need two different people.
@@ -54,6 +55,17 @@ With the file present, `sdlc approve <gate> --change <id>`:
 3. Applies the separation rules (`author_cannot_approve`, `distinct_approvers`, `max_gates_per_person`) against the approvals already recorded in the change.
 
 `reject` and `waive` check the person and the role, not the separation rules.
+
+Since 0.18.0, the file also decides who takes these team decisions:
+
+| Command | Role needed |
+|---|---|
+| `sdlc team accept` | `maintainer` |
+| `sdlc backlog move`, `sdlc backlog drop` | `product-owner` |
+
+A person without the role is refused with `missing_role`, and the message names who may. Without the file any person may run these commands, as before. An agent never may.
+
+The optional `qa` gate (`gates.qa: { required: true }`, since 0.18.0) sits between verify and review. Its default approver role is `qa`: add your testers to `qa` in `roles.yaml`. After verification passes, a person with the role accepts the evidence with `sdlc approve qa --change <id>`, or sends the change back with `sdlc reject qa --change <id> --note "…"`. An agent can never approve it.
 
 Ask before trying:
 

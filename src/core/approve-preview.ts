@@ -70,7 +70,7 @@ export interface PreviewInput {
 
 /** The preview of approving `input.gate` of `input.ref` as the current git identity. */
 export function previewApproval(input: PreviewInput): ApprovePreview {
-  const view = evaluateChange(input.root, input.ref, input.config);
+  const view = evaluateChange(input.root, input.ref, input.config, { withQa: input.gate === 'qa' });
   const evaluation = view.gates.find((item) => item.id === input.gate)!;
   const state = readChangeState(input.ref.dir);
   const refusals = approvalRefusals(input, evaluation, state, readRolesFile(input.root));
@@ -190,10 +190,15 @@ function assertKnownDecider(config: SdlcConfig, role: string, identity: string |
   throw new SdlcError('not_in_role', { key: 'error.x_is_not_listed_under_roles_x_in_openspec_sdlc_y', params });
 }
 
-/** The gate's artifact files: the planning artifacts it covers, or the review and release records. */
+/** The records each code gate covers: the qa evidence, the review, the review and the release. */
+const GATE_RECORDS: Partial<Record<ApprovalGateId, string[]>> = {
+  qa: ['verification'], review: ['review'], release: ['review', 'release'],
+};
+
+/** The gate's artifact files: the planning artifacts it covers, or the qa, review and release records. */
 function gateArtifacts(view: LifecycleView, gate: ApprovalGateId): PreviewArtifact[] {
-  if (gate === 'review' || gate === 'release') {
-    const records = gate === 'review' ? ['review'] : ['review', 'release'];
+  const records = GATE_RECORDS[gate];
+  if (records) {
     return records.filter((name) => fs.existsSync(path.join(view.dir, `${name}.md`)))
       .map((name) => ({ name, path: `${name}.md` }));
   }
@@ -208,15 +213,14 @@ function openQuestionsFact(input: PreviewInput, state: ChangeState): Partial<App
   return open.length > 0 ? { openQuestions: open } : {};
 }
 
-/** For review and release: the open blocking findings and the verification evidence. */
+/** For qa: the verification evidence; for review and release also the open blocking findings. */
 function codeGateFacts(view: LifecycleView, gate: ApprovalGateId): Partial<ApprovePreview> {
-  if (gate !== 'review' && gate !== 'release') return {};
+  if (gate !== 'qa' && gate !== 'review' && gate !== 'release') return {};
   const status = view.verification?.status ?? 'never';
   const at = view.verification?.at;
-  return {
-    openFindings: view.review?.blocking ?? [],
-    verification: { status, ...(at ? { at } : {}), fresh: status === 'passed' },
-  };
+  const verification = { status, ...(at ? { at } : {}), fresh: status === 'passed' };
+  if (gate === 'qa') return { verification };
+  return { openFindings: view.review?.blocking ?? [], verification };
 }
 
 /** Artifact files whose content differs from the gate's checkpoint (the approval's own stamp aside). */

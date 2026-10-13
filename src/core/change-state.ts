@@ -190,6 +190,8 @@ export interface ChangeState {
     release?: GateState & { environment?: string };
     /** Only `waived` is meaningful for verify; results live in `verify`. */
     verify?: GateState;
+    /** The optional qa gate (B110): present only once a qa decision was recorded. */
+    qa?: GateState;
   };
   verify?: VerifyRecord;
   history: HistoryEvent[];

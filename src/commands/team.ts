@@ -1,5 +1,6 @@
 import { loadProject } from '../cli/context.js';
 import { line, printJson, reportFailure } from '../cli/output.js';
+import { assertDecisionRole } from '../core/decision-role.js';
 import { SdlcError } from '../core/errors.js';
 import { formatIdentity, gitIdentity } from '../core/git.js';
 import { t } from '../core/i18n.js';
@@ -72,6 +73,7 @@ function printSkills(skills: SkillsOutcome): void {
 async function acceptRoleWithSkills(role: string, opts: Options): Promise<void> {
   const ctx = loadProject();
   assertHuman(ctx.config, 'team accept');
+  assertDecisionRole(ctx.root, 'team accept');
   const by = identity(ctx.root);
   const result = acceptRole(ctx.root, ctx.config, role, by);
   const skills = await installRoleSkills(ctx.root, ctx.config, result.skills, by);
@@ -87,6 +89,7 @@ async function acceptRoleWithSkills(role: string, opts: Options): Promise<void> 
 async function acceptSkillCommand(id: string, opts: Options): Promise<void> {
   const ctx = loadProject();
   assertHuman(ctx.config, 'team accept');
+  assertDecisionRole(ctx.root, 'team accept');
   const result = await acceptSkill(ctx.root, ctx.config, id, identity(ctx.root));
   if (opts.json) return printJson(result);
   const where = result.dirs.join(', ');
@@ -117,6 +120,7 @@ function printTable(roles: TeamListRole[]): void {
   const widths = rows[0].map((_cell, index) => Math.max(...rows.map((r) => r[index].length)));
   for (const cells of rows) line(cells.map((cell, index) => cell.padEnd(widths[index])).join('  ').trimEnd());
   for (const role of roles.filter((r) => r.status === 'changed')) line(t('team.list.changed', { id: role.id }));
+  for (const role of roles.filter((r) => r.newerDraft)) line(t('team.list.newerDraft', { id: role.id }));
 }
 
 export function teamListCommand(opts: Options): void {

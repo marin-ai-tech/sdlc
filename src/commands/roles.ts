@@ -5,7 +5,7 @@ import { line, printJson, reportFailure } from '../cli/output.js';
 import { agentEnvironment } from '../core/agent-env.js';
 import { readChangeState } from '../core/change-state.js';
 import { resolveChange } from '../core/changes.js';
-import { APPROVAL_GATES, type ApprovalGateId } from '../core/config.js';
+import { APPROVAL_GATES, usedApprovalGates, type ApprovalGateId } from '../core/config.js';
 import { SdlcError } from '../core/errors.js';
 import { humanCommandFix } from '../core/human-command.js';
 import {
@@ -98,7 +98,7 @@ export function rolesWho(gate: string, opts: Options): void {
 
 export function rolesCheck(opts: Options): void {
   try {
-    const gates = APPROVAL_GATES.map((gate) => matrix(gate, opts));
+    const gates = usedApprovalGates(loadProject().config).map((gate) => matrix(gate, opts));
     if (opts.json) {
       printJson({ gates: gates.map(forJson) });
     } else if (!opts.change) {

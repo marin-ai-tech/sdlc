@@ -24,6 +24,7 @@ import {
 import { SdlcError } from '../core/errors.js';
 import { formatIdentity, gitIdentity } from '../core/git.js';
 import { humanCommandFix } from '../core/human-command.js';
+import { assertDecisionRole } from '../core/decision-role.js';
 import { appendLog } from '../core/log.js';
 import * as path from 'node:path';
 import { assertValidChangeId } from '../core/changes.js';
@@ -250,6 +251,7 @@ export function backlogMove(id: string, opts: Options): void {
     opts,
     (ctx) => {
       human(ctx.config.cli, `backlog move ${id}`);
+      assertDecisionRole(ctx.root, 'backlog move');
       const targets = [
         opts.top && { top: true as const },
         opts.before && { before: text(opts.before)! },
@@ -271,6 +273,7 @@ export function backlogClose(id: string, status: 'done' | 'dropped', opts: Optio
     (ctx) => {
       if (status === 'dropped') {
         human(ctx.config.cli, `backlog drop ${id}`);
+        assertDecisionRole(ctx.root, 'backlog drop');
       }
       const note = text(opts.note);
       if (!note) {

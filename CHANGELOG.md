@@ -2,6 +2,25 @@
 
 All notable changes to sdlc. Versions follow [Semantic Versioning](https://semver.org/); while the major version is 0, a minor version may change behavior.
 
+## 0.18.0 — 2026-10-13
+
+### Added
+- `verify.require_behaviour: true` (default `false`) makes the verify gate also need the behavioural table of
+  `verification.md`: one row per spec scenario, as `sdlc verify --check --strict` checks it. Without the rows the gate
+  is not satisfied, its reason names the uncovered scenarios, and `sdlc next` asks the agent to fill the table.
+- An optional `qa` gate between verify and review: `gates.qa: { required: true }` (default `required: false`,
+  `approvers: [qa]`). After verification passes, a person with the `qa` role accepts the evidence with
+  `sdlc approve qa --change <id>`; review waits for it. The approval covers `verification.md` and the recorded verify
+  run, so a new `sdlc verify` makes it stale and `sdlc next` asks again. `sdlc reject qa` sends the change back to the
+  agent to fix and verify again. When the gate is not required, it does not appear. An agent can never approve it.
+
+### Changed
+- Team decisions go by role. With `openspec/roles.yaml`, `sdlc team accept` needs the `maintainer` role, and
+  `sdlc backlog move` and `sdlc backlog drop` need `product-owner`. A person without the role is refused with
+  `missing_role`, and the message names who may. Without the file any person may decide, as before; an agent never.
+- `sdlc team list` shows "a newer draft waits" (JSON `newerDraft: true`) when a draft in `docs/agents/drafts/` differs
+  from the accepted role.
+
 ## 0.17.0 — 2026-10-13
 
 ### Added

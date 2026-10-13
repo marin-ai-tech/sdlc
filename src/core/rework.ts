@@ -12,7 +12,7 @@ export { filesThatChange } from './plan-files.js';
  * (`sdlc rework`). The gate counts as rejected until its artifacts change or an approval follows, and
  * approvals and waivers of that gate and of every later gate made before the rework stop counting.
  */
-export const REWORK_GATES = ['intent', 'spec', 'plan', 'review'] as const;
+export const REWORK_GATES = ['intent', 'spec', 'plan', 'qa', 'review'] as const;
 export type ReworkGateId = (typeof REWORK_GATES)[number];
 
 /**

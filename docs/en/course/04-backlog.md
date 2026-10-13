@@ -419,8 +419,9 @@ is not ready.
 ### Pitfalls
 
 - After `backlog start`, the draft intent goes to the agent. Megan approves it after `/sdlc:intent` completes it.
-- `sdlc backlog move` and `drop` check that you are a person, not that you are the product owner. At Northwind only
-  Megan runs them; agree on this in your team.
+- Since 0.18.0, with `roles.yaml`, `sdlc backlog move` and `drop` need the `product-owner` role. Without the file any
+  person may run them, as before; an agent never may. At Northwind only Megan holds `product-owner`; anyone else is
+  refused with `missing_role`, and the message names who may.
 - `sdlc backlog done B<n> --note "…"` marks an item done without a change. Use it for work that was finished another
   way, and say how in the note.
 - Denial in this lesson: `sdlc guide denials#separation-of-duties`.

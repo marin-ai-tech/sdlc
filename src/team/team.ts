@@ -124,6 +124,16 @@ export interface TeamListRole {
   source: string;
   status: RoleStatus;
   subagent: string | null;
+  /** An accepted (or changed) role whose draft in docs/agents/drafts/ has a different text (B108). */
+  newerDraft: boolean;
+}
+
+/** A draft waits next to the accepted file and its text differs from it. */
+function hasNewerDraft(root: string, id: string): boolean {
+  const draft = readText(path.join(root, draftPath(id)));
+  if (draft === undefined) return false;
+  const accepted = readText(path.join(root, acceptedPath(id)));
+  return accepted !== undefined && draft !== accepted;
 }
 
 function listed(root: string, id: string, status: RoleStatus, team: TeamRecord): TeamListRole {
@@ -137,6 +147,7 @@ function listed(root: string, id: string, status: RoleStatus, team: TeamRecord):
     source: source ?? (isBuiltinRole(id) ? 'builtin' : 'local'),
     status,
     subagent: status === 'accepted' ? subagentName(role) : null,
+    newerDraft: status !== 'draft' && hasNewerDraft(root, id),
   };
 }
 

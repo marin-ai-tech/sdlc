@@ -191,7 +191,7 @@ export async function approveCommand(gateArg: string, opts: DecisionOptions): Pr
     assertHuman(ctx.config, 'approve');
     assertByAllowed(ctx.config.gates[gate], readRolesFile(ctx.root) !== undefined, opts.by);
     const ref = resolveChange(ctx.paths, opts.change);
-    const view = evaluateChange(ctx.root, ref, ctx.config);
+    const view = evaluateChange(ctx.root, ref, ctx.config, { withQa: gate === 'qa' });
     recordAwaiting(ctx.root, ctx.config, view, ctx.stamp);
     const evaluation = view.gates.find((g) => g.id === gate)!;
     if (evaluation.status === 'blocked') {
@@ -235,7 +235,7 @@ export async function approveCommand(gateArg: string, opts: DecisionOptions): Pr
       warn(t('warn.approvalProvenance', { error: stamping.error }));
     }
 
-    const after = evaluateChange(ctx.root, ref, ctx.config);
+    const after = evaluateChange(ctx.root, ref, ctx.config, { withQa: gate === 'qa' });
     const status = after.gates.find((g) => g.id === gate)!;
     const next = resolveNext(ctx, ref.id);
     const commitMessage = approvalCommitMessage(ref.id, gate, evaluation.digest);
@@ -273,7 +273,8 @@ export async function rejectCommand(gateArg: string, opts: DecisionOptions): Pro
     const roles = readRolesFile(ctx.root);
     const identity = approvalIdentity(ctx.root, roles, opts.by);
     if (roles) roleDecision(ctx.root, ctx.config, roles, gate, state, opts.as, false);
-    const digest = evaluateChange(ctx.root, ref, ctx.config).gates.find((item) => item.id === gate)?.digest;
+    const view = evaluateChange(ctx.root, ref, ctx.config, { withQa: gate === 'qa' });
+    const digest = view.gates.find((item) => item.id === gate)?.digest;
     state.gates[gate] = {
       ...(state.gates[gate] ?? {}),
       rejection: {

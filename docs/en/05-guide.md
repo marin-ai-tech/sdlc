@@ -115,6 +115,7 @@ Repeat steps 3–6 until the backlog is empty. A new idea goes through step 3 at
 | Approve the plan | engineer | | | `sdlc approve plan --change <id>` |
 | Implementation with a feedback loop | agent | `/sdlc:build` | `/sdlc-build` | |
 | Evidence + independent verification | agent + verifier subagent | `/sdlc:verify` | `/sdlc-verify` | `sdlc verify`, `sdlc verify --check` |
+| Accept the evidence (if `gates.qa.required`) | QA | | | `sdlc approve qa --change <id>` |
 | Review against REVIEW.md, fixing findings | agent + reviewer subagent | `/sdlc:review` | `/sdlc-review` | `sdlc review context\|check` |
 | Approve the review | code owner | | | `sdlc approve review --change <id>` |
 | Release (if enabled) | agent → release manager | `/sdlc:release` | `/sdlc-release` | `sdlc approve release --change <id>` |
@@ -254,6 +255,8 @@ Open questions under `## Open questions` in intent.md, proposal.md or design.md 
 
 With `openspec/roles.yaml`, approvals are tied to people in git: the approver's email must belong to a person holding a role the gate accepts, the authors of the code do not approve its review or release, listed gate pairs need different people, and a per-person limit applies. `sdlc roles who <gate> --change <id>` shows the roles needed for that change's risk and who may approve; people refused only for lacking the role are omitted from text. Without `--change`, it lists every role. The `Next:` hint and the workflows name eligible people. `gates.<g>.min_approvals: N` makes a gate wait for approvals from N different people; one person approving again replaces only their own approval. With `signing: warn | required`, `sdlc approvals verify` checks that each approval arrived in a commit signed by the approver. See [Roles, separation of duties and signed approvals](08-roles-and-signing.md).
 
+Since 0.18.0, the file also decides who takes team decisions: `sdlc team accept` needs the `maintainer` role, and `sdlc backlog move` and `sdlc backlog drop` need `product-owner`. A person without the role is refused with `missing_role`, and the message names who may. Without the file any person may run them, as before; an agent never may. `sdlc team list` shows "a newer draft waits" (JSON `newerDraft: true`) when a draft in `docs/agents/drafts/` differs from the accepted role.
+
 **Decisions are taken in your own terminal, not in the agent chat.** In OpenCode and Claude Code a command typed with `!` runs in the agent's shell, so `!sdlc approve …` is refused like the agent's own attempt; custom commands are no way around it either (an agent can run them). The refusal gives the exact command to run in your terminal.
 
 ### Import BMAD planning
@@ -280,6 +283,7 @@ gates:
   # spec:  { auto_waive: { kinds: [docs], tracks: [lite] } }   # waive for matching changes, logged as policy (intent, spec, plan only; not a kind an agent chose)
   release: { required: false, approvers: [release-manager] }
   verify:  { required: true }
+  qa:      { required: false, approvers: [qa] }   # true: the qa role accepts the evidence before review (0.18.0)
 roles:                        # optional: who may approve for a role (openspec/roles.yaml replaces this)
   product-owner: [anna@example.com]
   code-owner: [lead@example.com, dev2@example.com]
@@ -292,6 +296,7 @@ verify:
     - { name: ci-green, server: build, tool: pipeline_status, args: { ref: "${HEAD}" }, expect: { status: success } }
   timeout_seconds: 900
   output_lines: 40
+  require_behaviour: false    # true: the gate also needs the behavioural table, one row per scenario (0.18.0)
 review:
   policy: REVIEW.md
   passes: [bugs, security, compliance]
@@ -337,6 +342,17 @@ Since 0.17.0, the build workflow runs the `sdlc-simplifier` subagent after the l
 You do not need to list it in `stages.build.agents`. `stages.build.simplify: false` turns this step off. Only the
 build stage takes `simplify`; under another stage it is a configuration error. Existing projects get the step with
 `sdlc update`.
+
+Since 0.18.0, `gates.qa: { required: true }` adds a `qa` gate between verify and review (default `required: false`,
+`approvers: [qa]`). After verification passes, a person with the `qa` role accepts the evidence with
+`sdlc approve qa --change <id>`; the review gate waits for it. The approval covers `verification.md` and the recorded
+verify run, so a new `sdlc verify` makes it stale and `sdlc next` asks for it again.
+`sdlc reject qa --change <id> --note "…"` sends the change back to the agent to fix and verify again. When the gate is
+not required, it does not appear. An agent can never approve it.
+
+Since 0.18.0, `verify.require_behaviour: true` (default `false`) makes the verify gate also need the behavioural table
+of `verification.md`: one row per spec scenario, as `sdlc verify --check --strict` checks it. Without the rows the
+gate is not satisfied, its reason names the uncovered scenarios, and `sdlc next` asks the agent to fill the table.
 
 Project context and rules for artifacts are set in the same place as in OpenSpec: `openspec/config.yaml` → `context:` and `rules.<artifact>`. They are included in the instructions for intent, proposal, specs, design, plan and tasks.
 

@@ -301,6 +301,29 @@ follow a change from intent to evidence in one command.
 
    The task-to-commit links come from the `SDLC-Change` and `SDLC-Task` trailers (Module 6, Lesson 6.8).
 
+5. Grace accepts the evidence. Since 0.18.0, a team can record this decision with the optional `qa` gate between
+   verify and review. Steven turns it on in `openspec/sdlc.yaml` and gives Grace the `qa` role in `roles.yaml`:
+
+   ```yaml
+   # openspec/sdlc.yaml
+   gates:
+     qa: { required: true, approvers: [qa] }
+   # openspec/roles.yaml
+   roles:
+     qa: [grace]
+   ```
+
+   After verification passes, Grace reads `verification.md` and accepts it in her own terminal:
+
+   ```bash
+   sdlc approve qa --change add-due-dates
+   ```
+
+   The review gate waits for this approval. It covers `verification.md` and the recorded verify run, so a new
+   `sdlc verify` makes it stale and `sdlc next` asks Grace again. If the evidence is not good enough, Grace runs
+   `sdlc reject qa --change add-due-dates --note "…"`: the change goes back to the agent to fix and verify again. An
+   agent can never approve the gate. When `gates.qa.required` is `false` (the default), the gate does not appear.
+
 ### Check yourself
 
 - `sdlc verify --check --change add-due-dates` reports every scenario covered.
@@ -313,6 +336,9 @@ follow a change from intent to evidence in one command.
 - A task with no code (like "run sdlc verify") shows as a gap "task without a commit". Read the gaps, do not chase a
   zero.
 - Since 0.15.2, `sdlc trace` shows `Status: deferred (D1)` as `deferred (D1)` and keeps the D1 link.
+- Since 0.18.0, `verify.require_behaviour: true` makes the verify gate wait for the behavioural table: one row per
+  spec scenario, as `sdlc verify --check --strict` checks it. Until then the gate's reason names the uncovered
+  scenarios, and `sdlc next` asks the agent to fill the table. The default is `false`.
 
 ### On screen (for the video)
 
