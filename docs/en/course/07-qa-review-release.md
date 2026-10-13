@@ -393,7 +393,8 @@ follow a change from intent to evidence in one command.
    | lens | verification-gaps | behaviour that tests and evidence do not prove |
 
    The same lists are in `review.passes` and `review.lenses` of `openspec/sdlc.yaml`. Paul adds the team's design
-   principles to `REVIEW.md` (for example "money is always a decimal type").
+   principles to `REVIEW.md` (for example "money is always a decimal type"). Since 0.20.0, an accepted pack can add
+   a lens of its own, named `<pack>-<id>` (lesson 3.7).
 
 3. The agent runs each pass and lens in a fresh context (the `sdlc-reviewer` subagent) and writes `review.md`:
 

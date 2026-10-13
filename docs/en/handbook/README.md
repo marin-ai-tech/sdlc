@@ -45,6 +45,7 @@ Start with chapters 0 and 5, then use the sections for your role.
 - [4.1–4.6](04-backlog.md#s4-1)
 - [5.2–5.3](05-lifecycle-greenfield.md#s5-2)
 - [5.5](05-lifecycle-greenfield.md#s5-5)
+- [5.11](05-lifecycle-greenfield.md#s5-11)
 - [2.6](02-toolchain-mcp.md#s2-6)
 - [9.1](09-management-and-audit.md#s9-1)
 - [9.3](09-management-and-audit.md#s9-3)
@@ -52,7 +53,7 @@ Start with chapters 0 and 5, then use the sections for your role.
 
 ### Tech lead (Ethan)
 
-- [3.1–3.6](03-roles-and-team.md#s3-1)
+- [3.1–3.7](03-roles-and-team.md#s3-1)
 - [4.2](04-backlog.md#s4-2)
 - [5.4–5.5](05-lifecycle-greenfield.md#s5-4)
 - [6.1–6.8](06-developer.md#s6-1)
@@ -65,10 +66,12 @@ Start with chapters 0 and 5, then use the sections for your role.
 
 - [1.6](01-setup-greenfield.md#s1-6)
 - [3.2](03-roles-and-team.md#s3-2)
+- [5.11](05-lifecycle-greenfield.md#s5-11)
 - [6.1–6.9](06-developer.md#s6-1)
 - [7.1–7.4](07-qa-review-release.md#s7-1)
 - [10.1–10.4](10-multi-agent.md#s10-1)
 - [11.2](11-troubleshooting-and-reference.md#s11-2)
+- [11.8 (every command)](11-troubleshooting-and-reference.md#s11-8)
 
 ### QA engineer (Grace)
 
@@ -117,7 +120,8 @@ Start with chapters 0 and 5, then use the sections for your role.
 
 ## Before you start
 
-- sdlc 0.14.5 or later on the PATH (`sdlc --version`), Node.js 20.19 or later, git.
+- sdlc 0.14.5 or later on the PATH (`sdlc --version`), Node.js 20.19 or later, git. Sections 3.7, 5.11 and
+  11.8 need sdlc 0.20.0.
 - Claude Code installed and signed in.
 - For Chapter 2: a GitHub token, a Telegram bot token and the address of your knowledge server, as environment
   variables (`GITHUB_TOKEN`, `TELEGRAM_BOT_TOKEN`). The handbook never writes a secret into a file.

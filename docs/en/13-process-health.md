@@ -23,6 +23,7 @@ for newcomers.
 | Open questions are answered by people | `sdlc answer`; the intent and spec gates wait for the answers | 0.11.4 |
 | The team sees how much people took part | the audit and the dashboard: planned vs actual decisions per change | 0.11.4 |
 | A newcomer learns sdlc in an hour | `sdlc guide tour`: seven steps through the calculator demo | 0.11.4 |
+| A gate's artifacts are checked by the team's rubric before a person looks | `gates.<gate>.judge` and `sdlc judge`: a person cannot approve until a verdict passes | 0.20.0 |
 
 ## 13.2. Use cases
 
@@ -189,7 +190,8 @@ plan drift, trace); `sdlc health` looks at everything.
 
 | Command | Who | What |
 |---|---|---|
-| `sdlc health [--json]` | anyone | findings; records `health.degraded` / `health.recovered` in the log |
+| `sdlc health [--since <date> \| --days <n>] [--json]` | anyone | findings; records `health.degraded` / `health.recovered` in the log; `--since` or `--days` replaces `health.window_days` for one run |
+| `sdlc judge --gate <gate> --change <id>` | anyone, the agent too | runs the gate's judge and records its verdict (0.20.0) |
 | `/sdlc:health` (`/sdlc-health`) | agent with a person | explains the findings, drafts backlog items |
 | `sdlc explain --change <id> [--json]` | anyone | why a change is where it is; writes nothing |
 | `sdlc answer <n> --change <id> --text "…"` | person | answers an open question; `--list` shows them |

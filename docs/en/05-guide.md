@@ -46,7 +46,7 @@ the CLI returns `agent_cannot_edit_roles` in an agent session, and the hook deni
   Claude Code, a plugin for OpenCode, the tool's own hooks and rules for Cursor, Codex CLI, Qwen Code and GigaCode
   ([Supported tools](#supported-tools)); plus `REVIEW.md` if it does not exist.
 
-Useful flags: `--mode block` — strict enforcement; `--cli "npx --no-install sdlc"` — if the CLI is installed locally in the project (`npm i -D https://github.com/marin-ai-tech/sdlc/releases/latest/download/sdlc.tgz`; `--no-install` keeps npx from fetching the unrelated registry package); `--opsx` — also install OpenSpec's own `/opsx:*` workflows alongside; `--delivery skills|commands|both`; `--no-hooks`; `--statusline` — install the Claude Code status line.
+Useful flags: `--mode block` — strict enforcement; `--cli "npx --no-install sdlc"` — if the CLI is installed locally in the project (`npm i -D https://github.com/marin-ai-tech/sdlc/releases/latest/download/sdlc.tgz`; `--no-install` keeps npx from fetching the unrelated registry package); `--opsx` — also install OpenSpec's own `/opsx:*` workflows alongside; `--delivery skills|commands|both`; `--no-hooks`; `--statusline` — install the Claude Code status line; `--mcp` — register the sdlc MCP server for the chosen tools ([10.1](10-integrations.md#101-another-ai-system-reads-the-process)); `--tools all` or `--tools none` — every supported tool, or none of them.
 
 **Claude Code plugin (organization-wide):**
 ```text
@@ -108,15 +108,16 @@ Repeat steps 3–6 until the backlog is empty. A new idea goes through step 3 at
 | Step | Who | Claude Code | OpenCode, Cursor, Qwen Code, GigaCode | CLI |
 |---|---|---|---|---|
 | Idea → intent.md | agent + idea author | `/sdlc:intent "customers call to check the status of their request"` | `/sdlc-intent …` | `sdlc new <id>` |
+| Before a person approves: the judge checks the gate's artifacts (if `gates.<gate>.judge`, 0.20.0) | agent | | | `sdlc judge --gate <gate> --change <id>` |
 | Approve the intent | product owner | | | `sdlc approve intent --change <id>` |
 | proposal, deltas, design | agent | `/sdlc:spec` | `/sdlc-spec` | `sdlc validate` |
 | Approve the spec | product owner (+ tech lead if high risk) | | | `sdlc approve spec --change <id> [--as tech-lead]` |
 | plan.md + tasks.md (plan mode) | agent + engineer | `/sdlc:plan` | `/sdlc-plan` | |
-| Approve the plan | engineer | | | `sdlc approve plan --change <id>` |
+| Approve the plan | engineer (+ tech lead if high risk) | | | `sdlc approve plan --change <id> [--as tech-lead]` |
 | Implementation with a feedback loop | agent | `/sdlc:build` | `/sdlc-build` | |
 | Evidence + independent verification | agent + verifier subagent | `/sdlc:verify` | `/sdlc-verify` | `sdlc verify`, `sdlc verify --check` |
 | Accept the evidence (if `gates.qa.required`) | QA | | | `sdlc approve qa --change <id>` |
-| Review against REVIEW.md, fixing findings | agent + reviewer subagent | `/sdlc:review` | `/sdlc-review` | `sdlc review context\|check` |
+| Review against REVIEW.md, fixing findings | agent + reviewer subagent | `/sdlc:review` | `/sdlc-review` | `sdlc review context\|check\|suggest` |
 | Approve the review | code owner | | | `sdlc approve review --change <id>` |
 | Release (if enabled) | agent → release manager | `/sdlc:release` | `/sdlc-release` | `sdlc approve release --change <id>` |
 | Archive: deltas → living specs | agent | `/sdlc:archive` | `/sdlc-archive` | `sdlc archive <id> --yes` |
@@ -167,7 +168,7 @@ Goal: policyholders see claim status without calling support.
 - **Depends on**: B4
 ```
 
-Commands: `sdlc backlog epic add <title> [--goal]`, `sdlc backlog epic edit <E-id> [--title --goal --clear-goal]` (changes an epic's title or goal, never the order), `sdlc backlog add <title> [--epic --kind --risk --outcome --accept --depends --source-type --source-ref]`, `list [--epic --status --ready]`, `next`, `edit <B-id> [--title --outcome --accept --add-accept --depends --clear-depends --kind --risk]` (changes an open or in-progress item's text, never its place or status; `--accept` and `--depends` replace the list), `start <B-id> [--change <id>]` (creates the change and a draft `intent.md`, sets the item to `in-progress`), `move <B-id> (--top | --before | --after | --epic)` and `drop <B-id> --note` (human-only), `done <B-id> --note`. Flow: ready item → `backlog start` → change lifecycle → `sdlc archive` marks the item `done`. With no active change, `sdlc next` proposes the next ready item.
+Commands: `sdlc backlog epic add <title> [--goal]`, `sdlc backlog epic edit <E-id> [--title --goal --clear-goal]` (changes an epic's title or goal, never the order), `sdlc backlog add <title> [--epic --kind --risk --outcome --accept --depends --source-type --source-ref --allow-duplicate]`, `sdlc backlog list [--epic --status --ready]`, `sdlc backlog next` (the next ready item), `sdlc backlog edit <B-id> [--title --outcome --accept --add-accept --depends --clear-depends --kind --risk]` (changes an open or in-progress item's text, never its place or status; `--accept` and `--depends` replace the list; a done or dropped item is refused), `sdlc backlog start <B-id> [--change <id>]` (creates the change and a draft `intent.md`, sets the item to `in-progress`), `sdlc backlog move <B-id> (--top | --before <B-id> | --after <B-id> | --epic <E-id>)` and `sdlc backlog drop <B-id> --note <text>` (human-only), `sdlc backlog done <B-id> --note <text>` (marks an item done by hand; the note is required), `sdlc backlog import --issues` (GitHub issues, below). Flow: ready item → `backlog start` → change lifecycle → `sdlc archive` marks the item `done`. With no active change, `sdlc next` proposes the next ready item.
 
 People edit `openspec/backlog.md` by hand as well — notes under items and epics, extra fields and sections stay when a command writes the file — and agents change it only through these commands — the hook denies an agent's direct edit, so order and removal stay a person's decision. In every supported tool, the backlog workflow (`/sdlc:backlog`, `/sdlc-backlog`, `$sdlc-backlog` in Codex) works with the backlog: without input it shows the list, the next ready item and what blocks the others; with an epic or an idea it proposes items with an outcome and acceptance criteria and adds only those you confirm; with `B<n>` it brings the item to ready and offers to start it. For a reorder or a drop it gives you the command to run.
 
@@ -225,7 +226,7 @@ The intent and the spec are optional: the change starts with plan.md and tasks.m
 - adversarial: 1 finding
 ```
 
-`sdlc review check --change <id>` checks missing entries, mismatched finding counts, empty `checked:` evidence, and deferred links. The review gate uses that result. New projects require lens coverage; older projects warn until `review.require_lens_coverage: true` opts in.
+`sdlc review check --change <id>` checks missing entries, mismatched finding counts, empty `checked:` evidence, and deferred links. The review gate uses that result. New projects require lens coverage; older projects warn until `review.require_lens_coverage: true` opts in. An accepted extension pack adds its lenses as `<pack>-<id>`, and their coverage is required in the same way ([Extension packs](#extension-packs-0200)).
 
 ### Defer a finding
 
@@ -273,7 +274,31 @@ a failing verdict, `sdlc next` gives the agent the judge's rework instruction. A
 stale. A passing verdict is evidence only: a person still approves. After `max_loops` failing verdicts the
 author-critic loop stops and `sdlc next` hands the gate to a person, who may approve. A command judge runs as an agent
 (`SDLC_AGENT=judge`), so it can never approve or unlock. An answer that is not a verdict is refused
-(`judge_invalid_answer`); a judge that fails or times out is an error, never a pass.
+(`judge_invalid_answer`); a judge that fails or times out is an error, never a pass. The rubric must be a file inside
+the project, and a judge has 60 seconds to answer. A failing verdict exits with code 1.
+
+### Extension packs (0.20.0)
+
+A pack from git or npm (`packs` in `openspec/sdlc.yaml`, 5.4) may bring review lenses, workflows and gate checks,
+next to roles and skills ([12.5](12-agent-team.md#125-packs-from-git-or-npm)):
+
+- `lenses/<id>.md` becomes the review lens `<pack>-<id>`: `sdlc review context` gives its text, and
+  `sdlc review check` requires its coverage line.
+- `workflows/<id>.md` becomes the skill `sdlc-<pack>-<id>` for the project's tools. It never replaces a built-in
+  workflow.
+- `checks.yaml` holds `verify:` checks, named `<pack>/<name>`. `sdlc verify` runs them after `verify.commands`, as an
+  agent (`SDLC_AGENT=pack-<name>`).
+
+```bash
+sdlc team sync                  # fetch the packs and report their problems
+sdlc team accept --pack corp    # a person (with roles.yaml: a maintainer) accepts what the pack brings
+```
+
+Nothing a pack brings is in effect before a person accepts it with `sdlc team accept --pack <name>`. The acceptance
+is bound to the digest of the pack's contents, so a new version waits for a new acceptance. An agent can never
+accept. A pack with workflows or checks must be pinned to a git commit (40 hex digits) or an exact npm version
+(`pack_not_pinned` otherwise). A check or a workflow that calls a person's sdlc command is refused
+(`pack_forbidden_command`). A pack that `sdlc team sync` has not fetched yet is refused with `pack_not_synced`.
 
 ### Approvals in commits, evidence limits, gates that do not apply
 
@@ -360,7 +385,8 @@ task contract says what an executor gets and what it must return.
   `SDLC-Change: <id>` and `SDLC-Task: <n.m>`. Work is handed out only while the plan gate is approved and fresh;
   otherwise the command is refused with `plan_not_approved`. `--task` picks one task (`unknown_task` for a task the
   change does not have).
-- `sdlc task check-result --change <id> --branch <ref> --json` checks a returned branch. A commit without the trailers
+- `sdlc task check-result --change <id> --branch <ref> [--base <ref>] --json` checks a returned branch (the base
+  defaults to the merge-base of the branch and HEAD). A commit without the trailers
   (`missing_trailer`), a task the change does not have (`unknown_task`) or a forbidden path (`forbidden_path`) is a
   problem, and the command exits 1. Files outside the plan are a warning (`outside_plan`).
 
@@ -372,7 +398,7 @@ branch, verification and review stay the usual steps of the change. The contract
 
 With `openspec/roles.yaml`, approvals are tied to people in git: the approver's email must belong to a person holding a role the gate accepts, the authors of the code do not approve its review or release, listed gate pairs need different people, and a per-person limit applies. `sdlc roles who <gate> --change <id>` shows the roles needed for that change's risk and who may approve; people refused only for lacking the role are omitted from text. Without `--change`, it lists every role. The `Next:` hint and the workflows name eligible people. `gates.<g>.min_approvals: N` makes a gate wait for approvals from N different people; one person approving again replaces only their own approval. With `signing: warn | required`, `sdlc approvals verify` checks that each approval arrived in a commit signed by the approver. See [Roles, separation of duties and signed approvals](08-roles-and-signing.md).
 
-Since 0.18.0, the file also decides who takes team decisions: `sdlc team accept` needs the `maintainer` role, and `sdlc backlog move` and `sdlc backlog drop` need `product-owner`. A person without the role is refused with `missing_role`, and the message names who may. Without the file any person may run them, as before; an agent never may. `sdlc team list` shows "a newer draft waits" (JSON `newerDraft: true`) when a draft in `docs/agents/drafts/` differs from the accepted role.
+Since 0.18.0, the file also decides who takes team decisions: `sdlc team accept` (also with `--skill` and `--pack`) needs the `maintainer` role, and `sdlc backlog move` and `sdlc backlog drop` need `product-owner`. A person without the role is refused with `missing_role`, and the message names who may. Without the file any person may run them, as before; an agent never may. `sdlc team list` shows "a newer draft waits" (JSON `newerDraft: true`) when a draft in `docs/agents/drafts/` differs from the accepted role.
 
 Since 0.19.0, a person in `roles.yaml` may list chat handles, one per channel:
 
@@ -406,12 +432,17 @@ schema: sdlc                  # schema for sdlc new
 cli: sdlc                     # or "npx --no-install sdlc"
 locale: <code>                # optional: language for people (default: the system locale, else en)
 tools: [claude, opencode]   # also: cursor, codex, qwen, gigacode
+delivery: both                # both | skills | commands (sdlc init --delivery)
+statusline: false             # true: the Claude Code status line (sdlc init --statusline)
+project: { name: claims }     # optional: the project's name in events and in sdlc mcp serve --project
 gates:
   intent:  { required: true,  approvers: [product-owner] }
   spec:    { required: true,  approvers: [product-owner], high_risk_approvers: [tech-lead] }
   plan:    { required: true,  approvers: [engineer],      high_risk_approvers: [tech-lead] }
   review:  { required: true,  approvers: [code-owner], min_approvals: 2 }   # two different people (default 1)
   # spec:  { auto_waive: { kinds: [docs], tracks: [lite] } }   # waive for matching changes, logged as policy (intent, spec, plan only; not a kind an agent chose)
+  # spec:  { judge: { run: node tools/judge.mjs, rubric: docs/rubrics/spec.md } }   # a judge before the person (0.20.0)
+  # plan:  { overdue_hours: 24 }   # a wait longer than this raises gate.plan.overdue (unset: never overdue)
   release: { required: false, approvers: [release-manager] }
   verify:  { required: true }
   qa:      { required: false, approvers: [qa] }   # true: the qa role accepts the evidence before review (0.18.0)
@@ -432,10 +463,11 @@ review:
   policy: REVIEW.md
   passes: [bugs, security, compliance]
   lenses: [adversarial, edge-cases, verification-gaps]
-  require_lens_coverage: true
+  require_lens_coverage: true # sdlc init writes true; without the key, missing coverage only warns
   base: main                  # base for the diff (default: origin/HEAD)
   block_on: [important]
 release:
+  # default: deploy, kubectl, terraform and helm commands that name prod or production
   commands: ['\bdeploy\b.*\bprod(uction)?\b']   # regexes for the agent's production commands
 enforcement:
   mode: warn                  # off | warn | block
@@ -465,6 +497,10 @@ context:
     - { name: glossary, server: kb, resource: "kb://glossary", stages: [design], owner: docs-team, fresh_days: 30 }
 questions: { required: true } # a person answers open questions before intent/spec approval (sdlc answer)
 design: { debate: false }     # the debate lens; debate_sides: [simplicity and speed, robustness and safety]
+rework: { max_cycles: 3 }     # also reasons: the categories of sdlc rework --reason (the defaults are in 5.3)
+team: { registry: team-roles } # the server of mcp.servers the roles and skills come from (chapter 12)
+packs:                        # from git or npm; pin a commit or an exact version for workflows and checks (12.5)
+  - { name: corp, git: https://git.corp.example/sdlc-pack.git, ref: 0123456789abcdef0123456789abcdef01234567 }
 health:                       # thresholds of sdlc health; every key has a default
   wait_hours: 48              # also: window_days 90, stalled_days 14, deferred_days 30, first_pass_rate 0.5,
   rework_share: 0.5           #   waiver_share 0.3, reapprovals 3, denials 5, lock_days 7
@@ -512,15 +548,16 @@ sdlc validate --all --json            # deltas + cross-change overlaps
 sdlc status --json                    # stages and gates of all changes
 sdlc review check --change <id>       # exit 1 if important findings are open
 sdlc audit --json                     # playbook metrics (lead times, first-pass, waits on people, rework reasons)
-  sdlc log --json                       # project log with the sdlc version and license of each entry
+sdlc log --json                       # project log with the sdlc version and license of each entry
 sdlc approvals verify --mode required # every approval in a commit signed by the approver (roles.yaml)
 sdlc ci init --provider github        # a person: CI that runs validate and approvals verify (or --provider gitlab)
-  ```
+sdlc events flush                     # deliver the queued events now (the job from sdlc ci init ends with it)
+```
 
-  Use `sdlc log --event hook.warned --json` to inspect warnings before switching enforcement to block.
-  `--event` accepts `*` as any text, for example `hook.*` or `gate.*.approved`.
-  `sdlc log --since <date>` filters by date; both filters work with `--change` and `--limit`.
-  In JSON, `total` counts the filtered entries.
+Use `sdlc log --event hook.warned --json` to inspect warnings before switching enforcement to block.
+`--event` accepts `*` as any text, for example `hook.*` or `gate.*.approved`.
+`sdlc log --since <date>` filters by date; both filters work with `--change` and `--limit`.
+In JSON, `total` counts the filtered entries.
 
 For `claude -p`, allow the required tools in advance: `--allowedTools "Bash(sdlc *),Read,Write,Edit"`. In CI, it is convenient to add `sdlc status --markdown` to the PR description.
 
@@ -548,5 +585,6 @@ See [the demo and automation](09-demo-and-automation.md).
 npm install -g https://github.com/marin-ai-tech/sdlc/releases/latest/download/sdlc.tgz   # the latest release
 sdlc update                             # regenerate files (manually edited ones are kept; --force overwrites them)
 sdlc update --tools claude              # change the set of agents
+sdlc update --dry-run                   # show what would change; write nothing
 sdlc uninstall                          # remove agent files and hooks; openspec/ remains
 ```

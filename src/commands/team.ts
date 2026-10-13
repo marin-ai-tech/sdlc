@@ -10,6 +10,7 @@ import { acceptSkill, installRoleSkills, type SkillsOutcome } from '../team/skil
 import type { PackReport } from '../team/packs.js';
 import { acceptPack, type PackAcceptResult } from '../team/pack-accept.js';
 import type { PackContentsReport } from '../team/pack-effect.js';
+import { listPacks, type PackListItem } from '../team/pack-list.js';
 import { acceptRole, listTeam, syncTeam, type SyncResult, type TeamListRole } from '../team/team.js';
 import { assertHuman } from './gates.js';
 
@@ -160,12 +161,34 @@ function printTable(roles: TeamListRole[]): void {
   for (const role of roles.filter((r) => r.newerDraft)) line(t('team.list.newerDraft', { id: role.id }));
 }
 
+function packLine(pack: PackListItem): string {
+  const none = '-';
+  const params = { name: pack.name, source: pack.source };
+  if (!pack.synced) return t('team.list.packNotSynced', params);
+  if (pack.problems.length > 0) return t('team.list.packRefused', { ...params, code: pack.problems[0].code });
+  const contents = {
+    lenses: pack.lenses.join(', ') || none,
+    workflows: pack.workflows.join(', ') || none,
+    checks: pack.checks.join(', ') || none,
+  };
+  return t(pack.inEffect ? 'team.list.packInEffect' : 'team.list.packWaits', { ...params, ...contents });
+}
+
+/** 0.20.1: the packs of sdlc.yaml, so a person sees which one waits for acceptance and which one is in effect. */
+function printPacks(packs: PackListItem[]): void {
+  if (packs.length === 0) return;
+  line(t('team.list.packs'));
+  for (const pack of packs) line(`  ${packLine(pack)}`);
+}
+
 export function teamListCommand(opts: Options): void {
   try {
     const ctx = loadProject();
     const roles = listTeam(ctx.root);
-    if (opts.json) return printJson({ roles });
+    const packs = listPacks(ctx.root, ctx.config);
+    if (opts.json) return printJson({ roles, packs });
     printTable(roles);
+    printPacks(packs);
   } catch (error) {
     reportFailure(error, opts.json);
   }

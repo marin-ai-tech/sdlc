@@ -64,11 +64,19 @@ function renderParam(value: MessageParams[string], locale: Locale): string {
   return String(value);
 }
 
+/**
+ * A value right before the template's own period loses its trailing periods: a person's note or a judge's text that
+ * ends a sentence ("…the till.") would otherwise read "…the till.." (a defect found by the 0.20.0 course audit).
+ */
+function beforePeriod(value: string, text: string, end: number): string {
+  return text[end] === '.' ? value.replace(/\.+$/, '') : value;
+}
+
 function substitute(text: string, params: MessageParams | undefined, locale: Locale): string {
   if (!params) return text;
-  return text.replace(/\{(\w+)\}/g, (match, name: string) => {
-    if (Object.prototype.hasOwnProperty.call(params, name)) return renderParam(params[name], locale);
-    return match;
+  return text.replace(/\{(\w+)\}/g, (match, name: string, offset: number) => {
+    if (!Object.prototype.hasOwnProperty.call(params, name)) return match;
+    return beforePeriod(renderParam(params[name], locale), text, offset + match.length);
   });
 }
 

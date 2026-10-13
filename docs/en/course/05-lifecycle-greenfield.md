@@ -16,6 +16,7 @@ In this module:
 - Lesson 5.8 — Review: findings, a rejection and Paul's approval
 - Lesson 5.9 — Release: Emily authorizes production
 - Lesson 5.10 — Archive: living specs, the backlog and the record
+- Lesson 5.11 — A judge before the person
 
 All outputs come from a trial run of `tasklet` with sdlc 0.14.4 and the configuration of Modules 1 to 3. Each person
 ran their commands with their own git identity, outside the agent session. The `github` and `telegram` MCP servers
@@ -1368,6 +1369,171 @@ record the change leaves behind.
 
 ---
 
+## Lesson 5.11 — A judge before the person            (video: ~7 min)
+
+**Role:** Steven (configures), Oliver with Claude Code (runs the judge), Megan (decides)   **Project:** tasklet
+**You need:** lessons 5.3 and 5.5; a judge the team trusts: a command, or a tool of an MCP server in `mcp.servers`
+
+**Goal.** An independent model checks the spec by the team's rubric before Megan reads it. The agent fixes what the
+judge finds. Megan still approves.
+
+The outputs of this lesson come from a trial with sdlc 0.20.0 on a small change of `tasklet`, `fix-empty-title`. The
+judge in that trial was a small local script with one rule of the rubric: every requirement has a scenario. Your
+judge will be a model with a real rubric.
+
+### Steps
+
+1. Steven writes the rubric, `docs/rubrics/spec.md`, a file of the project under review like any other:
+
+   ```markdown
+   # Spec rubric
+
+   - Every requirement has at least one scenario.
+   - A scenario names the input and the exact result.
+   ```
+
+2. Steven sets the judge on the spec gate in `openspec/sdlc.yaml`, in his editor:
+
+   ```yaml
+   gates:
+     spec:
+       required: true
+       approvers: [product-owner]
+       judge: { run: node tools/judge.mjs, rubric: docs/rubrics/spec.md, max_loops: 3 }
+       # or a tool of the MCP registry:
+       # judge: { server: judges, tool: judge, rubric: docs/rubrics/spec.md }
+   ```
+
+   `sdlc judge` sends `{ change, gate, rubric, artifacts: [{ path, content }] }` to the judge. A command reads it on
+   stdin and prints the verdict as JSON; a tool gets it as arguments. The verdict is `{ pass, route, rework }`.
+   `max_loops` is 3 when you leave it out.
+
+3. The gate is blocked until the judge passes. When Megan tries to approve too early, she is refused:
+
+   ```text
+   error: The spec gate cannot be approved yet: waiting for the judge (`sdlc judge --gate spec`).
+   ```
+
+   `sdlc next` gives the step to the agent:
+
+   ```text
+   fix-empty-title: Design (requirements + design spec)
+   agent: Run the judge for the spec gate: `sdlc judge --gate spec --change fix-empty-title`.
+   $ sdlc judge --gate spec --change fix-empty-title
+   ```
+
+4. The agent runs the judge. Anyone may run `sdlc judge`, the agent too:
+
+   ```bash
+   sdlc judge --gate spec --change fix-empty-title
+   ```
+
+   ```text
+   Judge rejected the spec gate (route author).
+   Rework: Add a scenario to the requirement "Empty title".
+   ```
+
+   The command exits 1. sdlc records the verdict, bound to the digest of the spec artifacts.
+
+5. A failing verdict sends the rework instruction to the agent. `sdlc status --change fix-empty-title` shows it on
+   the gate and in `next`:
+
+   ```text
+   gates
+     intent   ✓ approved           Megan <megan@northwind.example> as product-owner
+     spec     · blocked            judge asked for rework: Add a scenario to the requirement "Empty title".
+   next      agent: The judge rejected the spec artifacts: Add a scenario to the requirement "Empty title".. Revise them, then run `sdlc judge --gate spec --change fix-empty-title` again.
+              $ sdlc judge --gate spec --change fix-empty-title
+   ```
+
+   (Shortened: the later gates are left out.)
+
+6. The agent adds the scenario to the delta spec and runs the judge again:
+
+   ```markdown
+   #### Scenario: Title of spaces only
+   - **WHEN** Oliver adds a task with the title "   "
+   - **THEN** the task is refused with "The title is empty"
+   ```
+
+   ```text
+   Judge passed the spec gate (route human).
+   ```
+
+   With `--json`, the answer has the verdict, the digest it is bound to, and the next step:
+
+   ```text
+   "verdict": {
+     "pass": true,
+     "route": "human",
+     "rework": ""
+   },
+   "digest": "sha256:d11aede961b1b6fbc11518bc286d250ff580d1e9e82f890a498ce6745e377d02",
+   ```
+
+7. A passing verdict is evidence only. The approval stays with the product owner. `sdlc next` now names a person:
+
+   ```text
+   fix-empty-title: Design (requirements + design spec)
+   person: A product-owner must review and approve the spec gate (proposal, specs, design).
+   $ sdlc approve spec --change fix-empty-title --as product-owner
+   ```
+
+   The agent cannot take this step. In its session the approval is refused:
+
+   ```text
+   error: `sdlc approve` records a human decision and cannot run inside an agent session (claude-code).
+   ```
+
+   Megan reads the three files and approves in her own terminal:
+
+   ```text
+   ✓ spec gate: Megan <megan@northwind.example> approved as product-owner (d11aede961b1)
+   ```
+
+8. The loop has an end. After `max_loops` failing verdicts, the author-critic loop stops and a person decides. In the
+   trial, a second change, `add-due-date`, had `max_loops: 2` and failed twice. `sdlc next` then said:
+
+   ```text
+   add-due-date: Design (requirements + design spec)
+   person: The judge rejected the spec gate Add a scenario to the requirement "Due date". — a person decides (the author-critic loop stopped).
+   $ sdlc approve spec --change add-due-date --as product-owner
+   ```
+
+   The gate is `pending` again, not approved. Megan reads the judge's notes and decides: she approves, rejects, or
+   sends the spec back with `sdlc rework`. The judge never approves.
+
+9. Know what the judge cannot do. A command judge runs as an agent (`SDLC_AGENT=judge`), so it can never approve or
+   unlock. An answer that is not a verdict is refused (`judge_invalid_answer`) and records nothing:
+
+   ```text
+   error: The judge answer was not a verdict `{ pass, route, rework }`.
+   fix: Fix the judge so it returns JSON `{ "pass": boolean, "route": string, "rework": string }` and run `sdlc judge` again.
+   ```
+
+   A judge that fails or times out is an error, never a pass.
+
+### Check yourself
+
+- Before a passing verdict, `sdlc approve spec` is refused with "waiting for the judge".
+- After a failing verdict, `sdlc status` shows the judge's instruction on the spec line.
+- After a passing verdict, `sdlc next` names the product owner, and only Megan's approval moves the gate.
+
+### Pitfalls
+
+- A changed artifact makes the verdict stale. If the agent edits `design.md` after a pass, `sdlc next` asks for the
+  judge again.
+- Every failing verdict counts toward `max_loops`, also after the agent changed the artifacts.
+- The judge gets only the rubric and the gate's artifacts. Write the rubric as short rules that a reader can check.
+- `gates.<g>.judge` works on any approval gate, not only on spec.
+
+### On screen (for the video)
+
+- The rubric and the `gates.spec.judge` line side by side.
+- Megan's refused approval, then the failing verdict and the rework line in `sdlc status`.
+- The scenario the agent adds; the passing verdict; Megan's approval in her own terminal.
+---
+
 ## Gaps found
 
 Things Modules 3 to 5 needed that sdlc 0.14.4 does not do, or does in a confusing way. One item each; all were
@@ -1376,8 +1542,8 @@ issue on archive) are gone from this list; see lesson 4.3.
 
 - `sdlc backlog add` has no `--source-url` (only `sdlc new` has one), so an issue link kept by hand is a ref string.
   Since 0.19.0, `sdlc backlog import --issues` uses the `Issue: GH-<n>` field instead.
-- `min_approvals` cannot require one approval per role (for example code owner and QA) outside
-  `high_risk_approvers`.
+- `min_approvals` cannot require one approval per role (for example code owner and tech lead) outside
+  `high_risk_approvers`. For QA, the optional qa gate of 0.18.0 (`gates.qa`) is an approval of its own.
 - The `missing_role` hint ("ask Paul, Ethan, …") can name people whom `distinct_approvers` excludes (seen in the
   first trial).
 - Since 0.16.2, set `agents: false` for an event-only `telegram` server: the CLI sends events,

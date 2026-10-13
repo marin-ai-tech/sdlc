@@ -13,7 +13,7 @@ decision, and a daily summary.
 | Release notes that match the specs | `sdlc changelog`: requirements added, changed and removed by the delta specs |
 | Know which commits agents made | a git hook marks them `SDLC-Agent: <agent>`; the audit shows the share |
 | Both sides of a key design decision on record | the debate lens: two advocates argue it before the spec gate |
-| A short morning digest | an example script writes done, next, blocked and waiting on people to a file |
+| A short morning digest | `sdlc events summary` sends the daily summary to the team's receivers (0.19.0); an example script writes done, next, blocked and waiting on people to a file |
 
 ## 14.2. Use cases
 
@@ -102,9 +102,12 @@ what waits on people (with the commands). It never sends anything; mail it, post
 schtasks /Create /SC DAILY /ST 08:00 /TN sdlc-daily /TR "cmd /c cd /d C:\work\shop && node daily-summary.mjs --out reports"
 ```
 
+Since 0.19.0, `sdlc events summary` sends the summary as the event `summary.daily` to the receivers whose `on` names
+it, for example a Telegram bot ([Events and the daily summary](05-guide.md#events-and-the-daily-summary)). There is
+one summary per project and day, so run it once a day from a scheduler or a CI job.
+
 ## 14.3. Limits we accept
 
 - The agent marker comes from the environment of the agent's terminal; a commit made outside it (for example, a person
   committing what an agent wrote) is a person's commit.
-- `sdlc audit --since` works together with `--export`; the plain audit covers all time.
 - The debate is recorded text: sdlc checks that both positions and the decision are there, not how good they are.

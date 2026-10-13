@@ -1,6 +1,6 @@
 # 11. Working with sdlc over MCP: capabilities and use cases
 
-Chapter 10 describes each MCP feature. This chapter is about using them: who connects to what, which situations they help in, and where the limits are today. Everything here works in 0.9.0 unless a limit says otherwise.
+Chapter 10 describes each MCP feature. This chapter is about using them: who connects to what, which situations they help in, and where the limits are today. Everything here works in sdlc 0.20.0; a version in brackets says since when, and 11.5 lists the limits.
 
 ## 11.1. What sdlc offers over MCP
 
@@ -23,6 +23,7 @@ MCP works in two directions here:
 | A daily summary, and chat handles for the people who must act | sdlc → servers | `sdlc events summary`; `chat:` on a receiver (0.19.0) | the team chat, for example Telegram |
 | GitHub issues into the backlog, commented on and closed when the change is archived | sdlc → servers | `issues`, `sdlc backlog import --issues` (0.19.0) | the product owner |
 | Context packs from the team's knowledge server, pulled into files | sdlc → servers | `context.sources`, `sdlc context pull` (0.19.0) | the owners of the knowledge |
+| An independent judge checks a gate's artifacts before a person approves | sdlc → servers | `gates.<g>.judge` with `server` and `tool`, `sdlc judge` (0.20.0) | the gates, as evidence for the person |
 | Which servers an agent may call at which stage | hook | `mcp.servers.<name>.stages` | enforced on every agent |
 | Which skills, subagents and servers a stage uses | generated workflows | `stages.<stage>` | the agent, as guidance |
 
@@ -306,7 +307,7 @@ Chapter 10.11 has the configuration.
 - **Who can call the sdlc server:** over stdio, whoever can start a process in the project folder; that person can read the repository anyway. Over HTTP (0.19.0), whoever can reach the port and holds the token from `SDLC_MCP_TOKEN`; without the token a request gets 401. Give the token only to clients that may read the repository.
 - **What it can read:** the same as the CLI's JSON: change names, stages, people from `roles.yaml`, file paths in traces, audit history. Treat a connected chat client as someone with read access to the repository.
 - **What it cannot do:** decide anything, write project files, or run arbitrary commands. Tool arguments that look like options are refused.
-- **What sdlc sends to other servers:** only the arguments of your `verify.mcp` checks (`${HEAD}`, `${CHANGE}`, your literals) and the `${VAR}` values for that server. Since 0.19.0 also the `args` of `context.sources`, the owner and repository of `issues` with the comment that names the archived change, and chat handles only to a receiver that names their channel.
+- **What sdlc sends to other servers:** only the arguments of your `verify.mcp` checks (`${HEAD}`, `${CHANGE}`, your literals) and the `${VAR}` values for that server. Since 0.19.0 also the `args` of `context.sources`, the owner and repository of `issues` with the comment that names the archived change, and chat handles only to a receiver that names their channel. Since 0.20.0, a judge on a registry tool (`gates.<g>.judge`) gets the gate's rubric and the text of its artifacts.
 
 ## 11.5. Limits today
 

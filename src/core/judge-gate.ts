@@ -66,6 +66,14 @@ export function failingJudgeCount(state: ChangeState, gate: ApprovalGateId): num
   return judgeVerdicts(state, gate).filter((row) => row.pass === false).length;
 }
 
+/**
+ * The judge's rework text as part of a sentence: trimmed, without its own end punctuation, which the message
+ * templates add ("…the proposal.. Revise" was a defect).
+ */
+export function reworkText(rework: string): string {
+  return rework.trim().replace(/[.!?。]+$/u, '');
+}
+
 /** The latest verdict whose digest matches the current artifacts; undefined when none. */
 export function currentJudgeVerdict(
   state: ChangeState,
@@ -110,7 +118,7 @@ export function judgeBlockReason(
   if (judgeCleared(config, state, gate, digest)) return undefined;
   const current = currentJudgeVerdict(state, gate, digest);
   if (current && current.pass === false) {
-    return lr('gate.judgeRework', { gate, rework: current.rework });
+    return lr('gate.judgeRework', { gate, rework: reworkText(current.rework) });
   }
   return lr('gate.judgeRequired', { gate });
 }
@@ -162,7 +170,7 @@ export function judgeNext(
     return withKey(
       { actor: 'human', action: 'approve-gate', gate, workflow: next.workflow, cli: next.cli },
       'next.judgeEscalated',
-      { gate, rework: last.rework, change: view.change },
+      { gate, rework: reworkText(last.rework), change: view.change },
     );
   }
   const current = currentJudgeVerdict(state, gate, digest);
@@ -176,7 +184,7 @@ export function judgeNext(
         cli: `sdlc judge --gate ${gate} --change ${view.change}`,
       },
       'next.judgeRework',
-      { gate, rework: current.rework, change: view.change },
+      { gate, rework: reworkText(current.rework), change: view.change },
     );
   }
   return withKey(

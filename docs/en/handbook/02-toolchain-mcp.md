@@ -781,7 +781,8 @@ gone from this list; see the sections above for what replaced them.
 
 - `stages: []` means "not checked"; use `agents: false` to keep an agent away.
 - An open change is never at `maintain`, so a `maintain`-only server is out of stage during `/sdlc:triage`.
-- Events are sent only from the clone where the command ran; every person needs the receiver's secret.
+- Events are sent only from the clone where the command ran; every person needs the receiver's secret. Since 0.19.0
+  a wait has the same event id in every clone and in CI, so a receiver keeps one.
 - A scheduled `events flush` for overdue gates needs a clone that keeps its log; a fresh checkout alone is not
   enough for that schedule. Since 0.19.0, `sdlc ci init` already runs `sdlc events flush` at the end of the CI
   workflow.

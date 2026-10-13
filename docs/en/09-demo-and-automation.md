@@ -48,3 +48,8 @@ node scripts/examples/dashboard-watch.mjs --cli "npx --no-install sdlc" --deboun
 - as a CI step that keeps the page as a build artifact.
 
 Everything stays local; nothing is published.
+
+Since 0.16.1 the CLI does the same without the script: `sdlc dashboard --watch [--serve <host:port>]` builds the
+page, rebuilds it when `openspec/` changes and, with `--serve`, serves it with an auto-refresh
+([5.6](05-guide.md#56-keeping-the-dashboard-current)). The script stays for schedulers such as the Windows Task
+Scheduler.

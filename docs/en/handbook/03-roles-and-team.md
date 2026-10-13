@@ -13,6 +13,7 @@ approves a gate. The outputs come from a trial run of `tasklet` with sdlc 0.14.4
 - [3.4 The agent team: sync, drafts and a person's acceptance](#s3-4)
 - [3.5 Roles and skills from the `knowledge` registry and from packs](#s3-5)
 - [3.6 The built-in subagents](#s3-6)
+- [3.7 Team extensions from a pack](#s3-7)
 
 
 <a id="s3-1"></a>
@@ -554,11 +555,13 @@ that carries a script.
      - { name: northwind-npm, npm: "@northwind/sdlc-pack@1.2.0" }
    ```
 
-   - Pin the version: a tag or a commit for git, an exact version for npm.
+   - Pin the version: a tag or a commit for git, an exact version for npm. Since 0.20.0, a pack with workflows or
+     checks needs the commit (lesson 3.7).
    - An `npm:` pack is a registry package or a `.tgz` file (a path or an `https://` URL). A folder or a repository is
      refused for `npm:`, because npm runs a package's `prepare` script for those even with `--ignore-scripts`. Put a
      repository in a `git:` pack.
-   - No code of a pack runs: no git hooks or submodules, no npm scripts.
+   - No code of a pack runs when it is fetched: no git hooks or submodules, no npm scripts. The checks of an
+     accepted pack run later, in `sdlc verify`, as an agent (lesson 3.7).
    - An unreachable pack is reported, and sync goes on with the next source.
 
 4. Run the sync. The team already accepted the five built-in roles in [lesson 3.4](#s3-4). The registry has a company
@@ -719,3 +722,138 @@ the place of two of them.
 - The read-only subagents have no Edit or Write tools. Asking the verifier to "just fix it" will not work, by design.
 - `stages.<stage>` is guidance in the workflow text. MCP servers outside their `stages` are also enforced by the hook
   (`sdlc guide denials#mcp-stage`); skills and subagents are not.
+
+
+<a id="s3-7"></a>
+## 3.7 Team extensions from a pack
+
+*Steven (configures), Ethan (accepts, as a maintainer)  ·  tasklet  · needs: lesson 3.5; Ethan in `maintainer` in
+`roles.yaml` (lesson 3.4)*
+
+Bring Northwind's review lens, workflow and verify check from the company pack, and see that none of them is
+in effect before a person accepts the pack.
+
+The outputs of this lesson come from a trial with sdlc 0.20.0. The pack was a local copy of a git repository, and its
+check was a stand-in that always passes.
+
+### Procedure
+
+1. Explain what a pack may bring since 0.20.0, next to roles and skills:
+
+   | File in the pack | What it becomes in the project | Who uses it |
+   |---|---|---|
+   | `lenses/<id>.md` | a review lens named `<pack>-<id>` | `sdlc review context` gives its text; `sdlc review check` needs its coverage line in review.md |
+   | `workflows/<id>.md` | a workflow, generated as the skill `sdlc-<pack>-<id>` for the project's tools | the agent; it never replaces a built-in workflow |
+   | `checks.yaml` | `verify:` checks, named `<pack>/<name>` | `sdlc verify` runs them as an agent |
+
+2. Northwind's pack holds one of each:
+
+   ```text
+   lenses/privacy.md            Look for personal data in logs, URLs and error messages.
+   workflows/release-notes.md   description: Draft release notes from the archived changes
+   checks.yaml                  verify: one check named licenses
+   ```
+
+3. Steven adds the pack with a tag, as in lesson 3.5, and runs the sync:
+
+   ```yaml
+   packs:
+     - { name: northwind, git: https://git.northwind.example/sdlc-pack.git, ref: v1.0.0 }
+   ```
+
+   ```bash
+   sdlc team sync
+   ```
+
+   ```text
+   Pack northwind (v1.0.0 d9d6e29abfd3): 0 roles, 0 skills
+   pack northwind: pack_not_pinned - ref v1.0.0: a pack with workflows or checks needs a git commit of 40 hex digits or an exact npm version; it cannot be accepted until this is fixed
+   ```
+
+   (Shortened: the lines about role drafts are left out.) A tag can move to other content; a commit cannot. A pack
+   with workflows or checks must point at a commit or at an exact npm version. A pack with only roles, skills or
+   lenses may still use a tag.
+
+4. Steven pins the commit (`git rev-parse v1.0.0` in a clone of the pack) and runs the sync again:
+
+   ```yaml
+   packs:
+     - { name: northwind, git: https://git.northwind.example/sdlc-pack.git, ref: d9d6e29abfd3ddcb6179e4617c963fbac1b10aad }
+   ```
+
+   ```text
+   Pack northwind (d9d6e29abfd3ddcb6179e4617c963fbac1b10aad d9d6e29abfd3): 0 roles, 0 skills
+   pack northwind: 1 lenses, 1 workflows, 1 checks - not in effect until a person runs `sdlc team accept --pack northwind`
+   ```
+
+   Nothing is in effect yet: `sdlc verify --list` does not list the pack's check, `sdlc review context` names no
+   lens of the pack, and the skill of the workflow is not generated.
+
+5. The agent cannot accept a pack. When Oliver asks Claude Code to do it, the command is refused:
+
+   ```text
+   error: `sdlc team accept` records a human decision and cannot run inside an agent session (claude-code).
+   fix: Run it yourself in your own terminal, not in the agent chat (a `!` command there runs in the agent's shell): sdlc team accept --pack northwind
+   ```
+
+6. Ethan reads the three files of the pack, then accepts it in his own terminal:
+
+   ```bash
+   sdlc team accept --pack northwind
+   ```
+
+   ```text
+   Pack northwind (d9d6e29abfd3ddcb6179e4617c963fbac1b10aad d9d6e29abfd3) accepted; recorded in openspec/.sdlc/team.json.
+     review lenses: northwind-privacy
+     workflows: sdlc-northwind-release-notes
+     check northwind/licenses (runs as an agent): node -e "process.exit(0)"
+   ```
+
+   The acceptance is bound to the digest of the pack's lenses, workflows and checks. A new commit, a changed entry
+   in `sdlc.yaml` or an edited cache puts none of them in effect until a person accepts again.
+
+7. Now the three are in effect. In the trial project, which had no checks of its own:
+
+   ```bash
+   sdlc verify --list
+   ```
+
+   ```text
+   northwind/licenses node -e "process.exit(0)"
+   ```
+
+   `sdlc review context --change <id>` names the lens, and `sdlc review check` asks for its coverage line:
+
+   ```text
+   lens northwind-privacy from pack northwind: its text is in `sdlc review context --json`
+   ```
+
+   The workflow is the skill `.claude/skills/sdlc-northwind-release-notes/SKILL.md`. `sdlc verify` runs
+   `northwind/licenses` as an agent (`SDLC_AGENT=pack-northwind`), never with the rights of the person who started
+   verify.
+
+8. A pack can never decide. In the trial, a second pack, `shortcut`, had a check that calls a person's command. The
+   sync reports it, and the acceptance is refused:
+
+   ```text
+   pack shortcut: pack_forbidden_command - checks.yaml verify[0]: sdlc approve review --change add-due-date; it cannot be accepted until this is fixed
+   ```
+
+   ```text
+   error: Pack shortcut: checks.yaml verify[0] calls a command only a person may run (sdlc approve review --change add-due-date); a pack can never approve or unlock.
+   fix: Remove that command from the pack: a person runs such commands, never a check or a workflow of a pack.
+   ```
+
+### You are done when
+
+- `sdlc team sync` prints `accepted, in effect` for the pack.
+- `sdlc verify --list` lists `northwind/licenses`.
+- `sdlc review check` asks for the coverage line `northwind-privacy` in review.md.
+
+### Pitfalls
+
+- A tag is not enough for workflows or checks (`pack_not_pinned`). Pin the commit.
+- A new version of the pack waits for a new acceptance. Until then, nothing of the pack is in effect, not even the
+  lens that was accepted before.
+- A pack workflow never replaces a built-in one: a `workflows/build.md` in a pack does not change `sdlc-build`.
+- `sdlc team list` lists the roles only. Read the state of a pack in the output of `sdlc team sync`.

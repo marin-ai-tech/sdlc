@@ -397,6 +397,21 @@ describe('demo: a team builds a calculator with sdlc (every command)', { timeout
     step('team-accept', 'visibility', 'alice', ['team', 'accept', 'tester'], 'Alice, the maintainer, accepts the tester: the subagent sdlc-tester gets this project\'s checks and takes over from sdlc-verifier.');
     step('team-list', 'visibility', 'bob', ['team', 'list'], 'The team: the tester is accepted, the other roles are still drafts.');
     step('team-check', 'visibility', 'bob', ['team', 'check'], 'The skills of the accepted roles, checked: checksums, scripts and tool grants; the built-in tester lists none.');
+    // 0.20.0 (B18): the company's pack brings a review lens; nothing of it counts before a person accepts the pack.
+    const pack = tempDir('sdlc-demo-pack-');
+    initGitRepo(pack);
+    write(path.join(pack, 'lenses/money.md'), '# Money\n\nLook for rounding of amounts and for floats used for money.\n');
+    git(pack, ['add', '-A']);
+    git(pack, ['commit', '-q', '-m', 'tillkit lens']);
+    const packCommit = spawnSync('git', ['rev-parse', 'HEAD'], { cwd: pack, encoding: 'utf-8' }).stdout.trim();
+    const withPack = parseDocument(read(path.join(root, 'openspec/sdlc.yaml')));
+    const packUrl = `file:///${pack.replace(/\\/g, '/').replace(/^\//, '')}`;
+    withPack.setIn(['packs'], [{ name: 'tillkit', git: packUrl, ref: packCommit }]);
+    write(path.join(root, 'openspec/sdlc.yaml'), withPack.toString());
+    step('team-sync-pack', 'visibility', 'agent', ['team', 'sync'],
+      'The company pack tillkit brings a review lens about money; it is not in effect yet.');
+    step('team-accept-pack', 'visibility', 'alice', ['team', 'accept', '--pack', 'tillkit'],
+      'Alice, the maintainer, accepts the pack: from now on every review must cover the lens tillkit-money.');
     step('plugin', 'visibility', 'bob', ['plugin', 'build', path.join(tempDir('sdlc-demo-plugin-'), 'plugin')], 'The same workflows as a Claude Code plugin.');
     step('ci-init', 'visibility', 'alice', ['ci', 'init', '--provider', 'github'],
       'Alice adds the sdlc checks to CI: a workflow on a full clone that validates and verifies approvals.');

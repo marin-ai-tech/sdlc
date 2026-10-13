@@ -2,6 +2,21 @@
 
 All notable changes to sdlc. Versions follow [Semantic Versioning](https://semver.org/); while the major version is 0, a minor version may change behavior.
 
+## 0.20.1 — 2026-10-13
+
+### Fixed
+- A person's note, a reason or a judge's text that ends with a period no longer reads with two periods in a message
+  (for example after a failing judge verdict in `sdlc next`); the message after `max_loops` puts a colon before the
+  judge's text.
+- `sdlc team list` shows the packs of `openspec/sdlc.yaml`: whether each is synced, waits for a person
+  (`sdlc team accept --pack <name>`) or is in effect, and its lenses, workflows and checks (JSON `packs`).
+- The 0.19.0 section of this changelog had lost its heading.
+
+### Changed
+- The documentation is checked against the CLI: every command and workflow is described in the reference documents
+  and in the command reference of the course and the handbook; the course and the handbook have lessons on the judge
+  gate and on extension packs; the demo accepts a company pack with a review lens.
+
 ## 0.20.0 — 2026-10-13
 
 ### Added
@@ -24,6 +39,7 @@ All notable changes to sdlc. Versions follow [Semantic Versioning](https://semve
   (`pack_not_pinned` otherwise). A pack that calls a person's sdlc command in a check or a workflow is refused
   (`pack_forbidden_command`).
 
+## 0.19.0 — 2026-10-13
 
 ### Added
 - `sdlc mcp serve --http <host:port>` serves the same read-only tools to remote MCP clients over Streamable HTTP at

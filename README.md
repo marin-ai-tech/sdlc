@@ -14,6 +14,7 @@ backlog ──► explore (optional) ──► intent ──► spec ──► p
 On top of OpenSpec, `sdlc` adds the process parts the playbook asks for:
 
 - **Stages and gates** with human approvals bound to content digests. If an artifact changes after it was approved, the approval goes stale and the gate needs a new approval.
+- **A judge before the person.** `gates.<gate>.judge` names an independent model (a command or an MCP tool) that checks a gate's artifacts by the team's rubric. `sdlc judge` records its verdict. Until a verdict passes for the current artifacts, a person cannot approve; a passing verdict is only evidence, and a person still decides. See [the guide](docs/en/05-guide.md#a-judge-before-the-person-0200).
 - **Separation of duties.** An agent cannot approve its own work: the CLI refuses inside agent sessions, and hooks block attempts. Between people, optional `openspec/roles.yaml` (in git) names who holds which role: the author of a change's code cannot approve its review or release, paired gates need different people, and `sdlc approvals verify` checks that each approval arrived in a commit signed by the approver.
 - **Verification evidence.** `sdlc verify` runs your real checks, stores their literal output, and ties the result to a content-addressed fingerprint of the worktree. Committing the code keeps the result valid; changing the code makes it stale.
 - **Review** follows `REVIEW.md` passes (bugs, security, compliance). Findings are graded by severity. A human code owner approves once no important finding is open, and **plan drift** is computed against `plan.md`.
@@ -22,13 +23,15 @@ On top of OpenSpec, `sdlc` adds the process parts the playbook asks for:
   [Supported tools](docs/en/05-guide.md#supported-tools)). No code before an approved plan, locked tests during bug
   fixes, protected paths, no production release without authorization, no keys or tokens added in agent edits, and no
   agent edits of the guard's own configuration.
-- **MCP in both directions.** `sdlc mcp serve` lets other AI systems read the process (status, next step, instructions, trace, audit); it offers no decisions. The team's MCP servers are described once in `openspec/sdlc.yaml` and laid out for Claude Code, OpenCode, Cursor, Codex, Qwen Code and GigaCode. `verify.mcp` checks are called by the CLI itself as gate evidence, and results from runs outside an agent session wait in `sdlc inbox` for the agent. The hook allows each server only at its stages, and each stage's workflows list the skills, subagents and servers configured for it. See [docs/en/10-integrations.md](docs/en/10-integrations.md) and the use cases in [docs/en/11-mcp-use-cases.md](docs/en/11-mcp-use-cases.md).
-- **The agent team.** Role agents — analyst, architect, developer, tester, reviewer — adapted to the project: from the team's MCP registry, a git or npm pack, or the built-in set, with a Project rules section the agent drafts from the code; sdlc adds where each role writes and the project's facts (checks, protected paths, people). A person accepts each role (`sdlc team accept`), and agents cannot edit accepted roles or vetted skills. See [docs/en/12-agent-team.md](docs/en/12-agent-team.md).
-- **Reviewer suggestion and context packs.** `sdlc review suggest` proposes a reviewer from roles, CODEOWNERS and open reviews, never the code's author; `docs/context/` sources reach the agent at their stage, and stale ones are marked.
+- **MCP in both directions.** `sdlc mcp serve` lets other AI systems read the process (status, next step, instructions, trace, audit, explain, health, report): over stdio, or over HTTP for remote clients with `--http <host:port>` and a bearer token from `SDLC_MCP_TOKEN`. It offers no decisions. The team's MCP servers are described once in `openspec/sdlc.yaml` and laid out for Claude Code, OpenCode, Cursor, Codex, Qwen Code and GigaCode. `verify.mcp` checks are called by the CLI itself as gate evidence, and results from runs outside an agent session wait in `sdlc inbox` for the agent. The hook allows each server only at its stages, and each stage's workflows list the skills, subagents and servers configured for it. See [docs/en/10-integrations.md](docs/en/10-integrations.md) and the use cases in [docs/en/11-mcp-use-cases.md](docs/en/11-mcp-use-cases.md).
+- **The agent team.** Role agents — analyst, architect, developer, tester, reviewer — adapted to the project: from the team's MCP registry, a git or npm pack, or the built-in set, with a Project rules section the agent drafts from the code; sdlc adds where each role writes and the project's facts (checks, protected paths, people). A person accepts each role (`sdlc team accept`), and agents cannot edit accepted roles or vetted skills. A pack may also bring review lenses, workflows and gate checks: none of them is in effect before a person accepts the pack with `sdlc team accept --pack <name>`, and a new version waits for a new acceptance. See [docs/en/12-agent-team.md](docs/en/12-agent-team.md).
+- **Events across clones and the daily summary.** `events` in `openspec/sdlc.yaml` push gate waits, approvals, verification and archives to the team's MCP servers, for example a Telegram bot. A wait has the same event id in every clone and in CI, a receiver with `chat:` mentions the people by their chat handles, and `sdlc events summary` sends one daily summary. See [docs/en/10-integrations.md](docs/en/10-integrations.md#1011-since-0190-github-issues-and-the-team-chat).
+- **Tasks for any executor.** `sdlc task export` gives each open task of an approved plan to another agent, a script or a person as a work item (the contract `sdlc.task/1`), and `sdlc task check-result` checks the branch that comes back: trailers, forbidden paths, files outside the plan. Both only read. See [the guide](docs/en/05-guide.md#handing-tasks-to-executors).
+- **Reviewer suggestion and context packs.** `sdlc review suggest` proposes a reviewer from roles, CODEOWNERS and open reviews, never the code's author; `docs/context/` sources reach the agent at their stage, and stale ones are marked; `sdlc context pull` writes packs from the team's knowledge server into `docs/context/`, where they stay in git and under review.
 - **Checks OpenSpec lacks.** Before a merge, delta targets are checked. Overlapping edits across open changes are flagged. So are base-spec drift and spec scenarios with no verification evidence.
 - **Right-sized process.** A `lite` track skips intent and spec for small, bounded work.
 - **Exploration before intent.** `/sdlc:explore` pressure-tests an idea in `openspec/explorations/`; a later change can cite the note.
-- **Repository backlog.** `openspec/backlog.md` holds epics and items (one item = one future OpenSpec change). `sdlc backlog` adds and starts them; when nothing is active, `sdlc next` proposes the next ready item; archive closes it.
+- **Repository backlog.** `openspec/backlog.md` holds epics and items (one item = one future OpenSpec change). `sdlc backlog` adds and starts them; when nothing is active, `sdlc next` proposes the next ready item; archive closes it. `sdlc backlog import --issues` brings in open GitHub issues through the team's GitHub MCP server (the archive comments on the issue and closes it), and `sdlc triage intake` adds an alert as an item. A person still sets the order.
 - **Review coverage.** Configured passes and lenses need recorded coverage in `review.md`; `sdlc review check` checks it.
 - **Human track confirmation.** `sdlc new` suggests a track; a person can confirm or change it with `sdlc track set` before plan approval.
 - **Deferred-work registry.** `sdlc defer` tracks postponed findings in `openspec/deferred-work.md` and exposes them in reports.
@@ -41,7 +44,7 @@ On top of OpenSpec, `sdlc` adds the process parts the playbook asks for:
 - **Codex CLI.** `sdlc init --tools codex` sets up skills, subagents, the MCP servers, Codex's own hooks and command rules: edits before the plan — by `apply_patch` or through the shell — and a person's decisions in the agent's shell are denied. Since 0.14.0 a write through the shell counts as an edit for the plan gate and locked tests in every tool. See [docs/en/16-codex.md](docs/en/16-codex.md).
 - **Qwen Code and GigaCode.** `sdlc init --tools qwen` (or `gigacode`, experimental) sets up skills, commands, subagents, the MCP servers, the tool's own hooks and `permissions.deny` rules that refuse a person's commands even in YOLO mode. See [docs/en/17-qwen-gigacode.md](docs/en/17-qwen-gigacode.md).
 - **A guide for every role.** [The sdlc handbook](docs/en/handbook/README.md) (to read) and [the video course](docs/en/course/README.md) (scripts for training videos) walk a team through a new project and the conversion of an existing one, with Claude Code and MCP servers for GitHub, a knowledge base and Telegram, in short lessons for each role.
-- **Traceability and audit.** `sdlc audit --export` bundles the evidence for auditors, `sdlc changelog` writes release notes from the delta specs, commits made in agent sessions carry `SDLC-Agent` and the audit shows their share, an optional debate lens records both sides of a key design decision, and an example writes a daily summary file. See [docs/en/14-traceability.md](docs/en/14-traceability.md).
+- **Traceability and audit.** `sdlc audit --export` bundles the evidence for auditors, `sdlc changelog` writes release notes from the delta specs, commits made in agent sessions carry `SDLC-Agent` and the audit shows their share, an optional debate lens records both sides of a key design decision, and `sdlc events summary` sends a daily summary (an example script also writes one to a file). See [docs/en/14-traceability.md](docs/en/14-traceability.md).
 - **People in the process.** A person answers the open questions of an intent or a design with `sdlc answer` before the gate can be approved; the audit and the dashboard compare the people's decisions the track planned with what happened; newcomers take `sdlc guide tour`.
 - **Project health.** `sdlc health` lists findings on flow, quality, discipline and configuration, each with its facts and a recommended improvement (no single score; thresholds under `health` in `sdlc.yaml`); `/sdlc:health` drafts improvements into the backlog for a person to order, and a bad finding shows at the agent's session start and on the dashboard. `sdlc explain --change <id>` says why a change is where it is and what unblocks it. See [docs/en/13-process-health.md](docs/en/13-process-health.md).
 - **Native agent UX.** Workflows ask with each tool's question tool (Claude Code AskUserQuestion, OpenCode
@@ -173,6 +176,8 @@ Everything sdlc writes records the sdlc version and the license the project uses
 | `sdlc track set <full\|lite> --change <id> [--note <text>]` | human confirmation of the suggested track before plan approval |
 | `sdlc defer add \| list \| close` | manage the deferred-work registry |
 | `sdlc backlog add \| epic add \| epic edit \| list \| next \| edit \| start \| move \| drop \| done` | manage planned changes in `openspec/backlog.md` (order = priority; `move`/`drop` are human-only) |
+| `sdlc backlog import --issues [--json]` | add one backlog item per open GitHub issue that is not linked yet (`issues` in `sdlc.yaml`) |
+| `sdlc triage intake [--json]` | add one alert (JSON on stdin) as a backlog item; the same alert again adds nothing |
 | `sdlc import bmad <path> (--change <id> \| --to-backlog) [--dry-run]` | import BMAD planning into an unapproved change, or epics/tickets (or a PRD/SPEC) into the backlog |
 | `sdlc status [--change] [--markdown] [--json]` / `sdlc next` | stages, gates, approvals, evidence, who acts next (with `--change`, a stage stepper and task bar); with no active change, the next ready backlog item |
 | `sdlc guide [topic[#section]] [--json]` | how sdlc works: short articles (in several languages) the guide workflow answers from; `denials#<rule>` explains a hook denial |
@@ -182,15 +187,19 @@ Everything sdlc writes records the sdlc version and the license the project uses
 | `sdlc layout check [--json]` / `scaffold [--dry-run] [--json]` / `adapt [--dry-run] [--json]` / `convert [--apply] [--json]` | check layout readiness, create missing documents, map existing paths, or plan and apply conversion |
 | `sdlc rework <gate> --change <id> --reason <r> --note <t> [--reset]` | send a change back to a gate's stage with a reason; later approvals stop counting; `--reset` restores the planned files from the gate checkpoint (human-only) |
 | `sdlc takeover` / `release-control --change <id> --note <t>` | take a change from the agent and hand it back with a note (human-only) |
-| `sdlc team sync \| list \| check [--json]` / `team accept <role>` | the agent team: drafts from the registry, packs and built-ins; roles and their status; vetted skills; a person accepts a role (or `--skill <id>`) |
-| `sdlc events list \| flush [--json]` | process events waiting for delivery to the team's server; deliver them now |
+| `sdlc team sync \| list \| check [--json]` / `team accept <role> \| --skill <id> \| --pack <name>` | the agent team: drafts from the registry, packs and built-ins; roles and their status; vetted skills; a person accepts a role, a skill with scripts, or the lenses, workflows and checks of a pack |
+| `sdlc events list \| flush \| summary [--json]` | process events waiting for delivery to the team's server; deliver them now; record and send the daily summary (once a day) |
 | `sdlc release check --change <id> [--json]` | run the release gate's MCP checks without approving |
-| `sdlc mcp serve` / `sdlc mcp check [--json]` | sdlc as a read-only MCP server (`init --mcp` registers it); connect to the registry servers and list their tools |
+| `sdlc mcp serve [--http <host:port>] [--project <path>]` / `sdlc mcp check [--json] [--strict] [--args]` | sdlc as a read-only MCP server over stdio (`init --mcp` registers it) or over HTTP with the token `SDLC_MCP_TOKEN`; connect to the registry servers and list their tools |
+| `sdlc context pull [--name <name>] [--json]` | write context packs from the team's knowledge server into `docs/context/` |
+| `sdlc task export --change <id> [--task <n.m>] --json` / `sdlc task check-result --change <id> --branch <ref> --json` | the task contract: the open tasks of an approved plan as work items; check a returned branch (both read-only) |
+| `sdlc judge --gate <gate> --change <id> [--json]` | run the gate's judge and record its verdict (anyone, an agent too) |
+| `sdlc ci init --provider github\|gitlab [--check <server>] [--force]` | write a CI configuration that runs `validate --all`, `approvals verify` and `events flush` (human-only) |
 | `sdlc inbox list [--json]` / `inbox done <id>` | MCP check results from runs outside an agent session, for the agent |
 | `sdlc review suggest --change <id> [--json]` | propose a reviewer: roles, CODEOWNERS owners first, fewer open reviews, never an author |
 | `sdlc trace <change> [--json]` | from intent to evidence: requirements, scenarios, tasks, commits (trailers `SDLC-Change`, `SDLC-Task`), verification and review findings, with the gaps |
 | `sdlc adopt [--apply] [--json]` | draft verify commands, protected paths and `roles.yaml` for an existing project; `--apply` writes them (human-only) |
-| `sdlc report [--format md\|json\|html] [--since] [--change] [--out]` / `sdlc dashboard [--since] [--change] [--out]` | progress report and self-contained HTML dashboard |
+| `sdlc report [--format md\|json\|html] [--since] [--change] [--out]` / `sdlc dashboard [--since] [--change] [--out] [--watch [--serve <host:port>]]` | progress report and self-contained HTML dashboard (`--watch` rebuilds it when `openspec/` changes) |
 | `sdlc instructions <artifact> --change <id> --json` | artifact instructions (from OpenSpec for planning artifacts; from the harness for verification, review, release) |
 | `sdlc approve \| reject \| waive <gate> --change <id> [--as <role>] [--note]` | human gate decisions (with `openspec/roles.yaml`: the person, the role and separation of duties are checked) |
 | `sdlc roles check [--change] \| who <gate> --change <id> \| migrate` | who holds which role and who may approve a gate; `migrate` (human-only) moves `roles:` from `sdlc.yaml` into `roles.yaml` |
@@ -201,20 +210,20 @@ Everything sdlc writes records the sdlc version and the license the project uses
 | `sdlc validate [--all]` | `openspec validate --strict`, delta target checks, overlaps |
 | `sdlc archive <id> --yes` | re-check gates, then `openspec archive` (delta merge) |
 | `sdlc audit [--change]` | audit trail and metrics |
-| `sdlc health` | project health findings with facts and recommendations |
+| `sdlc health [--since <date> \| --days <n>]` | project health findings with facts and recommendations |
 | `sdlc explain --change <id>` | why a change is where it is and what unblocks it |
 | `sdlc answer <n> --change <id> --text "…"` | a person answers an open question (human-only); `--list` shows them |
 | `sdlc guide tour [step]` | a walkthrough of the calculator demo for newcomers |
 | `sdlc audit --export <dir> [--since <date>]` | the evidence bundle for auditors |
 | `sdlc changelog [--change <id> \| --since <date>]` | release notes from the delta specs |
-| `sdlc log [--change] [--limit]` | project log, with the sdlc version and license of each entry |
+| `sdlc log [--change] [--event] [--since] [--limit]` | project log, with the sdlc version and license of each entry |
 | `sdlc license` / `sdlc license set community \| commercial --agreement <id> [--licensee]` | show or record the license the project uses sdlc under (setting it is human-only) |
-| `sdlc doctor` | installation health, including whether the declared license fits the project |
+| `sdlc doctor [--fix]` | installation health, including whether the declared license fits the project; `--fix` repairs only what sdlc owns |
 | `sdlc hook <event>` | policy dispatcher used by the hooks and the plugin |
 | `sdlc plugin build [dir] --marketplace` | render the Claude Code plugin |
 | `sdlc openspec <args>` | run the bundled OpenSpec CLI |
 
-Every command except `statusline`, `dashboard`, `hook` and the `openspec` pass-through supports `--json` and returns OpenSpec-style diagnostics (`{severity, code, message, fix}`) on failure.
+Every command except `statusline`, `dashboard`, `mcp serve`, `hook` and the `openspec` pass-through supports `--json` and returns OpenSpec-style diagnostics (`{severity, code, message, fix}`) on failure.
 
 ## Configuration (`openspec/sdlc.yaml`)
 
@@ -251,6 +260,9 @@ log:
   enabled: true                            # openspec/.sdlc/log.jsonl
   hook_decisions: true
 ```
+
+Every key, with the optional ones (`events`, `issues`, `context.sources`, `packs`, a gate's `judge`), is in
+[the guide, 5.4](docs/en/05-guide.md#54-configuring-openspecsdlcyaml).
 
 Project context and per-artifact rules stay where OpenSpec keeps them (`openspec/config.yaml` → `context`, `rules`).
 
@@ -291,6 +303,14 @@ Research and design are in [`docs/en/`](docs/en/README.md):
 - [The AI-ready project layout and progress reports](docs/en/07-ai-ready-project.md)
 - [Roles, separation of duties and signed approvals](docs/en/08-roles-and-signing.md)
 - [The calculator demo and keeping the dashboard current](docs/en/09-demo-and-automation.md)
+- [Integrations: MCP, context, secrets and reviewers](docs/en/10-integrations.md)
+- [Working with sdlc over MCP](docs/en/11-mcp-use-cases.md)
+- [The agent team](docs/en/12-agent-team.md)
+- [Process hygiene and project health](docs/en/13-process-health.md)
+- [Traceability and audit](docs/en/14-traceability.md)
+- [Cursor IDE](docs/en/15-cursor.md)
+- [Codex CLI](docs/en/16-codex.md)
+- [Qwen Code and GigaCode](docs/en/17-qwen-gigacode.md)
 - OpenSpec analysis
 - the playbook mapping
 - community reviews and other harnesses (Spec Kit, BMAD, Kiro, cc-sdd, superpowers…)
