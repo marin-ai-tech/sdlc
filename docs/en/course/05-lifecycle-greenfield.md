@@ -894,8 +894,9 @@ behavioural verification, and let Grace confirm that every scenario was exercise
 
 - The verify gate passes on the automated checks alone. The behavioural table is checked only by
   `sdlc verify --check`, which is not part of the gate. Grace (or CI) runs it with `--strict`.
-- `${HEAD}` is the head commit. If the agent verifies uncommitted work, CI answers for an older commit. Commit, push,
-  let CI finish, then run `sdlc verify`.
+- `${HEAD}` is the head commit. Since 0.17.0, a check that uses `${HEAD}` is not called while code outside
+  `openspec/` is uncommitted: it fails and asks you to commit (and push) first. Commit, push, let CI finish, then run
+  `sdlc verify`.
 - `sdlc verify --list` shows the `verify.mcp` checks (name, server, tool, required) next to the commands.
 - `sdlc verify --only <names>` runs some checks for a quick look but never passes the gate.
 - Editing the evidence block by hand changes nothing: the gate reads the result that `sdlc verify` stored in the
@@ -1383,10 +1384,8 @@ seen in the trial run unless the item says otherwise.
 - `sdlc team accept`, `sdlc backlog move` and `sdlc backlog drop` check that the caller is a person, not that the
   person holds a role in `roles.yaml`.
 - `sdlc team list` does not show that a newer registry draft waits next to an accepted role.
-- No workflow calls the `sdlc-simplifier` subagent unless `stages.build.agents` lists it.
 - The verify gate passes without the behavioural table; only `sdlc verify --check --strict` checks it, outside the
   gate.
 - QA has no gate of its own: Grace's acceptance of the evidence is not recorded by sdlc.
-- `${HEAD}` in `verify.mcp` is the head commit even when the evidence covers uncommitted changes.
 - Since 0.16.2, set `agents: false` for an event-only `telegram` server: the CLI sends events,
   while agent MCP settings omit it. A server without `stages` is not checked by the stage rule.

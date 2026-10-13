@@ -19,6 +19,7 @@ const EXAMPLES: Record<string, string> = {
   'backlog drop': 'sdlc backlog drop B2 --note "No longer needed"',
   'license set': 'sdlc license set community',
   'roles migrate': 'sdlc roles migrate',
+  'ci init': 'sdlc ci init --provider github --check github',
   takeover: 'sdlc takeover --change add-export --note "I will fix the migration myself" --json',
   'release-control': 'sdlc release-control --change add-export --note "Migration fixed, carry on" --json',
   uninstall: 'sdlc uninstall --dry-run',

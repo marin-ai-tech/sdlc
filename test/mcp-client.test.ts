@@ -46,6 +46,9 @@ function project(options: { servers?: Record<string, unknown>; checks?: unknown[
   write(file, stringify(config));
   expect(cli(['new', 'add-export', '--json']).code).toBe(0);
   write(path.join(root, 'openspec/changes/add-export/tasks.md'), '# Tasks\n\n- [x] 1.1 done\n');
+  // 0.17.0 (B111): a ${HEAD} check runs only on committed code, so the project is committed before verify.
+  git(root, ['add', '-A']);
+  git(root, ['commit', '-q', '-m', 'sdlc']);
   const json = (rel: string) => JSON.parse(read(path.join(root, rel)));
   return { root, cli, json, file };
 }

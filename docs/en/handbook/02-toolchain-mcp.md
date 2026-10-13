@@ -299,7 +299,24 @@ reach the agent through the inbox.
          - run: npm test
    ```
 
-2. Steven adds an MCP check to the `verify` block of `openspec/sdlc.yaml`:
+2. Since 0.17.0, sdlc writes its own workflow and the gate check. CI configuration is a person's decision, so Steven
+   runs the command in his own terminal. In an agent session it is refused, and the hook denies it too:
+
+   ```bash
+   sdlc ci init --provider github --check github
+   ```
+
+   ```text
+   Wrote .github/workflows/sdlc.yml.
+   Added the ci-green check of server github to verify.mcp in openspec/sdlc.yaml.
+   The tool and argument names are the server's own and may differ: confirm them with sdlc mcp check --args.
+   ```
+
+   `.github/workflows/sdlc.yml` checks out the full history (`fetch-depth: 0`), sets up Node 20, installs this sdlc
+   version from the release package, and runs `sdlc validate --all` and `sdlc approvals verify`. An existing file is
+   kept; `--force` rewrites it. `--check github` added the `ci-green` check to the `verify` block of
+   `openspec/sdlc.yaml`. Steven runs `sdlc mcp check --args`, compares the names with his server's tool, and adds
+   the arguments it needs (here `owner` and `repo`):
 
    ```yaml
    verify:
@@ -311,15 +328,14 @@ reach the agent through the inbox.
        - name: ci-green
          server: github
          tool: list_workflow_runs     # the tool name your server exposes
-         args:                        # argument names of that tool: take them from the server's documentation
-           owner: northwind-labs
-           repo: tasklet
-           workflow_id: ci.yml
+         args:                        # argument names of that tool: confirm them with `sdlc mcp check --args`
+           owner: northwind-labs      # added by Steven
+           repo: tasklet              # added by Steven
            head_sha: "${HEAD}"
-          expect:
-            workflow_runs: { $any: { status: completed, conclusion: success } }
-          wait_while: { workflow_runs: { $any: { status: [queued, in_progress] } } }
-          wait_seconds: 600
+           per_page: 5
+         expect: { workflow_runs: { $any: { conclusion: success } } }
+         wait_while: { workflow_runs: { $any: { status: [queued, in_progress] } } }
+         wait_seconds: 900
    ```
 
    | Key | Meaning |
@@ -327,7 +343,7 @@ reach the agent through the inbox.
    | `server`, `tool` | the registry server and the tool the CLI calls |
    | `args` | the tool's arguments; `${HEAD}` becomes the head commit, `${CHANGE}` the change id |
    | `expect` | what the answer must contain (a deep subset: objects by key, lists item by item) |
-   | `wait_while`, `wait_seconds` | retry pending answers for up to 600 seconds here; default is no wait |
+   | `wait_while`, `wait_seconds` | retry pending answers for up to 900 seconds here; default is no wait |
    | `required` | `true` by default; a failing required check fails the verification |
 
 3. Understand the run. Oliver's agent finishes the build, commits, and Oliver pushes the branch. CI runs on that commit.
@@ -378,7 +394,11 @@ reach the agent through the inbox.
 
 ### Pitfalls
 
-- Commit and push before you verify. `${HEAD}` is the last commit; uncommitted code is not what CI tested.
+- Commit and push before you verify. `${HEAD}` is the last commit; uncommitted code is not what CI tested. Since
+  0.17.0, a check that uses `${HEAD}` is not called while code outside `openspec/` is uncommitted: it fails with a
+  reason to commit (and push) first.
+- `$any` passes when one run of the commit is green, the `sdlc` workflow or `ci`. To wait for one workflow only, add
+  its id to `args` if your server's tool takes one (see `sdlc mcp check --args`).
 - With `wait_while`, a queued or in-progress CI run is polled until it finishes or the wait limit expires.
 - Plain lists match item by item and by exact length. Since 0.16.0, use
   `expect: { workflow_runs: { $any: { conclusion: success } } }` to match a run in a list.
@@ -697,7 +717,6 @@ data. The assistant can read, but it cannot decide anything.
 Limitations observed in the sdlc 0.14.4 trial. Some were fixed later; see the changelog.
 
 - No sync between GitHub Issues or Projects and `openspec/backlog.md`; only `--source-ref` links and the agent.
-- No built-in CI check: `verify.mcp` needs the GitHub server's tool and argument names; sdlc does not validate them.
 - `stages: []` means "not checked"; use `agents: false` to keep an agent away.
 - An open change is never at `maintain`, so a `maintain`-only server is out of stage during `/sdlc:triage`.
 - Events carry person ids; `roles.yaml` has no chat handle, so each receiver keeps its own mapping.

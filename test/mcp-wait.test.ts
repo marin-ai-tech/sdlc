@@ -33,6 +33,9 @@ function project(check: Record<string, unknown>) {
   config.verify.mcp = [{ name: 'ci-green', server: 'build', tool: 'pipeline_status', args: { ref: '${HEAD}' },
     expect: { status: 'success' }, ...check }];
   write(file, stringify(config));
+  // 0.17.0 (B111): a ${HEAD} check runs only on committed code, so the project is committed before verify.
+  git(root, ['add', '-A']);
+  git(root, ['commit', '-q', '-m', 'sdlc']);
   const calls = () => (fs.existsSync(pending) ? Number(read(pending)) : 0);
   const verify = (extra: NodeJS.ProcessEnv) =>
     cli(['verify', '--change', 'add-export', '--json'], { ...AGENT, ...extra });

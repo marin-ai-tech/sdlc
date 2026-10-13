@@ -13,7 +13,7 @@ import { computePlanDrift } from '../core/plan-drift.js';
 import { checkCoverage, parseCoverage, parseFindings, summarizeFindings } from '../core/review.js';
 import { applyVerifyToState, runVerification, writeEvidence, type VerificationRun } from '../core/verify.js';
 import { untouchedPlanned, verificationAttachments, type EvidenceExtras } from '../core/verify-extras.js';
-import { runMcpChecks, selectedChecks, withMcpChecks } from '../mcp/checks.js';
+import { runMcpChecks, selectedChecks, uncommittedCode, withMcpChecks } from '../mcp/checks.js';
 import { keepForAgent } from '../mcp/inbox.js';
 import { readAsset } from '../integrations/assets.js';
 import { readManifest } from '../integrations/manifest.js';
@@ -38,7 +38,10 @@ function uncoveredScenarios(changeDir: string): { scenarios: string[]; missing: 
   return { scenarios, missing };
 }
 
-/** The MCP checks (B12) after the commands: the CLI calls them itself, with `${HEAD}` and `${CHANGE}` expanded. */
+/**
+ * The MCP checks (B12) after the commands: the CLI calls them itself, with `${HEAD}` and `${CHANGE}` expanded.
+ * A `${HEAD}` check is not called while code outside openspec/ is uncommitted (B111).
+ */
 async function withMcp(
   ctx: ProjectContext,
   change: string,
@@ -50,7 +53,8 @@ async function withMcp(
   for (const { name, server, tool } of opts.json ? [] : checks) {
     process.stderr.write(c.dim(`${t('verify.runningMcp', { name, server, tool })}\n`));
   }
-  const mcp = await runMcpChecks(ctx.config, checks, { head: run.commit, change });
+  const vars = { head: run.commit, change, dirty: uncommittedCode(ctx.root, checks) };
+  const mcp = await runMcpChecks(ctx.config, checks, vars);
   return withMcpChecks(run, ctx.config, mcp);
 }
 

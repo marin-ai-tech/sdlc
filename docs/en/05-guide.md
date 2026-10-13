@@ -317,7 +317,7 @@ license:
   # licensee: Acme Corp
 stages:                       # what each stage uses (chapter 10.5); MCP servers come from mcp.servers.*.stages
   design: { skills: [architecture-review], agents: [sdlc-researcher] }
-  build:  { skills: [test-driven-development], agents: [sdlc-simplifier] }
+  build:  { skills: [test-driven-development], simplify: true }   # false: no sdlc-simplifier step (0.17.0)
 mcp:                          # chapter 10
   serve: true                 # register `sdlc mcp serve` for the tools (sdlc init --mcp)
   servers:                    # the team's MCP servers, laid out into every tool's MCP configuration
@@ -333,6 +333,11 @@ log:
   hook_decisions: true        # write hook denials and warnings to the log
 ```
 
+Since 0.17.0, the build workflow runs the `sdlc-simplifier` subagent after the last task and before `sdlc verify`.
+You do not need to list it in `stages.build.agents`. `stages.build.simplify: false` turns this step off. Only the
+build stage takes `simplify`; under another stage it is a configuration error. Existing projects get the step with
+`sdlc update`.
+
 Project context and rules for artifacts are set in the same place as in OpenSpec: `openspec/config.yaml` → `context:` and `rules.<artifact>`. They are included in the instructions for intent, proposal, specs, design, plan and tasks.
 
 ## 5.5. CI and headless mode
@@ -344,6 +349,7 @@ sdlc review check --change <id>       # exit 1 if important findings are open
 sdlc audit --json                     # playbook metrics (lead times, first-pass, waits on people, rework reasons)
   sdlc log --json                       # project log with the sdlc version and license of each entry
 sdlc approvals verify --mode required # every approval in a commit signed by the approver (roles.yaml)
+sdlc ci init --provider github        # a person: CI that runs validate and approvals verify (or --provider gitlab)
   ```
 
   Use `sdlc log --event hook.warned --json` to inspect warnings before switching enforcement to block.
@@ -352,6 +358,12 @@ sdlc approvals verify --mode required # every approval in a commit signed by the
   In JSON, `total` counts the filtered entries.
 
 For `claude -p`, allow the required tools in advance: `--allowedTools "Bash(sdlc *),Read,Write,Edit"`. In CI, it is convenient to add `sdlc status --markdown` to the PR description.
+
+Since 0.17.0, a person writes the CI configuration with `sdlc ci init --provider github|gitlab [--check <server>]
+[--force]`. GitHub gets `.github/workflows/sdlc.yml`; GitLab gets `.gitlab/sdlc.yml` and, when there is none, a
+`.gitlab-ci.yml` that includes it. The job runs `sdlc validate --all` and `sdlc approvals verify` on a full clone.
+An existing file is kept; `--force` rewrites it. `--check <server>` adds a `ci-green` check to `verify.mcp`. The
+command is refused in an agent session. See chapter 10.3.
 
 ## 5.6. Keeping the dashboard current
 

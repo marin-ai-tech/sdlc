@@ -3,7 +3,7 @@ import type { ReleaseCheckRecord } from '../core/change-state.js';
 import { SdlcError } from '../core/errors.js';
 import { headCommit } from '../core/git.js';
 import type { McpCheckOutcome } from '../core/verify.js';
-import { runMcpChecks } from './checks.js';
+import { runMcpChecks, uncommittedCode } from './checks.js';
 import type { McpCheck } from './registry.js';
 
 /**
@@ -17,9 +17,14 @@ export function releaseChecks(config: SdlcConfig): McpCheck[] {
   return config.release.mcp ?? [];
 }
 
-/** Runs the release checks for a change, with `${HEAD}` the current commit and `${CHANGE}` the change id. */
+/**
+ * Runs the release checks for a change, with `${HEAD}` the current commit and `${CHANGE}` the change id. A
+ * `${HEAD}` check is not called while code outside openspec/ is uncommitted (B111), as for `verify.mcp`.
+ */
 export async function runReleaseChecks(config: SdlcConfig, root: string, change: string): Promise<McpCheckOutcome[]> {
-  return runMcpChecks(config, releaseChecks(config), { head: headCommit(root), change });
+  const checks = releaseChecks(config);
+  const vars = { head: headCommit(root), change, dirty: uncommittedCode(root, checks) };
+  return runMcpChecks(config, checks, vars);
 }
 
 /** The checks that hold the release back: required and not ok. */

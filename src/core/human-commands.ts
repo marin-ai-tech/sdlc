@@ -7,4 +7,6 @@ export const HUMAN_COMMANDS = [
   'team accept',
   // An answer to an open question is a person's decision (B62).
   'answer',
+  // CI configuration (often a protected path) and the ci-green gate are a person's decision (B94).
+  'ci init',
 ] as const;

@@ -133,8 +133,34 @@ verify:
 - A required MCP check that fails fails the verification, just like a failing command.
 - Results go into the evidence next to the commands' results. The JSON answer lists them under `mcp`.
 - `sdlc verify --list` shows the MCP checks (name, server, tool, required) next to the commands.
+- `${HEAD}` is the last commit, but `sdlc verify` checks the working tree. Since 0.17.0, a check whose arguments use
+  `${HEAD}` is not called while the working tree has uncommitted changes outside `openspec/` (modified, staged or
+  untracked files). It fails with a reason to commit (and push) first. Checks without `${HEAD}` run as before. The
+  same rule holds for `release.mcp`.
 
 *Why it is safe.* The agent never reports the result: the CLI calls the server and records what it got. An agent cannot edit the evidence or `openspec/sdlc.yaml`, because the hook denies both.
+
+**A ready CI configuration (since 0.17.0).** `sdlc ci init --provider github|gitlab [--check <server>] [--force]`
+writes a starter CI configuration that runs the sdlc checks. It is a person's command: in an agent session it is
+refused, and the hook denies it too.
+
+- `--provider github` writes `.github/workflows/sdlc.yml`. The job checks out the full history (`fetch-depth: 0`),
+  sets up Node 20, installs this sdlc version from the release package, and runs `sdlc validate --all` and
+  `sdlc approvals verify`.
+- `--provider gitlab` writes `.gitlab/sdlc.yml`: one job on a full clone (`GIT_DEPTH: "0"`) with the same commands.
+  When the project has no `.gitlab-ci.yml`, the command creates one with `include: [{ local: .gitlab/sdlc.yml }]`.
+  An existing `.gitlab-ci.yml` is never edited: the command prints the include line to add.
+- An existing file is kept. `--force` rewrites it.
+- `--check <server>` adds the `ci-green` check to `verify.mcp` for that registry server. For GitHub it calls
+  `list_workflow_runs` with `head_sha: "${HEAD}"` and expects `{ workflow_runs: { $any: { conclusion: success } } }`.
+  For GitLab it calls `list_pipelines` with `sha: "${HEAD}"` and puts `$any` at the top level, because the answer is
+  a list. Both wait (`wait_while`) while a run is queued or in progress, for up to `wait_seconds: 900`. A check named
+  `ci-green` that already exists is kept.
+- The tool and argument names are the server's own and may differ: confirm them with `sdlc mcp check --args`.
+
+```bash
+sdlc ci init --provider github --check github
+```
 
 ## 10.4. A result for the agent who was not there
 

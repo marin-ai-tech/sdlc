@@ -8,6 +8,8 @@ import type { RoleFile } from '../team/role-file.js';
  * tools. Skills and subagents come from `stages.<stage>`, MCP servers from the registry's `stages` (one source).
  * CLI-only servers (`agents: false`) are omitted from these agent-facing lists.
  * A workflow without a stage, or a stage with nothing configured, renders exactly as before.
+ * The build workflow also runs the `sdlc-simplifier` subagent after the last task and before `sdlc verify` unless
+ * `stages.build.simplify` is false (B109); other workflows of the build stage do not.
  */
 const WORKFLOW_STAGE: Record<string, StageConfigId> = {
   explore: 'plan',
@@ -28,6 +30,18 @@ export interface StageResources {
   agents: string[];
   /** Registry server names, in the registry's order. */
   servers: string[];
+  /** The build workflow's default simplifier step (B109). */
+  simplify: boolean;
+}
+
+/** The subagent the build workflow runs after the last task (B109). */
+const SIMPLIFIER = 'sdlc-simplifier';
+const SIMPLIFY_STEP =
+  `- After the last task, run the \`${SIMPLIFIER}\` subagent on this change, before \`sdlc verify\`.`;
+
+/** Only the build workflow gets the simplifier step, and only while `stages.build.simplify` is not false. */
+function simplifies(config: SdlcConfig, workflow: string): boolean {
+  return workflow === 'build' && config.stages.build?.simplify !== false;
 }
 
 /** The subagents of a stage: the configured ones, then the accepted roles of the team for that stage (B70). */
@@ -49,9 +63,11 @@ export function stageResources(
     .filter((s) => s.agents && s.stages.includes(stage))
     .map((s) => s.name);
   const skills = own?.skills ?? [];
-  const agents = stageAgents(own?.agents ?? [], stage, team);
+  const simplify = simplifies(config, workflow);
+  const configured = [...(own?.agents ?? []), ...(simplify ? [SIMPLIFIER] : [])];
+  const agents = stageAgents(configured, stage, team);
   if (skills.length + agents.length + servers.length === 0) return undefined;
-  return { stage, skills, agents, servers };
+  return { stage, skills, agents, servers, simplify };
 }
 
 /** `allowed-tools` of a Claude Code skill or command: the CLI, then the stage's MCP tools. */
@@ -70,6 +86,7 @@ export function stageSection(resources: StageResources | undefined): string {
   const lines = ['', `## Stage resources (${resources.stage})`, ''];
   if (resources.skills.length > 0) lines.push(`- Skills for this stage: ${list(resources.skills)}.`);
   if (resources.agents.length > 0) lines.push(`- Subagents for this stage: ${list(resources.agents)}.`);
+  if (resources.simplify) lines.push(SIMPLIFY_STEP);
   if (resources.servers.length > 0) {
     const servers = resources.servers.map((name) => `\`${name}\` (tools \`mcp__${name}__*\`)`).join(', ');
     lines.push(`- MCP servers for this stage: ${servers}.`);

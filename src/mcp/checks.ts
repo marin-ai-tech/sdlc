@@ -1,5 +1,7 @@
 import type { SdlcConfig } from '../core/config.js';
+import { hasUncommittedChanges } from '../core/git.js';
 import { t } from '../core/i18n.js';
+import { FINGERPRINT_EXCLUDES } from '../core/lifecycle.js';
 import { findSecrets } from '../core/policy-secrets.js';
 import type { McpCheckOutcome, VerificationRun } from '../core/verify.js';
 import { McpTimeout, parseAnswer, withServer, type ToolAnswer } from './client.js';
@@ -13,6 +15,8 @@ import { expandedSecrets, type McpCheck, type McpServer } from './registry.js';
  * fingerprint are untouched: the checks run after them and only add to the outcome.
  * What a server was given (its expanded `env`/`headers`) and anything that looks like a key or token is masked in
  * the answer and the reason before they reach the evidence, the JSON answer or the inbox.
+ * B111: `${HEAD}` is the last commit, while verify checks the working tree. With uncommitted changes outside
+ * openspec/ a check whose arguments use `${HEAD}` is not called: it fails with a reason to commit (and push) first.
  */
 export const CHECK_TIMEOUT_MS = 60_000;
 const MASK = '[redacted]';
@@ -20,6 +24,27 @@ const MASK = '[redacted]';
 export interface CheckVars {
   head?: string;
   change: string;
+  /** B111: uncommitted changes outside openspec/, so the commit `${HEAD}` names is not the verified code. */
+  dirty?: boolean;
+}
+
+const HEAD_VAR = '${HEAD}';
+
+/** Whether any string in `value` (nested in arrays and objects) uses `${HEAD}`. */
+export function usesHead(value: unknown): boolean {
+  if (typeof value === 'string') return value.includes(HEAD_VAR);
+  if (Array.isArray(value)) return value.some((item) => usesHead(item));
+  if (value && typeof value === 'object') return Object.values(value).some((item) => usesHead(item));
+  return false;
+}
+
+/**
+ * B111: whether code outside openspec/ is uncommitted, for `CheckVars.dirty`. One git call, and only when one of
+ * `checks` uses `${HEAD}`: the other checks run as before whatever the working tree holds.
+ */
+export function uncommittedCode(root: string, checks: McpCheck[]): boolean {
+  if (!checks.some((check) => usesHead(check.args))) return false;
+  return hasUncommittedChanges(root, FINGERPRINT_EXCLUDES);
 }
 
 /** `${HEAD}` and `${CHANGE}` in every string of `value`. */
@@ -177,13 +202,18 @@ async function callCheck(check: McpCheck, server: McpServer, vars: CheckVars): P
   }
 }
 
+/** The check's verdict: not called for an unknown server or for `${HEAD}` with uncommitted code (B111). */
+async function verdictFor(check: McpCheck, server: McpServer | undefined, vars: CheckVars): Promise<Verdict> {
+  if (!server) return { ok: false, reason: t('verify.mcpUnknownServer', { server: check.server }), result: null };
+  if (vars.dirty && usesHead(check.args)) return { ok: false, reason: t('verify.mcpHeadDirty'), result: null };
+  return callCheck(check, server, vars);
+}
+
 /** One check, run and masked. */
 async function runCheck(check: McpCheck, servers: McpServer[], vars: CheckVars): Promise<McpCheckOutcome> {
   const started = Date.now();
   const server = servers.find((item) => item.name === check.server);
-  const verdict: Verdict = server
-    ? await callCheck(check, server, vars)
-    : { ok: false, reason: t('verify.mcpUnknownServer', { server: check.server }), result: null };
+  const verdict = await verdictFor(check, server, vars);
   const secrets = server ? expandedSecrets(server, process.env) : [];
   const base = { name: check.name, server: check.server, tool: check.tool, required: check.required, ok: verdict.ok };
   const reason = verdict.reason === undefined ? {} : { reason: maskText(verdict.reason, secrets) };

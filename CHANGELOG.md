@@ -2,6 +2,27 @@
 
 All notable changes to sdlc. Versions follow [Semantic Versioning](https://semver.org/); while the major version is 0, a minor version may change behavior.
 
+## 0.17.0 — 2026-10-13
+
+### Added
+- `sdlc ci init --provider github|gitlab [--check <server>] [--force]` writes a starter CI configuration. It installs
+  this sdlc version from the release package and runs `sdlc validate --all` and `sdlc approvals verify` on a full
+  clone. GitHub gets `.github/workflows/sdlc.yml` (`fetch-depth: 0`, Node 20). GitLab gets `.gitlab/sdlc.yml` (one
+  job, `GIT_DEPTH: "0"`) and, only when there is none, a `.gitlab-ci.yml` with `include: [{ local: .gitlab/sdlc.yml }]`.
+  An existing `.gitlab-ci.yml` is never edited: the command prints the include line to add. An existing file is kept;
+  `--force` rewrites it. Only a person may run the command: it is refused in an agent session and by the hook.
+- `sdlc ci init --check <server>` adds a `ci-green` check of that registry server to `verify.mcp`: GitHub
+  `list_workflow_runs` with `head_sha: "${HEAD}"`, GitLab `list_pipelines` with `sha: "${HEAD}"`, waiting up to
+  900 seconds while a run is pending. Confirm the server's tool and argument names with `sdlc mcp check --args`.
+- The build workflow runs the `sdlc-simplifier` subagent after the last task and before `sdlc verify` by default.
+  `stages.build.simplify: false` turns it off; only the build stage takes `simplify`. Existing projects get the step
+  with `sdlc update`.
+
+### Changed
+- A `verify.mcp` or `release.mcp` check whose arguments use `${HEAD}` is not called while the working tree has
+  uncommitted changes outside `openspec/` (modified, staged or untracked files). It fails with a reason to commit (and
+  push) first. Checks without `${HEAD}` run as before.
+
 ## 0.16.3 — 2026-10-12
 
 ### Fixed

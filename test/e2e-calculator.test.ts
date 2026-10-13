@@ -324,6 +324,8 @@ describe('demo: a team builds a calculator with sdlc (every command)', { timeout
     config.setIn(['verify', 'mcp'], [{ name: 'ci-green', server: 'ci', tool: 'pipeline_status', args: { ref: '${HEAD}' }, expect: green }]);
     write(path.join(root, 'openspec/sdlc.yaml'), config.toString());
     step('mcp-check', 'visibility', 'bob', ['mcp', 'check'], 'The team\'s MCP servers: reachable, tools listed, file writers flagged.');
+    // 0.17.0 (B111): a ${HEAD} check asks about the commit, so the work is committed before verify.
+    commit('bob', 'Wire the CI server into the checks');
     step('verify-mcp', 'visibility', 'bob', ['verify', '--change', 'fix-rounding'], 'Bob verifies himself: the CLI calls the CI server over MCP and keeps the result for the agent.');
     const inbox = step('inbox-list', 'visibility', 'agent', ['inbox', 'list', '--json'], 'The agent finds the result in its inbox.');
     step('statusline', 'visibility', 'bob', ['statusline'], 'Claude Code status line.', { input: JSON.stringify({ cwd: root }) });
@@ -339,6 +341,8 @@ describe('demo: a team builds a calculator with sdlc (every command)', { timeout
     step('team-list', 'visibility', 'bob', ['team', 'list'], 'The team: the tester is accepted, the other roles are still drafts.');
     step('team-check', 'visibility', 'bob', ['team', 'check'], 'The skills of the accepted roles, checked: checksums, scripts and tool grants; the built-in tester lists none.');
     step('plugin', 'visibility', 'bob', ['plugin', 'build', path.join(tempDir('sdlc-demo-plugin-'), 'plugin')], 'The same workflows as a Claude Code plugin.');
+    step('ci-init', 'visibility', 'alice', ['ci', 'init', '--provider', 'github'],
+      'Alice adds the sdlc checks to CI: a workflow on a full clone that validates and verifies approvals.');
     step('uninstall', 'visibility', 'alice', ['uninstall', '--dry-run'], 'Uninstall keeps every planning file.');
   });
 

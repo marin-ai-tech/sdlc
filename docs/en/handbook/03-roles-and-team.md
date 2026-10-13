@@ -657,7 +657,7 @@ the place of two of them.
    | `sdlc-verifier` | runs the app and the tests, exercises every spec scenario and the nearest flows, reports evidence and mismatches; fixes nothing | `/sdlc:verify` | no |
    | `sdlc-reviewer` | reviews one pass or lens at a time and records findings with severity, evidence and a fix | `/sdlc:review` | no |
    | `sdlc-researcher` | answers a focused question about the code, specs and history, concisely | `/sdlc:explore`, `/sdlc:spec`, `/sdlc:plan`, `/sdlc:team` | no |
-   | `sdlc-simplifier` | removes needless complexity from green code without changing behaviour | no workflow calls it by itself; list it for the build stage (step 4) or ask for it by name | yes |
+   | `sdlc-simplifier` | removes needless complexity from green code without changing behaviour | since 0.17.0 `/sdlc:build` runs it after the last task, before `sdlc verify` (`stages.build.simplify: false` turns this off); or ask for it by name | yes |
    | `sdlc-advocate` | argues one side of a key design decision for the debate lens | `/sdlc:spec` with `design: { debate: true }` | no |
    | `sdlc-health` | digs into one finding of `sdlc health` and reports the evidence | `/sdlc:health` | no |
 

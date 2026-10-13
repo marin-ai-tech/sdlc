@@ -32,6 +32,7 @@ import {
   backlogStart,
 } from '../commands/backlog.js';
 import { rolesCheck, rolesMigrate, rolesWho } from '../commands/roles.js';
+import { ciInitCommand } from '../commands/ci.js';
 import { teamAcceptCommand, teamCheckCommand, teamListCommand, teamSyncCommand } from '../commands/team.js';
 import { adoptCommand } from '../commands/adopt.js';
 import { traceCommand } from '../commands/trace.js';
@@ -99,6 +100,12 @@ export function buildProgram(): Command {
     .action((gate, opts) => rolesWho(gate, opts));
   roles.command('migrate').description(cmdDesc('cmd.roles.migrate'))
     .option('--json', 'output JSON').action((opts) => rolesMigrate(opts));
+  const ci = program.command('ci').description(cmdDesc('cmd.ci'));
+  ci.command('init').description(cmdDesc('cmd.ci.init'))
+    .requiredOption('--provider <provider>', 'CI provider: github | gitlab')
+    .option('--check <server>', 'add a ci-green check of this MCP registry server to verify.mcp')
+    .option('--force', 'replace an existing CI file')
+    .option('--json', 'output JSON').action((opts) => ciInitCommand(opts));
   const team = program.command('team').description(cmdDesc('cmd.team'));
   team.command('sync').description(cmdDesc('cmd.team.sync'))
     .option('--json', 'output JSON').action((opts) => teamSyncCommand(opts));

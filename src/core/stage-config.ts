@@ -4,6 +4,8 @@ import { SdlcError } from './errors.js';
  * What each stage uses (B14): `stages.<stage>` in `openspec/sdlc.yaml`, `{ skills: [names], agents: [names] }`.
  * The MCP servers of a stage are not listed here: they come from the registry (`mcp.servers.<name>.stages`), the one
  * source. Parsed at the boundary; an unknown stage or a value that is not a list of names is an error naming the key.
+ * `stages.build.simplify` (B109, default true) turns the build workflow's `sdlc-simplifier` step off; only the build
+ * stage takes it.
  */
 
 /** The lifecycle stages (the same ids as `STAGES` in lifecycle.ts, which imports the config and cannot be imported). */
@@ -13,6 +15,8 @@ export type StageConfigId = (typeof STAGE_IDS)[number];
 export interface StageResourcesConfig {
   skills: string[];
   agents: string[];
+  /** Build only (B109): false turns off the default `sdlc-simplifier` step; absent means true. */
+  simplify?: boolean;
 }
 
 export type StagesConfig = Partial<Record<StageConfigId, StageResourcesConfig>>;
@@ -35,6 +39,34 @@ function names(value: unknown, where: string): string[] {
   return value as string[];
 }
 
+function flag(value: unknown, where: string): boolean | undefined {
+  if (value === undefined || value === null) return undefined;
+  if (typeof value !== 'boolean') {
+    throw new SdlcError('invalid_config', { key: 'error.x_must_be_true_or_false', params: { where } });
+  }
+  return value;
+}
+
+/** `stages.<stage>.simplify` (B109): true or false, and only under the build stage. */
+function simplify(id: StageConfigId, entry: Raw, where: (key: string) => string): boolean | undefined {
+  const key = where(`stages.${id}.simplify`);
+  if (id !== 'build' && 'simplify' in entry) {
+    throw new SdlcError('invalid_config', { key: 'error.stages_simplify_build_only', params: { where: key } });
+  }
+  return flag(entry.simplify, key);
+}
+
+/** One `stages.<stage>` entry; `simplify` stays absent unless the file sets it. */
+function stageEntry(id: StageConfigId, entry: Raw, where: (key: string) => string): StageResourcesConfig {
+  const resources: StageResourcesConfig = {
+    skills: names(entry.skills, where(`stages.${id}.skills`)),
+    agents: names(entry.agents, where(`stages.${id}.agents`)),
+  };
+  const value = simplify(id, entry, where);
+  if (value !== undefined) resources.simplify = value;
+  return resources;
+}
+
 function isStage(id: string): id is StageConfigId {
   return (STAGE_IDS as readonly string[]).includes(id);
 }
@@ -49,10 +81,7 @@ export function parseStages(value: unknown, where: (key: string) => string): Sta
       throw new SdlcError('invalid_config', { key: 'error.x_must_be_one_of_x_got_x', params });
     }
     const entry = mapping(item, where(`stages.${id}`)) ?? {};
-    stages[id] = {
-      skills: names(entry.skills, where(`stages.${id}.skills`)),
-      agents: names(entry.agents, where(`stages.${id}.agents`)),
-    };
+    stages[id] = stageEntry(id, entry, where);
   }
   return stages;
 }

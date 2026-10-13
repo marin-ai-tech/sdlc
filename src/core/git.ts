@@ -45,6 +45,17 @@ export function isDirty(cwd: string, excludePaths: string[] = []): boolean {
 }
 
 /**
+ * Whether the working tree has changes that are not committed: modified, staged or untracked (not ignored) files
+ * outside `excludePaths`, in one `git status` call. Untracked files count whatever `status.showUntrackedFiles` says.
+ * Not a repository (or git failing) = `false`, as for `isDirty`.
+ */
+export function hasUncommittedChanges(cwd: string, excludePaths: string[] = []): boolean {
+  const pathspec = ['.', ...excludePaths.map((p) => `:(exclude)${p}`)];
+  const r = git(cwd, ['status', '--porcelain', '--untracked-files=normal', '--', ...pathspec]);
+  return r.ok && r.stdout.length > 0;
+}
+
+/**
  * Content fingerprint of the working tree: the git tree id of every tracked
  * and untracked (non-ignored) file as it is on disk, excluding `excludePaths`.
  *

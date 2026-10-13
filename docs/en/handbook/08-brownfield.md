@@ -670,9 +670,11 @@ Every person on the team knows what changed for them, which commands they run, a
 
 3. Steven points newcomers to the tour: `sdlc guide tour` (seven short steps), and to `sdlc guide` for the topics.
 
-4. Steven adds the sdlc checks to the CI pipeline. `.github/workflows/ci.yml` is a protected path, so he edits it
-   himself, for example with steps that run `sdlc validate --all --json`, `sdlc review check --change <id>` and,
-   with signing on, `sdlc approvals verify`. sdlc 0.14.4 ships no ready workflow file for this.
+4. Steven adds the sdlc checks to the CI pipeline. CI configuration is often a protected path and is a person's
+   decision, so he runs the command himself, in his own terminal: `sdlc ci init --provider github`. Since 0.17.0 it
+   writes `.github/workflows/sdlc.yml`, which runs `sdlc validate --all` and `sdlc approvals verify` on a full clone
+   (`fetch-depth: 0`). `.github/workflows/ci.yml` stays as it is. Steven may add more steps himself, for example
+   `sdlc review check --change <id>`.
 
 ### You are done when
 
@@ -695,7 +697,5 @@ Limitations observed in the sdlc 0.14.4 trial:
 
 - No built-in GitHub Issues sync: issues reach the backlog only through the agent and the GitHub MCP server; archiving
   does not close the linked issue.
-- No ready GitHub Actions workflow (or documented snippet) runs the sdlc checks (`validate`, `review check`,
-  `approvals verify`) in CI.
 - sdlc has no alert intake: `/sdlc:triage` from Telegram depends on pasted text or a read tool of the team's own
   Telegram MCP server.
