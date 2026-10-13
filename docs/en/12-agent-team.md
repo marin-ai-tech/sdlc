@@ -125,6 +125,27 @@ A pack holds `roles/<id>.md` (or `roles/<locale>/<id>.md`) and `skills/<id>/…`
   `--ignore-scripts` — so put a repository in a `git:` pack.
 - An unreachable pack is reported, and sync goes on with the next source.
 
+**Lenses, workflows and checks (since 0.20.0).** A pack may also hold:
+
+- `lenses/<id>.md` — a review lens, named `<pack>-<id>` in the project. `sdlc review context` gives its text, and
+  `sdlc review check` requires its coverage line in review.md like a configured lens.
+- `workflows/<id>.md` — a workflow (front matter `description`), generated as the skill `sdlc-<pack>-<id>` for the
+  project's tools. A pack workflow never replaces a built-in one: `sdlc-build` stays the harness's.
+- `checks.yaml` — `verify:` checks in the format of `verify.commands`, named `<pack>/<name>`. `sdlc verify --list`
+  lists them and `sdlc verify` runs them as an agent (`SDLC_AGENT=pack-<name>`), never as the person who runs verify.
+
+Rules for these:
+
+- **A person accepts the pack.** Nothing of the above is in effect before `sdlc team accept --pack <name>` (a person;
+  with `openspec/roles.yaml`, the maintainer). The acceptance is bound to the digest of the pack's lenses, workflows
+  and checks: a new version, a changed entry in `sdlc.yaml` or an edited cache puts none of them in effect until a
+  person accepts again. An agent can never accept.
+- **Pinned.** A pack with workflows or checks must point at a git commit (40 hex digits) or an exact npm version.
+  Otherwise `sdlc team sync` reports `pack_not_pinned` and the pack cannot be accepted. A pack with roles, skills or
+  lenses only keeps the warning.
+- **No person's command.** A check or a workflow that calls a human-only sdlc command (approve, reject, waive, tests
+  unlock, license set and the others) is refused with `pack_forbidden_command`.
+
 ## 12.6. Skills that reach the agents
 
 The skills a role lists are installed when the role is accepted, and only with a matching checksum.
@@ -166,6 +187,7 @@ Take only what the team needs, from sources it trusts. A skill is instructions a
 | `sdlc team list [--json]` | anyone | roles, sources, status: draft, accepted, changed |
 | `sdlc team check [--json]` | anyone | the skills of the accepted roles, vetted |
 | `sdlc team accept <role>` / `--skill <id>` | a person | accept a role or a skill with scripts |
+| `sdlc team accept --pack <name>` | a person | accept the lenses, workflows and checks of a pack (0.20.0) |
 | `/sdlc:team` (`/sdlc-team`) | the agent | sync, learn the project, draft the project's rules |
 
 ## 12.9. Limits we accept

@@ -5,7 +5,7 @@ import { listActiveChanges } from './changes.js';
 import { harnessStamp, stampText } from './license.js';
 import { evaluateChange, sharedFingerprint, type LifecycleView } from './lifecycle.js';
 import type { ProjectPaths } from './project.js';
-import { HUMAN_COMMANDS } from './human-commands.js';
+import { callsHumanCommand, CLI_PREFIX, joinContinuations } from './human-command-match.js';
 import { nextBacklogItem, readBacklog } from './backlog.js';
 import { t } from './i18n.js';
 import { quotedCommand } from './human-command.js';
@@ -113,24 +113,6 @@ function matcher(globs: string[]): (p: string) => boolean {
   return (p) => m(p);
 }
 
-/** The binary as agents spell it: `sdlc`, its old name, `sdlc.js` and the Windows shims `sdlc.cmd`, `sdlc.ps1`. */
-const CLI_BINARY = String.raw`\b(?:sdlc|scdl)(?:\.(?:js|cmd|ps1|exe))?`;
-/** Global options between the binary and the subcommand: `--locale en`, `--locale=ru`, `-h`. */
-const GLOBAL_OPTIONS = String.raw`(?:\s+--?[a-z][\w-]*(?:=[^\s;&|]+|\s+[^\s;&|-][^\s;&|]*)?)*`;
-/** The CLI and its global options, as the takeover rule matches an sdlc step on a held change. */
-const CLI_PREFIX = `${CLI_BINARY}${GLOBAL_OPTIONS}`;
-const HUMAN_NAMES = HUMAN_COMMANDS.map((name) => name.replace(/ /g, '\\s+')).join('|');
-// Every human-only catalog command is guarded here, including license set.
-// Case-insensitive: `SDLC.CMD approve` runs the same command on Windows.
-const APPROVAL_COMMAND = new RegExp(`${CLI_BINARY}${GLOBAL_OPTIONS}\\s+(?:${HUMAN_NAMES})\\b`, 'i');
-const ADOPT_APPLY_COMMAND = new RegExp(`${CLI_BINARY}${GLOBAL_OPTIONS}\\s+adopt\\b[^;&|\\r\\n]*--apply\\b`, 'i');
-const INIT_ROLES_COMMAND = new RegExp(`${CLI_BINARY}${GLOBAL_OPTIONS}\\s+init\\b[^;&|\\r\\n]*--roles\\b`, 'i');
-
-/** Joins `\`-newline (sh) and backtick-newline (PowerShell) continuations, so a split command reads as one. */
-function joinContinuations(command: string): string {
-  return command.replace(/[\\`]\r?\n/g, ' ');
-}
-
 /** One spelling per path before matching: forward slashes, no `/./` segments, no doubled slashes. */
 function normalizePaths(command: string): string {
   return command
@@ -222,8 +204,7 @@ function evaluateCommand(
   if (clearsAgentMarker(cmd)) {
     return { decision: 'deny', rule: 'agent-marker', reason: t('hook.agentMarker') };
   }
-  if (ctx.config.enforcement.forbidAgentApprovals &&
-      (APPROVAL_COMMAND.test(cmd) || ADOPT_APPLY_COMMAND.test(cmd) || INIT_ROLES_COMMAND.test(cmd))) {
+  if (ctx.config.enforcement.forbidAgentApprovals && callsHumanCommand(cmd)) {
     return {
       decision: 'deny',
       rule: 'separation-of-duties',

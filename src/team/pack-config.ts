@@ -122,3 +122,21 @@ export function npmSpecFloats(spec: string): boolean {
   if (!NPM_NAME.test(name)) return false;
   return cut === -1 || !EXACT.test(spec.slice(cut + 1));
 }
+
+/** A git commit as `ref`: 40 hex digits. */
+const COMMIT = /^[0-9a-f]{40}$/i;
+
+/** True when an npm spec names a registry package at an exact version (`name@1.2.3`); a tarball or a path is not. */
+function npmSpecExact(spec: string): boolean {
+  const at = spec.lastIndexOf('@');
+  const cut = at > (spec.startsWith('@') ? 0 : -1) ? at : -1;
+  return cut !== -1 && NPM_NAME.test(spec.slice(0, cut)) && EXACT.test(spec.slice(cut + 1));
+}
+
+/**
+ * True when what the pack brings cannot change while its entry in sdlc.yaml stays the same (B18): a git `ref` of 40
+ * hex digits, or an exact npm version. A pack that brings workflows or checks must be pinned.
+ */
+export function packPinned(pack: PackConfig): boolean {
+  return isGitPack(pack) ? COMMIT.test(pack.ref) : npmSpecExact(pack.npm);
+}

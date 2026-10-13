@@ -18,6 +18,7 @@ import { runMcpChecks, selectedChecks, uncommittedCode, withMcpChecks } from '..
 import { keepForAgent } from '../mcp/inbox.js';
 import { readAsset } from '../integrations/assets.js';
 import { readManifest } from '../integrations/manifest.js';
+import { packLenses, reviewLenses, withPackChecks } from '../team/pack-effect.js';
 import { reviewSuggest } from './review-suggest.js';
 import { t } from '../core/i18n.js';
 
@@ -130,7 +131,8 @@ function listChecks(ctx: ProjectContext, json?: boolean): void {
 
 export async function verifyCommand(opts: VerifyOptions): Promise<void> {
   try {
-    const ctx = loadProject();
+    // The checks of the accepted packs (B18) run after the project's own, each as an agent.
+    const ctx = withPackChecks(loadProject());
     if (opts.list) return listChecks(ctx, opts.json);
     const ref = resolveChange(ctx.paths, opts.change);
     if (opts.check) {
@@ -209,6 +211,8 @@ export async function reviewCommand(action: string, opts: { change?: string; bas
     }
     const ctx = loadProject();
     const ref = resolveChange(ctx.paths, opts.change);
+    // The lenses of the accepted packs (B18) are required and listed like the configured ones.
+    const lenses = packLenses(ctx.root, ctx.config);
     if (action === 'check') {
       const file = path.join(ref.dir, 'review.md');
       if (!isFile(file)) throw new SdlcError(
@@ -219,7 +223,7 @@ export async function reviewCommand(action: string, opts: { change?: string; bas
       const content = readText(file) ?? '';
       const findings = parseFindings(content);
       const summary = summarizeFindings(findings, ctx.config.review.blockOn);
-      const required = [...ctx.config.review.passes, ...ctx.config.review.lenses];
+      const required = [...ctx.config.review.passes, ...reviewLenses(ctx.config, lenses)];
       const coverage = { required, enforced: ctx.config.review.requireLensCoverage, ...checkCoverage(findings, parseCoverage(content), required) };
       const known = new Set(readDeferred(ctx.root).map((item) => item.id));
       const deferred = { missing: findings.filter((f) => f.deferredTo && !known.has(f.deferredTo)).map((f) => ({ finding: f, id: f.deferredTo })), unlinked: findings.filter((f) => f.deferredUnlinked) };
@@ -274,7 +278,8 @@ export async function reviewCommand(action: string, opts: { change?: string; bas
       policy: { file: isFile(policyFile) ? ctx.config.review.policy : null, content: policy },
       blockOn: ctx.config.review.blockOn,
       passes: ctx.config.review.passes,
-      lenses: ctx.config.review.lenses,
+      lenses: reviewLenses(ctx.config, lenses),
+      packLenses: lenses.map(({ id, pack, text }) => ({ id, pack, text })),
       requireLensCoverage: ctx.config.review.requireLensCoverage,
       artifacts: {
         intent: rel('intent.md'),
@@ -298,6 +303,7 @@ export async function reviewCommand(action: string, opts: { change?: string; bas
     for (const f of drift.untouched) line(`    - ${f} ${c.dim(t('review.plannedUnchanged'))}`);
     const policyLabel = isFile(policyFile) ? ctx.config.review.policy : t('review.policyBuiltin');
     line(`  ${t('review.policy', { policy: policyLabel })}`);
+    for (const lens of lenses) line(`  ${t('review.packLens', { id: lens.id, pack: lens.pack })}`);
     line(`  ${t('review.diff', { command: payload.diffCommand })}`);
   } catch (error) {
     reportFailure(error, opts.json);

@@ -27,6 +27,7 @@ import { reworkLimitNext } from './rework-limit.js';
 import { questionsNext } from './questions-next.js';
 import { draftIntentNext } from './draft-intent-next.js';
 import { debateNext } from './debate-next.js';
+import { judgeNext } from './judge-gate.js';
 import { evaluateQaGate } from './qa-gate.js';
 import { verifyBehaviourNext } from './verify-behaviour.js';
 import { codeDigest, lr } from './approval-gate.js';
@@ -278,7 +279,8 @@ export function evaluateChange(
   const limit = held ? undefined : reworkLimitNext(root, config, view, state, options.skipPeople);
   const advice = nextAction(view, config, mapping, state);
   const next = held ?? limit ?? questionsNext(view, config, state,
-    debateNext(view, config, draftIntentNext(view, verifyBehaviourNext(view, advice))));
+    judgeNext(view, config, state,
+      debateNext(view, config, draftIntentNext(view, verifyBehaviourNext(view, advice)))));
   view.next = held || options.skipPeople ? next : nameApprovers(root, config, view, state, next);
   return view;
 }

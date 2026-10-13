@@ -246,6 +246,24 @@ describe('demo: a team builds a calculator with sdlc (every command)', { timeout
     const division = '\n## Division by zero\n\nThe till shows "Error" for 10 / 0.\n';
     write(path.join(change('basic-arithmetic'), 'design.md'), `${DESIGN}${division}`);
     step('explain', 'gates', 'bob', ['explain', '--change', 'basic-arithmetic'], 'Bob asks why the change is back at the spec: the rework, its note and what unblocks it.');
+    // 0.20.0 (B19): after the rework the team turns on a judge for the spec; the agent runs it before Alice decides.
+    const judge = path.join(tempDir('sdlc-demo-judge-'), 'judge.mjs');
+    write(judge, [
+      'let text = "";',
+      'process.stdin.on("data", (chunk) => { text += chunk; });',
+      'process.stdin.on("end", () => {',
+      '  const ok = JSON.parse(text).artifacts.some((a) => a.content.includes("Division by zero"));',
+      '  process.stdout.write(JSON.stringify({ pass: ok, route: ok ? "human" : "author", rework: ok ? "" : "Cover 10 / 0." }));',
+      '});', '',
+    ].join('\n'));
+    write(path.join(root, 'docs/rubrics/spec.md'), '# Spec rubric\n\n- Every edge case of the till has an answer.\n');
+    const judged = parseDocument(read(path.join(root, 'openspec/sdlc.yaml')));
+    judged.setIn(['gates', 'spec', 'judge'], {
+      run: `node "${judge.replace(/\\/g, '/')}"`, rubric: 'docs/rubrics/spec.md',
+    });
+    write(path.join(root, 'openspec/sdlc.yaml'), judged.toString());
+    step('judge', 'gates', 'agent', ['judge', '--gate', 'spec', '--change', 'basic-arithmetic'],
+      'An independent judge checks the reworked spec by the team rubric; it passes, and only a person can approve.');
     step('approve-spec-again', 'gates', 'alice', ['approve', 'spec', '--change', 'basic-arithmetic'], 'The design now says what 10 / 0 shows; the spec is approved again.');
     step('approve-plan-again', 'gates', 'bob', ['approve', 'plan', '--change', 'basic-arithmetic'], 'The plan needs its own new approval.');
     commit('alice', 'Rework of the spec, approvals renewed');

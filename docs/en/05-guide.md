@@ -251,6 +251,30 @@ The plan gate holds code edits until a plan is approved. With one active change,
 
 Open questions under `## Open questions` in intent.md, proposal.md or design.md need a person's answer before the intent or spec gate can be approved. `sdlc answer --change <id> --list` shows them; `sdlc answer <n> --change <id> --text "…"` writes the answer under the question and records it in `.sdlc.yaml`. Only that record counts: an answer typed into the file by hand or by an agent does not, and a reworded question needs a new answer. Inside an agent session the command refuses, and the hook denies it; the intent and spec workflows leave the questions to you and give you the command. Turn the rule off with `questions: { required: false }` in `sdlc.yaml`.
 
+### A judge before the person (0.20.0)
+
+A judge is an independent model that checks a gate's artifacts by the team's rubric before a person approves. Set it
+on the gate, as a command or as an MCP tool of the registry:
+
+```yaml
+gates:
+  spec:
+    required: true
+    approvers: [product-owner]
+    judge: { run: node tools/judge.mjs, rubric: docs/rubrics/spec.md, max_loops: 3 }
+    # judge: { server: judges, tool: judge, rubric: docs/rubrics/spec.md }
+```
+
+`sdlc judge --gate spec --change <id>` sends `{ change, gate, rubric, artifacts: [{ path, content }] }` (a command
+reads it on stdin and prints the verdict as JSON; a tool gets it as arguments) and records the verdict
+`{ pass, route, rework }`, bound to the digest of the artifacts. Anyone may run it, the agent too: `sdlc next` asks
+the agent to. Until a verdict passes for the current artifacts, the gate is blocked and a person cannot approve; after
+a failing verdict, `sdlc next` gives the agent the judge's rework instruction. A changed artifact makes the verdict
+stale. A passing verdict is evidence only: a person still approves. After `max_loops` failing verdicts the
+author-critic loop stops and `sdlc next` hands the gate to a person, who may approve. A command judge runs as an agent
+(`SDLC_AGENT=judge`), so it can never approve or unlock. An answer that is not a verdict is refused
+(`judge_invalid_answer`); a judge that fails or times out is an error, never a pass.
+
 ### Approvals in commits, evidence limits, gates that do not apply
 
 `sdlc approve` prints a ready `git commit` with the trailer `SDLC-Approval: <change>:<gate>:<digest>` (JSON `commitMessage`); `sdlc approvals verify` reports `trailer: found | missing` for each approval. The evidence in `verification.md` warns about files listed under "Files that change" that the change did not touch (`planDrift.untouched`, never a failure), has a `## Not run / limits` section for the tester, and lists the files of the change's `verification/` folder (screenshots, browser results) as links. `gates.<gate>.auto_waive: { kinds, tracks }` waives the intent, spec or plan gate for matching changes, logged once as `gate.<gate>.auto_waived` and counted in the audit as a policy waiver; a kind chosen by an agent does not count. Use cases: [13. Process hygiene and project health](13-process-health.md).

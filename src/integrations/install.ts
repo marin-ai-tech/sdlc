@@ -12,12 +12,13 @@ import { cursorAdapter } from './cursor.js';
 import { qwenAdapter, gigacodeAdapter } from './qwen-family.js';
 import { mergeQwenSettings, qwenSettingsPath } from './qwen-settings.js';
 import { CURSOR_HOOKS_PATH, mergeCursorHooks } from './cursor-hooks.js';
-import { applyFiles, type ApplyReport } from './manifest.js';
+import { applyFiles, readManifest, type ApplyReport, type ManifestEntry } from './manifest.js';
 import { opencodeAdapter } from './opencode.js';
 import { applyMcpRegistration, removeMcpRegistration, type McpChange } from './mcp-config.js';
 import { applyRegistryServers, removeRegistryServers, type ServerChanges } from './mcp-servers.js';
 import { assertNoSecretLiterals } from '../mcp/registry.js';
 import { mergeClaudeHooks, mergeClaudeStatusLine, type SettingsChange } from './settings.js';
+import { renderPackWorkflows } from './pack-workflows.js';
 import { renderSkills } from './skills.js';
 import { renderTeamSkills } from './team-skills.js';
 import { acceptedRoles } from '../team/accepted.js';
@@ -79,6 +80,7 @@ export function renderContext(config: SdlcConfig, tools: ToolId[], root?: string
 
 export function renderAll(ctx: RenderContext): GeneratedFile[] {
   const files: GeneratedFile[] = [...schemaFiles(ctx.stamp), ...renderSkills(ctx), ...renderTeamSkills(ctx)];
+  files.push(...renderPackWorkflows(ctx));
   for (const tool of ctx.tools) files.push(...ADAPTERS[tool].render(ctx));
   return files;
 }
@@ -191,8 +193,25 @@ function pruneToolFolders(root: string, dryRun: boolean | undefined): void {
  * hook settings, so their notices follow a license change.
  */
 export function refreshGeneratedFiles(root: string, config: SdlcConfig): ApplyReport {
-  const ctx = renderContext(config, config.tools.filter((t) => t in ADAPTERS) as ToolId[], root);
+  const ctx = renderContext(config, configuredTools(config), root);
   return applyFiles(root, renderAll(ctx), { version: ctx.version, license: ctx.stamp.license });
+}
+
+function configuredTools(config: SdlcConfig): ToolId[] {
+  return config.tools.filter((t) => t in ADAPTERS) as ToolId[];
+}
+
+/**
+ * Writes the skills of the accepted packs' workflows and removes those no longer in effect (B18), touching no other
+ * generated file; does nothing when there are none and none was written before.
+ */
+export function refreshPackWorkflows(root: string, config: SdlcConfig): ApplyReport | undefined {
+  const ctx = renderContext(config, configuredTools(config), root);
+  const files = renderPackWorkflows(ctx);
+  const owned = Object.values(readManifest(root).files).some((entry) => entry.kind === 'pack-skill');
+  if (files.length === 0 && !owned) return undefined;
+  const removeObsolete = (entry: ManifestEntry) => entry.kind === 'pack-skill';
+  return applyFiles(root, files, { version: ctx.version, license: ctx.stamp.license, removeObsolete });
 }
 
 /** Removes every generated file (unless edited), the Claude, Cursor and Codex hooks. Planning data is never touched. */

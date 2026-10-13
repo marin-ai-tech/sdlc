@@ -16,6 +16,7 @@ import {
 } from './approval-gate.js';
 import { GATE_STAGE } from './stages.js';
 import type { GateEvaluation } from './lifecycle.js';
+import { judgeBlockReason } from './judge-gate.js';
 
 /** The three planning-gate evaluations plus the first reason a later gate is waiting on. */
 export function evaluatePlanningGates(
@@ -48,12 +49,13 @@ export function evaluatePlanningGates(
       continue;
     }
     const missing = missingOf(covered);
-    const blocked = missing.length > 0
-      ? lr('gate.missingArtifacts', { artifacts: missing.join(', ') })
-      : upstreamOpen;
     const digest = missing.length === 0
       ? digestFiles(ref.dir, coveredFiles(covered), (rel, content) => (rel === tracks ? withoutCheckboxState(content) : content))
       : undefined;
+    const judgeBlock = judgeBlockReason(config, state, id, digest);
+    const blocked = missing.length > 0
+      ? lr('gate.missingArtifacts', { artifacts: missing.join(', ') })
+      : (upstreamOpen ?? judgeBlock);
     const evaluation = evaluateApprovalGate(id, config, state, decided[id], digest, blocked, covered, ref.archived);
     gates.push(evaluation);
     if (!evaluation.satisfied && !upstreamOpen) upstreamOpen = lr('gate.waitingOn', { gate: id });

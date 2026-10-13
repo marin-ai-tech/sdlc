@@ -8,6 +8,8 @@ import { DRAFTS_DIR } from '../team/record.js';
 import { checkTeamSkills, type SkillCheck } from '../team/skill-check.js';
 import { acceptSkill, installRoleSkills, type SkillsOutcome } from '../team/skills.js';
 import type { PackReport } from '../team/packs.js';
+import { acceptPack, type PackAcceptResult } from '../team/pack-accept.js';
+import type { PackContentsReport } from '../team/pack-effect.js';
 import { acceptRole, listTeam, syncTeam, type SyncResult, type TeamListRole } from '../team/team.js';
 import { assertHuman } from './gates.js';
 
@@ -22,6 +24,18 @@ function printPack(pack: PackReport): void {
   else line(t('team.sync.pack', { name: pack.name, at: at.trim(), ...counts }));
   const spec = source?.npm ?? pack.name;
   if (pack.warning) line(`${t('label.warning')}: ${t('team.sync.packFloating', { name: pack.name, spec })}`);
+  if (pack.contents) printPackContents(pack.name, pack.contents);
+}
+
+/** B18: what the pack brings besides roles and skills, why it is refused, or whether a person accepted it. */
+function printPackContents(name: string, contents: PackContentsReport): void {
+  const { lenses, workflows, checks } = contents;
+  const counts = { lenses: lenses.length, workflows: workflows.length, checks: checks.length };
+  for (const problem of contents.problems) {
+    line(t('team.sync.packProblem', { name, code: problem.code, item: problem.item, detail: problem.detail }));
+  }
+  if (contents.problems.length > 0) return;
+  line(t(contents.accepted ? 'team.sync.packAccepted' : 'team.sync.packWaiting', { name, ...counts }));
 }
 
 function printSync(result: SyncResult): void {
@@ -97,9 +111,32 @@ async function acceptSkillCommand(id: string, opts: Options): Promise<void> {
   if (result.scripts.length > 0) line(t('team.acceptSkill.scripts', { list: result.scripts.join(', ') }));
 }
 
+function printPackAccept(result: PackAcceptResult): void {
+  const source = result.source;
+  const at = source.commit ? `${source.ref ?? ''} ${source.commit.slice(0, 12)}` : source.version ?? '';
+  const none = '-';
+  line(t('team.acceptPack.done', { name: result.pack, at: at.trim(), team: result.team }));
+  line(t('team.acceptPack.lenses', { list: result.lenses.join(', ') || none }));
+  line(t('team.acceptPack.workflows', { list: result.workflows.join(', ') || none }));
+  for (const check of result.checks) line(t('team.acceptPack.check', { name: check.name, run: check.run }));
+}
+
+/** B18: a person accepts the lenses, workflows and checks of a pack; refused like `team accept` for an agent. */
+function acceptPackCommand(name: string, opts: Options): void {
+  const ctx = loadProject();
+  assertHuman(ctx.config, 'team accept');
+  assertDecisionRole(ctx.root, 'team accept');
+  const result = acceptPack(ctx.root, ctx.config, name, identity(ctx.root));
+  if (opts.json) return printJson(result);
+  printPackAccept(result);
+}
+
+type AcceptOptions = Options & { skill?: string; pack?: string };
+
 /** A person's command: refused in an agent session (`agent_cannot_approve`), like a gate decision. */
-export async function teamAcceptCommand(role: string | undefined, opts: Options & { skill?: string }): Promise<void> {
+export async function teamAcceptCommand(role: string | undefined, opts: AcceptOptions): Promise<void> {
   try {
+    if (opts.pack !== undefined) return acceptPackCommand(opts.pack, opts);
     if (opts.skill !== undefined) return await acceptSkillCommand(opts.skill, opts);
     if (role === undefined) throw new SdlcError('usage', { key: 'error.team_accept_what' });
     await acceptRoleWithSkills(role, opts);

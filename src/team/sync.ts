@@ -3,6 +3,7 @@ import * as path from 'node:path';
 import type { SdlcConfig } from '../core/config.js';
 import { normalizeNewlines, readText, writeTextAtomic } from '../core/fs-utils.js';
 import type { Locale } from '../core/i18n.js';
+import { refreshPackWorkflows } from '../integrations/install.js';
 import { registryDraft } from './draft.js';
 import { packDrafts, type PackReport } from './packs.js';
 import { acceptedPath, draftPath, readTeam, writeTeam, type TeamEntry, type TeamRecord } from './record.js';
@@ -20,7 +21,9 @@ import { vetRole } from './vetting.js';
  * next source's role, if any, takes its place. An accepted role is never replaced: a new version from the registry
  * or a pack arrives as a draft next to it. A draft of the same version is left alone, and so is a draft someone
  * edited. A registry that does not answer leaves the built-ins to fill what is missing; the result says so, it is
- * not an error.
+ * not an error. Each pack's report also lists its lenses, workflows and checks (B18) and why it cannot be accepted
+ * (`pack_not_pinned`, `pack_forbidden_command`, `pack_invalid_content`); none of them is in effect before
+ * `sdlc team accept --pack`.
  */
 export interface Refused {
   id: string;
@@ -153,5 +156,7 @@ export async function syncTeam(root: string, config: SdlcConfig): Promise<SyncRe
   const drafts = [...fromRegistry, ...fromPacks, ...builtins];
   for (const draft of drafts) wrote = placeDraft(root, team, draft, result) || wrote;
   if (wrote) writeTeam(root, team);
+  // A new version of a pack is not in effect until accepted: the skills of its old workflows go (B18).
+  if (config.packs && config.packs.length > 0) refreshPackWorkflows(root, config);
   return result;
 }

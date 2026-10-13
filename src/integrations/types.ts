@@ -13,7 +13,7 @@ export interface GeneratedFile {
   path: string;
   content: string;
   tool: ToolId | 'shared';
-  kind: 'skill' | 'command' | 'agent' | 'plugin' | 'schema' | 'team-skill' | 'rule';
+  kind: 'skill' | 'command' | 'agent' | 'plugin' | 'schema' | 'team-skill' | 'rule' | 'pack-skill';
   /** Unix mode for executable files. */
   mode?: number;
 }

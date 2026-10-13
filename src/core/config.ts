@@ -11,6 +11,7 @@ import { parseContextSources, type ContextSourcesConfig } from '../mcp/context-s
 import { parsePacksConfig, type PackConfig } from '../team/pack-config.js';
 import { parseQuestionsConfig, type QuestionsConfig } from './questions-config.js';
 import { parseDesignConfig, type DesignConfig } from './debate.js';
+import { parseJudgeConfig, serializeJudgeConfig, type JudgeConfig } from './judge-config.js';
 import { parseTeamConfig, type TeamConfig } from '../team/team-config.js';
 import { parseStages, type StagesConfig } from './stage-config.js';
 import { readYamlObject } from './yaml-io.js';
@@ -56,6 +57,8 @@ export interface GateConfig {
   overdueHours?: number;
   /** Kinds or tracks of change this gate is waived for by policy (B59); never on verify or review. */
   autoWaive?: AutoWaive;
+  /** Optional judge (B19): an independent model checks the gate artifacts by a rubric. */
+  judge?: JudgeConfig;
 }
 
 export interface VerifyCommand {
@@ -64,6 +67,8 @@ export interface VerifyCommand {
   timeoutSeconds?: number;
   /** Optional commands record evidence but do not fail the verify gate. */
   required: boolean;
+  /** Set for a pack's check only (B18): `SDLC_AGENT=pack-<name>`, so it runs as an agent. Never read from sdlc.yaml. */
+  env?: Record<string, string>;
 }
 
 export interface SdlcConfig {
@@ -383,6 +388,8 @@ export function parseConfig(raw: Raw, file = 'openspec/sdlc.yaml'): SdlcConfig {
       if (overdueHours) target.overdueHours = overdueHours;
       const autoWaive = parseAutoWaive(gate.auto_waive, id, where(`gates.${id}.auto_waive`));
       if (autoWaive) target.autoWaive = autoWaive;
+      const judge = parseJudgeConfig(gate.judge, where(`gates.${id}.judge`));
+      if (judge) target.judge = judge;
     }
   }
 
@@ -607,6 +614,7 @@ export function serializeConfig(config: SdlcConfig): Record<string, unknown> {
       ...(gate.minApprovals ? { min_approvals: gate.minApprovals } : {}),
       ...(gate.overdueHours ? { overdue_hours: gate.overdueHours } : {}),
       ...(gate.autoWaive ? { auto_waive: gate.autoWaive } : {}),
+      ...(gate.judge ? { judge: serializeJudgeConfig(gate.judge) } : {}),
     };
   }
   gates.verify = { required: config.gates.verify.required };

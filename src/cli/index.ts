@@ -13,6 +13,7 @@ import { pluginBuildCommand } from '../commands/plugin.js';
 import { approveCommand, rejectCommand, testsCommand, waiveCommand } from '../commands/gates.js';
 import { releaseControlCommand, takeoverCommand } from '../commands/takeover.js';
 import { answerCommand } from '../commands/answer.js';
+import { judgeCommand } from '../commands/judge.js';
 import { reworkCommand } from '../commands/rework.js';
 import { initCommand, uninstallCommand, updateCommand } from '../commands/setup.js';
 import { reviewCommand, verifyCommand } from '../commands/verify.js';
@@ -115,6 +116,7 @@ export function buildProgram(): Command {
     .option('--json', 'output JSON').action((opts) => teamSyncCommand(opts));
   team.command('accept [role]').description(cmdDesc('cmd.team.accept'))
     .option('--skill <id>', 'accept a skill of the team registry, scripts included (human only)')
+    .option('--pack <name>', 'accept the lenses, workflows and checks of a pack (human only)')
     .option('--json', 'output JSON').action((role, opts) => teamAcceptCommand(role, opts));
   team.command('list').description(cmdDesc('cmd.team.list'))
     .option('--json', 'output JSON').action((opts) => teamListCommand(opts));
@@ -424,6 +426,11 @@ export function buildProgram(): Command {
     .option('--list', 'list the open questions and their answers (writes nothing)')
     .option('--json', 'output JSON')
     .action((n, opts) => answerCommand(n, opts));
+  program.command('judge').description(cmdDesc('cmd.judge'))
+    .requiredOption('--gate <gate>', 'gate whose judge to run (e.g. spec)')
+    .option('--change <id>', 'change id')
+    .option('--json', 'output JSON')
+    .action((opts) => judgeCommand(opts));
   program.command('takeover').description(cmdDesc('cmd.takeover'))
     .option('--change <id>', 'change id')
     .option('--note <text>', 'why you take the change over (required; the agent sees it)')

@@ -5,6 +5,7 @@ import { normalizeNewlines } from '../core/fs-utils.js';
 import type { Locale } from '../core/i18n.js';
 import { packDraft, withoutSource } from './draft.js';
 import { isGitPack, npmSpecFloats, type PackConfig, type PackSource } from './pack-config.js';
+import { contentsReport, type PackContentsReport } from './pack-effect.js';
 import { cachedPack, fetchPack, type FetchedPack } from './pack-fetch.js';
 import { failure } from './registry-client.js';
 import { parseRoleFile, ROLE_ID } from './role-file.js';
@@ -28,6 +29,8 @@ export interface PackReport {
   source?: PackSource;
   error?: string;
   warning?: string;
+  /** The lenses, workflows and checks it brings (B18), what refuses it, and whether they are in effect. */
+  contents?: PackContentsReport;
 }
 
 export interface PackDrafts {
@@ -134,6 +137,8 @@ export function packDrafts(root: string, config: SdlcConfig, locale: Locale): Pa
   const seen = new Set<string>();
   for (const pack of config.packs ?? []) {
     const loaded = loadPack(root, pack, true);
+    const contents = loaded.fetched ? contentsReport(root, pack, loaded.fetched) : undefined;
+    if (contents) loaded.report.contents = contents;
     out.reports.push(loaded.report);
     addRoles(loaded, locale, out, seen);
   }

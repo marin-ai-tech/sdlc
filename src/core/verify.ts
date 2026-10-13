@@ -57,7 +57,7 @@ function runCheck(root: string, check: VerifyCommand, timeoutSeconds: number, ou
     const child = spawn(check.run, {
       cwd: root,
       shell: true,
-      env: { ...process.env, CI: process.env.CI ?? '1', FORCE_COLOR: '0' },
+      env: { ...process.env, CI: process.env.CI ?? '1', FORCE_COLOR: '0', ...check.env },
       stdio: ['ignore', 'pipe', 'pipe'],
     });
     let timedOut = false;

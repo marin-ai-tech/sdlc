@@ -139,6 +139,8 @@ export interface GateState {
   rejection?: RejectionRecord;
   waived?: WaiverRecord;
   rework?: ReworkRecord;
+  /** Judge verdicts (B19); present only once a judge has run for this gate. */
+  judge?: Array<{ pass: boolean; route: string; rework: string; digest: string; at: string }>;
 }
 
 export interface HistoryEvent extends Provenance {

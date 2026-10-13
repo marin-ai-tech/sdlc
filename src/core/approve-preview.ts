@@ -11,6 +11,7 @@ import * as path from 'node:path';
 import { unchangedSinceRework } from './approval-hygiene.js';
 import { assertQuestionsAnswered, unansweredQuestions, type UnansweredQuestion } from './answers.js';
 import { assertDebateRecorded } from './debate.js';
+import { assertJudgeCleared } from './judge-gate.js';
 import { approverKey, assertByAllowed } from './approval-quorum.js';
 import { readChangeState, type ChangeState } from './change-state.js';
 import type { ChangeRef } from './changes.js';
@@ -101,6 +102,7 @@ function approvalRefusals(input: PreviewInput, evaluation: GateEvaluation, state
   found.push(...(roles ? rolesRefusals(input, state, roles) : configRefusals(input, evaluation)));
   attempt(found, () => assertQuestionsAnswered(input.config, input.ref.id, input.ref.dir, state, input.gate));
   attempt(found, () => assertDebateRecorded(input.config, input.ref.dir, input.gate));
+  attempt(found, () => assertJudgeCleared(input.config, state, input.gate, evaluation.digest));
   return found.filter((item, index) => found.findIndex((other) => other.rule === item.rule) === index);
 }
 

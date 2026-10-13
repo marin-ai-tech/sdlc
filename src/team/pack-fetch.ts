@@ -10,8 +10,9 @@ import { LIMITS, unsafeSkillPath } from './vetting.js';
  * Fetching a pack (B76) into the cache `<git dir>/sdlc/packs/<name>/<ref-or-version>/`, which lives in the git dir
  * and is never committed. Nothing of a pack runs:
  * - git: a shallow fetch of the ref into a bare repository (no work tree, so no checkout, no filters, no hooks;
- *   `core.hooksPath` points nowhere and submodules are not fetched); the files under `roles/` and `skills/` are
- *   copied out of the commit's tree, regular blobs only (no symlinks, no submodules), each path checked.
+ *   `core.hooksPath` points nowhere and submodules are not fetched); the files under `roles/`, `skills/`, `lenses/`
+ *   and `workflows/` and the file `checks.yaml` (B18) are copied out of the commit's tree, regular blobs only (no
+ *   symlinks, no submodules), each path checked.
  * - npm: only registry packages and tarballs are allowed. npm 10 can run `prepare` for folder and git specs even
  *   with `--ignore-scripts`, so those sources are refused. The tarball is extracted by `tar`.
  * A pack that cannot be fetched throws `PackError`; sync reports it and goes on with the next source.
@@ -25,9 +26,10 @@ export interface FetchedPack {
 
 const FETCH_MS = 180000;
 const META = '.sdlc-pack.json';
-/** Limits on a whole pack: the files under roles/ and skills/, and their size together. */
+/** Limits on a whole pack: the files of LAYOUT, and their size together. */
 export const PACK_LIMITS = { files: 1000, bytes: 16 * 1024 * 1024 };
-const LAYOUT = ['roles', 'skills'];
+/** What is exported from a git pack: roles and skills (B76), review lenses, workflows and gate checks (B18). */
+const LAYOUT = ['roles', 'skills', 'lenses', 'workflows', 'checks.yaml'];
 
 interface Run {
   ok: boolean;
@@ -86,7 +88,7 @@ interface TreeFile {
   path: string;
 }
 
-/** The regular files under roles/ and skills/ of the commit; symlinks (120000) and submodules (160000) are left. */
+/** The regular files of LAYOUT in the commit; symlinks (120000) and submodules (160000) are left. */
 function treeFiles(repo: string, commit: string): TreeFile[] {
   const out = gitOk(repo, ['ls-tree', '-r', '-l', '-z', '--full-tree', commit, '--', ...LAYOUT]).toString('utf8');
   const files: TreeFile[] = [];

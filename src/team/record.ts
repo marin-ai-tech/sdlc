@@ -12,7 +12,9 @@ import { ROLE_ID } from './role-file.js';
  * skills: { <id>: { version, checksum, source, server, by, at, dir, dirs?, files: { <path>: <sha256> }, scripts } },
  * drafts: { <id>: { kind, server?, version?, checksum?, text } } }`. `drafts` keeps each draft as its source gave
  * it, so accepting shows what was changed in it since. A role, a skill or a draft from a pack (B76) also keeps
- * `pack: { pack, git | npm, ref, commit | version, integrity? }`.
+ * `pack: { pack, git | npm, ref, commit | version, integrity? }`. A pack a person accepted (B18) is in
+ * `packs: { <name>: { digest, source, lenses, workflows, checks, by, at } }`: its lenses, workflows and checks are in
+ * effect only while its fetched copy has that source and that digest.
  *
  * A skill is installed for every configured tool (B86), so it may live in several folders: `dirs` lists them all and
  * `dir` is the first. A record written before 0.14.7 has only `dir`; it reads as that one folder.
@@ -60,11 +62,24 @@ export interface DraftRecord {
   text: string;
 }
 
+/** A pack a person accepted (B18): what it brought then, bound to the source and the digest of those files. */
+export interface PackEntry {
+  digest: string;
+  source: PackSource;
+  lenses: string[];
+  workflows: string[];
+  checks: string[];
+  by: string;
+  at: string;
+}
+
 export interface TeamRecord {
   version: 1;
   roles: Record<string, TeamEntry>;
   skills: Record<string, SkillEntry>;
   drafts: Record<string, DraftRecord>;
+  /** Absent in a record without accepted packs. */
+  packs?: Record<string, PackEntry>;
 }
 
 export function acceptedPath(id: string): string {
@@ -156,6 +171,19 @@ function draftRecord(value: unknown): DraftRecord | undefined {
     ...optional(raw, 'checksum'), text: raw.text };
 }
 
+function strings(value: unknown): string[] {
+  return Array.isArray(value) ? value.filter((item): item is string => typeof item === 'string') : [];
+}
+
+function packEntry(value: unknown): PackEntry | undefined {
+  const raw = object(value);
+  const source = packField(raw?.source).pack;
+  if (!raw || typeof raw.digest !== 'string' || !source) return undefined;
+  const text = (key: string) => (typeof raw[key] === 'string' ? (raw[key] as string) : '');
+  return { digest: raw.digest, source, lenses: strings(raw.lenses), workflows: strings(raw.workflows),
+    checks: strings(raw.checks), by: text('by'), at: text('at') };
+}
+
 function entries<T>(value: unknown, parse: (item: unknown) => T | undefined): Record<string, T> {
   const out: Record<string, T> = {};
   for (const [id, item] of Object.entries(object(value) ?? {})) {
@@ -172,8 +200,9 @@ export function readTeam(root: string): TeamRecord {
   if (!text) return team;
   try {
     const raw = object(JSON.parse(text)) ?? {};
+    const packs = entries(raw.packs, packEntry);
     return { version: 1, roles: entries(raw.roles, entry), skills: entries(raw.skills, skillEntry),
-      drafts: entries(raw.drafts, draftRecord) };
+      drafts: entries(raw.drafts, draftRecord), ...(Object.keys(packs).length > 0 ? { packs } : {}) };
   } catch {
     return team;
   }
@@ -186,7 +215,8 @@ function sorted<T>(map: Record<string, T>): Record<string, T> {
 export function writeTeam(root: string, team: TeamRecord): void {
   const skills = Object.keys(team.skills).length > 0 ? { skills: sorted(team.skills) } : {};
   const drafts = Object.keys(team.drafts).length > 0 ? { drafts: sorted(team.drafts) } : {};
-  const record = { version: 1, roles: sorted(team.roles), ...skills, ...drafts };
+  const packs = team.packs && Object.keys(team.packs).length > 0 ? { packs: sorted(team.packs) } : {};
+  const record = { version: 1, roles: sorted(team.roles), ...skills, ...drafts, ...packs };
   writeTextAtomic(path.join(root, TEAM_PATH), `${JSON.stringify(record, null, 2)}\n`);
 }
 

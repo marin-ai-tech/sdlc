@@ -23,6 +23,7 @@ import { approvalChecks } from '../mcp/release-checks.js';
 import { approvalCommitMessage, assertChangedSinceRework } from '../core/approval-hygiene.js';
 import { assertQuestionsAnswered } from '../core/answers.js';
 import { assertDebateRecorded } from '../core/debate.js';
+import { assertJudgeCleared } from '../core/judge-gate.js';
 
 /**
  * Gate decisions: approve, reject, waive, and the test lock. These record
@@ -216,6 +217,7 @@ export async function approveCommand(gateArg: string, opts: DecisionOptions): Pr
     assertChangedSinceRework(state, gate, evaluation.digest, opts.note);
     assertQuestionsAnswered(ctx.config, ref.id, ref.dir, state, gate);
     assertDebateRecorded(ctx.config, ref.dir, gate);
+    assertJudgeCleared(ctx.config, state, gate, evaluation.digest);
     // B47: the release checks run after every other check and before anything is written.
     const checks = gate === 'release' ? await approvalChecks(ctx.config, ctx.root, ref.id) : undefined;
 

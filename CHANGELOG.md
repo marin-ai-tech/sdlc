@@ -2,7 +2,28 @@
 
 All notable changes to sdlc. Versions follow [Semantic Versioning](https://semver.org/); while the major version is 0, a minor version may change behavior.
 
-## 0.19.0 — 2026-10-13
+## 0.20.0 — 2026-10-13
+
+### Added
+- A judge gate. `gates.<g>.judge` names a judge for an approval gate: a command (`run`) or an MCP tool of the registry
+  (`server`, `tool`), a rubric file of the project (`rubric`) and `max_loops` (default 3). `sdlc judge --gate <g>
+  --change <id> [--json]` (anyone, an agent too) sends the rubric and the gate's artifacts to the judge and records its
+  verdict `{ pass, route, rework }`, bound to the digest of those artifacts. Until a verdict passes for the current
+  artifacts, the gate is blocked: a person cannot approve, and `sdlc next` asks the agent to run the judge or to rework
+  the artifacts with the judge's instruction. A changed artifact makes the verdict stale. A passing verdict is
+  evidence only: a person still approves. After `max_loops` failing verdicts the loop stops and `sdlc next` hands the
+  gate to a person. A command judge runs as an agent, so it can never approve or unlock. An answer that is not a
+  verdict is refused (`judge_invalid_answer`) and records nothing.
+- Extension packs bring review lenses, workflows and gate checks, next to roles and skills. A pack may hold
+  `lenses/<id>.md` (a review lens named `<pack>-<id>`: `sdlc review context` gives its text and `sdlc review check`
+  requires its coverage line), `workflows/<id>.md` (a workflow generated as the skill `sdlc-<pack>-<id>`; it never
+  replaces a built-in one) and `checks.yaml` (`verify:` checks, named `<pack>/<name>` and run by `sdlc verify` as an
+  agent). Nothing a pack brings is in effect before a person accepts it with `sdlc team accept --pack <name>` (the
+  maintainer role with `openspec/roles.yaml`), bound to the digest of its contents: a new version waits for a new
+  acceptance. A pack with workflows or checks must be pinned to a git commit (40 hex digits) or an exact npm version
+  (`pack_not_pinned` otherwise). A pack that calls a person's sdlc command in a check or a workflow is refused
+  (`pack_forbidden_command`).
+
 
 ### Added
 - `sdlc mcp serve --http <host:port>` serves the same read-only tools to remote MCP clients over Streamable HTTP at

@@ -88,7 +88,9 @@ describe('projects written before the rename from scdl', () => {
       /^README\.md:.*under its old name \(`marin-ai-tech\/scdl`/,
       // 0.14.2 (B84): the second layer of Codex and Qwen refuses a person's commands under the `scdl` alias bin too.
       /^src\/integrations\/second-layer\.ts:/, /^src\/integrations\/qwen-settings\.ts:.*\(\?:sdlc\|scdl\)/,
-      /^test\/b84-hardening\.test\.ts:/];
+      /^test\/b84-hardening\.test\.ts:/,
+      // 0.20.0 (B18): the hook's match of a person's command moved to one module the packs share; same binary rule.
+      /^src\/core\/human-command-match\.ts:.*\(\?:sdlc\|scdl\)/];
     const leftovers = r.stdout.split('\n').filter((line) => line && !allowed.some((re) => re.test(line)));
     expect(leftovers).toEqual([]);
     expect(fs.existsSync(path.join(REPO_ROOT, 'LICENSES/sdlc-Additional-Permissions.md'))).toBe(true);
