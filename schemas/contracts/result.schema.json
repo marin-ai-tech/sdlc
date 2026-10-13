@@ -1,0 +1,65 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://sdlc.dev/schemas/contracts/result.schema.json",
+  "title": "sdlc task check-result verdict",
+  "description": "The JSON of `sdlc task check-result`: the commits and files of <base>..<branch>, the problems that fail the check and the warnings that do not. Read-only - nothing is merged or approved.",
+  "type": "object",
+  "required": ["ok", "base", "commits", "files", "problems", "warnings"],
+  "properties": {
+    "ok": { "type": "boolean" },
+    "base": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{40}$",
+      "description": "The commit the range <base>..<branch> was computed from"
+    },
+    "commits": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["sha", "subject"],
+        "properties": {
+          "sha": { "type": "string" },
+          "subject": { "type": "string" },
+          "change": { "type": "string", "description": "SDLC-Change trailer, when present" },
+          "task": { "type": "string", "description": "SDLC-Task trailer, when present" }
+        },
+        "additionalProperties": false
+      }
+    },
+    "files": {
+      "type": "array",
+      "items": { "type": "string" },
+      "uniqueItems": true,
+      "description": "Changed files of the range: repo-relative, POSIX separators, sorted"
+    },
+    "problems": {
+      "type": "array",
+      "description": "Failures: ok=false and exit code 1 when non-empty",
+      "items": {
+        "type": "object",
+        "required": ["code"],
+        "properties": {
+          "code": { "enum": ["missing_trailer", "unknown_task", "forbidden_path", "no_commits"] },
+          "sha": { "type": "string" },
+          "file": { "type": "string" },
+          "task": { "type": "string" }
+        },
+        "additionalProperties": false
+      }
+    },
+    "warnings": {
+      "type": "array",
+      "description": "Non-fatal findings: ok stays true and exit code stays 0",
+      "items": {
+        "type": "object",
+        "required": ["code", "file"],
+        "properties": {
+          "code": { "const": "outside_plan" },
+          "file": { "type": "string" }
+        },
+        "additionalProperties": false
+      }
+    }
+  },
+  "additionalProperties": false
+}

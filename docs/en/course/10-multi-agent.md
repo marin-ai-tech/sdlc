@@ -13,6 +13,7 @@ In this module:
 - Lesson 10.4 — Agent markers and the SDLC-Agent trailer
 - Lesson 10.5 — One MCP registry for every tool
 - Lesson 10.6 — A mixed team at Northwind
+- Lesson 10.7 — Handing a task to any executor
 
 ---
 
@@ -546,3 +547,85 @@ format.
 - Split screen: Claude Code, Cursor and Codex on the same `billing-api` change.
 - Show the denial in Codex with all three layers called out.
 - End with the `git log` count of trailers per tool.
+
+---
+
+## Lesson 10.7 — Handing a task to any executor            (video: ~6 min)
+
+**Role:** Ethan (tech lead), an executor, Paul (code owner)   **Project:** billing-api   **You need:** Lesson 10.6,
+a change whose plan is approved
+
+**Goal.** Ethan hands one task of an approved plan to an executor of any type (another agent tool, a script, or a
+person) and checks the branch it returns before the review. This is the first step towards several agents working on
+one change. The rest (a registry of executors, a board, types of agent swarms) comes later.
+
+### Steps
+
+1. Export the work item. Since 0.19.0 sdlc gives each open task of a change as one work item, in the contract
+   `sdlc.task/1`:
+
+   ```bash
+   sdlc task export --change <id> --json              # one item per open task
+   sdlc task export --change <id> --task 1.2 --json   # only task 1.2
+   ```
+
+   Each item holds what an executor needs:
+
+   | Field | What it holds |
+   |---|---|
+   | `id`, `contract` | `<change>#<task>`, and `sdlc.task/1` |
+   | `change`, `risk`, `kind` | the change, its risk and its kind |
+   | `task` | the task id and its text from `tasks.md` |
+   | `base.commit` | the commit to start from |
+   | `plan.files` | the files the plan names |
+   | `scenarios` | the spec scenarios of the change |
+   | `checks` | the verify checks, for example `npm test` |
+   | `forbidden` | the paths the executor must not touch, for example `openspec/roles.yaml` and the protected paths |
+   | `result` | the branch `sdlc/<change>/<task>` and the trailers `SDLC-Change` and `SDLC-Task` |
+
+   Work is handed out only while the plan gate is approved and fresh. Before the approval, or after `plan.md` changed,
+   the command refuses with `plan_not_approved`. A task that the change does not have gives `unknown_task`. The
+   contract is also published as JSON Schemas: `schemas/contracts/task.schema.json` for the work item and
+   `schemas/contracts/result.schema.json` for the result check.
+
+2. The executor does the work and returns a branch. It starts from `base.commit`, commits on the branch from `result`,
+   and ends every commit message with the trailers:
+
+   ```text
+   SDLC-Change: <id>
+   SDLC-Task: 1.2
+   ```
+
+3. Check the returned branch before the review. Ethan, or anyone else, an agent too, runs:
+
+   ```bash
+   sdlc task check-result --change <id> --branch sdlc/<id>/1.2 --json
+   ```
+
+   The answer has `ok`, `commits`, `files`, `problems` and `warnings`. A commit without the trailers
+   (`missing_trailer`), a task that the change does not have (`unknown_task`) or a touched forbidden path
+   (`forbidden_path`) is a problem, and the command exits with code 1. A file outside the plan is only a warning
+   (`outside_plan`).
+
+4. The normal gates apply. `check-result` merges nothing and approves nothing. The branch goes on like any other
+   work: verification, then Paul's review approval in his own terminal. An executor never approves a gate.
+
+### Check yourself
+
+- Before the plan is approved, `sdlc task export` refuses with `plan_not_approved`.
+- The returned branch passes `sdlc task check-result` with `ok: true` and no problems.
+- The review is still approved by a person from `roles.yaml`.
+
+### Pitfalls
+
+- After a change to `plan.md` the plan needs a new approval; until then the export is refused. Export again after
+  the new approval.
+- `check-result` is a check, not a decision. A clean result does not replace verification or the review.
+- Both commands only read, so any actor may run them, an agent too.
+- This is the first step. Several executors on one change at the same time, a registry of executors and a board come
+  later.
+
+### On screen (for the video)
+
+- Show `sdlc task export --json` and walk through the fields of one item.
+- Run `sdlc task check-result` on a branch with a missing trailer, then on a good one.

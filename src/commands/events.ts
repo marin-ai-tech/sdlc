@@ -3,9 +3,15 @@ import { c, line, printJson, reportFailure } from '../cli/output.js';
 import { recordAwaiting } from '../core/awaiting.js';
 import { listActiveChanges } from '../core/changes.js';
 import { t } from '../core/i18n.js';
+import { appendLog } from '../core/log.js';
 import { evaluateChange, sharedFingerprint, type LifecycleView } from '../core/lifecycle.js';
 import { deliverPending, FLUSH_CALL_MS } from '../mcp/events.js';
 import { readOutbox, type EventBody } from '../mcp/outbox.js';
+import {
+  buildDailySummary,
+  reportForSummary,
+  summaryAlreadySent,
+} from './summary-daily.js';
 
 /** `sdlc events list|flush` (B45): the event queue and its receivers. Any actor may run both; they decide nothing. */
 interface ReceiverView {
@@ -69,5 +75,33 @@ export async function eventsFlushCommand(opts: { json?: boolean }): Promise<void
     line(t('events.flushed', { delivered: result.delivered, failed: result.failed }));
   } catch (error) {
     reportFailure(error, opts.json, { delivered: 0, failed: 0 });
+  }
+}
+
+
+/** `sdlc events summary [--since <date>] [--json]`: one `summary.daily` per project and day (B99). */
+export async function eventsSummaryCommand(opts: { since?: string; json?: boolean }): Promise<void> {
+  try {
+    const ctx = loadProject();
+    if (summaryAlreadySent(ctx.root)) {
+      if (opts.json) return printJson({ sent: false, alreadySent: true });
+      line(t('events.summary.alreadySent'));
+      return;
+    }
+    const model = reportForSummary(ctx, opts.since);
+    const summary = buildDailySummary(model);
+    appendLog(ctx.root, ctx.config, { event: 'summary.daily', summary }, ctx.stamp);
+    if (opts.json) return printJson({ sent: true, alreadySent: false, summary });
+    const waiting = summary.waiting.map((item) => item.id).join(', ')
+      || t('events.message.noneWaiting');
+    line(t('events.summary.sent', {
+      done: summary.done,
+      active: summary.active,
+      awaitingHuman: summary.awaitingHuman,
+      blocked: summary.blocked,
+      waiting,
+    }));
+  } catch (error) {
+    reportFailure(error, opts.json, { sent: false, alreadySent: false });
   }
 }

@@ -67,6 +67,33 @@ export function readPlanFiles(changeDir: string, includeGlobs = false): string[]
   return filesThatChange(readText(file) ?? '', includeGlobs);
 }
 
+const PROOF_TITLE = /^proof\s*$/i;
+const HTML_COMMENT = /^\s*<!--/;
+
+/** The lines of a "## <title>" section, up to the next level-one/two heading: non-empty, comments dropped. */
+function sectionLines(planText: string, title: RegExp): string[] {
+  const lines: string[] = [];
+  let inSection = false;
+  for (const line of planText.split(/\r?\n/)) {
+    const heading = HEADING.exec(line.trim());
+    if (heading && (heading[1].length <= 2 || !inSection)) {
+      inSection = heading[1].length === 2 && title.test(heading[2]);
+      continue;
+    }
+    if (inSection && line.trim() !== '' && !HTML_COMMENT.test(line)) lines.push(line.trim());
+  }
+  return lines;
+}
+
+/** What the plan's "## Proof" section says proves the change; [] without plan.md or the section. */
+export function readPlanProof(changeDir: string): string[] {
+  const file = path.join(changeDir, 'plan.md');
+  if (!isFile(file)) {
+    return [];
+  }
+  return sectionLines(readText(file) ?? '', PROOF_TITLE);
+}
+
 /**
  * True when a project file (posix, relative to the root) is a planned one: the same path, a file under a planned
  * directory (`src/payments/`) or a match of a planned glob. Case-insensitive, as Windows and macOS paths are.

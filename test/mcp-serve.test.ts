@@ -20,7 +20,9 @@ const INTENT = [
 ].join('\n');
 
 // 0.9.1 adds `guide` (how sdlc works): read-only like the rest, a changed requirement.
-const READ_TOOLS = ['audit', 'guide', 'help', 'instructions', 'next', 'status', 'trace'];
+// B100 adds `explain`, `health` and `report` (remote clients ask about health and changes): read-only, a changed
+// requirement.
+const READ_TOOLS = ['audit', 'explain', 'guide', 'health', 'help', 'instructions', 'next', 'report', 'status', 'trace'];
 
 function project() {
   const root = tempDir('sdlc-mcp-serve-');

@@ -570,24 +570,118 @@ evidence of a quarter.
 Get a short summary of the project into the team's Telegram chat every morning, and the important process
 events (a gate waits for Megan, an approval, an overdue gate, health degraded) as they happen.
 
-sdlc itself sends nothing to Telegram. It gives two pieces: an example script that writes the summary to a file, and
-`events` that call a tool of an MCP server, with a ready one-line message if the receiver asks for one. The sending is
-done by the team's own script and the team's Telegram MCP server.
+sdlc has no chat API of its own. Everything goes through `events`: sdlc calls a tool of an MCP server you configure,
+with a ready one-line message if the receiver asks for one. A Telegram MCP server is a receiver like any other. Since
+0.19.0 the daily summary is an event too, `summary.daily`, so the same receiver delivers it.
 
 ### Procedure
 
-1. Find the example script. It ships in the sdlc package as `assets/examples/daily-summary.mjs`. Steven copies it to
-   the server's tools folder:
+1. Add a receiver. A person adds it to `openspec/sdlc.yaml` (protected: the agent cannot):
 
-   ```bash
-   cp "$(npm root -g)/sdlc/assets/examples/daily-summary.mjs" /srv/northwind/tools/
+   ```yaml
+   project: { name: tasklet }
+   events:
+     - server: telegram                 # a server of mcp.servers
+       tool: send_message               # the send tool of your Telegram MCP server
+       on: ["gate.*.awaiting", "gate.*.approved", "gate.*.overdue", "health.degraded", "summary.daily"]
+       args: { chat_id: "-1001234567890" }
+       message: text                    # one line of text instead of the event object
+       chat: telegram                   # mention people by their Telegram handle
    ```
 
-2. Try it in the project folder:
+   Since 0.19.0 a person in `openspec/roles.yaml` may list chat handles, for example
+   `megan: { name: Megan, emails: [megan@northwind.example], chat: { telegram: "@megan_tg" } }`. A receiver with
+   `chat: telegram` gets `waitingForChat` (the handles of the people in `waitingFor`), and its message mentions them.
+   A receiver without `chat` never gets chat handles.
+
+   Without `on`, a receiver gets `gate.*`, `verify.*`, `change.created`, `change.archived`, `backlog.*`,
+   `health.degraded` and `health.recovered`. `summary.daily` is not among them: name it (or `summary.*`) to get the
+   daily summary. Check it:
+
+   ```bash
+   sdlc events list
+   ```
+
+   Real output:
+
+   ```text
+   Receiver telegram/report_event: gate.*.awaiting, gate.*.approved, gate.*.overdue, health.degraded
+   No events wait for delivery.
+   ```
+
+   This real output is from a trial whose receiver used a `report_event` tool and no `summary.daily`. With the
+   configuration above, the first line names `telegram/send_message` and lists `summary.daily` too.
+
+2. Know what the tool receives. Without `message`, sdlc calls the tool after a command with your static `args` plus
+   one `event` object: `{ id, project, event, change, gate, at, sdlc, by, waitingFor }`. `waitingFor` names the
+   people from `roles.yaml` who may take a waiting gate. `id` is stable, so a bot can drop repeats. Since 0.19.0 the
+   id of `gate.<g>.awaiting` and `gate.<g>.overdue` comes from `project.name` (when set), the change, the gate, the
+   event and the digest the gate waits on, not from the time. Every clone and CI send the same id for the same wait,
+   so the bot keeps one message. With
+   `message: text`, as above, sdlc sends no `event` object: it calls `send_message` with your `args` plus `text`, one
+   line that names the project, the change, the gate and the people by their names from `roles.yaml`, in the locale
+   of the command. So the chat learns that the intent of fix-empty-title waits for Megan, and the plain send tool
+   needs no extra code. Neither the event nor the text ever carries an email address, a command, its output or a
+   note. The text is built when the event is queued, so an event that waited in the outbox reads the same.
+
+3. Make overdue gates arrive on time. Add `overdue_hours` to a gate in `openspec/sdlc.yaml`, inside its existing
+   entry:
+
+   ```yaml
+   gates:
+     intent:
+       required: true
+       approvers: [product-owner]
+       overdue_hours: 24
+   ```
+
+   sdlc has no daemon. A gate past its limit raises `gate.intent.overdue` once, at the next command, session start or
+   `sdlc events flush`. Run the flush on the server every 15 minutes:
+
+   ```bash
+   */15 * * * * cd /srv/northwind/tasklet && git pull --quiet && sdlc events flush
+   ```
+
+   Since 0.19.0 the CI configuration from `sdlc ci init` (GitHub and GitLab) runs `sdlc events flush` at the end, also
+   when a check failed, so waits seen in CI are delivered too.
+
+4. Send the daily summary. Since 0.19.0 one command records it and sends it to every receiver whose `on` matches:
 
    ```bash
    cd /srv/northwind/tasklet
-   node /srv/northwind/tools/daily-summary.mjs --out /srv/northwind/summaries/tasklet
+   sdlc events summary
+   ```
+
+   It prints one line, like this one from a small trial project:
+
+   ```text
+   Daily summary recorded: done 0, active 1, waiting 0, blocked 0; waiting changes: none
+   ```
+
+   The `summary.daily` event carries the counts (changes done, active, waiting for people, blocked) and the waiting
+   changes. With `message: text`, the chat gets a short text that names the project and the waiting changes. The
+   period starts yesterday; `--since <date>` changes it. There is one summary per project and day: a second run on the
+   same day sends nothing new (with `--json` the answer has `"alreadySent": true`).
+
+5. Schedule it every weekday at 08:00:
+
+   ```bash
+   # crontab -e
+   0 8 * * 1-5 cd /srv/northwind/tasklet && git pull --quiet && sdlc events summary
+   ```
+
+   On a Windows server, use Task Scheduler:
+
+   ```bat
+   schtasks /Create /SC DAILY /ST 08:00 /TN sdlc-daily /TR "cmd /c cd /d C:\northwind\tasklet && sdlc events summary"
+   ```
+
+6. A summary file, if you also want one. The example script `assets/examples/daily-summary.mjs` ships in the sdlc
+   package and still writes the summary as a Markdown file:
+
+   ```bash
+   cd /srv/northwind/tasklet
+   node "$(npm root -g)/sdlc/assets/examples/daily-summary.mjs" --out /srv/northwind/summaries/tasklet
    ```
 
    It prints the path of the file it wrote and nothing else. Real content of the file:
@@ -620,94 +714,9 @@ done by the team's own script and the team's Telegram MCP server.
    The script reads `sdlc report --format json --since <yesterday>`. Options: `--out <folder>` (default: the current
    folder) and `--since <YYYY-MM-DD>`. `SDLC_BIN` changes how it calls sdlc (default `sdlc`).
 
-3. Send the file to Telegram with a small script of your own. This example uses the Telegram Bot API directly; the
-   token and the chat id come from the environment of the server, never from the repository:
-
-   ```bash
-   #!/usr/bin/env bash
-   # /srv/northwind/tools/daily-tasklet.sh
-   set -e
-   cd /srv/northwind/tasklet
-   git pull --quiet
-   file=$(node /srv/northwind/tools/daily-summary.mjs --out /srv/northwind/summaries/tasklet)
-   curl -s -F chat_id="${TELEGRAM_CHAT_ID}" -F document=@"${file}" \
-     "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendDocument" > /dev/null
-   ```
-
-4. Schedule it every weekday at 08:00:
-
-   ```bash
-   # crontab -e
-   0 8 * * 1-5 /srv/northwind/tools/daily-tasklet.sh
-   ```
-
-   On a Windows server, use Task Scheduler with the same idea:
-
-   ```bat
-   schtasks /Create /SC DAILY /ST 08:00 /TN sdlc-daily /TR "cmd /c cd /d C:\northwind\tasklet && node C:\northwind\tools\daily-summary.mjs --out C:\northwind\summaries\tasklet"
-   ```
-
-   Then add the sending step for Windows in the same task (for example a PowerShell script).
-
-5. Push events as they happen. A person adds a receiver to `openspec/sdlc.yaml` (protected: the agent cannot):
-
-   ```yaml
-   project: { name: tasklet }
-   events:
-     - server: telegram                 # a server of mcp.servers
-       tool: send_message               # the send tool of your Telegram MCP server
-       on: ["gate.*.awaiting", "gate.*.approved", "gate.*.overdue", "health.degraded"]
-       args: { chat_id: "-1001234567890" }
-       message: text                    # one line of text instead of the event object
-   ```
-
-   Without `on`, a receiver gets `gate.*`, `verify.*`, `change.created`, `change.archived`, `backlog.*`,
-   `health.degraded` and `health.recovered`. Check it:
-
-   ```bash
-   sdlc events list
-   ```
-
-   Real output:
-
-   ```text
-   Receiver telegram/report_event: gate.*.awaiting, gate.*.approved, gate.*.overdue, health.degraded
-   No events wait for delivery.
-   ```
-
-   This real output is from a trial whose receiver used a `report_event` tool. With the configuration above, the
-   first line names `telegram/send_message`.
-
-6. Know what the tool receives. Without `message`, sdlc calls the tool after a command with your static `args` plus
-   one `event` object: `{ id, project, event, change, gate, at, sdlc, by, waitingFor }`. `waitingFor` names the
-   people from `roles.yaml` who may take a waiting gate. `id` is stable, so a bot can drop repeats. With
-   `message: text`, as above, sdlc sends no `event` object: it calls `send_message` with your `args` plus `text`, one
-   line that names the project, the change, the gate and the people by their names from `roles.yaml`, in the locale
-   of the command. So the chat learns that the intent of fix-empty-title waits for Megan, and the plain send tool
-   needs no extra code. Neither the event nor the text ever carries an email address, a command, its output or a
-   note. The text is built when the event is queued, so an event that waited in the outbox reads the same.
-
-7. Make overdue gates arrive on time. Add `overdue_hours` to a gate in `openspec/sdlc.yaml`, inside its existing
-   entry:
-
-   ```yaml
-   gates:
-     intent:
-       required: true
-       approvers: [product-owner]
-       overdue_hours: 24
-   ```
-
-   sdlc has no daemon. A gate past its limit raises `gate.intent.overdue` once, at the next command, session start or
-   `sdlc events flush`. Run the flush on the server every 15 minutes:
-
-   ```bash
-   */15 * * * * cd /srv/northwind/tasklet && git pull --quiet && sdlc events flush
-   ```
-
 ### You are done when
 
-- The chat gets one summary file every weekday morning.
+- The chat gets one daily summary every weekday morning; a second `sdlc events summary` on the same day sends nothing.
 - `sdlc events list` names the `telegram` receiver and its patterns.
 - When Megan's intent gate waits longer than 24 hours, the chat gets one overdue message.
 
@@ -716,7 +725,8 @@ done by the team's own script and the team's Telegram MCP server.
 - Delivery never fails a command and takes at most 5 seconds. An event that could not be sent waits in
   `.git/sdlc/outbox/` on the machine that ran the command (never committed) and goes with the next command there, or
   with `sdlc events flush`. `sdlc events list` shows what waits.
-- Hook decisions (`hook.*`) are sent only when a pattern names them, for example `hook.denied`.
+- Hook decisions (`hook.*`) are sent only when a pattern names them, for example `hook.denied`. The same holds for
+  `summary.daily`: it is opt-in.
 - A literal token in `mcp.servers` is refused (`mcp_secret_literal`). Write `${TELEGRAM_BOT_TOKEN}`.
 - The summary script writes to `--out`, which may be any folder. Keep it outside the repository, or add it to
   `.gitignore`.
@@ -760,6 +770,9 @@ report.
    | `audit` | `change`, `project` | `sdlc audit --json` |
    | `help` | `topic`, `project` | `sdlc help --json` |
    | `guide` | `topic`, `project` | `sdlc guide <topic> --json` |
+   | `explain` | `change`, `project` | `sdlc explain --json` (since 0.19.0) |
+   | `health` | `since`, `days`, `project` | `sdlc health --json` (since 0.19.0) |
+   | `report` | `since`, `change`, `project` | `sdlc report --format json` (since 0.19.0) |
 
    Read-only resources come with them: `sdlc://<project>/spec/<capability>`, `sdlc://<project>/change/<id>/<artifact>`
    and others.
@@ -775,8 +788,8 @@ report.
    The assistant answers from `status`, `next` and `audit`. It cannot approve anything: the decision commands are not
    tools.
 
-4. For health and the full report, use the CLI per project; `health` and `report` are not MCP tools. A small script on
-   the team server:
+4. Since 0.19.0 `health`, `report` and `explain` are MCP tools too, so the assistant can answer from them. For a file
+   per project on a schedule, a small script on the team server still works:
 
    ```bash
    for p in tasklet billing-api; do
@@ -787,17 +800,40 @@ report.
 
    The process state lives in each repository, so a central job never needs anyone's laptop.
 
+5. A central dashboard over HTTP. Since 0.19.0 the same read-only tools are served over MCP Streamable HTTP at
+   `/mcp`, so a client on another machine can reach them. A bearer token is always required, also on localhost. It
+   comes only from the environment variable `SDLC_MCP_TOKEN` (at least 16 characters), never from a flag:
+
+   ```bash
+   export SDLC_MCP_TOKEN="<a secret of 16 characters or more>"
+   sdlc mcp serve --http 127.0.0.1:8765 --project /srv/northwind/tasklet --project /srv/northwind/billing-api
+   ```
+
+   The server prints its address on its error stream, for example `http://127.0.0.1:8765/mcp`. Port 0 picks a free
+   port. The client sends the token as `Authorization: Bearer <token>`. Without `SDLC_MCP_TOKEN` the server does not
+   start:
+
+   ```text
+   error: SDLC_MCP_TOKEN is required for HTTP serve (token_required): set a secret of at least 16 characters.
+   fix: Export SDLC_MCP_TOKEN in the environment (never pass the token as a flag), then run again.
+   ```
+
+   A request without the token, or with another one, gets 401. A request whose `Origin` header names another host
+   gets 403. Only `/mcp` is served (other paths get 404), and a request body may be up to 1 MB. The tools stay
+   read-only: there is still no decision over MCP.
+
 ### You are done when
 
-- Claude Desktop lists the `sdlc` server with seven tools.
+- Claude Desktop lists the `sdlc` server with ten tools.
+- With `--http`, a request without the token gets 401.
 - A question about both projects gets an answer that names each project.
 
 ### Pitfalls
 
 - A folder that is not an sdlc project, or two projects with the same name, stop the server at start. Give each project
   a distinct `project.name`.
-- `sdlc mcp serve` speaks stdio only; there is no HTTP endpoint to reach from another machine. Run the client on the
-  machine that has the checkouts.
+- With `--http`, the token is the only check on who may read. Keep `SDLC_MCP_TOKEN` in the server's environment,
+  never in the repository, and give it only to the people who may see the process.
 - Treat a connected chat client as someone with read access to the repository: it sees names, stages, file paths and
   audit history.
 - Each tool call starts the CLI anew (about half a second). That matters only for scripts with many calls.

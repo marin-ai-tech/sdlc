@@ -41,7 +41,7 @@ so that nobody's work stops.
    | Code owners | `.github/CODEOWNERS` | `code-owner` in the roles draft; reviewer suggestions |
    | Documents | `ARCHITECTURE.md`, `CONTRIBUTING.md`, `docs/adr/` | mapped (adapt) or moved (convert) into the AI-ready layout |
    | People | git history | people in the `openspec/roles.yaml` draft |
-   | Open work | GitHub issues | brought into `openspec/backlog.md` by the agent, item by item |
+   | Open work | GitHub issues | brought into `openspec/backlog.md` by `sdlc backlog import --issues` |
 
 2. They agree on the order. Each step is a separate commit, so it can be reviewed and reverted:
 
@@ -62,7 +62,8 @@ so that nobody's work stops.
 ### Pitfalls
 
 - Converting in one big step on `main` blocks the team. Use `warn` mode first, and a worktree for moves.
-- sdlc does not sync GitHub Issues. Plan the backlog step as agent work with a person's confirmation (Lesson 8.5).
+- `sdlc backlog import --issues` brings the open GitHub issues in, but a person still adds the outcome and acceptance
+  and orders the backlog. Plan time for that (Lesson 8.5).
 
 ### On screen (for the video)
 
@@ -436,47 +437,52 @@ criteria. Planning documents, if the team has them in BMAD format, are imported.
 
 ### Steps
 
-1. sdlc has **no built-in GitHub Issues sync**. The agent reads the issues through the GitHub MCP server and adds
-   items with `sdlc backlog`. Ethan asks:
+1. Since 0.19.0 sdlc brings the open GitHub issues into the backlog itself, through the team's GitHub MCP server.
+   `openspec/sdlc.yaml` is a protected file, so Ethan adds the setting by hand:
 
-   > /sdlc:backlog Bring the open GitHub issues labelled "accepted" into the backlog. One item per issue, link each
-   > to its issue. Show me the list before you add anything.
-
-   The agent calls the tool your server exposes, e.g. `list_issues`, and proposes items. It adds only those Ethan
-   confirms:
-
-   ```bash
-   sdlc backlog epic add "Refunds" --goal "Support refunds without manual credit notes"
-   sdlc backlog add "Refund one invoice line" --epic E1 --kind feature --risk medium \
-     --outcome "Support refunds one line of a paid invoice" \
-     --accept "a refund never exceeds the amount paid for the line" --source-type ticket --source-ref "GH-17"
-   sdlc backlog add "Invoice PDF shows wrong VAT rounding" --kind bugfix --risk low \
-     --outcome "VAT on the PDF matches the API" --accept "an invoice of 3 x 0.10 EUR shows 0.06 EUR VAT" \
-     --source-type ticket --source-ref "GH-23"
+   ```yaml
+   issues:
+     server: github                # a server of mcp.servers
+     repo: northwind/billing-api   # owner/name on GitHub
    ```
 
+   Then he runs the import in his terminal:
+
    ```bash
+   sdlc backlog import --issues
+   ```
+
+   It adds one item per open issue that is not linked yet: the issue title and the field `- **Issue**: GH-<n>` in
+   `openspec/backlog.md`. Pull requests are not issues and are skipped. A second import adds only issues that are new
+   since the last one. Without `issues:` the command is refused with `issues_not_configured`. The import takes every
+   open issue; a person drops the ones the team no longer wants (`sdlc backlog drop`).
+
+2. The imported items have a title and a link, nothing more, so they are not ready yet. The agent reads each issue
+   through the GitHub MCP server and proposes an outcome and acceptance criteria. Ethan confirms them, and the agent
+   records them:
+
+   ```bash
+   sdlc backlog edit B1 --kind feature --risk medium --outcome "Support refunds one line of a paid invoice" \
+     --accept "a refund never exceeds the amount paid for the line"
+   sdlc backlog edit B2 --kind bugfix --risk low --outcome "VAT on the PDF matches the API" \
+     --accept "an invoice of 3 x 0.10 EUR shows 0.06 EUR VAT"
    sdlc backlog list
    ```
 
    ```text
-   E1 Refunds  ░░░░░░░░░░  0/1
-   ID  Status  Ready  Title                    Change
-   B1  open    ✓      Refund one invoice line  -
    Unassigned
    ID  Status  Ready  Title                                 Change
+   B1  open    ✓      Refund one invoice line               -
    B2  open    ✓      Invoice PDF shows wrong VAT rounding  -
    ```
 
-   Each item in `openspec/backlog.md` carries `- **Source**: ticket GH-17`.
-
-2. The order is Megan's decision. The agent proposes it and gives the command; Megan runs it:
+3. The order is Megan's decision. The agent proposes it and gives the command; Megan runs it:
 
    ```bash
    sdlc backlog move B2 --top
    ```
 
-3. If the team planned with BMAD, the agent imports the documents. First a preview:
+4. If the team planned with BMAD, the agent imports the documents. First a preview:
 
    ```bash
    sdlc import bmad _bmad-output/refunds --to-backlog --dry-run --json
@@ -501,7 +507,7 @@ criteria. Planning documents, if the team has them in BMAD format, are imported.
 ### Check yourself
 
 - `sdlc backlog list` shows the items with `Ready ✓`.
-- Each item links to its issue (`Source: ticket GH-<n>`).
+- Each imported item links to its issue (`Issue: GH-<n>`); no pull request became an item.
 - `sdlc backlog next` names the item Megan put at the top.
 
 ### Pitfalls
@@ -509,8 +515,11 @@ criteria. Planning documents, if the team has them in BMAD format, are imported.
 - The agent may not edit `openspec/backlog.md` directly (`[sdlc:state-integrity]`); it uses `backlog add` and
   `backlog edit`. People may edit the file by hand.
 - `backlog move` and `backlog drop` are a person's commands.
-- Closing the GitHub issue when the change is archived is not automatic. A person closes it, or the agent does it
-  through the GitHub MCP server when asked.
+- Since 0.19.0, archiving a change whose item has `Issue: GH-<n>` comments on the issue (the comment names the
+  change) and closes it. The calls go through the event outbox: when the GitHub server fails, the archive still
+  succeeds and `sdlc events flush` delivers them later. An item without an issue never calls GitHub.
+- sdlc holds no GitHub token. The import and the closing use the team's `github` server from `mcp.servers` and the
+  token in each person's own environment.
 - The `github` server is checked against `stages` only while a change is active. List `plan` in its `stages` if the
   agent reads issues while changes are open.
 - Read the imported requirement text. Since 0.15.2, actor-first sentences become requirements such as
@@ -518,7 +527,7 @@ criteria. Planning documents, if the team has them in BMAD format, are imported.
 
 ### On screen (for the video)
 
-- The GitHub issues page next to the agent's proposed list.
+- The GitHub issues page next to the output of `sdlc backlog import --issues`.
 - `sdlc backlog list` with the bars; Megan's `backlog move`.
 - The BMAD dry run, then `sdlc backlog list` after the import.
 
@@ -735,9 +744,9 @@ no surprise.
 
 ## Gaps found
 
-Found while writing Modules 6–8 against sdlc 0.14.4 (temporary copies of `tasklet` and `billing-api`):
+Found while writing Modules 6–8 against sdlc 0.14.4 (temporary copies of `tasklet` and `billing-api`). sdlc 0.19.0
+closes both gaps listed here:
 
-- No built-in GitHub Issues sync: issues reach the backlog only through the agent and the GitHub MCP server; archiving
-  does not close the linked issue.
-- sdlc has no alert intake: `/sdlc:triage` from Telegram depends on pasted text or a read tool of the team's own
-  Telegram MCP server.
+- GitHub issues: since 0.19.0 `sdlc backlog import --issues` brings them into the backlog, and archiving a change
+  closes its linked issue (Lesson 8.5).
+- Alerts: since 0.19.0 `sdlc triage intake` adds an alert from monitoring to the backlog as data (Lesson 6.9).

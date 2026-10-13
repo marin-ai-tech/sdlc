@@ -59,6 +59,7 @@ Start with chapters 0 and 5, then use the sections for your role.
 - [7.4–7.5](07-qa-review-release.md#s7-4)
 - [8.1–8.7](08-brownfield.md#s8-1)
 - [9.4](09-management-and-audit.md#s9-4)
+- [10.7](10-multi-agent.md#s10-7)
 
 ### Developer (Oliver)
 

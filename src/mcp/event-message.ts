@@ -10,7 +10,8 @@ import type { EventBody } from './outbox.js';
  * its output: the event carries none of them. The note of a rejection or a rework is not part of the text either;
  * only a receiver with `include_note: true` (0.16.1) gets it, appended at delivery by `withNote`. The text is in
  * the given locale (default: the current one, as every other output); the outbox builds it when the event is
- * queued (src/mcp/outbox.ts).
+ * queued (src/mcp/outbox.ts). For a receiver with `chat` (B98) the people it waits for are named with their handle
+ * on that channel (`Alice Ivanova (@alice_tg)`); every other text names no handle.
  */
 type Param = MessageParams[string];
 
@@ -45,6 +46,7 @@ export function peopleNames(root: string): Map<string, string> {
 }
 
 function templateKey(event: EventBody): string {
+  if (event.event === 'summary.daily') return 'events.message.summaryDaily';
   if (!event.change) return 'events.message.other';
   const kind = event.gate ? event.event.slice(`gate.${event.gate}.`.length) : undefined;
   const known = kind === undefined ? CHANGE_TEMPLATES[event.event] : GATE_TEMPLATES[kind];
@@ -60,25 +62,41 @@ function byParam(event: EventBody, names: Map<string, string>): Param {
   return personName(event.by, names);
 }
 
-function peopleParam(event: EventBody, names: Map<string, string>): Param {
+/** The person's name followed by the handle to mention, when there is one. */
+function mentioned(id: string, names: Map<string, string>, mentions: Map<string, string>): string {
+  const handle = mentions.get(id);
+  return handle ? `${personName(id, names)} (${handle})` : personName(id, names);
+}
+
+function peopleParam(event: EventBody, names: Map<string, string>, mentions: Map<string, string>): Param {
   const ids = event.waitingFor ?? [];
   if (ids.length === 0) return { key: 'events.message.anyApprover' };
-  return ids.map((id) => personName(id, names)).join(', ');
+  return ids.map((id) => mentioned(id, names, mentions)).join(', ');
+}
+
+function waitingParam(event: EventBody): Param {
+  const waiting = event.summary?.waiting.map((item) => item.id) ?? [];
+  const active = event.summary?.activeIds ?? [];
+  const ids = waiting.length > 0 ? waiting : active;
+  if (ids.length === 0) return { key: 'events.message.noneWaiting' };
+  return ids.join(', ');
 }
 
 function oneLine(text: string): string {
   return text.replace(/\s+/g, ' ').trim();
 }
 
-/** The one-line text of the event. */
-export function eventMessage(event: EventBody, names: Map<string, string>, locale?: Locale): string {
+/** The one-line text of the event; `mentions` (person id to chat handle) only for a receiver with `chat`. */
+export function eventMessage(event: EventBody, names: Map<string, string>, locale?: Locale,
+  mentions: Map<string, string> = new Map()): string {
   const params: MessageParams = {
     project: event.project,
     change: event.change ?? '',
     gate: event.gate ?? '',
     event: event.event,
     by: byParam(event, names),
-    people: peopleParam(event, names),
+    people: peopleParam(event, names, mentions),
+    waiting: waitingParam(event),
   };
   return oneLine(t(templateKey(event), params, locale));
 }

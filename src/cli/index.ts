@@ -31,14 +31,18 @@ import {
   backlogAdd, backlogClose, backlogEdit, backlogEpicAdd, backlogEpicEdit, backlogList, backlogMove, backlogNext,
   backlogStart,
 } from '../commands/backlog.js';
+import { backlogImportIssues } from '../commands/backlog-import.js';
 import { rolesCheck, rolesMigrate, rolesWho } from '../commands/roles.js';
 import { ciInitCommand } from '../commands/ci.js';
 import { teamAcceptCommand, teamCheckCommand, teamListCommand, teamSyncCommand } from '../commands/team.js';
 import { adoptCommand } from '../commands/adopt.js';
 import { traceCommand } from '../commands/trace.js';
+import { taskCheckResultCommand, taskExportCommand } from '../commands/task.js';
 import { mcpCheckCommand, mcpServeCommand } from '../commands/mcp.js';
+import { contextPullCommand } from '../commands/context.js';
 import { inboxDoneCommand, inboxListCommand } from '../commands/inbox.js';
-import { eventsFlushCommand, eventsListCommand } from '../commands/events.js';
+import { eventsFlushCommand, eventsListCommand, eventsSummaryCommand } from '../commands/events.js';
+import { triageIntakeCommand } from '../commands/triage.js';
 import { deliverAfterCommand } from '../mcp/events.js';
 import { nextMeCommand } from '../commands/next-me.js';
 import { approvePreviewCommand } from '../commands/approve-preview.js';
@@ -184,6 +188,10 @@ export function buildProgram(): Command {
     .option('--note <text>', 'completion note')
     .option('--json', 'output JSON')
     .action((id, opts) => backlogClose(id, 'done', opts));
+  backlog.command('import').description(cmdDesc('cmd.backlog.import'))
+    .option('--issues', 'import open GitHub issues')
+    .option('--json', 'output JSON')
+    .action((opts) => backlogImportIssues(opts));
   const defer = program.command('defer').description(cmdDesc('cmd.defer'));
   defer.command('add <title>').description(cmdDesc('cmd.defer.add'))
     .option('--why <text>', 'reason for deferring')
@@ -322,10 +330,16 @@ export function buildProgram(): Command {
     .option('--json', 'output JSON').action((topic, step, opts) => guideCommand(topic, step, opts));
   program.command('statusline').description(cmdDesc('cmd.statusline'))
     .action(() => statuslineCommand());
+  const context = program.command('context').description(cmdDesc('cmd.context'));
+  context.command('pull').description(cmdDesc('cmd.context.pull'))
+    .option('--name <name>', 'pull only this source')
+    .option('--json', 'output JSON')
+    .action((opts) => contextPullCommand(opts));
   const mcp = program.command('mcp').description(cmdDesc('cmd.mcp'));
   mcp.command('serve').description(cmdDesc('cmd.mcp.serve'))
     .option('--project <path>', 'serve this sdlc project instead of the current folder (repeatable)',
       (value, previous: string[]) => [...previous, value], [] as string[])
+    .option('--http <host:port>', 'serve MCP Streamable HTTP at /mcp on this address (needs SDLC_MCP_TOKEN)')
     .action((opts) => mcpServeCommand(opts));
   mcp.command('check').description(cmdDesc('cmd.mcp.check'))
     .option('--json', 'output JSON')
@@ -346,6 +360,14 @@ export function buildProgram(): Command {
   events.command('flush').description(cmdDesc('cmd.events.flush'))
     .option('--json', 'output JSON')
     .action((opts) => eventsFlushCommand(opts));
+  events.command('summary').description(cmdDesc('cmd.events.summary'))
+    .option('--since <date>', cmdDesc('cmd.events.summary.since'))
+    .option('--json', 'output JSON')
+    .action((opts) => eventsSummaryCommand(opts));
+  const triage = program.command('triage').description(cmdDesc('cmd.triage'));
+  triage.command('intake').description(cmdDesc('cmd.triage.intake'))
+    .option('--json', 'output JSON')
+    .action((opts) => triageIntakeCommand(opts));
   const release = program.command('release').description(cmdDesc('cmd.release'));
   release.command('check').description(cmdDesc('cmd.release.check'))
     .option('--change <id>', 'change id (defaults to the only active change)')
@@ -435,6 +457,19 @@ export function buildProgram(): Command {
     .option('--change <id>', 'change id')
     .option('--json', 'output JSON')
     .action((action, opts) => testsCommand(action, opts));
+
+  const task = program.command('task').description(cmdDesc('cmd.task'));
+  task.command('export').description(cmdDesc('cmd.task.export'))
+    .option('--change <id>', 'change id')
+    .option('--task <n.m>', 'export only this task (e.g. 1.2)')
+    .option('--json', 'output JSON')
+    .action((opts) => taskExportCommand(opts));
+  task.command('check-result').description(cmdDesc('cmd.task.check-result'))
+    .requiredOption('--change <id>', 'change id')
+    .requiredOption('--branch <ref>', 'result branch to check')
+    .option('--base <ref>', 'base ref (default: merge-base of branch and HEAD)')
+    .option('--json', 'output JSON')
+    .action((opts) => taskCheckResultCommand(opts));
 
   program
     .command('verify')

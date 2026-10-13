@@ -2,6 +2,54 @@
 
 All notable changes to sdlc. Versions follow [Semantic Versioning](https://semver.org/); while the major version is 0, a minor version may change behavior.
 
+## 0.19.0 — 2026-10-13
+
+### Added
+- `sdlc mcp serve --http <host:port>` serves the same read-only tools to remote MCP clients over Streamable HTTP at
+  `/mcp`. A bearer token is always required, on localhost too: the environment variable `SDLC_MCP_TOKEN`, at least
+  16 characters (there is no flag for it). Without it the server does not start (`token_required`). A request without
+  the token or with another one gets 401, a browser `Origin` of another host or port gets 403, any path but `/mcp`
+  gets 404, and a request body is at most 1 MB. Port 0 picks a free port; the server prints its URL on stderr. New
+  read-only tools in both transports: `health`, `report` and `explain`. There is still no decision over MCP.
+- Events across clones. `gate.<g>.awaiting` and `gate.<g>.overdue` get an id from `project.name` (when set), the
+  change, the gate, the event and the digest the gate waits on, not from the time. Every clone and CI send the same
+  id for the same wait, so a receiver keeps one. A person in `openspec/roles.yaml` may list chat handles
+  (`chat: { telegram: "@alice_tg", slack: U0ALICE }`). A receiver in `events` with `chat: telegram` gets
+  `waitingForChat` with those handles, and its message mentions them; a receiver without `chat` never gets handles.
+- `sdlc events summary [--since <date>] [--json]` records the event `summary.daily`: the counts of changes done,
+  active, waiting for people and blocked, and the waiting changes. It goes to the receivers whose `on` matches
+  (`summary.*` or `summary.daily`). It is not in the default patterns, so a receiver opts in. One summary per project
+  and day. A Telegram MCP server is a receiver like any other: sdlc has no chat API of its own. The example script
+  `assets/examples/daily-summary.mjs` still writes a file.
+- `sdlc triage intake [--json]` reads one alert as JSON on stdin (`{ id, title, severity?, url? }`) and adds a backlog
+  item with the source `alert:<id>`. The same alert again adds nothing (`duplicate: true`); input that is not JSON, or
+  an alert without an id or a title, is refused with `invalid_alert`. It never sets the priority: a person orders the
+  backlog.
+- GitHub Issues and the backlog stay linked through the team's GitHub MCP server:
+  `issues: { server: github, repo: owner/name }` in `openspec/sdlc.yaml`, where `github` is a server in `mcp.servers`
+  (sdlc holds no token). `sdlc backlog import --issues` adds one item per open issue that is not linked yet, with the
+  field `Issue: GH-<n>`; pull requests are skipped, and a second import adds nothing. Without `issues` it is refused
+  with `issues_not_configured`. Archiving a change whose item has an issue comments on the issue and closes it,
+  through the event outbox: a failing server does not fail the archive, and `sdlc events flush` delivers later.
+- Context packs from the team's knowledge server: `context.sources` in `openspec/sdlc.yaml`, a list of
+  `{ name, server, resource | tool, args?, stages, owner, fresh_days? }`. `sdlc context pull [--name <name>] [--json]`
+  writes `docs/context/<name>.md` with the usual header (`source: mcp:<server> <resource or tool>`, `updated:` today).
+  The packs stay in git and under review, and `sdlc instructions` stays offline. A failing source leaves its file as
+  it was.
+- The task contract for executors of any type. `sdlc task export --change <id> [--task <n.m>] --json` gives one work
+  item per open task (contract `sdlc.task/1`): the task, the risk, the base commit, the plan's files, the spec
+  scenarios, the verify checks, the forbidden paths, and where the result goes (the branch `sdlc/<change>/<task>` and
+  the trailers `SDLC-Change` and `SDLC-Task`). It works only while the plan gate is approved and fresh
+  (`plan_not_approved` otherwise). `sdlc task check-result --change <id> --branch <ref> --json` checks a returned
+  branch: a missing trailer, an unknown task or a forbidden path is a problem (exit code 1); files outside the plan are
+  a warning. Both commands only read: they merge nothing and approve nothing, and any actor may run them. The JSON
+  Schemas are `schemas/contracts/task.schema.json` and `schemas/contracts/result.schema.json`.
+
+### Changed
+- The CI configuration from `sdlc ci init` (GitHub and GitLab) now ends with `sdlc events flush`, also when a check
+  failed, so the waits seen in CI reach the receivers. An existing file gets the step with `sdlc ci init --force`.
+- Internal: the lifecycle code is split into one module per gate, with no change in behaviour.
+
 ## 0.18.0 — 2026-10-13
 
 ### Added

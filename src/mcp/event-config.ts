@@ -10,6 +10,8 @@ import { SdlcError } from '../core/errors.js';
  * Events carry no note, unless a receiver opts in with `include_note: true` (0.16.1, default false): then that
  * receiver, and only that one, gets the note of a rejection or a rework (`gate.<g>.rejected`, `gate.<g>.rework`),
  * cleaned by src/mcp/outbox.ts. `include_note` must be true or false.
+ * With `chat: <channel>` (B98) the receiver, and only that one, gets the chat handles on that channel of the people
+ * an event waits for (`waitingForChat`, from `people.<id>.chat` in roles.yaml), and its text mentions them.
  */
 export interface EventReceiver {
   server: string;
@@ -22,9 +24,15 @@ export interface EventReceiver {
   message?: string;
   /** Opt-in to the note of a rejection or a rework (`include_note: true`); absent = no note. */
   includeNote?: boolean;
+  /** The chat channel whose handles the receiver gets (`chat: telegram`); absent = no handles. */
+  chat?: string;
 }
 
-/** The events a receiver gets when its `on` is absent. */
+/**
+ * The events a receiver gets when its `on` is absent.
+ * `summary.*` / `summary.daily` are opt-in (B99): a daily digest is not a gate signal;
+ * gate receivers must not get digests unless they ask (`on: ['summary.*']`).
+ */
 export const DEFAULT_EVENT_PATTERNS = [
   'gate.*', 'verify.*', 'change.created', 'change.archived', 'backlog.*', 'health.degraded', 'health.recovered',
 ];
@@ -71,12 +79,18 @@ function trueOrFalse(value: unknown, where: string): boolean | undefined {
   return value;
 }
 
+function channel(value: unknown, where: string): string | undefined {
+  if (value === undefined || value === null) return undefined;
+  return text(value, where).trim();
+}
+
 function parseReceiver(value: unknown, where: string, servers: string[]): EventReceiver {
   const raw = mapping(value, where) ?? {};
   const server = text(raw.server, `${where}.server`);
   if (!servers.includes(server)) throw invalid('error.events_unknown_server', `${where}.server`, { server });
   const message = argumentName(raw.message, `${where}.message`);
   const includeNote = trueOrFalse(raw.include_note, `${where}.include_note`);
+  const chat = channel(raw.chat, `${where}.chat`);
   return {
     server,
     tool: text(raw.tool, `${where}.tool`),
@@ -84,6 +98,7 @@ function parseReceiver(value: unknown, where: string, servers: string[]): EventR
     args: mapping(raw.args, `${where}.args`) ?? {},
     ...(message ? { message } : {}),
     ...(includeNote ? { includeNote } : {}),
+    ...(chat ? { chat } : {}),
   };
 }
 

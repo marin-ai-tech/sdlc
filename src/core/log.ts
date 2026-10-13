@@ -3,7 +3,7 @@ import * as path from 'node:path';
 import type { SdlcConfig } from './config.js';
 import { ensureDir, isFile, readText } from './fs-utils.js';
 import { harnessStamp, type HarnessStamp } from './license.js';
-import { queueEvent, type QueueConfig } from '../mcp/outbox.js';
+import { queueEvent, type EventSummary, type QueueConfig } from '../mcp/outbox.js';
 
 /**
  * Append-only project log: one JSON object per line in
@@ -26,6 +26,8 @@ export interface LogEntry {
   agent?: string;
   /** Person ids from roles.yaml a waiting gate waits for (`gate.<g>.awaiting`, `gate.<g>.overdue`; B54). */
   waitingFor?: string[];
+  /** Counts for `summary.daily` only (B99); queued onto EventBody.summary. */
+  summary?: EventSummary;
   sdlc: string;
   license: string;
 }
@@ -54,6 +56,7 @@ export function appendLog(
       ...(input.detail ? { detail: input.detail } : {}),
       ...(input.agent ? { agent: input.agent } : {}),
       ...(input.waitingFor ? { waitingFor: input.waitingFor } : {}),
+      ...(input.summary ? { summary: input.summary } : {}),
       sdlc: stamp.version,
       license: stamp.license,
     };

@@ -319,6 +319,15 @@ All outputs are real, from a trial run of `tasklet` with sdlc 0.14.4, unless a s
 | The audit export is refused | the folder exists and is not empty, or it is inside `openspec/` | choose a new folder outside the repository |
 | Events never arrive | the receiver's server is unreachable, or the tool rejects the `event` argument | `sdlc events list`; `sdlc mcp check`; `sdlc events flush` |
 | `mcp_secret_literal` | a literal token in `mcp.servers` | write `${VAR}` and keep the value in the environment |
+| The daily summary does not arrive | no receiver names `summary.daily` (it is opt-in), or it was already sent today | add `summary.daily` (or `summary.*`) to a receiver's `on`; `sdlc events summary --json` shows `alreadySent` |
+| `sdlc mcp serve --http` does not start: `token_required` | `SDLC_MCP_TOKEN` is not set, or shorter than 16 characters | export a secret of 16 characters or more in the environment; it is never a flag |
+| An HTTP MCP client gets 401 or 403 | no token or another token (401); an `Origin` header of another host (403) | send `Authorization: Bearer <token>`; use the address the server printed |
+| `sdlc backlog import --issues` refuses with `issues_not_configured` | `openspec/sdlc.yaml` has no `issues:` | a person adds `issues: { server: <a server of mcp.servers>, repo: <owner/name> }` |
+| The linked GitHub issue stays open after the archive | the GitHub server failed during the archive; the comment and the close wait in the outbox | `sdlc events list`; `sdlc events flush` |
+| `sdlc triage intake` refuses with `invalid_alert` | the input is not one JSON object with a non-empty `id` and `title` | pass `{"id":"…","title":"…"}` on stdin; `severity` and `url` are optional |
+| `sdlc task export` refuses with `plan_not_approved` | the plan gate is not approved, or `plan.md` changed after the approval | have the plan approved (again), then export |
+| `sdlc task export` or `check-result` names `unknown_task` | the task is not in the change's `tasks.md` | `sdlc task export --change <id> --json` lists the open tasks |
+| `sdlc task check-result` names `missing_trailer` or `forbidden_path` | a commit has no `SDLC-Change` or `SDLC-Task` trailer, or the branch touches a forbidden path | add the trailers to the commits; undo the changes to the forbidden paths |
 | A change commits with no `SDLC-Agent` trailer | a person committed, the project has its own git hook, or the tool set no marker | `sdlc doctor` (`git hook` line); Lesson 10.4 |
 
 ---
@@ -352,7 +361,8 @@ The lite track: `sdlc track set lite --change <id>`, a person's decision (`sdlc 
 
 **Can the agent run the reports and the audit?**
 Yes. `report`, `dashboard`, `health`, `audit`, `trace`, `changelog`, `log`, `explain` and `approvals verify` only
-read. The agent cannot approve, reject, waive, rework, take over, unlock tests, order the backlog or set the license.
+read. Since 0.19.0, so do `sdlc task export` and `sdlc task check-result`. The agent cannot approve, reject, waive,
+rework, take over, unlock tests, order the backlog or set the license.
 
 **Where is the history of decisions?**
 `sdlc audit --change <id>`, `sdlc log`, and `sdlc trace <id>` from intent to evidence.
@@ -370,8 +380,12 @@ Yes. `sdlc init --tools claude,cursor` (or `sdlc update --tools ...`) serves bot
 Experimentally. Check on your installation that an early edit is denied and `sdlc approve` is refused (Lesson 10.3).
 
 **Does sdlc send anything to Telegram, Slack or email by itself?**
-No. `events` call a tool of an MCP server you configure, and the daily summary script writes a file. Your server or
-your script does the sending.
+No. `events` call a tool of an MCP server you configure. Since 0.19.0 the daily summary is such an event too
+(`sdlc events summary`). Your MCP server does the sending.
+
+**Can a person or a tool outside the team's agent tools do a task?**
+Yes. Since 0.19.0 `sdlc task export --change <id> --json` gives the work item, and
+`sdlc task check-result --change <id> --branch <ref> --json` checks the branch that comes back. The gates stay the same.
 
 **I am new. Where do I start?**
 `sdlc guide tour`: seven short steps through the calculator demo. `sdlc guide` lists every topic.
@@ -406,6 +420,9 @@ Claude Code spelling; in Cursor, OpenCode, Qwen Code and GigaCode use `/sdlc-<na
 | `sdlc waive <gate> --change <id> --note "…"` **(person)** | `/sdlc:guide` — how sdlc works |
 | `sdlc takeover`, `sdlc release-control` **(person)** | |
 | `sdlc roles who <gate> --change <id>`, `sdlc explain --change <id>` | |
+| `sdlc backlog import --issues [--json]` (with `issues:` in `openspec/sdlc.yaml`) | |
+| `sdlc task export --change <id> [--task <n.m>] --json` | |
+| `sdlc task check-result --change <id> --branch <ref> --json` | |
 
 ### Oliver — developer (Claude Code)
 
@@ -415,6 +432,7 @@ Claude Code spelling; in Cursor, OpenCode, Qwen Code and GigaCode use `/sdlc-<na
 | `sdlc new <id>`, `sdlc backlog start B<n>` | `/sdlc:build` — implement from the approved plan |
 | `sdlc verify --change <id>` | `/sdlc:verify` — evidence and independent verification |
 | `sdlc tests lock --change <id>` | `/sdlc:triage <alert>` — an incident becomes an intent |
+| `sdlc triage intake [--json]` (one alert as JSON on stdin) | |
 | `sdlc guide denials#<rule>` | `/sdlc:guide why was this denied?` |
 
 ### Grace — QA engineer
@@ -452,6 +470,8 @@ Claude Code spelling; in Cursor, OpenCode, Qwen Code and GigaCode use `/sdlc-<na
 |---|---|
 | `sdlc init --tools … --mcp`, `sdlc update [--tools …]`, `sdlc doctor` | `/sdlc:adopt` |
 | `sdlc mcp check`, `sdlc events list`, `sdlc events flush` | `/sdlc:team` |
+| `sdlc events summary [--since <date>] [--json]` (scheduled every morning) | |
+| `sdlc context pull [--name <name>] [--json]` (packs from the knowledge server) | |
 | `sdlc adopt --apply` **(person)**, `sdlc roles migrate` **(person)**, `sdlc roles check` | |
 | `sdlc team sync`, `sdlc team check`, `sdlc team accept <role>` **(person)** | |
 | `sdlc license set community` or `commercial --agreement <id> --licensee "<name>"` **(person)** | |
@@ -469,6 +489,7 @@ Claude Code spelling; in Cursor, OpenCode, Qwen Code and GigaCode use `/sdlc-<na
 | `sdlc approvals verify [--mode required]` | |
 | `sdlc audit --export ../evidence-<period> --since <date>` | |
 | `sdlc mcp serve --project <path> --project <path>` (in Claude Desktop) | |
+| `sdlc mcp serve --http <host:port>` with `SDLC_MCP_TOKEN` in the environment (a central dashboard) | |
 
 ### The external auditor
 
@@ -512,13 +533,17 @@ Claude Code spelling; in Cursor, OpenCode, Qwen Code and GigaCode use `/sdlc-<na
 | agent marker | the environment variable that marks an agent's shell (`CLAUDECODE`, `CURSOR_AGENT`, `CODEX_CI`, `QWEN_CODE`, ...) |
 | `SDLC-Agent` trailer | the commit line that marks a commit made in an agent's shell |
 | `SDLC-Approval` trailer | the commit line that ties a commit to one approval |
-| `SDLC-Change`, `SDLC-Task` trailers | the commit lines that tie a commit to a change and a task, for `sdlc trace` |
+| `SDLC-Change`, `SDLC-Task` trailers | the commit lines that tie a commit to a change and a task, for `sdlc trace` and `sdlc task check-result` |
 | roles.yaml | `openspec/roles.yaml`: people, their emails and signing keys, roles, separation rules |
 | separation of duties | rules on who may approve: not the author, different people for gate pairs, a per-person limit |
 | signing | approvals arrive in commits signed by the approver; `sdlc approvals verify` checks it |
 | MCP registry | `mcp.servers` in `openspec/sdlc.yaml`; sdlc writes it into every tool's MCP file |
 | stages (MCP) | the stages at which the agent may call a registry server |
 | event receiver | an entry under `events`: a server and tool sdlc calls for matching process events |
+| wait id | the id of a `gate.<g>.awaiting` or `gate.<g>.overdue` event: built from the project, the change, the gate, the event and the digest, so it is the same in every clone and in CI |
+| chat handle | a person's name in a chat, under `people.<id>.chat` in `roles.yaml` (for example `telegram: "@megan_tg"`); a receiver with `chat:` mentions it |
+| daily summary | the event `summary.daily` from `sdlc events summary`: counts and the waiting changes, once per project and day |
+| work item | one open task given to an executor by `sdlc task export`, in the contract `sdlc.task/1` |
 | outbox | events that could not be delivered yet, in `.git/sdlc/outbox/`; `sdlc events flush` sends them |
 | inbox | MCP check results from runs outside an agent session, for the agent's next session |
 | health finding | one observation of `sdlc health`: area, level, facts, recommendation |
@@ -526,7 +551,7 @@ Claude Code spelling; in Cursor, OpenCode, Qwen Code and GigaCode use `/sdlc-<na
 | plan drift | files changed but not in the plan, and planned files not touched |
 | manifest | `openspec/.sdlc/manifest.json`: the files sdlc generated, so `update` and `uninstall` touch only those |
 | project log | `openspec/.sdlc/log.jsonl`: every harness event with the sdlc version and license |
-| context pack | a file in `docs/context/` with an owner, a source and a freshness date, given to the agent at its stages |
+| context pack | a file in `docs/context/` with an owner, a source and a freshness date, given to the agent at its stages; `sdlc context pull` writes packs from `context.sources` |
 
 ---
 
@@ -534,10 +559,6 @@ Claude Code spelling; in Cursor, OpenCode, Qwen Code and GigaCode use `/sdlc-<na
 
 What this course needed and sdlc 0.14.4 does not offer, or does differently from its documentation. One line each.
 
-- The daily summary only writes a file; sdlc has no built-in delivery to Telegram (or any channel) and no "daily
-  summary" event.
-- `sdlc mcp serve` has no `health`, `report` or `explain` tool, so a portfolio view of health over MCP is not possible;
-  it needs the CLI per repository.
 - `sdlc guide denials` says "The Claude Code hook and the OpenCode plugin check every edit"; it does not mention Cursor,
   Codex, Qwen Code and GigaCode, which apply the same rules.
 - The health thresholds can be set only in `openspec/sdlc.yaml`.

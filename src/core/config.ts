@@ -5,7 +5,9 @@ import { parseHealth, serializeHealth, type HealthThresholds } from './health/th
 import { isFile } from './fs-utils.js';
 import { LAYOUT_ROLE_IDS, type LayoutMapping, type LayoutRoleId } from './layout.js';
 import { parseEvents, type EventReceiver } from '../mcp/event-config.js';
+import { parseIssues, type IssuesConfig } from '../mcp/issues-config.js';
 import { parseMcpChecks, parseMcpServers, type McpCheck, type McpServer } from '../mcp/registry.js';
+import { parseContextSources, type ContextSourcesConfig } from '../mcp/context-sources.js';
 import { parsePacksConfig, type PackConfig } from '../team/pack-config.js';
 import { parseQuestionsConfig, type QuestionsConfig } from './questions-config.js';
 import { parseDesignConfig, type DesignConfig } from './debate.js';
@@ -153,6 +155,11 @@ export interface SdlcConfig {
    */
   events?: EventReceiver[];
   /**
+   * The GitHub issues link (B93): the registry server and `owner/name` repository the backlog imports issues
+   * from and whose issues an archive closes. Absent when sdlc.yaml has no `issues`; never written back.
+   */
+  issues?: IssuesConfig;
+  /**
    * The agent team (B71): `registry` names the server of `mcp.servers` the roles and skills come from. Absent when
    * sdlc.yaml has no `team`; never written back, so the file keeps it as people wrote it.
    */
@@ -162,6 +169,13 @@ export interface SdlcConfig {
    * skills, read by `sdlc team sync` after the registry. Absent when sdlc.yaml has none; never written back.
    */
   packs?: PackConfig[];
+  /**
+   * Context packs pulled from the team's knowledge servers (B101): `context.sources`, each a pack name, a
+   * registry server and a resource or a tool; `invalid` keeps entries that failed to parse (`context pull`
+   * reports them as failed — a bad entry must not stop the other commands). Absent when sdlc.yaml has none;
+   * never written back.
+   */
+  context?: ContextSourcesConfig;
   /**
    * Thresholds of `sdlc health` (B65, B68), every one filled in; absent when sdlc.yaml has no `health` block (the
    * defaults apply). Written back with the values that differ from the defaults only.
@@ -317,10 +331,15 @@ export function parseConfig(raw: Raw, file = 'openspec/sdlc.yaml'): SdlcConfig {
   }
   const events = parseEvents(raw.events, where, (config.mcp?.servers ?? []).map((server) => server.name));
   if (events.length > 0) config.events = events;
+  const issues = parseIssues(raw.issues, where, (config.mcp?.servers ?? []).map((server) => server.name));
+  if (issues) config.issues = issues;
   const team = parseTeamConfig(raw.team, where, (config.mcp?.servers ?? []).map((server) => server.name));
   if (team) config.team = team;
   const packs = parsePacksConfig(raw.packs, where);
   if (packs.length > 0) config.packs = packs;
+  const context = asObject(raw.context, where('context'));
+  const sources = parseContextSources(context?.sources, where, (config.mcp?.servers ?? []).map((s) => s.name));
+  if (sources.sources.length > 0 || sources.invalid.length > 0) config.context = sources;
   assertCliValue(config.cli, where('cli'));
   config.tools = asStringArray(raw.tools, where('tools')) ?? config.tools;
   const delivery = asString(raw.delivery, where('delivery'));

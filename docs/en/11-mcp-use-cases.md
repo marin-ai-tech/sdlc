@@ -11,14 +11,18 @@ MCP works in two directions here:
 
 | Capability | Direction | Command or setting | Who uses it |
 |---|---|---|---|
-| Read the process: status, next step, artifact instructions, trace, audit, help, guide | sdlc → others | `sdlc mcp serve`, registered by `sdlc init --mcp` | agents, orchestrators, chat clients, IDE assistants |
+| Read the process: status, next step, artifact instructions, trace, audit, help, guide; explain, health and report (0.19.0) | sdlc → others | `sdlc mcp serve`, registered by `sdlc init --mcp` | agents, orchestrators, chat clients, IDE assistants |
 | Read the team's knowledge: context packs, living specs, change artifacts, documents for agents | sdlc → others | MCP resources of `sdlc mcp serve` (0.10.0) | other agents and assistants |
 | Several projects in one server | sdlc → others | `sdlc mcp serve --project <path> --project <path>` (0.10.0) | Claude Desktop, central scripts |
+| The same tools for remote clients over HTTP, always with a bearer token | sdlc → others | `sdlc mcp serve --http <host:port>` and `SDLC_MCP_TOKEN` (0.19.0) | remote assistants, central servers |
 | One registry of the team's MCP servers for every supported tool | config → tools | `mcp.servers` in `openspec/sdlc.yaml` | the team lead, once |
 | Check that the servers are reachable and what they can do | sdlc → servers | `sdlc mcp check` | whoever adds a server |
 | A server's answer as gate evidence | sdlc → servers | `verify.mcp`; `release.mcp` for the release gate (0.10.0) | the verify and release gates |
 | Results for the agent from runs it was not part of | sdlc → agent | `sdlc inbox`, the session-start summary | the agent |
 | Tell other systems what happens: gates waiting, approvals, verification, archives, overdue gates | sdlc → servers | `events` in `openspec/sdlc.yaml` (0.10.0) | a central server, a chat bot, a ticket system |
+| A daily summary, and chat handles for the people who must act | sdlc → servers | `sdlc events summary`; `chat:` on a receiver (0.19.0) | the team chat, for example Telegram |
+| GitHub issues into the backlog, commented on and closed when the change is archived | sdlc → servers | `issues`, `sdlc backlog import --issues` (0.19.0) | the product owner |
+| Context packs from the team's knowledge server, pulled into files | sdlc → servers | `context.sources`, `sdlc context pull` (0.19.0) | the owners of the knowledge |
 | Which servers an agent may call at which stage | hook | `mcp.servers.<name>.stages` | enforced on every agent |
 | Which skills, subagents and servers a stage uses | generated workflows | `stages.<stage>` | the agent, as guidance |
 
@@ -71,6 +75,24 @@ await client.close();
 
 Every tool answers with exactly the JSON of the matching CLI command (`sdlc status --json` and so on). A script can therefore be written and tested against the CLI first.
 
+**A remote client over HTTP** (since 0.19.0). Start the server with a token (chapter 10.1), then connect with the
+Streamable HTTP transport and the token in the `Authorization` header:
+
+```js
+import { Client } from '@modelcontextprotocol/sdk/client/index.js';
+import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
+
+const headers = { Authorization: `Bearer ${process.env.SDLC_MCP_TOKEN}` };
+const url = new URL('http://build-host:8765/mcp');
+const transport = new StreamableHTTPClientTransport(url, { requestInit: { headers } });
+const client = new Client({ name: 'report', version: '1.0.0' });
+await client.connect(transport);
+const { structuredContent } = await client.callTool({ name: 'health', arguments: {} });
+await client.close();
+```
+
+The tools are the same as over stdio. A request without the token, or with another one, gets 401.
+
 ## 11.3. Use cases
 
 ### The agent analyses the process itself
@@ -93,6 +115,13 @@ Every tool answers with exactly the JSON of the matching CLI command (`sdlc stat
 
 *What you get:* the dispatch rule comes from the gates, not from the orchestrator's guess. An executor can never be handed a step that belongs to a person.
 
+Since 0.19.0, the orchestrator does not have to build the work item itself. `sdlc task export --change <id> --json`
+gives one work item per open task of an approved plan, in the contract `sdlc.task/1`: the task, the risk, the base
+commit, the plan's files, the spec scenarios, the verify checks, the forbidden paths, and the branch and trailers for
+the result. When the executor returns its branch, `sdlc task check-result --change <id> --branch <ref> --json` reports
+missing trailers, unknown tasks and forbidden paths as problems, and files outside the plan as a warning. Neither
+command merges or approves anything. See [Handing tasks to executors](05-guide.md#handing-tasks-to-executors).
+
 ### Other agents read the team's knowledge
 
 *Who:* any agent or assistant connected to the sdlc server, even one that does not run the sdlc workflows.
@@ -109,6 +138,9 @@ Every tool answers with exactly the JSON of the matching CLI command (`sdlc stat
 With several projects, the URI starts with the project's name: `sdlc://claims/spec/auth`.
 
 *What you get:* the agent finds the domain rule, the requirement or the plan where the team keeps it, and sees which knowledge is stale. State, configuration, the log, the inbox, the agents' own folders and anything outside the project are never offered.
+
+Since 0.19.0, packs can also come from the team's knowledge server: `sdlc context pull` writes them into
+`docs/context/` (chapter 10.8). After review they are offered here like any other pack.
 
 ### A reviewer's assistant prepares the review
 
@@ -136,6 +168,9 @@ With several projects, the URI starts with the project's name: `sdlc://claims/sp
 
 The assistant answers from `next`, `status` and `audit`.
 
+Since 0.19.0, the assistant can connect over HTTP (`sdlc mcp serve --http`, 11.2), and it can also answer from
+`explain` ("why is add-export stuck?"), `health` and `report`.
+
 *What you get:* the process is visible to the people who decide, without asking a developer.
 
 ### Reports across the team
@@ -144,7 +179,7 @@ The assistant answers from `next`, `status` and `audit`.
 
 *How:* the process state lives in the repository (`openspec/`, `.sdlc.yaml`, the log), not on a developer's machine. A central job therefore does not need to reach anyone's laptop. It checks out each repository (or its main branch) and reads the state in one of two ways:
 
-- through `sdlc mcp serve` started in that checkout;
+- through `sdlc mcp serve` started in that checkout, over stdio or, since 0.19.0, over HTTP with a token (`--http`);
 - directly with `sdlc status --json`, `sdlc audit --json` or `sdlc report --format json`.
 
 It then merges the answers. `sdlc dashboard` builds the HTML page per repository.
@@ -206,6 +241,8 @@ Give each stage its skills and subagents in `stages.<stage>`. The workflows list
 - the session-start summary lists the inbox items and every gate that waits for a person;
 - `sdlc next` names who acts;
 - the project log (`openspec/.sdlc/log.jsonl`) records when a gate starts waiting for a person (`gate.<g>.awaiting`), every approval, verification and rework. A job that reads the log can notify a channel.
+- since 0.19.0, `sdlc events summary` sends the daily summary to the receivers that ask for `summary.daily`, and a
+  receiver with `chat:` mentions the people by their chat handles (10.11).
 
 *What you get:* problems and waits surface by themselves inside the agent's session and in the log.
 
@@ -229,6 +266,8 @@ gates:
 - After a command, sdlc calls the tool with `event: { id, project, event, change, gate, at, sdlc, by, waitingFor }` and the static `args`.
 - `waitingFor` names the people from `roles.yaml` who may take a waiting gate, so the receiver can ping them.
 - `id` is stable, so a receiver can drop repeats.
+- Since 0.19.0, a wait (`gate.<g>.awaiting`, `gate.<g>.overdue`) has the same id in every clone and in CI: it comes
+  from `project.name` (when set), the change, the gate, the event and the digest, not from the time.
 - A gate waiting past its `overdue_hours` raises `gate.<g>.overdue` once.
 - Delivery takes at most 5 seconds and never fails a command. An event that could not be sent waits in `.git/sdlc/outbox/` (never committed) and goes with the next command or `sdlc events flush`, which a CI job or a scheduler can run. `sdlc events list` shows what waits.
 - An event never carries an email, the text of a command, its output or a note. Hook decisions are sent only when a pattern names them.
@@ -248,18 +287,30 @@ events:
 - It never carries an email, a note, a command or its output.
 - sdlc builds the text when the event is queued, so an event that waits in the outbox reads the same when it is sent.
 
+*Chat handles, the daily summary and issues* (since 0.19.0):
+
+- A receiver with `chat: telegram` also gets `waitingForChat`, the telegram handles of the people it waits for, from
+  `people.<id>.chat` in `roles.yaml`; its text mentions them. A receiver without `chat` never gets a handle.
+- `sdlc events summary` records `summary.daily` once per project and day. A receiver gets it only when its `on` names
+  `summary.*` or `summary.daily`.
+- The comment and the close of a linked GitHub issue, when a change is archived, wait in the same outbox when the
+  server fails.
+- The CI configuration from `sdlc ci init` runs `sdlc events flush` at the end, also when a check failed.
+
+Chapter 10.11 has the configuration.
+
 *What you get:* the central picture updates within minutes, and the people who must act are told.
 
 ## 11.4. Security model in short
 
-- **Who can call the sdlc server:** whoever can start a process in the project folder. That person can read the repository anyway.
+- **Who can call the sdlc server:** over stdio, whoever can start a process in the project folder; that person can read the repository anyway. Over HTTP (0.19.0), whoever can reach the port and holds the token from `SDLC_MCP_TOKEN`; without the token a request gets 401. Give the token only to clients that may read the repository.
 - **What it can read:** the same as the CLI's JSON: change names, stages, people from `roles.yaml`, file paths in traces, audit history. Treat a connected chat client as someone with read access to the repository.
 - **What it cannot do:** decide anything, write project files, or run arbitrary commands. Tool arguments that look like options are refused.
-- **What sdlc sends to other servers:** only the arguments of your `verify.mcp` checks (`${HEAD}`, `${CHANGE}`, your literals) and the `${VAR}` values for that server.
+- **What sdlc sends to other servers:** only the arguments of your `verify.mcp` checks (`${HEAD}`, `${CHANGE}`, your literals) and the `${VAR}` values for that server. Since 0.19.0 also the `args` of `context.sources`, the owner and repository of `issues` with the comment that names the archived change, and chat handles only to a receiver that names their channel.
 
 ## 11.5. Limits today
 
-- **Local servers only.** `sdlc mcp serve` speaks stdio; there is no HTTP endpoint to reach from another machine. Central reporting reads the repository instead (11.3).
+- **One shared token, plain HTTP.** `sdlc mcp serve --http` (0.19.0) knows one token and has no TLS. Between machines, keep it on a private network or behind a TLS proxy. To change the token, restart the server with a new one.
 - **One CLI process per tool call.** That costs about half a second, which matters only for scripts that make many calls.
 - **Overdue is noticed by the next command,** session start or `sdlc events flush`; there is no daemon. Run `sdlc events flush` on a schedule if you need it on time.
 - **Tools and resources only.** The server does not offer MCP prompts.

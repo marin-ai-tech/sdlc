@@ -6,10 +6,12 @@
  * all, unless the change already has a qa decision or a command asks for it (`sdlc approve qa`, as for release).
  */
 import { createHash } from 'node:crypto';
+import type { ChangeRef } from './changes.js';
 import type { ChangeState, GateState } from './change-state.js';
 import type { SdlcConfig } from './config.js';
 import { digestFiles } from './digest.js';
 import { t, type MessageParams } from './i18n.js';
+import { evaluateApprovalGate, type LocalizedReason } from './approval-gate.js';
 import type { GateEvaluation, LifecycleView, NextAction } from './lifecycle.js';
 import { awaitedRoles } from './approval-quorum.js';
 
@@ -40,6 +42,24 @@ export function qaDigest(changeDir: string, state: ChangeState): string {
   hash.update('\0');
   hash.update(digestFiles(changeDir, [QA_EVIDENCE]));
   return `sha256:${hash.digest('hex')}`;
+}
+
+/**
+ * The qa-gate evaluation while the gate is in use; undefined when the change does not show it.
+ * Recorded approvals are trusted when the change is archived or the reader cannot fingerprint.
+ */
+export function evaluateQaGate(
+  ref: ChangeRef,
+  config: SdlcConfig,
+  state: ChangeState,
+  gateState: GateState | undefined,
+  blocked: LocalizedReason | undefined,
+  options: { skipFingerprint?: boolean; withQa?: boolean } = {}
+): GateEvaluation | undefined {
+  if (!qaInUse(config, state, options.withQa)) return undefined;
+  const trustRecorded = ref.archived || options.skipFingerprint === true;
+  return evaluateApprovalGate('qa', config, state, gateState, qaDigest(ref.dir, state), blocked, [],
+    trustRecorded, ref.archived);
 }
 
 function withKey(action: Omit<NextAction, 'message' | 'key' | 'params'>, key: string,

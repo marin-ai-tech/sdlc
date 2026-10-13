@@ -78,6 +78,24 @@ writes them into the agent tool's own configuration.
    - `knowledge` is the team's own server with docs, ADRs, the glossary, and the registry of agent roles and skills.
    - `telegram` is the team's bot server. The CLI sends events to it ([lesson 2.6](#s2-6)). The agent does not need it.
 
+   Since 0.19.0, Steven can also pull context packs from the knowledge server into `docs/context/` for review.
+   He lists them under `context.sources` in `openspec/sdlc.yaml`:
+
+   ```yaml
+   context:
+     sources:
+       - name: glossary
+         server: knowledge
+         resource: docs/glossary.md
+         stages: [plan, design, build]
+         owner: platform
+         fresh_days: 30
+   ```
+
+   `sdlc context pull` (or `sdlc context pull --name glossary`) writes `docs/context/<name>.md` with a header
+   (`source: mcp:knowledge …`, `updated: today`) and the text as the body. Packs stay in git under review;
+   `sdlc instructions` stays offline. A failing source leaves its file as it was.
+
 3. Each person sets the variables in their own environment, for example from the team's password manager:
 
    ```bash
@@ -546,8 +564,23 @@ when a wait is overdue, without anyone asking `sdlc next`.
 
    `waitingFor` holds the person ids from `roles.yaml`; an approval carries `by` instead. Neither the event nor the
    text ever carries an email, a command, its output or a note. Without `message`, sdlc sends this `event` object
-   instead of the text, and the bot's tool must accept it. The text names people by name only; mapping `megan` to
-   her Telegram account is still the bot's job.
+   instead of the text, and the bot's tool must accept it.
+
+   Since 0.19.0, people may list chat handles in `openspec/roles.yaml`, and a receiver may ask for them:
+
+   ```yaml
+   # in openspec/roles.yaml, under people.megan:
+   chat: { telegram: "@megan_nw", slack: U0MEGAN }
+   ```
+
+   ```yaml
+   # on the telegram receiver in openspec/sdlc.yaml:
+   chat: telegram
+   ```
+
+   That receiver gets `waitingForChat` (the handles on that channel) and the message mentions them. A receiver
+   without `chat` never gets handles. Event ids for `gate.*.awaiting` and `gate.*.overdue` are the same in every
+   clone and in CI (from `project.name`, change, gate, event and digest), so a receiver can keep one.
 
 3. See the queue. Delivery takes at most five seconds after a command and never fails the command. What could not
    be sent waits in `.git/sdlc/outbox/`, which is never committed:
@@ -591,17 +624,30 @@ when a wait is overdue, without anyone asking `sdlc next`.
 
    `--autostash` keeps the clone's own log entries across the pull; the log merges line by line (`merge=union`).
 
-6. **The daily summary.** sdlc ships an example script, `assets/examples/daily-summary.mjs` in the installed package
-   (`$(npm root -g)/sdlc/assets/examples/`). It writes `daily-summary-<date>.md`: what was approved or archived in
-   the last day, what comes next, what is blocked and what waits on people. It publishes nothing by itself. Northwind
-   sends the file with the Bot API, outside sdlc:
+6. **The daily summary.** Since 0.19.0, `sdlc events summary` records the event `summary.daily` (counts of done,
+   active, waiting for people, blocked; the waiting changes) and sends it to receivers whose `on` matches
+   `summary.*` or `summary.daily` (opt-in: not in the default patterns). One summary per project and day. Add the
+   pattern to the Telegram receiver:
+
+   ```yaml
+   on:
+     - "gate.*.awaiting"
+     - "gate.*.overdue"
+     - "gate.*.approved"
+     - "gate.*.rejected"
+     - "gate.*.rework"
+     - "verify.failed"
+     - "change.archived"
+     - "summary.daily"
+   ```
 
    ```bash
    # every weekday at 08:00, in the same dedicated clone
-   node "$(npm root -g)/sdlc/assets/examples/daily-summary.mjs" --out reports
-   curl -F chat_id="$TASKLET_CHAT_ID" -F document=@"reports/daily-summary-$(date +%F).md" \
-     "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendDocument"
+   sdlc events summary
    ```
+
+   The Telegram MCP server is a receiver like any other: sdlc has no chat API of its own. The example script
+   `assets/examples/daily-summary.mjs` still writes a file if you want a document instead of the event line.
 
 ### You are done when
 
@@ -615,8 +661,7 @@ when a wait is overdue, without anyone asking `sdlc next`.
   shell, needs `${TELEGRAM_BOT_TOKEN}`. Without it, the events wait in that clone's outbox.
 - A fresh CI checkout starts from the committed log each time. A scheduled flush there can announce the same wait
   again and miss an overdue gate. Use a clone that keeps its log, as in step 5.
-- Several clones can each announce the same wait before their logs are merged. The event ids then differ, so the
-  bot cannot drop such repeats by `id`; it can by change, gate and event name.
+- Since 0.19.0, awaiting and overdue event ids match across clones; a receiver can drop repeats by `id`.
 - A generic Telegram server with only `send_message(chat_id, text)` takes events through `message: text`. Without
   `message`, sdlc sends the `event` object, and the tool must accept it.
 - `events` must name a server of `mcp.servers`; an unknown name is a configuration error.
@@ -633,9 +678,12 @@ data. The assistant can read, but it cannot decide anything.
 
 ### Procedure
 
-1. Understand the server. `sdlc mcp serve` speaks MCP over stdio. `sdlc init --mcp` registered it for the project's
-   tools in [lesson 1.2](01-setup-greenfield.md#s1-2). Its tools answer exactly what the matching CLI command prints
-   with `--json`:
+1. Understand the server. `sdlc mcp serve` speaks MCP over stdio by default. `sdlc init --mcp` registered it for the
+   project's tools in [lesson 1.2](01-setup-greenfield.md#s1-2). Since 0.19.0, `sdlc mcp serve --http <host:port>`
+   serves the same read-only tools over MCP Streamable HTTP at `/mcp` for a remote client. A bearer token is always
+   required, also on localhost: set `SDLC_MCP_TOKEN` in the environment (at least 16 characters; never a flag).
+   Without it the server does not start (`token_required`); a bad or missing token gets 401. Port `0` picks a free
+   port; the URL is printed on stderr. Its tools answer exactly what the matching CLI command prints with `--json`:
 
    | Tool | Answers like |
    |---|---|
@@ -646,6 +694,9 @@ data. The assistant can read, but it cannot decide anything.
    | `audit` | `sdlc audit --json` |
    | `help` | `sdlc help --json` |
    | `guide` | `sdlc guide --json` |
+   | `health` | `sdlc health --json` |
+   | `report` | `sdlc report --format json` |
+   | `explain` | `sdlc explain --json` |
 
    Read-only resources: `sdlc://context/<file>`, `sdlc://spec/<capability>`, `sdlc://change/<id>/<artifact>` and
    `sdlc://doc/<path>`. State, configuration, the log and the inbox are never offered.
@@ -675,6 +726,17 @@ data. The assistant can read, but it cannot decide anything.
    With several projects, each tool takes a `project` argument: `project.name` from `openspec/sdlc.yaml`
    (`tasklet`), else the folder name. `status` without it answers for all projects.
 
+   For a chat client on another machine, Steven starts the HTTP server (token required) and Laura points the client
+   at the URL:
+
+   ```bash
+   export SDLC_MCP_TOKEN='……………………'   # ≥16 characters; each person's own secret
+   sdlc mcp serve --http 0.0.0.0:8765 --project C:\work\tasklet --project C:\work\billing-api
+   ```
+
+   The client sends `Authorization: Bearer <token>` to `http://<host>:8765/mcp`. Origin of another host is refused
+   (403); only `/mcp` answers (404 otherwise).
+
 4. Laura asks in plain words:
 
    > Which gates are waiting for a person in tasklet and billing-api, and for how long?
@@ -703,8 +765,8 @@ data. The assistant can read, but it cannot decide anything.
 
 ### Pitfalls
 
-- The server runs locally over stdio; there is no HTTP endpoint for another machine. Central reports read each
-  repository instead (`sdlc report --format json`, `sdlc dashboard`).
+- Prefer stdio for a local client. For HTTP, always set `SDLC_MCP_TOKEN` (≥16 characters); never put the token
+  in the command line. Treat a remote client as someone with read access to the repository.
 - A folder that is not an sdlc project, or two projects with the same name, stop the server at start.
 - Treat a connected chat client as someone with read access to the repository: it sees change names, people from
   `roles.yaml`, file paths and the audit history.
@@ -714,15 +776,12 @@ data. The assistant can read, but it cannot decide anything.
 <a id="known-limitations"></a>
 ## Known limitations
 
-Limitations observed in the sdlc 0.14.4 trial. Some were fixed later; see the changelog.
+Limitations observed in the sdlc 0.14.4 trial. Some were fixed later; see the changelog. Items closed in 0.19.0 are
+gone from this list; see the sections above for what replaced them.
 
-- No sync between GitHub Issues or Projects and `openspec/backlog.md`; only `--source-ref` links and the agent.
 - `stages: []` means "not checked"; use `agents: false` to keep an agent away.
 - An open change is never at `maintain`, so a `maintain`-only server is out of stage during `/sdlc:triage`.
-- Events carry person ids; `roles.yaml` has no chat handle, so each receiver keeps its own mapping.
 - Events are sent only from the clone where the command ran; every person needs the receiver's secret.
-- A scheduled `events flush` in a fresh CI checkout can repeat waits and miss overdue gates; it needs a kept clone.
-- Several clones can announce one wait with different event ids, so a receiver cannot deduplicate by `id`.
-- The daily summary example only writes a file; sending it to a chat is outside sdlc.
-- `sdlc mcp serve` is stdio only; no remote endpoint for a chat client on another machine.
-- Context packs come only from local `docs/context/`; sdlc does not pull documents from the knowledge server.
+- A scheduled `events flush` for overdue gates needs a clone that keeps its log; a fresh checkout alone is not
+  enough for that schedule. Since 0.19.0, `sdlc ci init` already runs `sdlc events flush` at the end of the CI
+  workflow.

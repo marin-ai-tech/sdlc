@@ -6,6 +6,7 @@ import { git } from '../core/git.js';
 import type { LogEntry } from '../core/log.js';
 import { personByEmail, readRolesFile } from '../core/roles.js';
 import { maskSecrets } from './checks.js';
+import { chatParts, type ChatParts } from './event-chat.js';
 import { patternMatches, receiverKey, receiversFor, type EventReceiver } from './event-config.js';
 import { eventMessage, peopleNames } from './event-message.js';
 
@@ -22,9 +23,27 @@ import { eventMessage, peopleNames } from './event-message.js';
  * When a receiver asks for a ready message (`message`), the one-line text is built here, when the event is queued,
  * in the locale of the command that caused it and with the names roles.yaml has at that moment: a later delivery
  * (`sdlc events flush` from another shell, CI or locale; roles.yaml edited since) still reads as the event happened.
+ * A wait is one fact wherever it is seen (B98): `gate.<g>.awaiting` and `gate.<g>.overdue` get an id from the
+ * configured project.name (when set), the change, the gate, the event and digest, not from the time, so every clone
+ * (and CI) that announces the same wait sends the same id and a receiver keeps one. Every other event keeps an id
+ * of its own entry. Chat handles are queued per channel, only for receivers with `chat` (src/mcp/event-chat.ts).
  */
+/** Counts and waiting changes carried only on `summary.daily` (B99). */
+export interface EventSummary {
+  done: number;
+  active: number;
+  awaitingHuman: number;
+  blocked: number;
+  waiting: Array<{ id: string; gate: string; waitingFor: string[] }>;
+  /** Active change ids (ready message names them even when none wait on people). */
+  activeIds: string[];
+}
+
 export interface EventBody {
-  /** Stable for the entry (a hash of at, event, change and gate), so a receiver can drop repeats. */
+  /**
+   * Stable for the entry (a hash of at, event, change and gate), so a receiver can drop repeats; for a wait, the
+   * same in every clone (a hash of project.name when set, change, gate, event and digest).
+   */
   id: string;
   project: string;
   event: string;
@@ -35,6 +54,8 @@ export interface EventBody {
   /** The person id from roles.yaml; absent without roles.yaml or when the identity is no person. */
   by?: string;
   waitingFor?: string[];
+  /** Present only for `summary.daily` (B99). */
+  summary?: EventSummary;
 }
 
 export interface QueuedEvent {
@@ -45,6 +66,17 @@ export interface QueuedEvent {
   message?: string;
   /** The cleaned note of a rejection or a rework; stored only when a receiver of the event has `include_note`. */
   note?: string;
+  /** Per channel, the handles and the text for receivers with `chat`; only for an event that waits for people. */
+  chat?: ChatParts;
+  /** Tool calls a command owes (B93: the GitHub comment and close of an archive); they carry their arguments. */
+  calls?: QueuedCall[];
+}
+
+/** A tool call queued by a command, delivered like an event receiver. */
+export interface QueuedCall {
+  server: string;
+  tool: string;
+  args: Record<string, unknown>;
 }
 
 export interface QueuedFile {
@@ -56,6 +88,7 @@ export interface QueuedFile {
 export type QueueConfig = Partial<Pick<SdlcConfig, 'events' | 'project'>>;
 
 const GATE_EVENT = /^gate\.([^.]+)\./;
+const WAIT_EVENT = /^gate\.[^.]+\.(awaiting|overdue)$/;
 const EMAIL_IN_IDENTITY = /<([^>]+)>/;
 const NOTE_EVENT = /^gate\.[^.]+\.(rejected|rework)$/;
 const NOTE_MAX = 200;
@@ -71,7 +104,49 @@ export function outboxDir(root: string): string | undefined {
 /** The event id: the same entry always gets the same id. */
 export function eventId(entry: Pick<LogEntry, 'ts' | 'event' | 'change'>, gate?: string): string {
   const source = [entry.ts, entry.event, entry.change ?? '', gate ?? ''].join('\n');
+  return shortHash(source);
+}
+
+function shortHash(source: string): string {
   return createHash('sha256').update(source).digest('hex').slice(0, 24);
+}
+
+/** The id of a wait: the same in every clone; project.name when set, else change/gate/event/digest only. */
+export function waitId(
+  projectName: string | undefined,
+  entry: Pick<LogEntry, 'event' | 'change' | 'detail'>,
+  gate: string,
+): string {
+  const shared = [entry.change ?? '', gate, entry.event, entry.detail ?? ''];
+  const parts = projectName ? ['wait', projectName, ...shared] : ['wait', ...shared];
+  return shortHash(parts.join('\n'));
+}
+
+/** The id of an entry's event: a wait with its digest gets `waitId`, every other entry `eventId`. */
+export function entryEventId(
+  projectName: string | undefined,
+  entry: LogEntry,
+  gate: string | undefined,
+): string {
+  const wait = gate !== undefined && Boolean(entry.detail) && WAIT_EVENT.test(entry.event);
+  return wait ? waitId(projectName, entry, gate) : eventId(entry, gate);
+}
+
+/**
+ * Id for `summary.daily` only (B99): stable per project and local calendar day (YYYY-MM-DD), the same in every clone
+ * like a wait (B98): project.name when set, never the folder name. A second `events summary` the same day collides.
+ */
+export function summaryDailyEventId(projectName: string | undefined, day: string): string {
+  const parts = projectName ? ['summary.daily', projectName, day] : ['summary.daily', day];
+  return shortHash(parts.join('\n'));
+}
+
+/** Local YYYY-MM-DD (process timezone), for summary.daily. */
+export function localDayOf(date: Date): string {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, '0');
+  const d = String(date.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
 }
 
 function identityEmail(by: string | undefined): string | undefined {
@@ -97,9 +172,13 @@ function personId(root: string, by: string | undefined): string | undefined {
 export function eventBody(root: string, config: QueueConfig, entry: LogEntry): EventBody {
   const gate = GATE_EVENT.exec(entry.event)?.[1];
   const by = personId(root, entry.by);
+  const project = config.project?.name ?? path.basename(root);
+  const id = entry.event === 'summary.daily'
+    ? summaryDailyEventId(config.project?.name, localDayOf(new Date(entry.ts)))
+    : entryEventId(config.project?.name, entry, gate);
   return {
-    id: eventId(entry, gate),
-    project: config.project?.name ?? path.basename(root),
+    id,
+    project,
     event: entry.event,
     ...(entry.change ? { change: entry.change } : {}),
     ...(gate ? { gate } : {}),
@@ -107,6 +186,7 @@ export function eventBody(root: string, config: QueueConfig, entry: LogEntry): E
     sdlc: entry.sdlc,
     ...(by ? { by } : {}),
     ...(Array.isArray(entry.waitingFor) ? { waitingFor: [...entry.waitingFor] } : {}),
+    ...(entry.summary ? { summary: entry.summary } : {}),
   };
 }
 
@@ -155,12 +235,33 @@ export function queueEvent(root: string, config: QueueConfig, entry: LogEntry): 
       receivers: receivers.map(receiverKey),
       ...messageFor(root, receivers, event),
       ...noteFor(config, entry),
+      ...chatParts(root, receivers, event),
     };
     fs.mkdirSync(dir, { recursive: true });
     const file = path.join(dir, `${event.id}.json`);
     fs.writeFileSync(file, `${JSON.stringify(item, null, 2)}\n`, { encoding: 'utf-8', flag: 'wx' });
   } catch {
     // The log entry is written either way; only this notification is lost (or it was queued already).
+  }
+}
+
+/**
+ * Queues tool calls a command owes (B93: the GitHub issue comment and close of an archive). They share the
+ * outbox and its delivery (src/mcp/events.ts): queued here, sent after the command or by `sdlc events flush`.
+ * Never throws: a call that cannot be queued never fails a command.
+ */
+export function queueCalls(root: string, config: QueueConfig, entry: LogEntry, calls: QueuedCall[]): void {
+  if (calls.length === 0) return;
+  try {
+    const dir = outboxDir(root);
+    if (!dir) return;
+    const event = eventBody(root, config, entry);
+    const item: QueuedEvent = { event, receivers: [], calls };
+    fs.mkdirSync(dir, { recursive: true });
+    const file = path.join(dir, `${event.id}.calls.json`);
+    fs.writeFileSync(file, `${JSON.stringify(item, null, 2)}\n`, { encoding: 'utf-8', flag: 'wx' });
+  } catch {
+    // The command stands either way; only this call is lost (or it was queued already).
   }
 }
 
@@ -183,12 +284,24 @@ export function readOutbox(root: string): QueuedFile[] {
   return queued.sort((a, b) => a.item.event.at.localeCompare(b.item.event.at));
 }
 
-/** Removes receivers that took (or no longer want) the event; the file goes once no receiver is left. */
-export function settleQueued(queued: QueuedFile, keys: string[]): void {
-  queued.item.receivers = queued.item.receivers.filter((key) => !keys.includes(key));
-  if (queued.item.receivers.length === 0) {
+/** Rewrites the queue file, or removes it once no receiver and no call is left. */
+function persist(queued: QueuedFile): void {
+  const left = queued.item.receivers.length + (queued.item.calls?.length ?? 0);
+  if (left === 0) {
     fs.rmSync(queued.file, { force: true });
     return;
   }
   fs.writeFileSync(queued.file, `${JSON.stringify(queued.item, null, 2)}\n`, 'utf-8');
+}
+
+/** Removes receivers that took (or no longer want) the event; the file goes once nothing waits for it. */
+export function settleQueued(queued: QueuedFile, keys: string[]): void {
+  queued.item.receivers = queued.item.receivers.filter((key) => !keys.includes(key));
+  persist(queued);
+}
+
+/** Removes calls that went through; the file goes once nothing waits for it. */
+export function settleCalls(queued: QueuedFile, calls: QueuedCall[]): void {
+  queued.item.calls = (queued.item.calls ?? []).filter((call) => !calls.includes(call));
+  persist(queued);
 }

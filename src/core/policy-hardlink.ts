@@ -1,6 +1,7 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { changeDirs, inboxFiles } from './policy-shell.js';
+import { STATE_FILES } from './state-files.js';
 
 /**
  * Hard links to state files (B40). A hard link is the state file under another name: an edit through it writes the
@@ -9,9 +10,6 @@ import { changeDirs, inboxFiles } from './policy-shell.js';
  * link is compared by device and inode with the state files of the project. The guard's own configuration (B41)
  * uses the same comparison with its files (`hardLinkedFiles`).
  */
-const FIXED_STATE_FILES = [
-  'openspec/roles.yaml', 'openspec/backlog.md', 'openspec/.sdlc/log.jsonl', 'openspec/.sdlc/team.json',
-];
 
 interface FileId {
   dev: bigint;
@@ -31,7 +29,7 @@ function linkedId(abs: string): FileId | undefined {
 
 /** The state files of the project, root-relative: the fixed ones, each change's `.sdlc.yaml`, the inbox files. */
 function stateFiles(root: string): string[] {
-  return [...FIXED_STATE_FILES, ...changeDirs(root).map((dir) => `${dir}/.sdlc.yaml`), ...inboxFiles(root)];
+  return [...STATE_FILES, ...changeDirs(root).map((dir) => `${dir}/.sdlc.yaml`), ...inboxFiles(root)];
 }
 
 function sameFile(id: FileId, abs: string): boolean {

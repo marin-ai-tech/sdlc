@@ -500,8 +500,10 @@ something by hand.
 - Do not use lite for new behaviour users will notice, for security, data or public APIs, or when the scope is
   unclear. `sdlc health` reports the lite track on behaviour changes.
 - `track set` is refused after the plan is approved. Decide the track before the plan.
-- There is no sync with GitHub Issues: `--source-ref "GH-42"` only links the change to the issue. Closing the issue is
-  done in GitHub (by a person, or by the agent through the GitHub MCP server).
+- `--source-ref "GH-42"` alone only links the change to the issue. Since 0.19.0 sdlc can also close the issue: with
+  `issues:` in `openspec/sdlc.yaml`, `sdlc backlog import --issues` brings each open issue in as a backlog item with
+  `Issue: GH-<n>` (Lesson 8.5). Start the change from that item with `sdlc backlog start` (Module 4). When the change
+  is archived, sdlc comments on the issue and closes it through the team's GitHub MCP server.
 
 ### On screen (for the video)
 
@@ -699,14 +701,23 @@ dismisses. No fix happens before that decision.
    [ALERT] tasklet prod: POST /tasks 5xx rate 7% for 10 min (band 5%)
    ```
 
-   Oliver copies the text into `/sdlc:triage`. In `tasklet` the `telegram` server only receives events from the CLI
-   (Lesson 2.6); the agent does not read the channel. sdlc has no built-in alert intake: the input is the text Oliver
-   gives the agent.
+   Since 0.19.0 an alert can enter sdlc as data. A small script of the team's monitoring, or Oliver himself, passes
+   it to `sdlc triage intake` as one JSON object (`id` and `title`; `severity` and `url` are optional):
+
+   ```bash
+   echo '{"id":"PD-1412","title":"POST /tasks 5xx rate 7% for 10 min","severity":"high"}' | sdlc triage intake
+   ```
+
+   The command adds a backlog item with the source `alert:PD-1412` and prints its id. The same alert again adds
+   nothing (with `--json` the answer has `duplicate: true`). It never sets a priority; Megan orders the backlog.
+
+   Oliver then gives the alert to `/sdlc:triage`. In `tasklet` the `telegram` server only receives events from the
+   CLI (Lesson 2.6); the agent does not read the channel.
 
 3. The agent classifies the problem (a bounded fix, or wider work), then creates the change:
 
    ```bash
-   sdlc new fix-tasks-5xx --kind incident --risk medium --source-type alert --source-ref "tg-alert-2026-10-09-1412"
+   sdlc new fix-tasks-5xx --kind incident --risk medium --source-type alert --source-ref "PD-1412"
    ```
 
    It writes `intent.md` with the anomaly and its evidence in Problem, the desired end state and the open questions.
@@ -720,17 +731,21 @@ dismisses. No fix happens before that decision.
    ```
 
    With `events` configured (Lesson 2.6), the waiting intent gate goes to the Telegram bot, and Megan gets the message
-   with her name in `waitingFor`.
+   with her name in `waitingFor`. Since 0.19.0, when Megan has a `chat` handle in `roles.yaml` and the receiver has
+   `chat: telegram`, the message mentions her by that handle.
 
 ### Check yourself
 
 - `sdlc status` lists `fix-tasks-5xx` at the intent gate, with source `alert`.
+- `openspec/backlog.md` has the alert item with `- **Source**: alert:PD-1412`.
 - `intent.md` holds the evidence: run id, error rate, time window.
 - No code changed before Megan's decision.
 
 ### Pitfalls
 
 - With an empty input, `/sdlc:triage` stops and asks for the alert. It never invents one.
+- `sdlc triage intake` refuses input without an `id` or a `title`, or text that is not JSON (`invalid_alert`), and
+  adds nothing. It only records the alert: it does not diagnose, fix or set a priority.
 - An agent may ask for `--track lite` for a bounded fix. The change stays full until a person runs
   `sdlc track set lite`.
 - A Telegram message is never an approval. Approvals happen only in a person's terminal.
@@ -740,6 +755,7 @@ dismisses. No fix happens before that decision.
 
 ### On screen (for the video)
 
+- Pipe the alert JSON into `sdlc triage intake`; show the new item in `openspec/backlog.md`.
 - Paste the Telegram alert into `/sdlc:triage`. Show the agent collecting evidence without editing anything.
 - Show the new `intent.md` and the stop at the intent gate with Megan's command.
 - On a phone screen, show the Telegram message that the intent gate waits for Megan.

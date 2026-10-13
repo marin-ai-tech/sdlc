@@ -64,6 +64,8 @@ export interface BacklogItem {
   acceptance: string[];
   dependsOn: string[];
   source?: string;
+  /** Linked GitHub issue (`GH-<n>`), written by `backlog import --issues` (B93). */
+  issue?: string;
   change?: string;
   closed?: string;
   line: number;
@@ -90,6 +92,8 @@ export interface BacklogItemInput {
   acceptance?: string[];
   dependsOn?: string[];
   source?: string;
+  /** Linked GitHub issue (`GH-<n>`); renders as `- **Issue**: GH-<n>` (B93). */
+  issue?: string;
 }
 
 export interface AddBacklogItemOptions {
@@ -268,6 +272,7 @@ export function addBacklogItem(
     acceptance: input.acceptance ?? [],
     dependsOn: input.dependsOn ?? [],
     source: input.source,
+    issue: input.issue,
     line: 0,
     ready: false,
     blockedBy: [],

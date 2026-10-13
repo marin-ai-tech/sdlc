@@ -4,6 +4,7 @@ import { parse } from 'yaml';
  * Starter CI configurations of `sdlc ci init` (B94, 0.17.0): a GitHub Actions workflow and a GitLab CI job that
  * install this sdlc version and run the sdlc checks on a full clone (`sdlc approvals verify` refuses a shallow one
  * since 0.16.3), and the `ci-green` check of verify.mcp that waits for the CI run of the commit (`${HEAD}`).
+ * After the checks, also when one failed, `sdlc events flush` delivers the events queued in CI (B98).
  * Every file is built from an array of lines.
  */
 
@@ -60,6 +61,9 @@ export function githubWorkflow(version: string): string {
     '      - run: sdlc validate --all',
     '      # Approvals are in place (and signed where roles.yaml asks for it).',
     '      - run: sdlc approvals verify',
+    '      # Events queued here (a gate that waits for a person) reach the event sink, also when a check failed.',
+    '      - if: always()',
+    '        run: sdlc events flush',
     '',
   ].join('\n');
 }
@@ -82,6 +86,9 @@ export function gitlabJobs(version: string): string {
     '    - sdlc validate --all',
     '    # Approvals are in place (and signed where roles.yaml asks for it).',
     '    - sdlc approvals verify',
+    '  # Events queued here reach the event sink; after_script runs also when a check failed (like when: always).',
+    '  after_script:',
+    '    - sdlc events flush',
     '',
   ].join('\n');
 }

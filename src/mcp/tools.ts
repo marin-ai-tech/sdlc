@@ -79,6 +79,40 @@ export const READ_TOOLS: readonly ReadTool[] = [
     inputSchema: schema({ topic: 'guide topic, or topic#section (e.g. denials#plan-gate); omit for the index' }),
     argv: (a) => ['guide', ...(a.topic === undefined ? [] : [a.topic])],
   },
+  {
+    name: 'explain',
+    description: 'What `sdlc explain --json` prints: why a change is where it is and what unblocks it.',
+    inputSchema: schema({ change: CHANGE }),
+    argv: (a) => ['explain', ...changeOption(a.change)],
+  },
+  {
+    name: 'health',
+    description: 'What `sdlc health --json` prints: advice about the project over a time window.',
+    inputSchema: schema({
+      since: 'from this date on instead of health.window_days',
+      days: 'look at the last n days instead of health.window_days',
+    }),
+    argv: (a) => [
+      'health',
+      ...(a.since === undefined ? [] : ['--since', a.since]),
+      ...(a.days === undefined ? [] : ['--days', a.days]),
+    ],
+  },
+  {
+    name: 'report',
+    description: 'What `sdlc report --format json` prints: the project report for a period or one change.',
+    inputSchema: schema({
+      since: 'period start',
+      change: 'one change',
+    }),
+    argv: (a) => [
+      'report',
+      '--format',
+      'json',
+      ...(a.since === undefined ? [] : ['--since', a.since]),
+      ...changeOption(a.change),
+    ],
+  },
 ];
 
 export function findTool(name: string): ReadTool | undefined {

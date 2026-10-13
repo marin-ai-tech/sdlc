@@ -33,7 +33,7 @@ const GOAL_RE = /^Goal: (.+)$/;
 const EPIC_SOURCE_RE = /^Source: (.+)$/;
 const ACCEPTANCE_ITEM_RE = /^  [-*] (.+)$/;
 const FIELD_RE =
-  /^[-*] \*\*(Kind|Risk|Outcome|Acceptance|Depends on|Source|Change|Closed)\*\*: ?(.*)$/;
+  /^[-*] \*\*(Kind|Risk|Outcome|Acceptance|Depends on|Source|Issue|Change|Closed)\*\*: ?(.*)$/;
 const NEXT_ID_COMMENT_RE = (prefix: string): RegExp =>
   new RegExp(`<!-- next-${prefix}: (\\d+) -->`, 'g');
 const NEXT_ID_LINE_RE = /^<!-- next-[BE]: \d+ -->$/;
@@ -166,6 +166,9 @@ function applyField(item: BacklogItem, name: string, value: string): void {
       break;
     case 'Source':
       item.source = value;
+      break;
+    case 'Issue':
+      item.issue = value;
       break;
     case 'Change':
       item.change = value;
@@ -300,6 +303,7 @@ function renderFieldLines(item: BacklogItem): string[] {
   }
   pushFields(lines, [
     ['Source', item.source],
+    ['Issue', item.issue],
     ['Change', item.change],
     ['Closed', item.closed],
   ]);

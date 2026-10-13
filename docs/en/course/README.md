@@ -43,7 +43,7 @@ the pitfalls and notes for the video. A lesson is one short video (about 5–8 m
 | [7. Quality, review and release](07-qa-review-release.md) | 7.1–7.8 | Grace, Paul, Emily |
 | [8. Converting an existing project](08-brownfield.md) | 8.1–8.8 | Steven, Ethan; 8.8 for everyone |
 | [9. Managing and auditing the process](09-management-and-audit.md) | 9.1–9.8 | Laura, the auditor, Megan |
-| [10. One project, several agent tools](10-multi-agent.md) | 10.1–10.6 | Steven, developers on other tools |
+| [10. One project, several agent tools](10-multi-agent.md) | 10.1–10.7 | Steven, developers on other tools; 10.7 for Ethan |
 | [11. Troubleshooting and quick reference](11-troubleshooting-and-reference.md) | 11.1–11.3 and reference | everyone |
 
 ## Tracks by role
@@ -53,7 +53,7 @@ Watch Module 0 and Module 5 first, whatever your role. Then:
 | Role | Lessons |
 |---|---|
 | Product owner (Megan) | 1.3, 3.2, 4.1–4.6, 5.2–5.3, 5.5, 2.6, 9.1, 9.3, 11.6 (her cheat sheet) |
-| Tech lead (Ethan) | 3.1–3.6, 4.2, 5.4–5.5, 6.1–6.8, 7.4–7.5, 8.1–8.7, 9.4 |
+| Tech lead (Ethan) | 3.1–3.6, 4.2, 5.4–5.5, 6.1–6.8, 7.4–7.5, 8.1–8.7, 9.4, 10.7 |
 | Developer (Oliver) | 1.6, 3.2, 6.1–6.9, 7.1–7.4, 10.1–10.4, 11.2 |
 | QA engineer (Grace) | 3.2, 6.7, 7.1–7.3, 9.5, 11.3 |
 | Code owner (Paul) | 3.2–3.3, 7.4–7.6, 9.5 |
@@ -73,8 +73,10 @@ Watch Module 0 and Module 5 first, whatever your role. Then:
 
 The course says so where it matters. The main points:
 
-- There is no built-in sync between GitHub Issues and the sdlc backlog: the agent reads issues through the GitHub
-  MCP server and adds backlog items (Lesson 4.3); archiving a change does not close its issue.
-- The daily summary example writes a file; sending it is a scheduler's job (Lesson 9.7).
 - CI evidence calls the tool your GitHub server exposes; a run that is still in progress fails the check until it is
   run again (Lesson 2.4).
+
+Since 0.19.0 sdlc brings open GitHub issues into the backlog and closes them on archive
+(`sdlc backlog import --issues`, Lessons 4.3 and 8.5), sends the daily summary as an event (`sdlc events summary`,
+Lesson 9.7), takes alerts from monitoring (`sdlc triage intake`, Lesson 6.9), serves the read-only MCP tools over HTTP
+with a token (`sdlc mcp serve --http`, Lesson 9.8), and hands a task to any executor (`sdlc task export`, Lesson 10.7).

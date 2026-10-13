@@ -1232,9 +1232,10 @@ record the change leaves behind.
    evidence and the approvals, moved to `openspec/changes/archive/2026-10-09-add-due-dates/`. Telegram receives
    `change.archived`.
 
-3. The agent closes the loop, as proposals for Oliver: a CLAUDE.md rule for a mistake that happened twice, follow-up
-   intents for deferred work (D2), and here, a comment on the GitHub issue `northwind/tasklet#12` through the `github`
-   server ([lesson 4.3](04-backlog.md#s4-3)).
+3. The agent closes the loop, as proposals for Oliver: a CLAUDE.md rule for a mistake that happened twice, and
+   follow-up intents for deferred work (D2). Since 0.19.0, when the backlog item carried `Issue: GH-<n>`, archive
+   already comments on the GitHub issue and closes it ([lesson 4.3](04-backlog.md#s4-3)); the agent does not need to
+   do that by hand.
 
 4. The backlog item is done, and the next one is proposed:
 
@@ -1321,12 +1322,11 @@ record the change leaves behind.
 <a id="known-limitations"></a>
 ## Known limitations
 
-Limitations observed in the sdlc 0.14.4 trial. Some were fixed later; see the changelog.
+Limitations observed in the sdlc 0.14.4 trial. Some were fixed later; see the changelog. Items closed in 0.19.0
+(GitHub Issues import and closing the issue on archive) are gone from this list; see [lesson 4.3](04-backlog.md#s4-3).
 
-- No built-in GitHub Issues sync: the agent reads issues through the `github` MCP server and runs
-  `sdlc backlog add`; nothing keeps the two lists in step.
-- `sdlc backlog add` has no `--source-url` (only `sdlc new` has one), so an issue link is kept as a ref string.
-- Archiving a change marks its backlog item done but does not close or comment on the linked GitHub issue.
+- `sdlc backlog add` has no `--source-url` (only `sdlc new` has one), so an issue link kept by hand is a ref string.
+  Since 0.19.0, `sdlc backlog import --issues` uses the `Issue: GH-<n>` field instead.
 - `min_approvals` cannot require one approval per role (for example code owner and QA) outside
   `high_risk_approvers`.
 - The `missing_role` hint ("ask Paul, Ethan, …") can name people whom `distinct_approvers` excludes (seen in the

@@ -95,7 +95,7 @@ Qwen Code and GigaCode call them (`/sdlc-adopt`); in Codex CLI they are `$sdlc-a
 | 5 | Take the next ready item: `sdlc backlog start B<n>` creates the change with a draft intent; then the lifecycle of a change (5.3). | `/sdlc:intent`, then `/sdlc:next` | you approve each gate in your terminal |
 | 6 | Close: `sdlc archive` merges the deltas into the living specs and marks the item `done`. With no active change, `/sdlc:next` proposes the next ready item. | `/sdlc:archive` / `/sdlc-archive` | — |
 
-Repeat steps 3–6 until the backlog is empty. A new idea goes through step 3 at any time; an alert or an incident through `/sdlc:triage` (`/sdlc-triage`).
+Repeat steps 3–6 until the backlog is empty. A new idea goes through step 3 at any time; an alert or an incident through `/sdlc:triage` (`/sdlc-triage`). Since 0.19.0, `sdlc triage intake` turns an alert into a backlog item, and `sdlc backlog import --issues` brings in GitHub issues ([Backlog and epics](#backlog-and-epics)).
 
 - In an empty folder step 1 already creates the agent documents (and offers `git init`), so step 2 mostly drafts the settings and roles.
 - Step 3 is not a study of the whole project (that is step 2) and not a gate: skip it when the idea is clear and add the item in step 4.
@@ -174,6 +174,22 @@ People edit `openspec/backlog.md` by hand as well — notes under items and epic
 `sdlc backlog add` refuses a second open item with the same `--source-type` and `--source-ref`.
 The `duplicate_item` error names the existing item. Use `--allow-duplicate` when one source needs several items.
 
+Since 0.19.0, the backlog can also take work from two outside sources. Neither sets the order: a person still orders
+the backlog (`sdlc backlog move`).
+
+- **GitHub Issues.** With `issues: { server: github, repo: owner/name }` in `openspec/sdlc.yaml` (5.4),
+  `sdlc backlog import --issues [--json]` adds one item per open issue that is not linked yet: the issue's title and
+  the field `**Issue**: GH-<n>` (JSON `issue: "GH-<n>"`). Pull requests are skipped, and a second import adds nothing.
+  Without the `issues` setting the command is refused with `issues_not_configured`. When a change whose item has an
+  issue is archived, sdlc comments on the issue (the comment names the change) and closes it. The calls go through
+  the event outbox: if the server fails, the archive still succeeds, and `sdlc events flush` delivers them later. An
+  item without an issue never causes a GitHub call. See
+  [10.11](10-integrations.md#1011-since-0190-github-issues-and-the-team-chat).
+- **Alerts.** `sdlc triage intake [--json]` reads one alert as JSON on stdin (`{ id, title, severity?, url? }`) and
+  adds a backlog item with the source `alert:<id>`. The same alert again adds nothing and answers `duplicate: true`.
+  Input that is not JSON, or an alert without an id or a title, is refused with `invalid_alert`, and nothing is added.
+  Anyone may run it, so a monitoring job can pipe its alerts in. `/sdlc:triage` still turns an alert into a new intent.
+
 ### Explore before intent
 
 Step 3 of the path in 5.2. Use `/sdlc:explore` (`/sdlc-explore`) to research and pressure-test an idea. `sdlc explore <slug>` creates `openspec/explorations/<slug>.md`; `sdlc explore list` lists notes. Start a linked change with `sdlc new <id> --source-type exploration --source-ref openspec/explorations/<slug>.md`. Exploration is optional and does not approve intent.
@@ -229,7 +245,7 @@ The plan gate holds code edits until a plan is approved. With one active change,
 
 ### Evidence, changelog and agent commits
 
-`sdlc audit --export <dir> [--since <date>] [--change <id>]` writes the evidence bundle for auditors: `index.json` and `index.md` with every approval, its signature status (as `sdlc approvals verify` checks it, `not-checked` without signing) and its trailer, the change folders and the log of the period; only files inside openspec/. Since 0.16.2, `sdlc audit --since <date>` without `--export` gives the plain audit for that period: changes with history from that date, agent commits from that date, and JSON `since`. `sdlc audit --change <id>` includes commits made while an archived change was active and the agents' share of commits bearing its `SDLC-Change: <id>` trailer (JSON `agentCommits: { agent, total }`); `--since` limits it. `sdlc changelog [--change <id> | --since <date>]` lists the requirements the delta specs add, change and remove; `/sdlc:release` puts it into release.md. `sdlc init` and `sdlc update` install a `prepare-commit-msg` git hook that marks commits made in an agent session with `SDLC-Agent: <agent>`; the audit and the dashboard show the agents' share. A project's own hook is kept (`sdlc doctor` shows the line to chain sdlc's), and a `core.hooksPath` outside the project is left alone. With `design: { debate: true }`, the spec workflow has two `sdlc-advocate` subagents argue the key decision and records `## Debate` in design.md; the spec gate waits for it. An example script (`assets/examples/daily-summary.mjs` in the package) writes a daily summary file for a scheduler. Use cases: [14. Traceability and audit](14-traceability.md).
+`sdlc audit --export <dir> [--since <date>] [--change <id>]` writes the evidence bundle for auditors: `index.json` and `index.md` with every approval, its signature status (as `sdlc approvals verify` checks it, `not-checked` without signing) and its trailer, the change folders and the log of the period; only files inside openspec/. Since 0.16.2, `sdlc audit --since <date>` without `--export` gives the plain audit for that period: changes with history from that date, agent commits from that date, and JSON `since`. `sdlc audit --change <id>` includes commits made while an archived change was active and the agents' share of commits bearing its `SDLC-Change: <id>` trailer (JSON `agentCommits: { agent, total }`); `--since` limits it. `sdlc changelog [--change <id> | --since <date>]` lists the requirements the delta specs add, change and remove; `/sdlc:release` puts it into release.md. `sdlc init` and `sdlc update` install a `prepare-commit-msg` git hook that marks commits made in an agent session with `SDLC-Agent: <agent>`; the audit and the dashboard show the agents' share. A project's own hook is kept (`sdlc doctor` shows the line to chain sdlc's), and a `core.hooksPath` outside the project is left alone. With `design: { debate: true }`, the spec workflow has two `sdlc-advocate` subagents argue the key decision and records `## Debate` in design.md; the spec gate waits for it. An example script (`assets/examples/daily-summary.mjs` in the package) writes a daily summary file for a scheduler. Since 0.19.0, `sdlc events summary` sends the summary as an event ([Events and the daily summary](#events-and-the-daily-summary)). Use cases: [14. Traceability and audit](14-traceability.md).
 
 ### Open questions answered by a person
 
@@ -247,15 +263,106 @@ Open questions under `## Open questions` in intent.md, proposal.md or design.md 
 
 `sdlc explain --change <id> [--json]` says why a change is where it is: the stage, the open gate and its reason, what it waits for, the steps that unblock it and the latest decisions. It writes nothing.
 
+### Events and the daily summary
+
+`events` in `openspec/sdlc.yaml` push process events to the team's MCP servers: a gate that waits for a person, an
+approval, a verification, an archive ([10.10](10-integrations.md#1010-since-0100),
+[11.3](11-mcp-use-cases.md#pushing-events-to-a-central-server)). Since 0.19.0:
+
+- **One wait, one id.** `gate.<g>.awaiting` and `gate.<g>.overdue` get an id from `project.name` (when set), the
+  change, the gate, the event and the digest the gate waits on, not from the time. Every clone of the project and CI
+  send the same id for the same wait, so a receiver keeps one. Other events keep an id of their own.
+- **Chat handles.** A receiver with `chat: <channel>`, for example `chat: telegram`, also gets `waitingForChat`: the
+  handles on that channel of the people in `waitingFor`, from `people.<id>.chat` in `roles.yaml`
+  ([Roles and separation of duties](#roles-and-separation-of-duties)). With `message`, its text mentions them. A
+  receiver without `chat` never gets a handle.
+- **The daily summary.** `sdlc events summary [--since <date>] [--json]` records the event `summary.daily`: the counts
+  of changes done, active, waiting for people and blocked, and the changes that wait. `--since` sets the start of the
+  period (default: yesterday). The summary goes to the receivers whose `on` matches `summary.*` or `summary.daily`.
+  It is not in the default patterns, so a receiver opts in. A receiver with `message` gets a short text that names
+  the project and the waiting changes. One summary per project and day: a second run on the same day sends nothing
+  new. Run it once a day from a scheduler or a CI job.
+- **CI delivers.** The CI configuration from `sdlc ci init` ends with `sdlc events flush`, also when a check failed
+  (5.5).
+
+```yaml
+events:
+  - server: telegram                  # a Telegram MCP server in mcp.servers
+    tool: send_message
+    on: ["gate.*", "summary.daily"]
+    args: { chat_id: "${TELEGRAM_CHAT_ID}" }
+    message: text
+    chat: telegram                    # mention the people by their telegram handles
+```
+
+sdlc has no chat API of its own: a Telegram MCP server is a receiver like any other.
+
+### The sdlc MCP server over HTTP
+
+`sdlc mcp serve` gives other AI systems the process as read-only MCP tools over stdio
+([10.1](10-integrations.md#101-another-ai-system-reads-the-process)). Since 0.19.0,
+`sdlc mcp serve --http <host:port>` serves the same tools over MCP Streamable HTTP at `/mcp`, for a client on another
+machine or in another process:
+
+```bash
+export SDLC_MCP_TOKEN="<a secret of at least 16 characters>"
+sdlc mcp serve --http 127.0.0.1:8765     # port 0 picks a free port; the URL is printed on stderr
+```
+
+- A bearer token is always required, on localhost too. It comes only from the environment variable
+  `SDLC_MCP_TOKEN` (at least 16 characters), never from a flag. Without it the server does not start
+  (`token_required`).
+- A client sends `Authorization: Bearer <token>`. A request without the token, or with another one, gets 401 and
+  reaches no tool.
+- A browser `Origin` of another host or port is refused with 403. Only `/mcp` is served (404 otherwise), and a request
+  body is at most 1 MB.
+- New tools in both transports: `health`, `report` and `explain` answer what `sdlc health --json`,
+  `sdlc report --format json` and `sdlc explain --json` print. There is still no decision over MCP.
+
+Stop the server with Ctrl+C. Connecting a remote client: [11.2](11-mcp-use-cases.md#112-connecting-a-client).
+
 ### Trace a change
 
 `sdlc trace <change> [--json]` links the intent, the requirements and scenarios of the delta specs, the tasks, the commits, the verification evidence and the review findings, for an active or archived change, and lists the gaps: a requirement without a scenario, a scenario without evidence, a task without a commit, a finding without a status. A commit belongs to a task through the trailers `SDLC-Change: <id>` and `SDLC-Task: <n.m>`; `/sdlc:build` asks the agent to add them.
+
+### Handing tasks to executors
+
+Since 0.19.0, the tasks of an approved plan can go to executors of any type: another agent, a script or a person. The
+task contract says what an executor gets and what it must return.
+
+- `sdlc task export --change <id> [--task <n.m>] --json` gives one work item per open task (contract
+  `sdlc.task/1`): the task, the risk, the base commit, the plan's files, the spec scenarios, the verify checks, the
+  paths the executor must not touch, and where the result goes: the branch `sdlc/<change>/<task>` and the trailers
+  `SDLC-Change: <id>` and `SDLC-Task: <n.m>`. Work is handed out only while the plan gate is approved and fresh;
+  otherwise the command is refused with `plan_not_approved`. `--task` picks one task (`unknown_task` for a task the
+  change does not have).
+- `sdlc task check-result --change <id> --branch <ref> --json` checks a returned branch. A commit without the trailers
+  (`missing_trailer`), a task the change does not have (`unknown_task`) or a forbidden path (`forbidden_path`) is a
+  problem, and the command exits 1. Files outside the plan are a warning (`outside_plan`).
+
+Both commands only read: they merge nothing and approve nothing, and anyone, an agent too, may run them. Merging the
+branch, verification and review stay the usual steps of the change. The contract is published as JSON Schemas:
+`schemas/contracts/task.schema.json` and `schemas/contracts/result.schema.json`.
 
 ### Roles and separation of duties
 
 With `openspec/roles.yaml`, approvals are tied to people in git: the approver's email must belong to a person holding a role the gate accepts, the authors of the code do not approve its review or release, listed gate pairs need different people, and a per-person limit applies. `sdlc roles who <gate> --change <id>` shows the roles needed for that change's risk and who may approve; people refused only for lacking the role are omitted from text. Without `--change`, it lists every role. The `Next:` hint and the workflows name eligible people. `gates.<g>.min_approvals: N` makes a gate wait for approvals from N different people; one person approving again replaces only their own approval. With `signing: warn | required`, `sdlc approvals verify` checks that each approval arrived in a commit signed by the approver. See [Roles, separation of duties and signed approvals](08-roles-and-signing.md).
 
 Since 0.18.0, the file also decides who takes team decisions: `sdlc team accept` needs the `maintainer` role, and `sdlc backlog move` and `sdlc backlog drop` need `product-owner`. A person without the role is refused with `missing_role`, and the message names who may. Without the file any person may run them, as before; an agent never may. `sdlc team list` shows "a newer draft waits" (JSON `newerDraft: true`) when a draft in `docs/agents/drafts/` differs from the accepted role.
+
+Since 0.19.0, a person in `roles.yaml` may list chat handles, one per channel:
+
+```yaml
+people:
+  alice:
+    name: Alice
+    emails: [alice@corp.example]
+    chat: { telegram: "@alice_tg", slack: U0ALICE }
+```
+
+A handle must be a non-empty string; anything else makes `roles.yaml` invalid (`sdlc roles check`). Only an event
+receiver with `chat:` naming that channel gets the handles
+([Events and the daily summary](#events-and-the-daily-summary)).
 
 **Decisions are taken in your own terminal, not in the agent chat.** In OpenCode and Claude Code a command typed with `!` runs in the agent's shell, so `!sdlc approve …` is refused like the agent's own attempt; custom commands are no way around it either (an agent can run them). The refusal gives the exact command to run in your terminal.
 
@@ -328,6 +435,10 @@ mcp:                          # chapter 10
   servers:                    # the team's MCP servers, laid out into every tool's MCP configuration
     build: { type: stdio, command: [npx, -y, corp-build-mcp], env: { CI_TOKEN: "${CI_TOKEN}" }, stages: [build, test] }
     jira:  { type: http, url: https://mcp.corp.example/jira, headers: { Authorization: "Bearer ${JIRA_TOKEN}" }, stages: [plan, deploy] }
+issues: { server: github, repo: acme/claims }   # GitHub Issues through a server of mcp.servers (0.19.0)
+context:
+  sources:                    # packs from the knowledge server, written by sdlc context pull (0.19.0)
+    - { name: glossary, server: kb, resource: "kb://glossary", stages: [design], owner: docs-team, fresh_days: 30 }
 questions: { required: true } # a person answers open questions before intent/spec approval (sdlc answer)
 design: { debate: false }     # the debate lens; debate_sides: [simplicity and speed, robustness and safety]
 health:                       # thresholds of sdlc health; every key has a default
@@ -353,6 +464,20 @@ not required, it does not appear. An agent can never approve it.
 Since 0.18.0, `verify.require_behaviour: true` (default `false`) makes the verify gate also need the behavioural table
 of `verification.md`: one row per spec scenario, as `sdlc verify --check --strict` checks it. Without the rows the
 gate is not satisfied, its reason names the uncovered scenarios, and `sdlc next` asks the agent to fill the table.
+
+Since 0.19.0, `issues: { server, repo }` links the backlog to GitHub Issues through the team's GitHub MCP server:
+`server` is a name in `mcp.servers`, and `repo` is `owner/name`. sdlc holds no token; the server has it. See
+[Backlog and epics](#backlog-and-epics).
+
+Since 0.19.0, `context.sources` lists the context packs that come from the team's knowledge server. Each source has a
+`name` (a plain file name), a `server` (a name in `mcp.servers`), a `resource` or a `tool` with optional `args`, the
+`stages`, the `owner` and an optional `fresh_days`. `sdlc context pull [--name <name>] [--json]` reads each source
+(an MCP resource, or the text a tool answers) and writes `docs/context/<name>.md` with the usual header: `owner`,
+`source: mcp:<server> <resource or tool>`, `updated:` today, `fresh_days` and `stages`. JSON lists `pulled` and
+`failed`. A source that fails is listed under `failed` (exit code 1), and its file stays as it was. A name that is not
+a plain file name, or a server that is not in `mcp.servers`, is a configuration error, and nothing is written. The
+packs stay in git and go through review like any file, and `sdlc instructions` stays offline: it reads the files, not
+the server. See [10.8](10-integrations.md#108-team-knowledge-at-the-right-stage).
 
 Project context and rules for artifacts are set in the same place as in OpenSpec: `openspec/config.yaml` → `context:` and `rules.<artifact>`. They are included in the instructions for intent, proposal, specs, design, plan and tasks.
 
@@ -380,6 +505,10 @@ Since 0.17.0, a person writes the CI configuration with `sdlc ci init --provider
 `.gitlab-ci.yml` that includes it. The job runs `sdlc validate --all` and `sdlc approvals verify` on a full clone.
 An existing file is kept; `--force` rewrites it. `--check <server>` adds a `ci-green` check to `verify.mcp`. The
 command is refused in an agent session. See chapter 10.3.
+
+Since 0.19.0, the job ends with `sdlc events flush`, also when a check failed (`if: always()` on GitHub,
+`after_script` on GitLab), so the events queued in CI reach the receivers. An existing file keeps its old job until
+`sdlc ci init --force` rewrites it.
 
 ## 5.6. Keeping the dashboard current
 

@@ -7,7 +7,7 @@
  *   signing: off            # off | warn | required — see `sdlc approvals verify`
  *   people:
  *     alice: { name: Alice Ivanova, emails: [alice@corp.example], signing_key: "ssh-ed25519 AAAA… alice@corp" }
- *     bob:   { name: Bob Petrov,    emails: [bob@corp.example] }
+ *     bob:   { name: Bob Petrov,    emails: [bob@corp.example], chat: { telegram: "@bob_tg" } }
  *   roles:
  *     product-owner: [alice]
  *     code-owner: [bob]
@@ -42,6 +42,8 @@ export interface Person {
   handles: string[];
   /** An `ssh-…` public key (or a GPG key id) used to sign approval commits. */
   signingKey?: string;
+  /** Chat handles by channel (`chat: { telegram: "@alice_tg" }`), for event receivers with `chat` (B98). */
+  chat?: Record<string, string>;
 }
 
 export interface SeparationRules {
@@ -128,6 +130,20 @@ function parseHandles(value: unknown, file: string, id: string): string[] {
   });
 }
 
+/** `people.<id>.chat`: a mapping of channel to a nonempty handle string; absent = no chat handles. */
+function parseChat(value: unknown, file: string, id: string): Record<string, string> | undefined {
+  if (value === undefined) return undefined;
+  const field = `people.${id}.chat`;
+  const raw = mapping(value, file, field);
+  const chat: Record<string, string> = {};
+  for (const [channel, handle] of Object.entries(raw)) {
+    const valid = typeof handle === 'string' && handle.trim() !== '';
+    if (!valid) invalid(file, `${field}.${channel}`, 'must be a nonempty string');
+    chat[channel] = (handle as string).trim();
+  }
+  return chat;
+}
+
 function gates(value: unknown, file: string, field: string): ApprovalGateId[] {
   return strings(value, file, field).map((gate) => {
     if (!(APPROVAL_GATES as readonly string[]).includes(gate)) invalid(file, field, `unknown gate ${gate}`);
@@ -158,6 +174,7 @@ function parsePeople(value: unknown, file: string): Person[] {
     if (typeof item.name !== 'string' || !item.name.trim()) invalid(file, `people.${id}.name`, 'required');
     const emails = strings(item.emails, file, `people.${id}.emails`).map((email) => email.toLowerCase());
     const handles = parseHandles(item.handles, file, id);
+    const chat = parseChat(item.chat, file, id);
     if (!emails.length) invalid(file, `people.${id}.emails`, 'required');
     for (const email of emails) {
       if (seen.has(email)) invalid(file, `people.${id}.emails`, `duplicate email ${email}`);
@@ -167,7 +184,7 @@ function parsePeople(value: unknown, file: string): Person[] {
       invalid(file, `people.${id}.signing_key`, 'must be a string');
     }
     return { id, name: item.name as string, emails, handles,
-      ...(item.signing_key ? { signingKey: item.signing_key as string } : {}) };
+      ...(item.signing_key ? { signingKey: item.signing_key as string } : {}), ...(chat ? { chat } : {}) };
   });
   return people;
 }

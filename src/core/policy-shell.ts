@@ -4,6 +4,7 @@ import picomatch from 'picomatch';
 import { isWithin, toPosix } from './fs-utils.js';
 import { INBOX_DIR } from '../mcp/inbox.js';
 import { scanShell } from './policy-shell-scanner.js';
+import { STATE_FILES } from './state-files.js';
 
 /**
  * Which state files a tool call writes, beyond the path text `policy.ts` matches (rule `state-integrity`):
@@ -65,9 +66,7 @@ const FOLDER_OPS = anyOf(FILE_OPS);
 const STATE_FOLDER = /^openspec(?:\/changes(?:\/archive)?(?:\/[^/]+)?|\/\.sdlc(?:\/inbox)?)?$/i;
 
 /** The state files at fixed places; a `.sdlc.yaml` may sit in any change directory. */
-const FIXED_STATE_FILES = [
-  'openspec/backlog.md', 'openspec/roles.yaml', 'openspec/.sdlc/log.jsonl', 'openspec/.sdlc/team.json', '.sdlc.yaml',
-];
+const FIXED_STATE_FILES = [...STATE_FILES, '.sdlc.yaml'];
 const GLOB_CHARS = /[*?[{]/;
 const DIR_COMMAND = /^(?:cd|chdir|pushd|Set-Location|sl|Push-Location)$/i;
 const POP_COMMAND = /^(?:popd|Pop-Location)$/i;

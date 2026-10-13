@@ -1,0 +1,78 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://sdlc.dev/schemas/contracts/task.schema.json",
+  "title": "sdlc.task/1 work item",
+  "description": "One entry of the items[] of `sdlc task export`: a task of a change handed to an executor while the plan gate is approved. Versioned by `contract`.",
+  "type": "object",
+  "required": ["contract", "id", "change", "risk", "task", "base", "plan", "scenarios", "checks", "forbidden", "result"],
+  "properties": {
+    "contract": { "const": "sdlc.task/1" },
+    "id": {
+      "type": "string",
+      "pattern": "^[a-z0-9-]+#\\d+(\\.\\d+)+$",
+      "description": "<change>#<task>, e.g. add-farewell#1.2"
+    },
+    "change": { "type": "string", "minLength": 1 },
+    "risk": { "type": "string", "minLength": 1 },
+    "kind": { "type": "string" },
+    "task": {
+      "type": "object",
+      "required": ["id", "text"],
+      "properties": {
+        "id": { "type": "string", "pattern": "^\\d+(\\.\\d+)+$" },
+        "text": { "type": "string", "minLength": 1 }
+      },
+      "additionalProperties": false
+    },
+    "base": {
+      "type": "object",
+      "description": "HEAD when the item was exported",
+      "properties": {
+        "commit": { "type": "string", "pattern": "^[0-9a-f]{40}$" }
+      },
+      "additionalProperties": false
+    },
+    "plan": {
+      "type": "object",
+      "required": ["files", "proof"],
+      "properties": {
+        "files": { "type": "array", "items": { "type": "string" } },
+        "proof": { "type": "array", "items": { "type": "string" } }
+      },
+      "additionalProperties": false
+    },
+    "scenarios": { "type": "array", "items": { "type": "string" } },
+    "checks": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["name", "run"],
+        "properties": {
+          "name": { "type": "string" },
+          "run": { "type": "string" },
+          "required": { "type": "boolean" }
+        },
+        "additionalProperties": false
+      }
+    },
+    "forbidden": { "type": "array", "items": { "type": "string" } },
+    "result": {
+      "type": "object",
+      "required": ["branch", "trailers"],
+      "properties": {
+        "branch": { "type": "string", "minLength": 1 },
+        "trailers": {
+          "type": "object",
+          "required": ["SDLC-Change", "SDLC-Task"],
+          "properties": {
+            "SDLC-Change": { "type": "string" },
+            "SDLC-Task": { "type": "string" }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}

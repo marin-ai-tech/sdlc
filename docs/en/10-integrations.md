@@ -38,10 +38,39 @@ Any other MCP client starts the same command over stdio in the project folder. T
 | `audit` | `change?` | `sdlc audit [--change] --json` |
 | `help` | `topic?` | `sdlc help [topic] --json` |
 | `guide` | `topic?` | `sdlc guide [topic] --json` |
+| `explain` | `change` | `sdlc explain --change <id> --json` (0.19.0) |
+| `health` | `since?`, `days?` | `sdlc health [--since] [--days] --json` (0.19.0) |
+| `report` | `since?`, `change?` | `sdlc report [--since] [--change] --format json` (0.19.0) |
 
 Each tool runs the CLI command as a separate process and returns its JSON both as structured content and as text. A failed command becomes a tool error carrying the CLI's error code. An argument that the CLI would read as an option (one starting with `-`) is refused.
 
 *Why it is safe.* The server only reads. `status` and `next` may record that a gate started waiting for a person, the same as the CLI does. The decision commands are not tools at all.
+
+**Remote clients over HTTP (since 0.19.0).** `sdlc mcp serve --http <host:port>` serves the same tools over MCP
+Streamable HTTP at `/mcp`, for a client that does not start sdlc itself: a central server, a chat assistant, an IDE
+on another machine.
+
+```bash
+export SDLC_MCP_TOKEN="<a secret of at least 16 characters>"
+sdlc mcp serve --http 127.0.0.1:8765     # prints http://127.0.0.1:8765/mcp on stderr; port 0 picks a free port
+```
+
+- A bearer token is always required, on localhost too. It comes only from `SDLC_MCP_TOKEN` (at least 16 characters),
+  never from a flag, and it is never printed. Without it the server does not start (`token_required`).
+- A request without `Authorization: Bearer <token>`, or with another token, gets 401 and reaches no tool.
+- A browser `Origin` of another host or port is refused with 403, against DNS rebinding. A client that sends no
+  `Origin` passes.
+- Only `/mcp` is served (404 otherwise), and a request body is at most 1 MB.
+- The server speaks plain HTTP. Between machines, keep it on a private network or behind a TLS proxy.
+
+A client names the URL and the header, for example in `.mcp.json`:
+
+```json
+{ "mcpServers": { "sdlc": { "type": "http", "url": "http://build-host:8765/mcp",
+  "headers": { "Authorization": "Bearer ${SDLC_MCP_TOKEN}" } } } }
+```
+
+Over HTTP, too, the server only reads, and no decision is a tool.
 
 ## 10.2. The team's MCP servers, described once
 
@@ -283,6 +312,28 @@ Refunds never exceed the charge.
 
 A source older than `fresh_days` is marked `stale`, and the agent is told to check it with its owner. A file without a valid header is skipped and named under `contextSkipped`.
 
+**Packs from the knowledge server (since 0.19.0).** When the knowledge lives on the team's knowledge server, list it
+in `openspec/sdlc.yaml` and pull it into files:
+
+```yaml
+context:
+  sources:
+    - { name: glossary, server: kb, resource: "kb://glossary", stages: [design], owner: docs-team, fresh_days: 30 }
+    - { name: faq, server: kb, tool: search_docs, args: { query: claims }, stages: [build], owner: support }
+```
+
+`server` is a name in `mcp.servers`. `sdlc context pull [--name <name>] [--json]` reads each source, an MCP resource
+or the text a tool answers, and writes `docs/context/<name>.md` with the header above: `owner`,
+`source: mcp:<server> <resource or tool>`, `updated:` today, `fresh_days` and `stages`. JSON:
+`{ pulled: [{ name, file }], failed: [] }`.
+
+- The packs stay files: they are in git and go through review like any change, and `sdlc instructions` stays offline.
+- A source that fails is listed under `failed` (exit code 1), and its existing file stays as it was.
+- A `name` that is not a plain file name (`../x`, `a/b`), or a `server` that is not in `mcp.servers`, is an invalid
+  configuration, and nothing is written.
+
+Pull by hand or on a schedule, and commit what changed.
+
 ## 10.9. The guard protects its own configuration (0.8.2)
 
 Everything above depends on the agent not being able to switch the guard off. Since 0.8.2, the hook denies agent edits and shell writes of the files that configure it:
@@ -322,7 +373,68 @@ events:
 
 Chapter 11 shows the use cases.
 
-## 10.11. Limits we accept
+## 10.11. Since 0.19.0: GitHub Issues and the team chat
+
+**GitHub Issues and the backlog.** *Situation.* Requests arrive as GitHub issues, but the team plans in
+`openspec/backlog.md`. Copying them by hand loses some, and nobody closes the issue when the change is done.
+
+```yaml
+mcp:
+  servers:
+    github: { type: http, url: https://mcp.corp.example/github, headers: { Authorization: "Bearer ${GITHUB_TOKEN}" } }
+issues: { server: github, repo: acme/claims }
+```
+
+- `issues.server` names the team's GitHub MCP server in `mcp.servers`, and `repo` is `owner/name`. sdlc holds no
+  token: the server has its own.
+- `sdlc backlog import --issues [--json]` asks the server for the open issues and adds one backlog item per issue that
+  is not linked yet: the title and the field `**Issue**: GH-<n>`. Pull requests are not issues and are skipped. A
+  second import adds nothing. Without `issues` the command is refused with `issues_not_configured` and calls nothing.
+- The order of the backlog stays a person's decision (`sdlc backlog move`).
+- When a change whose backlog item has an issue is archived, sdlc comments on the issue (the comment names the change)
+  and closes it. The calls go through the event outbox: a failing server does not fail the archive, and
+  `sdlc events flush` delivers them later. An item without an issue never causes a GitHub call.
+- sdlc calls the tools `list_issues`, `add_issue_comment` and `update_issue`, as GitHub's MCP server names them.
+  `sdlc mcp check --args` shows whether your server has them.
+
+**Telegram as an event receiver.** *Situation.* The team works in a Telegram chat. It wants the daily summary there,
+and a gate that waits should mention the person who must act.
+
+```yaml
+events:
+  - server: telegram                  # a Telegram MCP server in mcp.servers
+    tool: send_message
+    on: ["gate.*", "summary.daily"]
+    args: { chat_id: "${TELEGRAM_CHAT_ID}" }
+    message: text
+    chat: telegram
+```
+
+```yaml
+# openspec/roles.yaml
+people:
+  alice:
+    name: Alice
+    emails: [alice@corp.example]
+    chat: { telegram: "@alice_tg", slack: U0ALICE }
+```
+
+- `sdlc events summary [--since <date>] [--json]` records the event `summary.daily`: the counts of changes done,
+  active, waiting for people and blocked, and the waiting changes. Only a receiver whose `on` names `summary.*` or
+  `summary.daily` gets it; the default patterns do not. With `message`, the text names the project and the waiting
+  changes. One summary per project and day, so run it once a day from a scheduler or a CI job.
+- `chat: telegram` gives the receiver `waitingForChat`, the telegram handles of the people in `waitingFor`, and its
+  text mentions them. A receiver without `chat` never gets a handle: handles go only to a receiver that names their
+  channel.
+- A wait has the same event id in every clone and in CI. The id comes from `project.name` (when set), the change, the
+  gate, the event and the digest, so a receiver that keeps event ids drops the repeats.
+- The CI configuration from `sdlc ci init` runs `sdlc events flush` at the end, also when a check failed, so waits
+  seen in CI reach the chat.
+
+sdlc has no chat API of its own. A Telegram MCP server is a receiver like any other; any chat server with a tool that
+takes the text works the same way.
+
+## 10.12. Limits we accept
 
 - **The secret patterns** are a floor, not a scanner: keep a secret scanner in CI as well.
 - **The shell rules are heuristics on the command text.** A path built at run time (`cd "$DIR"`, a variable set in the same command) can slip past them. A computed path is much rarer in an agent's command than a literal one.

@@ -26,6 +26,7 @@ import {
   printChangeFlow, printChangeParticipation, printProjectFlow, printProjectParticipation,
 } from './audit-flow.js';
 import { readBacklog, setBacklogStatus } from '../core/backlog.js';
+import { queueIssueClose } from '../mcp/issues.js';
 import { auditExportCommand, type AuditExportOptions } from './audit-export.js';
 import { closeDeferred, readDeferred } from '../core/deferred.js';
 import { parseSince } from '../report/model.js';
@@ -227,6 +228,16 @@ export async function archiveCommand(id: string | undefined, opts: ArchiveOption
         if (deferred && readDeferred(ctx.root).some(entry => entry.id === deferred && entry.status === 'open')) {
           closeDeferred(ctx.root, deferred, 'done', `implemented by ${ref.id}`);
         }
+      }
+      // B93: a linked GitHub issue gets a comment and is closed, through the event outbox.
+      if (item?.issue) {
+        queueIssueClose(ctx.root, ctx.config, {
+          change: ref.id,
+          issue: item.issue,
+          sdlc: ctx.stamp.version,
+          license: ctx.stamp.license,
+          ...(by ? { by } : {}),
+        });
       }
     }
     const next = resolveNext(ctx);

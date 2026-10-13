@@ -8,7 +8,7 @@ In this module:
 
 - Lesson 4.1 — The backlog: epics, items and when an item is ready
 - Lesson 4.2 — Planning with Claude Code: `/sdlc:backlog`
-- Lesson 4.3 — GitHub issues into the backlog, through the agent and the `github` server
+- Lesson 4.3 — GitHub issues into the backlog
 - Lesson 4.4 — Order, drop and start: the product owner's commands
 - Lesson 4.5 — Explore an idea before intent, and defer work for later
 - Lesson 4.6 — Import planning documents from BMAD
@@ -216,20 +216,21 @@ is not ready.
 
 ---
 
-## Lesson 4.3 — GitHub issues into the backlog, through the agent and the `github` server            (video: ~7 min)
+## Lesson 4.3 — GitHub issues into the backlog            (video: ~7 min)
 
 **Role:** Megan, with Claude Code   **Project:** tasklet
-**You need:** lesson 4.2; the `github` MCP server in `mcp.servers` (Module 2) and Claude Code allowed to use it
+**You need:** lesson 4.2; the `github` MCP server in `mcp.servers` (Module 2)
 
-**Goal.** Bring the planned GitHub issues of `northwind/tasklet` into the backlog, each one linked to its issue.
+**Goal.** Bring the open GitHub issues of `northwind/tasklet` into the backlog, each one linked to its issue, and
+close that link when the change is archived.
 
 ### Steps
 
-1. Say it plainly first: **sdlc has no built-in GitHub Issues sync.** Nothing in sdlc reads or writes issues by itself,
-   and nothing keeps the two lists in step. The agent does the work: it reads issues through the `github` MCP server
-   and runs `sdlc backlog add` for each one that Megan confirms.
+1. Say it plainly first. Since 0.19.0, sdlc can import open GitHub issues into the backlog through the team's GitHub
+   MCP server. Steven names the server and the repository once; Megan (or anyone) runs the import. The agent still
+   helps with the outcome and acceptance of each item. A person orders the backlog.
 
-2. Check the server. Steven described it once in `openspec/sdlc.yaml`:
+2. Steven adds the `issues` setting next to the `github` server in `openspec/sdlc.yaml`:
 
    ```yaml
    mcp:
@@ -239,47 +240,36 @@ is not ready.
          url: https://api.githubcopilot.com/mcp/
          headers: { Authorization: "Bearer ${GITHUB_TOKEN}" }
          stages: [plan, build, test, deploy]
+   issues:
+     server: github
+     repo: northwind/tasklet
    ```
 
-   `sdlc mcp check` lists the tools the server exposes. Use the names your server shows; the official GitHub server
-   exposes tools such as `list_issues` and `get_issue`.
+   `github` is the name of the team's GitHub MCP server in `mcp.servers`. sdlc holds no token; the server uses
+   `${GITHUB_TOKEN}` as in Module 2. Without `issues`, the import is refused (`issues_not_configured`).
 
-3. Megan asks the agent in plain words:
-
-   > Read the open issues with the label "planned" in northwind/tasklet through the github MCP server. For each one,
-   > propose a backlog item under E1 with an outcome and acceptance criteria taken from the issue. Skip issues that are
-   > already in the backlog (compare the source refs). Ask me before you add anything.
-
-   The agent calls the issue tool of the server (for example `list_issues`), reads each issue, and checks
-   `sdlc backlog list --json` for items whose `source` already names the issue. It shows Megan a table of proposed
-   items and asks her to confirm.
-
-4. For each confirmed issue, the agent runs `sdlc backlog add` with the issue as the source:
+3. Megan imports the open issues:
 
    ```bash
-   sdlc backlog add "Add due dates to tasks" --epic E1 --kind feature --risk medium \
-     --outcome "A task can carry a due date, and overdue tasks are easy to find" \
-     --accept "a task created with a due date returns it in GET /tasks/:id" \
-     --source-type ticket --source-ref "northwind/tasklet#12"
+   sdlc backlog import --issues
    ```
 
    ```text
-   B1 Add due dates to tasks
+   Imported 2 issues.
    ```
 
-   The item in `backlog.md` now carries `- **Source**: ticket northwind/tasklet#12`. When the item starts, the change
-   inherits the link: the draft intent says `Source: backlog B1 (ticket northwind/tasklet#12)`.
+   One backlog item per open issue that is not linked yet. Pull requests are skipped. The item carries the field
+   `Issue: GH-<n>` (for example `Issue: GH-12`). A second import adds nothing. Use `--json` in a script.
 
-5. The trial added the same issue twice; it printed this second item:
+4. The agent still adds value on the wording. Megan opens `/sdlc:backlog B1` and asks the agent to draft an outcome
+   and acceptance criteria from the issue text. The agent proposes text; Megan confirms; then the agent runs
+   `sdlc backlog edit` (it cannot edit `backlog.md` by hand). Megan sets the order herself:
 
-   ```text
-   B8 Add due dates to tasks
+   ```bash
+   sdlc backlog move B1 --top
    ```
 
-   Since 0.15.1, `sdlc backlog add` refuses a second open item with the same `--source-type` and `--source-ref`.
-   It reports `duplicate_item` and names the existing item. Use `--allow-duplicate` if one issue needs several items.
-
-6. Show the stage rule. The `github` server is allowed at the stages `plan, build, test, deploy`. While an active
+5. Show the stage rule. The `github` server is allowed at the stages `plan, build, test, deploy`. While an active
    change is at the design stage, an agent's call to it is denied in `block` mode (real reason):
 
    ```text
@@ -288,34 +278,34 @@ is not ready.
    Why, and what to do: `sdlc guide denials#mcp-stage`.
    ```
 
-   With no active change, calls are not checked. Plan the import when no change is in design, or ask Steven to add
-   `design` to the server's stages.
+   The import itself is a CLI command, so the stage rule does not block it. Plan agent calls to the issue tools when
+   no change is in design, or ask Steven to add `design` to the server's stages.
 
-7. Close the loop by hand. When the change is archived, sdlc marks the backlog item `done`, but it does not close or
-   comment on the GitHub issue. Megan asks the agent to do it at the end of `/sdlc:archive`:
-
-   > Comment on northwind/tasklet#12 with a link to the archived change and close the issue.
+6. Close the loop on archive. When the change started from that item is archived, sdlc marks the backlog item
+   `done` and, since 0.19.0, comments on the linked GitHub issue and closes it (through the event outbox). A failing
+   server does not fail the archive; `sdlc events flush` delivers the comment and the close later. An item without
+   `Issue: GH-<n>` calls nothing.
 
 ### Check yourself
 
-- Each new item shows `Source: ticket northwind/tasklet#<n>` in `openspec/backlog.md`.
-- `sdlc backlog list --json` has no two open items with the same `source`.
-- No item was added that Megan did not confirm.
+- Each imported item shows `Issue: GH-<n>` in `openspec/backlog.md`.
+- A second `sdlc backlog import --issues` adds no new item.
+- After archive of a linked change, the GitHub issue is closed (or waits in the outbox until `events flush`).
 
 ### Pitfalls
 
 - There is no two-way sync. An issue edited in GitHub after the import does not change the backlog item.
-- `sdlc backlog add` has no `--source-url`. The issue is kept as a reference string (`owner/repo#n`); `sdlc new`
-  has `--source-url` when you start a change directly.
+- `sdlc backlog add` still has no `--source-url`. The import uses the `Issue: GH-<n>` field instead of a free-form
+  source ref.
 - Write access to issues through MCP is a real write. Keep the token's permissions narrow, and keep servers that can
   write files out of the registry (`sdlc mcp check` warns about them).
 - Never paste a token into `sdlc.yaml`: use `${GITHUB_TOKEN}` (`mcp_secret_literal` otherwise).
 
 ### On screen (for the video)
 
-- A "No built-in sync" title card first.
-- The GitHub issue page next to the item in `backlog.md`; highlight the `Source` line.
-- The trial's duplicate `B8`, then the current `duplicate_item` rule and `--allow-duplicate`.
+- The `issues:` block next to `mcp.servers.github`.
+- `sdlc backlog import --issues` then `backlog.md` with `Issue: GH-12`; a second import that adds nothing.
+- Archive of the change; the GitHub issue closed (or the outbox entry until flush).
 
 ---
 

@@ -33,8 +33,10 @@ export interface Trace {
 
 const REQUIREMENT = /^###\s+Requirement:\s*(.+?)\s*$/;
 const SCENARIO = /^####\s+Scenario:\s*(.+?)\s*$/;
-const TASK_ID = /^(\d+(?:\.\d+)+)\s+(.*)$/;
-const TRAILER = /^(SDLC-Change|SDLC-Task):\s*(\S+)\s*$/gim;
+/** A numbered task line: `1.2 text` -> id `1.2`, text `text`. */
+export const TASK_ID = /^(\d+(?:\.\d+)+)\s+(.*)$/;
+/** The trailers an executor's commit carries: `SDLC-Change: <id>` and `SDLC-Task: <n.m>`. */
+export const TRAILER = /^(SDLC-Change|SDLC-Task):\s*(\S+)\s*$/gim;
 
 function specFiles(dir: string): string[] {
   const specs = path.join(dir, 'specs');
@@ -45,7 +47,7 @@ function specFiles(dir: string): string[] {
     .sort();
 }
 
-function parseRequirements(dir: string): TraceRequirement[] {
+export function parseRequirements(dir: string): TraceRequirement[] {
   const requirements: TraceRequirement[] = [];
   for (const file of specFiles(dir)) {
     const relative = path.relative(dir, file).replace(/\\/g, '/');

@@ -197,6 +197,20 @@ describe('demo: a team builds a calculator with sdlc (every command)', { timeout
     step('list', 'backlog', 'bob', ['backlog', 'list'], 'The backlog with readiness and the epic bar.');
     step('backlog-next', 'backlog', 'bob', ['backlog', 'next'], 'The first ready item.');
     step('next-empty', 'backlog', 'agent', ['next'], 'No active change: next proposes the backlog item.');
+    // B93: work requests arrive as GitHub issues; the team's GitHub server (the test fixture) hands them over.
+    const gh = path.join(REPO_ROOT, 'test/fixtures/mcp/fake-github.mjs').replace(/\\/g, '/');
+    const sdlcYaml = parseDocument(read(path.join(root, 'openspec/sdlc.yaml')));
+    sdlcYaml.setIn(['mcp', 'servers', 'github'], { type: 'stdio', command: ['node', gh], stages: [] });
+    sdlcYaml.setIn(['issues'], { server: 'github', repo: 'till/calculator' });
+    write(path.join(root, 'openspec/sdlc.yaml'), sdlcYaml.toString());
+    env.FAKE_ISSUES = JSON.stringify([
+      { number: 7, title: 'Export sums to the till log', state: 'open' },
+      { number: 9, title: 'Keyboard shortcut for percent', state: 'open', pull_request: { url: 'https://calc.example/pull/9' } },
+    ]);
+    step('import-issues', 'backlog', 'agent', ['backlog', 'import', '--issues'],
+      'Open GitHub issues become backlog items; pull requests are skipped.');
+    step('import-issues-again', 'backlog', 'agent', ['backlog', 'import', '--issues'],
+      'The same issues are linked already: a second import adds nothing.');
   });
 
   it('5. the item becomes a change; the track is suggested, never self-chosen', () => {
@@ -248,6 +262,9 @@ describe('demo: a team builds a calculator with sdlc (every command)', { timeout
 
   it('7. build and verify with evidence (Bob writes the code on a branch)', () => {
     git(root, ['checkout', '-q', '-b', 'basic-arithmetic']);
+    // 0.19.0 (B115): the plan is approved, so the open tasks go to an executor as sdlc.task/1 work items.
+    step('task-export', 'build', 'agent', ['task', 'export', '--change', 'basic-arithmetic', '--json'],
+      'The open tasks as work items for an executor: checks, forbidden paths, the result branch and trailers.');
     write(path.join(root, 'test/calc.test.js'), TEST);
     write(path.join(root, 'src/calc.js'), CODE);
     write(path.join(change('basic-arithmetic'), 'tasks.md'), TASKS.replace(/- \[ \]/g, '- [x]'));
@@ -256,6 +273,15 @@ describe('demo: a team builds a calculator with sdlc (every command)', { timeout
     fs.writeFileSync(path.join(change('basic-arithmetic'), 'verification.md'), evidence.replace(/(## Behavioral verification[\s\S]*?\|---\|---\|---\|---\|\n)/, '$1| Add | node --test | 5 | PASS |\n| Divide | node --test | 2.5 | PASS |\n'));
     step('verify-check', 'build', 'agent', ['verify', '--check', '--change', 'basic-arithmetic'], 'Every scenario has evidence.');
     commit('bob', 'Basic arithmetic');
+    // The executor returns a branch for task 1.1; the trailers say which work item the commit is.
+    git(root, ['checkout', '-q', '-b', 'sdlc/basic-arithmetic/1.1']);
+    write(path.join(root, 'src/calc.js'), `${CODE}export const pow = (a, b) => a ** b;\n`);
+    git(root, ['add', '-A']);
+    git(root, ['commit', '-q', '-m', 'Add pow\n\nSDLC-Change: basic-arithmetic\nSDLC-Task: 1.1']);
+    git(root, ['checkout', '-q', 'basic-arithmetic']);
+    step('task-check-result', 'build', 'agent',
+      ['task', 'check-result', '--change', 'basic-arithmetic', '--branch', 'sdlc/basic-arithmetic/1.1', '--json'],
+      'The returned branch checked: the commit trailers carry the change and the task, no forbidden path touched.');
   });
 
   it('8. review with lenses; a finding is deferred; the author cannot approve his own review', () => {
@@ -316,14 +342,21 @@ describe('demo: a team builds a calculator with sdlc (every command)', { timeout
     step('dashboard', 'visibility', 'alice', ['dashboard', '--out', 'reports/dashboard.html'], 'The dashboard, one offline HTML page.');
     step('audit', 'visibility', 'alice', ['audit'], 'Lead times and first-pass rate.');
     step('log', 'visibility', 'alice', ['log', '--limit', '15'], 'Who did what, with the sdlc version and license.');
-    // The team's MCP registry: a CI server (the test fixture) for the build and test stages, and a check on it.
+    // The team's MCP registry: a CI server (the test fixture) for the build and test stages, a check on it,
+    // and a knowledge server whose glossary becomes a context pack (B101).
     const ci = path.join(REPO_ROOT, 'test/fixtures/mcp/fake-server.mjs').replace(/\\/g, '/');
+    const kb = path.join(REPO_ROOT, 'test/fixtures/mcp/fake-knowledge.mjs').replace(/\\/g, '/');
     const config = parseDocument(read(path.join(root, 'openspec/sdlc.yaml')));
     config.setIn(['mcp', 'servers', 'ci'], { type: 'stdio', command: ['node', ci], stages: ['build', 'test'] });
+    config.setIn(['mcp', 'servers', 'kb'], { type: 'stdio', command: ['node', kb], stages: [] });
     const green = { status: 'success' };
     config.setIn(['verify', 'mcp'], [{ name: 'ci-green', server: 'ci', tool: 'pipeline_status', args: { ref: '${HEAD}' }, expect: green }]);
+    config.setIn(['context', 'sources'], [
+      { name: 'glossary', server: 'kb', resource: 'kb://glossary', stages: ['design'], owner: 'docs-team', fresh_days: 30 },
+    ]);
     write(path.join(root, 'openspec/sdlc.yaml'), config.toString());
     step('mcp-check', 'visibility', 'bob', ['mcp', 'check'], 'The team\'s MCP servers: reachable, tools listed, file writers flagged.');
+    step('context-pull', 'visibility', 'bob', ['context', 'pull'], 'Bob pulls the glossary pack from the knowledge server into docs/context/: the pack stays in git, under review.');
     // 0.17.0 (B111): a ${HEAD} check asks about the commit, so the work is committed before verify.
     commit('bob', 'Wire the CI server into the checks');
     step('verify-mcp', 'visibility', 'bob', ['verify', '--change', 'fix-rounding'], 'Bob verifies himself: the CLI calls the CI server over MCP and keeps the result for the agent.');
@@ -333,6 +366,11 @@ describe('demo: a team builds a calculator with sdlc (every command)', { timeout
     step('inbox-done', 'visibility', 'agent', ['inbox', 'done', JSON.parse(inbox.stdout).items[0].id], 'Read: the agent marks the item done.');
     step('events-list', 'visibility', 'agent', ['events', 'list'], 'Process events waiting for the team\'s servers; no receivers are configured here.');
     step('events-flush', 'visibility', 'bob', ['events', 'flush'], 'Bob sends the waiting events now; nothing waits.');
+    step('events-summary', 'visibility', 'bob', ['events', 'summary'],
+      'Bob records the daily summary event: done, active, waiting and blocked changes, once a day.');
+    step('triage-intake', 'visibility', 'agent', ['triage', 'intake'],
+      'An alert from monitoring becomes a backlog item; the same alert again adds nothing.',
+      { input: JSON.stringify({ id: 'MON-1', title: 'Percent key answers twice', severity: 'low' }) });
     step('mcp', 'visibility', 'agent', ['mcp', 'serve'], 'Other AI systems read the process over MCP.', { input: MCP_LIST });
     // The agent team (0.11.0): the built-in roles as drafts, a person accepts one, the subagent knows this project.
     step('team-sync', 'visibility', 'agent', ['team', 'sync'], 'The agent brings the built-in roles as drafts: analyst, architect, developer, tester, reviewer.');
