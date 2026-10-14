@@ -2,6 +2,20 @@
 
 All notable changes to sdlc. Versions follow [Semantic Versioning](https://semver.org/); while the major version is 0, a minor version may change behavior.
 
+## 0.21.1 — 2026-10-14
+
+### Changed
+- The documentation covers 0.21.0 everywhere: the README, the overview and roles lessons of the course and the
+  handbook, and their command references (every command of the CLI) describe the executor registry, executor
+  tokens and the task board.
+- The built-in guide (`sdlc guide`) explains the executor registry and tokens (`roles`), the board tools over MCP
+  (`mcp`), the registry and the board file among the records agents cannot edit (`denials#state-integrity`), and how
+  to hand tasks to a swarm (`faq`).
+
+### Fixed
+- The documentation said that sdlc offers only read tools over MCP, and that executor tokens came in 0.20.x; a
+  glossary row of the command reference held two terms.
+
 ## 0.21.0 — 2026-10-14
 
 ### Added

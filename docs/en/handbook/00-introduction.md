@@ -26,6 +26,9 @@ gates, and you know where sdlc keeps its state.
    underneath it. sdlc does not fork OpenSpec: it calls the OpenSpec CLI for all spec work. Your `openspec/` folder
    stays a plain OpenSpec project, so `openspec` and `/opsx:*` keep working on it.
 
+   For swarms of agents, a person lists executors in `openspec/executors.yaml`. Their agents claim approved-plan
+   tasks from the `sdlc board` under leases. The board appears in the dashboard and report (Section 10.7).
+
 2. See the lifecycle in the terminal:
 
    ```bash
@@ -89,6 +92,7 @@ gates, and you know where sdlc keeps its state.
    | `openspec/changes/<id>/` | the artifacts of one change and its record `.sdlc.yaml` | the agent; the record only the CLI |
    | `openspec/sdlc.yaml` | gates, checks, enforcement, MCP servers | a person; agents cannot edit it |
    | `openspec/roles.yaml` | people, their roles, separation rules | a person (a maintainer) |
+   | `openspec/executors.yaml` | executors allowed to take tasks | a person; agents cannot edit it |
    | `openspec/backlog.md` | planned work: epics and items | people, and agents through `sdlc backlog` |
    | `openspec/.sdlc/log.jsonl` | the project log: decisions, verify runs, hook denials | only the CLI |
 

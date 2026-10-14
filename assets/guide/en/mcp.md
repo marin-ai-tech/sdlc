@@ -17,6 +17,13 @@ systems — an orchestrator, a chat client, an IDE assistant — then read the p
 - Resources, read-only: `sdlc://context/<file>`, `sdlc://spec/<capability>`, `sdlc://change/<id>/<artifact>`,
   `sdlc://doc/<path>`. State and configuration are never offered.
 
+## Task board
+
+`board_list` is available to every MCP client. Over HTTP, an executor token also enables `board_claim`,
+`board_heartbeat`, `board_release` and `board_submit`. The executor comes from the token, not the call.
+A person issues it with `sdlc task executors token <id>`.
+No MCP tool dispatches, reopens or makes a decision; use `sdlc board` for dispatch and reopen.
+
 ## The team's servers
 
 ```yaml

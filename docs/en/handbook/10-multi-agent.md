@@ -551,7 +551,7 @@ risk at most `max_risk`, and the kind in `kinds` when given. It refuses with `ex
 carry `SDLC-Agent: <executor>/<agent>`, and `check-result` wants every commit's first `SDLC-Agent` trailer to name
 an allowed executor: `missing_agent`, `unknown_executor` or `executor_not_allowed` otherwise.
 
-#### The executor token (0.20.x)
+#### The executor token (0.21.0)
 
 A remote executor reaches the board over `sdlc mcp serve --http`, so the server must know which executor is
 calling. A person issues each executor its own token:

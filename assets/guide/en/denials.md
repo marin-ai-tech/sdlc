@@ -34,9 +34,11 @@ wrong, a person runs `sdlc tests unlock --change <id>`.
 
 ## state-integrity
 
-Hard rule. `.sdlc.yaml`, `openspec/roles.yaml`, the log, the inbox, the team record and the backlog are records only the CLI
-writes.
-**Do:** use the commands: `sdlc approve` (a person), `sdlc backlog add|edit`, `sdlc verify`.
+Hard rule. `.sdlc.yaml`, `openspec/roles.yaml`, the log, the inbox, the team record, the backlog,
+`openspec/.sdlc/board.json` and its lock `openspec/.sdlc/board.lock` are records only the CLI writes.
+Only a person edits the executor registry `openspec/executors.yaml`.
+**Do:** use `sdlc approve` (a person), `sdlc backlog add|edit` or `sdlc verify` for their records.
+Have a person edit the registry; change board state through `sdlc board`.
 
 ## guard-config
 

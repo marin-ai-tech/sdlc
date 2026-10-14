@@ -31,6 +31,10 @@ Write `openspec/roles.yaml` for the Northwind team, connect its roles to the gat
    sdlc reads the git email of the person who runs `sdlc approve`, finds that person in the file, and checks that the
    person holds a role the gate accepts.
 
+   A person also keeps `openspec/executors.yaml` next to `roles.yaml`. It lists which executors may take work.
+   Agents cannot edit it. A person issues each remote executor's token with `sdlc task executors token <id>`;
+   only the token hash stays in the registry (Section 10.7).
+
 2. Steven opens `openspec/sdlc.yaml` in his editor and checks the `gates` section. It names **roles**, not people:
 
    ```yaml

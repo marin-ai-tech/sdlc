@@ -23,6 +23,12 @@ The code changed after `sdlc verify`. Committing does not make it stale; editing
 **Who should review this?**
 `sdlc review suggest --change <id>`.
 
+**How do I hand tasks to a swarm of agents?**
+List its executor in `openspec/executors.yaml`. A person issues its token with `sdlc task executors token <id>`.
+Use `sdlc board dispatch` to reserve a task, or let its agents use `sdlc board claim`.
+They submit with `sdlc board submit`. Reopen a rejected result with
+`sdlc board reopen --change <id> --task <n.m> --reason <text>`.
+
 **How do I skip intent and spec for a small fix?**
 The lite track: `sdlc track set lite --change <id>` (a person's decision; `sdlc guide tracks`).
 

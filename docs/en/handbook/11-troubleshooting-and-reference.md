@@ -4,8 +4,8 @@ The first part of this chapter is three short lessons: checking the installation
 change that does not move. The rest is reference material to keep open next to the terminal: common problems, the
 questions people ask, a cheat sheet per role, a glossary and the reference of every command. The chapter ends with
 the gaps this handbook found in sdlc. All outputs are real, from a trial run of `tasklet` with sdlc 0.14.4, unless a
-step says otherwise. The command reference (11.8) and the rows for 0.19.0 and 0.20.0 were checked against sdlc
-0.20.0.
+step says otherwise. The command reference (11.8) and the rows for 0.19.0, 0.20.0 and 0.21.0 were checked against
+sdlc 0.21.0.
 
 ## Contents
 
@@ -439,7 +439,9 @@ Claude Code spelling; in Cursor, OpenCode, Qwen Code and GigaCode use `/sdlc-<na
 | `sdlc board list [--change <id>] --json` | |
 | `sdlc board dispatch --change <id> --task <n.m> --executor <id> [--lease <s>] --json` | |
 | `sdlc board claim --change <id> --task <n.m> --executor <id> --agent <name> --json` | |
-| `sdlc board heartbeat|release|submit --claim <id>` | |
+| `sdlc board heartbeat --claim <id>` | |
+| `sdlc board release --claim <id>` | |
+| `sdlc board submit --claim <id> --branch <ref>` | |
 | `sdlc board reopen --change <id> --task <n.m> --reason <text> [--escalate] [--json]` | |
 
 ### Oliver — developer (Claude Code)
@@ -575,7 +577,8 @@ Claude Code spelling; in Cursor, OpenCode, Qwen Code and GigaCode use `/sdlc-<na
 | plan drift | files changed but not in the plan, and planned files not touched |
 | judge | an independent model or tool that checks a gate's artifacts by a rubric before a person approves (`gates.<g>.judge`, `sdlc judge`) |
 | verdict | the judge's answer `{ pass, route, rework }`, bound to the digest of the artifacts; evidence only, never an approval |
-| extension pack | a pack whose lenses, workflows and checks a person accepts with `sdlc team accept --pack <name>`; pinned to a commit or an exact version || manifest | `openspec/.sdlc/manifest.json`: the files sdlc generated, so `update` and `uninstall` touch only those |
+| extension pack | a pack whose lenses, workflows and checks a person accepts with `sdlc team accept --pack <name>`; pinned to a commit or an exact version |
+| manifest | `openspec/.sdlc/manifest.json`: the files sdlc generated, so `update` and `uninstall` touch only those |
 | project log | `openspec/.sdlc/log.jsonl`: every harness event with the sdlc version and license |
 | context pack | a file in `docs/context/` with an owner, a source and a freshness date, given to the agent at its stages; `sdlc context pull` writes packs from `context.sources` |
 
@@ -584,7 +587,7 @@ Claude Code spelling; in Cursor, OpenCode, Qwen Code and GigaCode use `/sdlc-<na
 <a id="s11-8"></a>
 ## 11.8 Command reference
 
-Every command of sdlc 0.20.0 and every workflow, from `sdlc help --json`. "Who" is the `actor` of the
+Every command of sdlc 0.21.0 and every workflow, from `sdlc help --json`. "Who" is the `actor` of the
 command: **anyone** means a person or an agent; **a person** means the command refuses inside an agent session and
 the hook denies it to the agent. Options are the common ones; `sdlc <command> --help` lists all of them. Most
 commands also take `--json` and, with several active changes, `--change <id>`.
@@ -679,7 +682,9 @@ commands also take `--json` and, with several active changes, `--change <id>`.
 | `sdlc board list [--change <id>]` | anyone | the open tasks on the board and their claim state (read-only) |
 | `sdlc board dispatch --change <id> --task <n.m> --executor <id>` | anyone | reserve a task for a lease |
 | `sdlc board claim --change <id> --task <n.m> --executor <id> --agent <name>` | anyone | claim one task for an executor's agent under a lease (writes the board state file) |
-| `sdlc board heartbeat|release|submit --claim <id>` | the claim holder | renew the lease, give the task back, or submit the result branch |
+| `sdlc board heartbeat --claim <id>` | the claim holder | renew the lease |
+| `sdlc board release --claim <id>` | the claim holder | give the task back |
+| `sdlc board submit --claim <id> --branch <ref>` | the claim holder | check and submit the result branch |
 | `sdlc board reopen` | anyone | reopen a submitted result; escalation excludes its executor |
 | `sdlc archive <id>` | anyone | check every required gate, then merge the delta specs into the living specs |
 
@@ -700,7 +705,7 @@ commands also take `--json` and, with several active changes, `--change <id>`.
 
 | Command | Who | What it does |
 |---|---|---|
-| `sdlc mcp serve [--project <path>] [--http <host:port>]` | anyone | serve the process read-only to other AI systems (stdio or HTTP) |
+| `sdlc mcp serve [--project <path>] [--http <host:port>]` | anyone | serve process reads over stdio or HTTP; allow executor-token board tools over HTTP |
 | `sdlc mcp check` | anyone | connect to each registry server and list its tools |
 | `sdlc context pull [--name <name>]` | anyone | pull context packs from the knowledge servers into `docs/context/` |
 | `sdlc events list` | anyone | list the events that wait for delivery and their receivers |
@@ -748,6 +753,6 @@ in Codex `$sdlc-<name>`. A workflow runs as the agent, so it never approves.
 
 
 What this handbook needed and sdlc does not offer, or does differently from its documentation, checked against sdlc
-0.20.0. One line each.
+0.21.0. One line each.
 
 - The health thresholds can be set only in `openspec/sdlc.yaml`.

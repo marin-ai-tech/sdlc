@@ -23,6 +23,12 @@ summary: Короткие ответы на вопросы, которые во�
 **Кому отдать на ревью?**
 `sdlc review suggest --change <id>`.
 
+**Как раздать задачи агентам?**
+Внесите исполнителя в `openspec/executors.yaml`. Человек выдаёт токен:
+`sdlc task executors token <id>`. Назначьте через `sdlc board dispatch` или дайте
+агентам взять задачу через `sdlc board claim` и сдать через `sdlc board submit`.
+При отказе откройте: `sdlc board reopen --change <id> --task <n.m> --reason <text>`.
+
 **Как пропустить intent и spec для небольшого исправления?**
 Облегчённый трек: `sdlc track set lite --change <id>` (решение человека; `sdlc guide tracks`).
 

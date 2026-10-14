@@ -23,6 +23,12 @@ separation:
   max_gates_per_person: 3
 ```
 
+## Executor registry
+
+`openspec/executors.yaml` lists executor ids, types, highest risk, and optional kinds and capabilities.
+Agents cannot edit it. A person issues a token with `sdlc task executors token <id>`.
+The token is printed once; only its SHA-256 hash is kept in the registry.
+
 ## What is checked on approval
 
 - Your git email belongs to a person, and the person holds one of the gate's roles (`approvers` in `sdlc.yaml`).

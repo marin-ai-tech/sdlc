@@ -1,12 +1,12 @@
 # 11. Working with sdlc over MCP: capabilities and use cases
 
-Chapter 10 describes each MCP feature. This chapter is about using them: who connects to what, which situations they help in, and where the limits are today. Everything here works in sdlc 0.20.0; a version in brackets says since when, and 11.5 lists the limits.
+Chapter 10 describes each MCP feature. This chapter is about using them: who connects to what, which situations they help in, and where the limits are today. Everything here works in sdlc 0.21.0; a version in brackets says since when, and 11.5 lists the limits.
 
 ## 11.1. What sdlc offers over MCP
 
 MCP works in two directions here:
 
-- **sdlc as a server.** Agents and other systems read the process.
+- **sdlc as a server.** Agents and other systems read the process. Executor tokens also permit board tools.
 - **sdlc as a client.** The CLI calls your team's servers and records what they answer.
 
 | Capability | Direction | Command or setting | Who uses it |
@@ -15,6 +15,7 @@ MCP works in two directions here:
 | Read the team's knowledge: context packs, living specs, change artifacts, documents for agents | sdlc → others | MCP resources of `sdlc mcp serve` (0.10.0) | other agents and assistants |
 | Several projects in one server | sdlc → others | `sdlc mcp serve --project <path> --project <path>` (0.10.0) | Claude Desktop, central scripts |
 | The same tools for remote clients over HTTP, always with a bearer token | sdlc → others | `sdlc mcp serve --http <host:port>` and `SDLC_MCP_TOKEN` (0.19.0) | remote assistants, central servers |
+| Claim, heartbeat, release and submit board tasks (0.21.0) | sdlc → executors | board tools over HTTP with an executor token | agents of a registered executor |
 | One registry of the team's MCP servers for every supported tool | config → tools | `mcp.servers` in `openspec/sdlc.yaml` | the team lead, once |
 | Check that the servers are reachable and what they can do | sdlc → servers | `sdlc mcp check` | whoever adds a server |
 | A server's answer as gate evidence | sdlc → servers | `verify.mcp`; `release.mcp` for the release gate (0.10.0) | the verify and release gates |
@@ -27,7 +28,7 @@ MCP works in two directions here:
 | Which servers an agent may call at which stage | hook | `mcp.servers.<name>.stages` | enforced on every agent |
 | Which skills, subagents and servers a stage uses | generated workflows | `stages.<stage>` | the agent, as guidance |
 
-**What is never offered:** approving, rejecting, waiving, sending back, taking over, unlocking tests, setting the license or uninstalling. Over MCP, sdlc reads and reports. A person decides at their own terminal.
+**What is never offered:** approving, rejecting, waiving, sending back, taking over, unlocking tests, setting the license or uninstalling. Over MCP, sdlc reads and reports; executor tokens can claim, heartbeat, release and submit board tasks. A person decides at their own terminal.
 
 ## 11.2. Connecting a client
 
@@ -94,7 +95,7 @@ await client.close();
 
 The tools are the same as over stdio. A request without the token, or with another one, gets 401.
 
-Since 0.20.x the server also accepts the token of an executor: a person issues one with
+Since 0.21.0 the server also accepts the token of an executor: a person issues one with
 `sdlc task executors token <id>` (a human-only command — the token is printed once and only its SHA-256 is kept
 as `token_sha256` in `openspec/executors.yaml`). A request whose bearer token's SHA-256 equals a `token_sha256`
 of a served project's registry passes; the registry is read on every request, so a reissued token or a removed
@@ -324,7 +325,7 @@ with `{ "claim": "<id>", "note": "<reason>" }`. `lease` on claim and `base` on s
 The tool inputs have no `executor` field. The token supplies that identity and scopes calls to its project.
 The server token and stdio can only use `board_list`. Dispatch, reopen and gate decisions stay outside MCP.
 
-- **Who can call the sdlc server:** over stdio, whoever can start a process in the project folder; that person can read the repository anyway. Over HTTP (0.19.0), whoever can reach the port and holds the token from `SDLC_MCP_TOKEN`; without the token a request gets 401. Give the token only to clients that may read the repository. Since 0.20.x, an executor's token works the same way: a person issues it with `sdlc task executors token <id>`; only its SHA-256 is kept, and replacing or removing the executor revokes it at once.
+- **Who can call the sdlc server:** over stdio, whoever can start a process in the project folder; that person can read the repository anyway. Over HTTP (0.19.0), whoever can reach the port and holds the token from `SDLC_MCP_TOKEN`; without the token a request gets 401. Give the token only to clients that may read the repository. Since 0.21.0, an executor's token works the same way: a person issues it with `sdlc task executors token <id>`; only its SHA-256 is kept, and replacing or removing the executor revokes it at once.
 - **What it can read:** the same as the CLI's JSON: change names, stages, people from `roles.yaml`, file paths in traces, audit history. Treat a connected chat client as someone with read access to the repository.
 - **What it cannot do:** decide anything or run arbitrary commands. An executor token can write board state
   through the four board write tools; the server token cannot. Tool arguments that look like options are refused.

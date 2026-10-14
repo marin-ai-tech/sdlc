@@ -598,7 +598,7 @@ name there — and `check-result` wants every commit's first `SDLC-Agent` traile
 the change: `missing_agent`, `unknown_executor` or `executor_not_allowed` otherwise, and the result's `executors`
 list names the executors the commits used.
 
-#### The executor token (0.20.x)
+#### The executor token (0.21.0)
 
 A remote executor reaches the board over `sdlc mcp serve --http`, so the server must know which executor is
 calling. A person issues each executor its own token:

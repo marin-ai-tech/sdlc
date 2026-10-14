@@ -120,8 +120,8 @@ Start with chapters 0 and 5, then use the sections for your role.
 
 ## Before you start
 
-- sdlc 0.14.5 or later on the PATH (`sdlc --version`), Node.js 20.19 or later, git. Sections 3.7, 5.11 and
-  11.8 need sdlc 0.20.0.
+- sdlc 0.14.5 or later on the PATH (`sdlc --version`), Node.js 20.19 or later, git. Sections 3.7 and 5.11 need
+  sdlc 0.20.0; Sections 10.7 and 11.8 need sdlc 0.21.0.
 - Claude Code installed and signed in.
 - For Chapter 2: a GitHub token, a Telegram bot token and the address of your knowledge server, as environment
   variables (`GITHUB_TOKEN`, `TELEGRAM_BOT_TOKEN`). The handbook never writes a secret into a file.

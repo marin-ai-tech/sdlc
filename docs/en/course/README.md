@@ -64,8 +64,8 @@ Watch Module 0 and Module 5 first, whatever your role. Then:
 
 ## Before you start
 
-- sdlc 0.14.5 or later on the PATH (`sdlc --version`), Node.js 20.19 or later, git. Lessons 3.7 and 5.11 and
-  Reference 11.8 need sdlc 0.20.0.
+- sdlc 0.14.5 or later on the PATH (`sdlc --version`), Node.js 20.19 or later, git. Lessons 3.7 and 5.11 need
+  sdlc 0.20.0; Lesson 10.7 and Reference 11.8 need sdlc 0.21.0.
 - Claude Code installed and signed in.
 - For Module 2: a GitHub token, a Telegram bot token and the address of your knowledge server, as environment
   variables (`GITHUB_TOKEN`, `TELEGRAM_BOT_TOKEN`). The course never writes a secret into a file.
@@ -85,3 +85,6 @@ with a token (`sdlc mcp serve --http`, Lesson 9.8), and hands a task to any exec
 Since 0.20.0 a judge checks a gate's artifacts by the team's rubric before a person approves (`sdlc judge`,
 Lesson 5.11), and a pack brings review lenses, workflows and verify checks that a person accepts
 (`sdlc team accept --pack`, Lesson 3.7).
+
+Since 0.21.0 a person lists executors in `openspec/executors.yaml`, and their agents claim tasks from the board
+(`sdlc board`, Lesson 10.7). The dashboard and report show the board.

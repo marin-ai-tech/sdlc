@@ -35,8 +35,11 @@ Codex CLI, Qwen Code и GigaCode или плагин OpenCode. Отказ наз
 
 ## state-integrity
 
-Жёсткое правило. `.sdlc.yaml`, `openspec/roles.yaml`, журнал, inbox, запись команды и бэклог — записи, которые пишет только CLI.
-**Что делать:** пользоваться командами: `sdlc approve` (человек), `sdlc backlog add|edit`, `sdlc verify`.
+Жёсткое правило. `.sdlc.yaml`, `openspec/roles.yaml`, журнал, inbox, запись команды, бэклог,
+`openspec/.sdlc/board.json` и его блокировку `openspec/.sdlc/board.lock` записывает только CLI.
+Реестр исполнителей `openspec/executors.yaml` редактирует только человек.
+**Что делать:** для этих записей использовать `sdlc approve` (человек), `sdlc backlog add|edit` или `sdlc verify`.
+Попросить человека изменить реестр; состояние доски менять через `sdlc board`.
 
 ## guard-config
 
