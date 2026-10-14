@@ -420,7 +420,8 @@ format.
 
 - The `github`, `knowledge` and `telegram` entries exist in every tool's file, next to `sdlc`.
 - No file contains a literal token.
-- `sdlc mcp check` lists the tools of each reachable server.
+- `sdlc mcp check` lists the tools of each reachable server and marks the others unavailable. It reports and
+  exits 0; add `--strict` (in CI) to make an unavailable server exit 1.
 
 ### Pitfalls
 
@@ -451,7 +452,7 @@ Run one change across three tools: Oliver on Claude Code, a contractor on Cursor
    ```
 
    The contractor and Ethan pull the commit. The contractor is not in `openspec/roles.yaml`, so they cannot approve
-   any gate (`unknown_person`); they write code and nothing else.
+   any gate (`unknown_person` in `--json`); they write code and nothing else.
 
 2. Each person does the trust step of their tool ([Section 10.3](#s10-3)). The contractor sets Cursor's terminal to
    PowerShell

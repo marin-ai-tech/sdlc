@@ -347,7 +347,7 @@ export async function nextCommand(opts: { change?: string; json?: boolean }): Pr
       printJson({ change: view.change, stage: view.stage, stageTitle: view.stageTitle, track: view.track, next: view.next, root: { path: ctx.root } });
       return;
     }
-    line(`${c.bold(view.change)}: ${view.stageTitle}`);
+    line(`${c.bold(view.change)}: ${stageTitleText(view)}`);
     line(`${actorLabel(view)}: ${nextText(view)}`);
     if (view.next.cli) line(c.cyan(`$ ${view.next.cli}`));
   } catch (error) {

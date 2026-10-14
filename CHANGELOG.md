@@ -2,6 +2,22 @@
 
 All notable changes to sdlc. Versions follow [Semantic Versioning](https://semver.org/); while the major version is 0, a minor version may change behavior.
 
+## 0.20.3 — 2026-10-14
+
+### Fixed
+- A plan-gate denial points to `sdlc guide denials#plan-gate` once instead of twice.
+- `sdlc next` after a debate no longer names the next step as an agent's.
+- A literal credential after `Bearer`, `Basic`, `Token` or `Bot` in the MCP registry is refused whatever its shape,
+  and an agent edit that adds a credential after `Bearer` or `Basic` is denied.
+- `sdlc next` and the Claude Code status line name the stage in the reader's language, as `sdlc status` does.
+- The daily summary text names the active changes and the changes waiting for people separately; with nothing
+  waiting, it no longer calls the active changes waiting.
+
+### Changed
+- The documentation: the status line reads the session on stdin; `sdlc mcp check` exits 1 for an unavailable server
+  only with `--strict`; `unknown_person` is the `--json` code; the guide warns that `sdlc audit --export` into a
+  folder inside the project that git does not ignore makes the verification of the active changes stale.
+
 ## 0.20.2 — 2026-10-13
 
 ### Fixed

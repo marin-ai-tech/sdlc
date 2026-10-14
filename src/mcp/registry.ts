@@ -185,8 +185,20 @@ export function referencedVariables(server: McpServer): string[] {
   return [...new Set(names)];
 }
 
+/**
+ * A credential after an authorization scheme (`Bearer <token>`, `Basic …`, `token …`, `Bot …`). It is a literal secret
+ * unless it is a `${VAR}` reference; its shape does not matter (0.20.3: an unknown token format was accepted).
+ */
+const AUTH_SCHEME = /^\s*(?:Bearer|Basic|Token|Bot)\s+(\S+)\s*$/i;
+
+function literalCredential(value: string): boolean {
+  const credential = AUTH_SCHEME.exec(value)?.[1];
+  return credential !== undefined && !new RegExp(REFERENCE.source).test(credential);
+}
+
 /** A value that holds a secret literal: the patterns of B16, on the value alone and as `key = "value"`. */
 function holdsSecret(key: string, value: string): boolean {
+  if (literalCredential(value)) return true;
   if (findSecrets(value).length > 0) return true;
   return !/[\s"'`]/.test(value) && findSecrets(`${key} = "${value}"`).length > 0;
 }

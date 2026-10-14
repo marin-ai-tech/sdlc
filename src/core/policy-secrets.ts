@@ -18,7 +18,8 @@ import { relToRoot, WRITE_OPS } from './policy-shell.js';
  * Every regular expression starts at a fixed prefix or at the start of a word and has no nested repetition, so the
  * scan is linear in the text.
  */
-export type SecretKind = 'aws' | 'github' | 'gitlab' | 'slack' | 'google' | 'privateKey' | 'url' | 'assignment';
+export type SecretKind =
+  'aws' | 'github' | 'gitlab' | 'slack' | 'google' | 'privateKey' | 'url' | 'assignment' | 'bearer';
 
 /** A secret found in a text; `value` is only compared, never shown. */
 interface Finding {
@@ -41,6 +42,7 @@ const KIND_KEYS: Record<SecretKind, string> = {
   privateKey: 'hook.secretKindPrivateKey',
   url: 'hook.secretKindUrl',
   assignment: 'hook.secretKindAssignment',
+  bearer: 'hook.secretKindBearer',
 };
 
 /** Tokens with a fixed prefix; the whole match is the value. */
@@ -57,6 +59,12 @@ const TOKEN_PATTERNS: Array<{ kind: SecretKind; re: RegExp }> = [
     re: /-----BEGIN (?:RSA |EC |DSA |OPENSSH |ENCRYPTED )?PRIVATE KEY-----(?:\r?\n[A-Za-z0-9+/=]{0,64})?/g,
   },
 ];
+/**
+ * A credential after `Bearer` or `Basic` (0.20.3): 20 or more token characters, of any provider. A reference
+ * (`${VAR}`, `process.env…`) or a placeholder (`<your-token>`) does not match: `$`, `<` and spaces are not token
+ * characters.
+ */
+const AUTH_CREDENTIAL = /(?<![A-Za-z0-9_])(?:[Bb]earer|[Bb]asic)[ \t]+([A-Za-z0-9._~+/=:-]{20,})/g;
 /** `scheme://user:<password>@host`; the user may be empty (`redis://:<password>@host`). */
 const URL_PASSWORD = /:\/\/[^\s:/@'"`]*:([^\s/@'"`]+)@(?=[^\s/@'"`])/g;
 /** `name = "value"`, `name: 'value'`, `"name": "value"`, `name := "value"`; a quoted value without spaces. */
@@ -98,6 +106,9 @@ export function findSecrets(text: string): Finding[] {
       // AWS documents its sample keys with this suffix (`...EXAMPLE`): a placeholder.
       if (kind !== 'aws' || !m[0].endsWith('EXAMPLE')) found.push({ kind, value: m[0] });
     }
+  }
+  for (const m of text.matchAll(AUTH_CREDENTIAL)) {
+    if (!placeholder(m[1])) found.push({ kind: 'bearer', value: m[1] });
   }
   for (const m of text.matchAll(URL_PASSWORD)) {
     if (!placeholder(m[1])) found.push({ kind: 'url', value: m[1] });

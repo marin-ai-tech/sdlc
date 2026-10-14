@@ -74,10 +74,15 @@ function peopleParam(event: EventBody, names: Map<string, string>, mentions: Map
   return ids.map((id) => mentioned(id, names, mentions)).join(', ');
 }
 
+/** The changes waiting for a person; never the active ones (0.20.3: the text called active changes waiting). */
 function waitingParam(event: EventBody): Param {
-  const waiting = event.summary?.waiting.map((item) => item.id) ?? [];
-  const active = event.summary?.activeIds ?? [];
-  const ids = waiting.length > 0 ? waiting : active;
+  const ids = event.summary?.waiting.map((item) => item.id) ?? [];
+  if (ids.length === 0) return { key: 'events.message.noneWaiting' };
+  return ids.join(', ');
+}
+
+function activeParam(event: EventBody): Param {
+  const ids = event.summary?.activeIds ?? [];
   if (ids.length === 0) return { key: 'events.message.noneWaiting' };
   return ids.join(', ');
 }
@@ -97,6 +102,7 @@ export function eventMessage(event: EventBody, names: Map<string, string>, local
     by: byParam(event, names),
     people: peopleParam(event, names, mentions),
     waiting: waitingParam(event),
+    active: activeParam(event),
   };
   return oneLine(t(templateKey(event), params, locale));
 }

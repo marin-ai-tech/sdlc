@@ -28,7 +28,8 @@ export async function statuslineCommand(): Promise<void> {
       const view = views.find((item) => item.next.actor === 'human') ?? views[0];
       const prefix = views.length > 1 ? t('statusline.changesPrefix', { count: views.length }) : '';
       const actor = t(view.next.actor === 'human' ? 'statusline.actor.person' : 'statusline.actor.agent');
-      process.stdout.write(t('statusline.line', { prefix, change: view.change, stage: view.stageTitle, actor }) + '\n');
+      const stage = t(`stage.${view.stage}`);
+      process.stdout.write(t('statusline.line', { prefix, change: view.change, stage, actor }) + '\n');
       return;
     }
     const next = nextBacklogItem(readBacklog(root));

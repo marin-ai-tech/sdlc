@@ -80,7 +80,7 @@ what happened overnight. He turns on the status line.
    `inbox done` decides nothing, so the agent may run it. The inbox files themselves are written only by the CLI.
 
 3. Oliver turns on the status line once. Steven can do it for the project with `sdlc init --statusline`; it adds a
-   `statusLine` entry to `.claude/settings.json` that runs `sdlc statusline`. Under the prompt Oliver now sees one line:
+   `statusLine` entry to `.claude/settings.json` that runs `sdlc statusline` (Claude Code passes the session on stdin; run bare in a terminal, the command prints nothing). Under the prompt Oliver now sees one line:
 
    ```text
    add-due-dates · Build (plan + implementation) · next: person
