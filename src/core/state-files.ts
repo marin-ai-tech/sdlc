@@ -3,5 +3,6 @@
  * contract share. A change's `.sdlc.yaml` sits inside its change folder; callers add the folders on disk.
  */
 export const STATE_FILES = [
-  'openspec/backlog.md', 'openspec/roles.yaml', 'openspec/.sdlc/log.jsonl', 'openspec/.sdlc/team.json',
+  'openspec/backlog.md', 'openspec/roles.yaml', 'openspec/executors.yaml', 'openspec/.sdlc/log.jsonl',
+  'openspec/.sdlc/team.json', 'openspec/.sdlc/board.json', 'openspec/.sdlc/board.lock',
 ];

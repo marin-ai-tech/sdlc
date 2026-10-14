@@ -28,6 +28,7 @@ import { readDeferred, type DeferredItem } from '../core/deferred.js';
 import { epicProgress, readBacklog, type BacklogItem } from '../core/backlog.js';
 import { buildChangePage, type ChangePage } from './change-page.js';
 import { collectHealth, healthReport, type FindingDraft, type HealthReport } from '../core/health/index.js';
+import { boardSnapshot, type BoardSnapshot } from '../core/board-view.js';
 
 export interface ReportOptions {
   /** ISO date (YYYY-MM-DD) or timestamp: events and "moved in period" start here. Unset = everything. */
@@ -119,6 +120,8 @@ export interface ReportModel {
     /** Open items whose blockedBy is not empty. */
     blocked: BacklogItem[];
   };
+  board?: BoardSnapshot;
+  boardWarning?: boolean;
 }
 
 function deferredWork(root: string): ReportModel['deferred'] {
@@ -226,6 +229,16 @@ function projectHealth(ctx: ProjectContext): ReportModel['health'] {
   return { ...healthReport(drafts, 'en'), drafts };
 }
 
+function projectBoard(ctx: ProjectContext, now: Date, change?: string): Pick<ReportModel, 'board' | 'boardWarning'> {
+  try {
+    const board = boardSnapshot(ctx.root, ctx.paths, ctx.config, now, change);
+    return board ? { board } : {};
+  } catch (error) {
+    if (error instanceof SdlcError && error.code === 'board_invalid') return { boardWarning: true };
+    throw error;
+  }
+}
+
 /** Builds the model for a loaded project. Read-only. */
 export function buildReport(ctx: ProjectContext, opts: ReportOptions = {}): ReportModel {
   const since = parseSince(opts.since);
@@ -261,5 +274,6 @@ export function buildReport(ctx: ProjectContext, opts: ReportOptions = {}): Repo
     deferred: deferredWork(ctx.root),
     backlog: backlogWork(ctx.root),
     health: projectHealth(ctx),
+    ...projectBoard(ctx, now, opts.change),
   };
 }

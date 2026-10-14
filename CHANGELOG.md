@@ -2,6 +2,38 @@
 
 All notable changes to sdlc. Versions follow [Semantic Versioning](https://semver.org/); while the major version is 0, a minor version may change behavior.
 
+## 0.21.0 — 2026-10-14
+
+### Added
+- An executor registry, `openspec/executors.yaml`: a person lists the executors (swarms of type representative,
+  board, market or mesh), the highest risk and the kinds of change each may take, and labels for what it can do.
+  It is a state file: agents cannot edit it. `sdlc task executors` shows it. With a registry, `sdlc task export`
+  hands work only to a named executor allowed for the change (`--executor`), and `sdlc task check-result` wants
+  every commit to carry `SDLC-Agent: <executor>/<agent>` naming such an executor. Each handed-out task and each
+  check is in the log.
+- Executor tokens: a person issues an executor its own token with `sdlc task executors token <id>`; the token is
+  printed once and only its SHA-256 is kept in the registry. `sdlc mcp serve --http` accepts it besides
+  `SDLC_MCP_TOKEN` and knows the calling executor from it; a new token or a removed executor revokes the old one at
+  once.
+- A task board: `sdlc board list|claim|heartbeat|release|submit`. The open tasks of changes whose plan is approved
+  are on the board; an executor's agent claims a task with a lease, keeps it with heartbeats, releases it or submits
+  a result branch, which goes through the result check. Two agents cannot hold one task; a task whose agent stops
+  sending heartbeats is open again. The board lives in `openspec/.sdlc/board.json` of the clone that serves it (not
+  committed, agents cannot edit it); every claim, release, expiry and submission is in the log.
+- `sdlc board reopen --change <id> --task <n.m> --reason <text> [--escalate]`: a rejected result opens its task again
+  with the reason, which the board and the next work item show; `--escalate` keeps the executors that failed it from
+  claiming it again.
+- `sdlc board dispatch`: a person or the lead agent reserves a task for one executor, typically a swarm's
+  representative, with a lease; unanswered, the task returns to the pool.
+- Board tools over MCP: `board_list` for every client; `board_claim`, `board_heartbeat`, `board_release` and
+  `board_submit` only for a client that presents an executor token, and the executor always comes from the token,
+  never from the arguments. No MCP tool dispatches, reopens or takes any decision.
+- The dashboard and `sdlc report` show the board: open, dispatched, claimed and submitted tasks per change with
+  their executor, agent and lease end, and the count per executor. They only read.
+
+### Changed
+- The task contract (`schemas/contracts/task.schema.json`, `result.schema.json`) gains the executor, the
+  `SDLC-Agent` trailer, the earlier attempts of a reopened task and the new problem codes.
 ## 0.20.3 — 2026-10-14
 
 ### Fixed

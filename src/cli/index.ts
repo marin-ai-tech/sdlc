@@ -38,7 +38,13 @@ import { ciInitCommand } from '../commands/ci.js';
 import { teamAcceptCommand, teamCheckCommand, teamListCommand, teamSyncCommand } from '../commands/team.js';
 import { adoptCommand } from '../commands/adopt.js';
 import { traceCommand } from '../commands/trace.js';
-import { taskCheckResultCommand, taskExportCommand } from '../commands/task.js';
+import {
+  taskCheckResultCommand, taskExecutorTokenCommand, taskExecutorsCommand, taskExportCommand,
+} from '../commands/task.js';
+import {
+  boardClaimCommand, boardHeartbeatCommand, boardListCommand, boardReleaseCommand, boardSubmitCommand,
+  boardReopenCommand, boardDispatchCommand,
+} from '../commands/board.js';
 import { mcpCheckCommand, mcpServeCommand } from '../commands/mcp.js';
 import { contextPullCommand } from '../commands/context.js';
 import { inboxDoneCommand, inboxListCommand } from '../commands/inbox.js';
@@ -466,9 +472,16 @@ export function buildProgram(): Command {
     .action((action, opts) => testsCommand(action, opts));
 
   const task = program.command('task').description(cmdDesc('cmd.task'));
+  const executors = task.command('executors').description(cmdDesc('cmd.task.executors'))
+    .option('--json', 'output JSON')
+    .action((opts) => taskExecutorsCommand(opts));
+  executors.command('token <id>').description(cmdDesc('cmd.task.executors.token'))
+    .option('--json', 'output JSON')
+    .action((id, opts) => taskExecutorTokenCommand(id, opts));
   task.command('export').description(cmdDesc('cmd.task.export'))
     .option('--change <id>', 'change id')
     .option('--task <n.m>', 'export only this task (e.g. 1.2)')
+    .option('--executor <id>', 'executor id from openspec/executors.yaml')
     .option('--json', 'output JSON')
     .action((opts) => taskExportCommand(opts));
   task.command('check-result').description(cmdDesc('cmd.task.check-result'))
@@ -477,6 +490,52 @@ export function buildProgram(): Command {
     .option('--base <ref>', 'base ref (default: merge-base of branch and HEAD)')
     .option('--json', 'output JSON')
     .action((opts) => taskCheckResultCommand(opts));
+
+  const board = program.command('board').description(cmdDesc('cmd.board'));
+  board.command('list').description(cmdDesc('cmd.board.list'))
+    .option('--change <id>', 'change id')
+    .option('--json', 'output JSON')
+    .action((opts) => boardListCommand(opts));
+  board.command('dispatch').description(cmdDesc('cmd.board.dispatch'))
+    .requiredOption('--change <id>', 'change id')
+    .requiredOption('--task <n.m>', 'task id to reserve')
+    .requiredOption('--executor <id>', 'executor id from openspec/executors.yaml')
+    .option('--lease <seconds>', 'lease in seconds (default: 900, max: 86400)')
+    .option('--json', 'output JSON')
+    .action((opts) => boardDispatchCommand(opts));
+  board.command('claim').description(cmdDesc('cmd.board.claim'))
+    .requiredOption('--change <id>', 'change id')
+    .requiredOption('--task <n.m>', 'task id to claim (e.g. 1.2)')
+    .requiredOption('--executor <id>', 'executor id from openspec/executors.yaml')
+    .requiredOption('--agent <name>', 'agent name inside the executor')
+    .option('--lease <seconds>', 'lease in seconds (default: 900, max: 86400)')
+    .option('--json', 'output JSON')
+    .action((opts) => boardClaimCommand(opts));
+  board.command('heartbeat').description(cmdDesc('cmd.board.heartbeat'))
+    .requiredOption('--claim <id>', 'claim id from board claim')
+    .option('--executor <id>', 'require the claim to belong to this executor')
+    .option('--json', 'output JSON')
+    .action((opts) => boardHeartbeatCommand(opts));
+  board.command('release').description(cmdDesc('cmd.board.release'))
+    .requiredOption('--claim <id>', 'claim id from board claim')
+    .option('--executor <id>', 'require the claim to belong to this executor')
+    .option('--note <text>', 'note written to the log entry')
+    .option('--json', 'output JSON')
+    .action((opts) => boardReleaseCommand(opts));
+  board.command('submit').description(cmdDesc('cmd.board.submit'))
+    .requiredOption('--claim <id>', 'claim id from board claim')
+    .option('--executor <id>', 'require the claim to belong to this executor')
+    .requiredOption('--branch <ref>', 'result branch to check')
+    .option('--base <ref>', 'base ref (default: merge-base of branch and HEAD)')
+    .option('--json', 'output JSON')
+    .action((opts) => boardSubmitCommand(opts));
+  board.command('reopen').description(cmdDesc('cmd.board.reopen'))
+    .requiredOption('--change <id>', 'change id')
+    .requiredOption('--task <n.m>', 'task id to reopen (e.g. 1.2)')
+    .option('--reason <text>', 'reason for reopening the submitted result')
+    .option('--escalate', 'exclude this executor from future claims of the task')
+    .option('--json', 'output JSON')
+    .action((opts) => boardReopenCommand(opts));
 
   program
     .command('verify')

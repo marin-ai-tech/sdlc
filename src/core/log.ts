@@ -28,6 +28,10 @@ export interface LogEntry {
   waitingFor?: string[];
   /** Counts for `summary.daily` only (B99); queued onto EventBody.summary. */
   summary?: EventSummary;
+  /** Task number of a `task.exported` entry (B116). */
+  task?: string;
+  /** Executor id of `task.exported` / `task.result_checked` entries (B116). */
+  executor?: string;
   sdlc: string;
   license: string;
 }
@@ -57,6 +61,8 @@ export function appendLog(
       ...(input.agent ? { agent: input.agent } : {}),
       ...(input.waitingFor ? { waitingFor: input.waitingFor } : {}),
       ...(input.summary ? { summary: input.summary } : {}),
+      ...(input.task ? { task: input.task } : {}),
+      ...(input.executor ? { executor: input.executor } : {}),
       sdlc: stamp.version,
       license: stamp.license,
     };

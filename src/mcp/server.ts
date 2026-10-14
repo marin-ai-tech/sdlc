@@ -8,29 +8,34 @@ import {
 } from '@modelcontextprotocol/sdk/types.js';
 import { harnessVersion } from '../core/version.js';
 import type { CliRunner } from './call-tool.js';
-import { callProjectTool, listedTools, resolveProjects, type ServedProject } from './projects.js';
+import { callProjectTool, listedTools, resolveProjects, type Caller, type ServedProject } from './projects.js';
 import { listResources, readResource } from './resources.js';
 import { runCli } from './run-cli.js';
 
 export { callTool, errorResult, resultOf, type CliRunner, type ToolResult } from './call-tool.js';
+export type { Caller } from './projects.js';
 
 /**
  * `sdlc mcp serve` (B13, B46, B48): an MCP server over stdio. Its tools answer exactly what `sdlc <command> --json`
  * prints; its resources are the team's documents, read in this process. stdout carries only protocol messages;
- * logs go to stderr. Nothing here writes a project file.
+ * logs go to stderr. Board write tools run CLI board commands under an executor token.
  */
 
 function log(text: string): void {
   process.stderr.write(`[sdlc mcp] ${text}\n`);
 }
 
-/** The server with its handlers over the served projects (one, or several by name). */
-export function createServer(projects: readonly ServedProject[], run: CliRunner = runCli): Server {
+/**
+ * The server with its handlers over the served projects (one, or several by name). `caller` is who the request's
+ * bearer token names (`{ project, executor }` of an executor token, empty for the server token); it reaches the
+ * tool call as a separate value. Board tools use it; tool arguments cannot set it.
+ */
+export function createServer(projects: readonly ServedProject[], run: CliRunner = runCli, caller: Caller = {}): Server {
   const capabilities = { tools: {}, resources: {} };
   const server = new Server({ name: 'sdlc', version: harnessVersion() }, { capabilities });
-  server.setRequestHandler(ListToolsRequestSchema, async () => ({ tools: listedTools(projects) }));
+  server.setRequestHandler(ListToolsRequestSchema, async () => ({ tools: listedTools(projects, caller) }));
   server.setRequestHandler(CallToolRequestSchema, async (request) => {
-    return callProjectTool(request.params.name, request.params.arguments, projects, run);
+    return callProjectTool(request.params.name, request.params.arguments, projects, run, caller);
   });
   server.setRequestHandler(ListResourcesRequestSchema, async () => ({ resources: listResources(projects) }));
   server.setRequestHandler(ReadResourceRequestSchema, async (request) => readResource(projects, request.params.uri));

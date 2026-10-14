@@ -21,7 +21,8 @@
           "sha": { "type": "string" },
           "subject": { "type": "string" },
           "change": { "type": "string", "description": "SDLC-Change trailer, when present" },
-          "task": { "type": "string", "description": "SDLC-Task trailer, when present" }
+          "task": { "type": "string", "description": "SDLC-Task trailer, when present" },
+          "agent": { "type": "string", "description": "SDLC-Agent trailer value `<executor>/<agent>`, when present" }
         },
         "additionalProperties": false
       }
@@ -39,13 +40,20 @@
         "type": "object",
         "required": ["code"],
         "properties": {
-          "code": { "enum": ["missing_trailer", "unknown_task", "forbidden_path", "no_commits"] },
+          "code": { "enum": ["missing_trailer", "unknown_task", "forbidden_path", "no_commits", "missing_agent", "unknown_executor", "executor_not_allowed", "wrong_executor"] },
           "sha": { "type": "string" },
           "file": { "type": "string" },
-          "task": { "type": "string" }
+          "task": { "type": "string" },
+          "executor": { "type": "string", "description": "Executor id the SDLC-Agent trailer names (agent problems)" }
         },
         "additionalProperties": false
       }
+    },
+    "executors": {
+      "type": "array",
+      "items": { "type": "string", "pattern": "^[a-z0-9][a-z0-9._-]{0,63}$" },
+      "uniqueItems": true,
+      "description": "Distinct executor ids the commits' SDLC-Agent trailers name, sorted; only with a registry"
     },
     "warnings": {
       "type": "array",

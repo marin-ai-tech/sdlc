@@ -1,5 +1,5 @@
 /**
- * The tools of `sdlc mcp serve` (B13). Each one is a read-only CLI command run with `--json`; the server never
+ * The tools of `sdlc mcp serve`. Each runs a CLI command with `--json`; the server never
  * offers a decision (approve, reject, waive, rework, takeover, release-control, tests unlock, license set,
  * backlog move or drop, adopt --apply, uninstall). Input schemas are plain JSON Schema.
  */
@@ -34,6 +34,12 @@ function changeOption(change: string | undefined): string[] {
 const CHANGE = 'change id (defaults to the only active change)';
 
 export const READ_TOOLS: readonly ReadTool[] = [
+  {
+    name: 'board_list',
+    description: 'List tasks on the board and their current state.',
+    inputSchema: schema({ change: CHANGE }),
+    argv: (a) => ['board', 'list', ...changeOption(a.change)],
+  },
   {
     name: 'status',
     description: 'What `sdlc status --json` prints: every change, or one change in detail.',
@@ -115,8 +121,44 @@ export const READ_TOOLS: readonly ReadTool[] = [
   },
 ];
 
+export const WRITE_TOOLS: readonly ReadTool[] = [
+  {
+    name: 'board_claim',
+    description: 'Claim a board task as the token executor.',
+    inputSchema: schema({ change: CHANGE, task: 'task number', agent: 'agent name',
+      lease: 'lease in seconds' }, ['change', 'task', 'agent']),
+    argv: (a) => ['board', 'claim', '--change', a.change ?? '', '--task', a.task ?? '',
+      '--agent', a.agent ?? '', ...(a.lease ? ['--lease', a.lease] : [])],
+  },
+  {
+    name: 'board_heartbeat',
+    description: 'Extend a claim lease.',
+    inputSchema: schema({ claim: 'secret claim id' }, ['claim']),
+    argv: (a) => ['board', 'heartbeat', '--claim', a.claim ?? ''],
+  },
+  {
+    name: 'board_release',
+    description: 'Release a claim to the board.',
+    inputSchema: schema({ claim: 'secret claim id', note: 'release note' }, ['claim']),
+    argv: (a) => ['board', 'release', '--claim', a.claim ?? '',
+      ...(a.note ? ['--note', a.note] : [])],
+  },
+  {
+    name: 'board_submit',
+    description: 'Submit a claim result branch.',
+    inputSchema: schema({ claim: 'secret claim id', branch: 'result branch',
+      base: 'base ref' }, ['claim', 'branch']),
+    argv: (a) => ['board', 'submit', '--claim', a.claim ?? '', '--branch', a.branch ?? '',
+      ...(a.base ? ['--base', a.base] : [])],
+  },
+];
+
+export function isWriteTool(name: string): boolean {
+  return WRITE_TOOLS.some((tool) => tool.name === name);
+}
+
 export function findTool(name: string): ReadTool | undefined {
-  return READ_TOOLS.find((tool) => tool.name === name);
+  return [...READ_TOOLS, ...WRITE_TOOLS].find((tool) => tool.name === name);
 }
 
 /**

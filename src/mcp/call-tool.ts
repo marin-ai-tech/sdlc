@@ -1,5 +1,5 @@
 import { runCli, type CliRun } from './run-cli.js';
-import { checkArguments, findTool } from './tools.js';
+import { checkArguments, findTool, isWriteTool } from './tools.js';
 
 /**
  * One tools/call of `sdlc mcp serve` (B13) in one project: the arguments checked, the CLI command run with `--json`
@@ -58,11 +58,16 @@ export async function callTool(
   input: unknown,
   cwd: string,
   run: CliRunner = runCli,
+  executor?: string,
 ): Promise<ToolResult> {
+  if (isWriteTool(name) && executor === undefined) {
+    return errorResult('executor_token_required', 'An executor token is required for this board tool.');
+  }
   const tool = findTool(name);
   if (!tool) return errorResult('unknown_tool', `unknown tool: ${name}`);
   const args = checkArguments(tool, input);
   if (typeof args === 'string') return errorResult('invalid_arguments', `${name}: ${args}`);
-  const argv = [...tool.argv(args), '--json'];
+  const identity = isWriteTool(name) ? ['--executor', executor ?? ''] : [];
+  const argv = [...tool.argv(args), ...identity, '--json'];
   return resultOf(await run(argv, cwd), name);
 }

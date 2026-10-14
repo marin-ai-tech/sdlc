@@ -126,7 +126,9 @@ function stateReason(paths: string[], edit: boolean): string {
   const allMatch = (pattern: RegExp) => paths.length > 0 && paths.every((file) => pattern.test(file));
   if (allMatch(/(?:^|\/)backlog\.md$/i)) return t('hook.backlogIntegrity');
   if (allMatch(/(?:^|\/)roles\.yaml$/i)) return t('hook.rolesIntegrity');
+  if (allMatch(/(?:^|\/)executors\.yaml$/i)) return t('hook.executorsIntegrity');
   if (allMatch(/(?:^|\/)team\.json$/i)) return t('hook.teamIntegrity');
+  if (allMatch(/(?:^|\/)board\.(?:json|lock)$/i)) return t('hook.boardIntegrity');
   if (allMatch(/(?:^|\/)inbox(?:\/|$)/i)) return t('hook.inboxIntegrity');
   return t(edit ? 'hook.stateIntegrityEdit' : 'hook.stateIntegrityBash');
 }

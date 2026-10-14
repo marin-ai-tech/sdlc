@@ -9,4 +9,6 @@ export const HUMAN_COMMANDS = [
   'answer',
   // CI configuration (often a protected path) and the ci-green gate are a person's decision (B94).
   'ci init',
+  // Issuing an executor's token is a person's decision (B118): the token is an identity, not a config value.
+  'task executors token',
 ] as const;

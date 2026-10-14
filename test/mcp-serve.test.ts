@@ -22,7 +22,11 @@ const INTENT = [
 // 0.9.1 adds `guide` (how sdlc works): read-only like the rest, a changed requirement.
 // B100 adds `explain`, `health` and `report` (remote clients ask about health and changes): read-only, a changed
 // requirement.
-const READ_TOOLS = ['audit', 'explain', 'guide', 'health', 'help', 'instructions', 'next', 'report', 'status', 'trace'];
+// B117 adds `board_list` (what `sdlc board list --json` prints, read-only): a changed requirement. The board write
+// tools are listed only for an executor's token over HTTP, never over stdio.
+const READ_TOOLS = [
+  'audit', 'board_list', 'explain', 'guide', 'health', 'help', 'instructions', 'next', 'report', 'status', 'trace',
+];
 
 function project() {
   const root = tempDir('sdlc-mcp-serve-');

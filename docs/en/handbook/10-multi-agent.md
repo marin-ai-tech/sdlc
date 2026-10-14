@@ -521,8 +521,52 @@ Run one change across three tools: Oliver on Claude Code, a contractor on Cursor
 plan is approved*
 
 Ethan hands one task of an approved plan to an executor of any type (another agent tool, a script, or a person) and
-checks the branch it returns before the review. This is the first step towards several agents working on one change.
-The rest (a registry of executors, a board, types of agent swarms) comes later.
+checks the branch it returns before the review. The executor registry (`openspec/executors.yaml`) lets a person name
+the executors work may go to, and since 0.21.0 the task board (`sdlc board`) is where a swarm's agents claim the
+open tasks — each under a lease. Swarming itself stays outside sdlc.
+
+#### The executor registry
+
+A person lists the executors in `openspec/executors.yaml` — a state file, so agents can never edit it (the hook
+denies it like `openspec/roles.yaml`):
+
+```yaml
+executors:
+  swarm-a:                    # id: ^[a-z0-9][a-z0-9._-]{0,63}$
+    type: board               # representative | board | market | mesh   (required)
+    name: Team A board        # optional display name
+    max_risk: medium          # low | medium | high   (required)
+    kinds: [feature, bugfix]  # optional; absent = any kind
+    capabilities: [typescript]# optional free labels
+    token_sha256: <64 hex>    # optional; written by `sdlc task executors token`, never the token itself
+```
+
+`sdlc task executors [--json]` shows the registry (empty list without one; in JSON each entry also has `hasToken`).
+A broken file — a bad id, an unknown type, a missing or bad `max_risk`, a kind that is not a change kind, an
+unknown field, a `token_sha256` that is not exactly 64 lowercase hex — is refused with `executors_invalid`
+naming the executor and the field. With a registry, `sdlc task export` needs `--executor <id>`
+and hands work only to an executor the change's risk and kind allow: risk order `low < medium < high`, the change
+risk at most `max_risk`, and the kind in `kinds` when given. It refuses with `executor_required`, `unknown_executor`,
+`no_executor_registry` or `executor_not_allowed`, and a refused export logs nothing. Work-item trailers then also
+carry `SDLC-Agent: <executor>/<agent>`, and `check-result` wants every commit's first `SDLC-Agent` trailer to name
+an allowed executor: `missing_agent`, `unknown_executor` or `executor_not_allowed` otherwise.
+
+#### The executor token (0.20.x)
+
+A remote executor reaches the board over `sdlc mcp serve --http`, so the server must know which executor is
+calling. A person issues each executor its own token:
+
+```bash
+sdlc task executors token swarm-a          # prints the token once
+sdlc task executors token swarm-a --json   # { "executor": "swarm-a", "token": "…" }
+```
+
+The token (43 base64url characters) is shown once and never stored — only its SHA-256 goes into `token_sha256`
+of that executor. Issuing a new token, or removing the executor from the registry, revokes the old one at once:
+the HTTP server reads the registry on every request. The `executor.token_issued` log entry records who issued
+it — never the token, never the hash. Only a person may run the command (`agent_cannot_issue_token`; the hook
+denies `sdlc task executors token` like the other human commands), and `SDLC_MCP_TOKEN` is still required to
+start the server — an executor token alone does not start it.
 
 ### Procedure
 
@@ -530,8 +574,9 @@ The rest (a registry of executors, a board, types of agent swarms) comes later.
    `sdlc.task/1`:
 
    ```bash
-   sdlc task export --change <id> --json              # one item per open task
-   sdlc task export --change <id> --task 1.2 --json   # only task 1.2
+   sdlc task export --change <id> --json                          # one item per open task
+   sdlc task export --change <id> --task 1.2 --json               # only task 1.2
+   sdlc task export --change <id> --executor swarm-a --json       # to the named executor (with a registry)
    ```
 
    Each item holds what an executor needs:
@@ -575,6 +620,47 @@ The rest (a registry of executors, a board, types of agent swarms) comes later.
 4. The normal gates apply. `check-result` merges nothing and approves nothing. The branch goes on like any other
    work: verification, then Paul's review approval in his own terminal. An executor never approves a gate.
 
+#### The task board
+
+A person or lead agent can reserve one task for a representative with
+`sdlc board dispatch --change <id> --task <n.m> --executor <id> [--lease <s>]`.
+The reservation appears as `dispatched` until that executor claims it or its lease expires.
+With its HTTP executor token, the representative calls MCP `board_list`, `board_claim`, `board_heartbeat`,
+`board_release` and `board_submit`. The token sets the executor and project; the write tools do not accept
+an executor argument. A foreign claim id is `claim_unknown`.
+
+With several agents on one swarm, the board (`openspec/.sdlc/board.json`, a state file agents cannot edit and
+git ignores) holds every open task of every change whose plan is open; an agent claims one under a lease:
+
+```bash
+sdlc board list --change <id> --json                                  # open tasks and their claim state
+sdlc board claim --change <id> --task 1.2 --executor swarm-a --agent coder-1 --json
+sdlc board heartbeat --claim <id> --json                              # pushes the lease end out
+sdlc board release --claim <id> --note "took another task" --json     # the task is open again
+sdlc board submit --claim <id> --branch sdlc/<id>/1.2 --json          # the result check, then done
+sdlc board reopen --change <id> --task 1.2 --reason "Missing case" --escalate --json
+```
+
+The claim answer is the `task export` work item with `SDLC-Agent: <executor>/<agent>` filled in, plus a claim id
+— a random secret: whoever holds it may heartbeat, release or submit. The lease is 900 s by default
+(`--lease <s>`, 1-86400). `task_claimed` refuses a second claim, `task_submitted` a task while it stays submitted;
+a task whose lease ran out is open again — there is no timer, every command drops the dead claims when it runs
+and logs one `task.lease_expired` each. `submit` runs the check of step 3 and wants every commit's executor to
+be the claim's (`wrong_executor`); a fail keeps the claim held. The log events are `task.claimed`,
+`task.released`, `task.lease_expired` and `task.submitted` — heartbeats write nothing. The board approves
+nothing.
+
+When a submitted result is rejected, `board reopen` writes `task.reopened` with the reason and opens the task.
+`board list` shows `attempts` and `lastReason`; the next claim receives `previousAttempts` with the prior
+executor, agent, branch, reason and reopening time. `--escalate` writes `task.escalated` and excludes that
+executor from this task (`executor_excluded`). Anyone may run reopen, including an agent. It does not change
+`.sdlc.yaml` or approve a gate; verification and review still decide the change.
+
+The offline dashboard and Markdown report show board tasks by change with status, executor, agent, lease end,
+attempts and the last reopening reason, plus claimed and submitted counts per executor. With an executor registry,
+JSON reports expose the same read-only view under `board`. Expired leases appear open without changing the board
+file or log; a broken board file produces a dashboard warning.
+
 ### You are done when
 
 - Before the plan is approved, `sdlc task export` refuses with `plan_not_approved`.
@@ -587,5 +673,11 @@ The rest (a registry of executors, a board, types of agent swarms) comes later.
   the new approval.
 - `check-result` is a check, not a decision. A clean result does not replace verification or the review.
 - Both commands only read, so any actor may run them, an agent too.
-- This is the first step. Several executors on one change at the same time, a registry of executors and a board come
-  later.
+- With a registry the work goes only through `--executor`: an executor over the change's risk or kind is refused
+  (`executor_not_allowed`), an unknown one `unknown_executor`, a missing flag `executor_required`.
+- Agents can never edit `openspec/executors.yaml` — the hook denies it. Nor can they run
+  `sdlc task executors token`: issuing a token is a person's command (`agent_cannot_issue_token`).
+- `openspec/.sdlc/board.json` and `board.lock` are protected the same way as the registry.
+- The claim id is a secret of the holder; it never appears in `board list`. An expired claim still answers
+  `claim_expired` to a heartbeat, but the task is already free.
+- `board submit` closes the claim — it does not merge and it does not approve.

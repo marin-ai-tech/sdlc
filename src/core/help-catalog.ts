@@ -50,6 +50,14 @@ const EXAMPLES: Record<string, string> = {
   answer: 'sdlc answer 1 --change add-export --text "Cashiers at the till"',
   'team list': 'sdlc team list --json',
   'team check': 'sdlc team check --json',
+  'task executors token': 'sdlc task executors token swarm-a',
+  'board list': 'sdlc board list --json',
+  'board dispatch': 'sdlc board dispatch --change add-export --task 1.2 --executor swarm-a --json',
+  'board claim': 'sdlc board claim --change add-export --task 1.2 --executor swarm-a --agent coder-1 --json',
+  'board heartbeat': 'sdlc board heartbeat --claim 0123456789abcdef0123456789abcdef --json',
+  'board release': 'sdlc board release --claim 0123456789abcdef0123456789abcdef --json',
+  'board submit': 'sdlc board submit --claim 0123456789abcdef0123456789abcdef --branch sdlc/add-export/1.2 --json',
+  'board reopen': 'sdlc board reopen --change add-export --task 1.2 --reason "Result needs a retry" --json',
 };
 
 /** A real value per argument name, so a generated example can be run as it is. */

@@ -280,9 +280,38 @@ describe('demo: a team builds a calculator with sdlc (every command)', { timeout
 
   it('7. build and verify with evidence (Bob writes the code on a branch)', () => {
     git(root, ['checkout', '-q', '-b', 'basic-arithmetic']);
+    // 0.20.x (B116): Alice lists the executors work may go to; the registry is a state file only a person edits.
+    write(path.join(root, 'openspec/executors.yaml'), 'executors:\n  calc-swarm:\n    type: board\n    max_risk: high\n');
+    commit('alice', 'Executor registry for the calculator');
+    step('task-executors', 'build', 'agent', ['task', 'executors', '--json'],
+      'The executors work may go to: id, type, max risk and kinds.');
+    // 0.20.x (B118): Alice, a person, issues the executor its token for `sdlc mcp serve --http`; only its SHA-256
+    // is kept in the registry. The token is shown once and is masked in the transcript.
+    const issued = step('executor-token', 'build', 'alice', ['task', 'executors', 'token', 'calc-swarm', '--json'],
+      'Alice issues the executor its token for the HTTP server: shown once, only its SHA-256 is kept.');
+    const secret = issued.json<{ token: string }>().token;
+    steps[steps.length - 1].output = steps[steps.length - 1].output.replace(secret, '<token>');
     // 0.19.0 (B115): the plan is approved, so the open tasks go to an executor as sdlc.task/1 work items.
-    step('task-export', 'build', 'agent', ['task', 'export', '--change', 'basic-arithmetic', '--json'],
-      'The open tasks as work items for an executor: checks, forbidden paths, the result branch and trailers.');
+    step('task-export', 'build', 'agent', ['task', 'export', '--change', 'basic-arithmetic', '--executor', 'calc-swarm', '--json'],
+      'The open tasks as work items for the executor calc-swarm: checks, forbidden paths, the result branch and trailers.');
+    // 0.21.0 (B118a): the board hands the open tasks to the swarm's agents, each under a lease.
+    step('board-list', 'build', 'agent', ['board', 'list', '--json'],
+      'The board: the open tasks of every change whose plan is approved.');
+    step('board-dispatch', 'build', 'alice',
+      ['board', 'dispatch', '--change', 'basic-arithmetic', '--task', '1.1', '--executor', 'calc-swarm', '--json'],
+      'Alice reserves task 1.1 for the swarm representative under a lease.');
+    const claimed = step('board-claim', 'build', 'agent',
+      ['board', 'claim', '--change', 'basic-arithmetic', '--task', '1.1', '--executor', 'calc-swarm', '--agent', 'coder-1', '--json'],
+      'The agent claims task 1.1 for the executor calc-swarm: a lease and the work item.');
+    const claimId = JSON.parse(claimed.stdout).claim.id as string;
+    step('board-heartbeat', 'build', 'agent', ['board', 'heartbeat', '--claim', claimId, '--json'],
+      'A heartbeat pushes the lease end out; it writes no log entry.');
+    const second = step('board-claim-2', 'build', 'agent',
+      ['board', 'claim', '--change', 'basic-arithmetic', '--task', '1.2', '--executor', 'calc-swarm', '--agent', 'coder-2', '--json'],
+      'A second agent of the swarm claims task 1.2.');
+    step('board-release', 'build', 'agent',
+      ['board', 'release', '--claim', JSON.parse(second.stdout).claim.id, '--note', 'coder-2 took a different task', '--json'],
+      'The claim is released with a note for the log: task 1.2 is open again.');
     write(path.join(root, 'test/calc.test.js'), TEST);
     write(path.join(root, 'src/calc.js'), CODE);
     write(path.join(change('basic-arithmetic'), 'tasks.md'), TASKS.replace(/- \[ \]/g, '- [x]'));
@@ -295,11 +324,18 @@ describe('demo: a team builds a calculator with sdlc (every command)', { timeout
     git(root, ['checkout', '-q', '-b', 'sdlc/basic-arithmetic/1.1']);
     write(path.join(root, 'src/calc.js'), `${CODE}export const pow = (a, b) => a ** b;\n`);
     git(root, ['add', '-A']);
-    git(root, ['commit', '-q', '-m', 'Add pow\n\nSDLC-Change: basic-arithmetic\nSDLC-Task: 1.1']);
+    git(root, ['commit', '-q', '-m', 'Add pow\n\nSDLC-Change: basic-arithmetic\nSDLC-Task: 1.1\nSDLC-Agent: calc-swarm/coder-1']);
     git(root, ['checkout', '-q', 'basic-arithmetic']);
     step('task-check-result', 'build', 'agent',
       ['task', 'check-result', '--change', 'basic-arithmetic', '--branch', 'sdlc/basic-arithmetic/1.1', '--json'],
       'The returned branch checked: the commit trailers carry the change and the task, no forbidden path touched.');
+    step('board-submit', 'build', 'agent',
+      ['board', 'submit', '--claim', claimId, '--branch', 'sdlc/basic-arithmetic/1.1', '--json'],
+      'The agent returns the branch its claim named: the result check passes and the claim is submitted.');
+    step('board-reopen', 'build', 'alice',
+      ['board', 'reopen', '--change', 'basic-arithmetic', '--task', '1.1', '--reason',
+        'The returned result does not cover the empty-input case.', '--json'],
+      'Alice rejects the submitted result with a reason; its claim is reopened without changing the task checkbox.');
   });
 
   it('8. review with lenses; a finding is deferred; the author cannot approve his own review', () => {

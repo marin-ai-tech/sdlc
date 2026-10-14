@@ -35,8 +35,8 @@ const REQUIREMENT = /^###\s+Requirement:\s*(.+?)\s*$/;
 const SCENARIO = /^####\s+Scenario:\s*(.+?)\s*$/;
 /** A numbered task line: `1.2 text` -> id `1.2`, text `text`. */
 export const TASK_ID = /^(\d+(?:\.\d+)+)\s+(.*)$/;
-/** The trailers an executor's commit carries: `SDLC-Change: <id>` and `SDLC-Task: <n.m>`. */
-export const TRAILER = /^(SDLC-Change|SDLC-Task):\s*(\S+)\s*$/gim;
+/** The trailers an executor's commit carries: `SDLC-Change: <id>`, `SDLC-Task: <n.m>` and `SDLC-Agent: <e>/<a>`. */
+export const TRAILER = /^(SDLC-Change|SDLC-Task|SDLC-Agent):\s*(\S+)\s*$/gim;
 
 function specFiles(dir: string): string[] {
   const specs = path.join(dir, 'specs');

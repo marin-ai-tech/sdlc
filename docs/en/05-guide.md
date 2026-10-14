@@ -350,7 +350,7 @@ sdlc has no chat API of its own: a Telegram MCP server is a receiver like any ot
 
 ### The sdlc MCP server over HTTP
 
-`sdlc mcp serve` gives other AI systems the process as read-only MCP tools over stdio
+`sdlc mcp serve` gives other AI systems read tools, including `board_list`, over stdio
 ([10.1](10-integrations.md#101-another-ai-system-reads-the-process)). Since 0.19.0,
 `sdlc mcp serve --http <host:port>` serves the same tools over MCP Streamable HTTP at `/mcp`, for a client on another
 machine or in another process:
@@ -381,20 +381,88 @@ Stop the server with Ctrl+C. Connecting a remote client: [11.2](11-mcp-use-cases
 Since 0.19.0, the tasks of an approved plan can go to executors of any type: another agent, a script or a person. The
 task contract says what an executor gets and what it must return.
 
-- `sdlc task export --change <id> [--task <n.m>] --json` gives one work item per open task (contract
-  `sdlc.task/1`): the task, the risk, the base commit, the plan's files, the spec scenarios, the verify checks, the
-  paths the executor must not touch, and where the result goes: the branch `sdlc/<change>/<task>` and the trailers
-  `SDLC-Change: <id>` and `SDLC-Task: <n.m>`. Work is handed out only while the plan gate is approved and fresh;
-  otherwise the command is refused with `plan_not_approved`. `--task` picks one task (`unknown_task` for a task the
-  change does not have).
+- `sdlc task executors [--json]` lists the executors a person named in `openspec/executors.yaml` (empty list
+  without a registry). Each entry has an id, a `type` (`representative`, `board`, `market`, `mesh`), the highest
+  risk it may take (`max_risk`), optional `kinds` and `capabilities`; in JSON also `hasToken` — never the hash or
+  a token. The registry is a state file: only a person edits it — the hook denies an agent's write. A broken
+  registry (bad id, unknown type or field, missing or bad `max_risk`, a kind that is not a change kind, a
+  `token_sha256` that is not 64 lowercase hex) is refused with `executors_invalid`.
+- `sdlc task executors token <id> [--json]` — a person's command — issues the executor a new token for
+  `sdlc mcp serve --http`. The token is printed once; only its SHA-256 goes into `token_sha256` of that executor.
+  Issuing a new token, or removing the executor, revokes the old one at once — no restart. The command is refused
+  in an agent session (`agent_cannot_issue_token`, and the hook denies it), and the `executor.token_issued` log
+  entry records who issued it — never the token, never the hash.
+- `sdlc task export --change <id> [--task <n.m>] [--executor <id>] --json` gives one work item per open task
+  (contract `sdlc.task/1`): the task, the risk, the base commit, the plan's files, the spec scenarios, the verify
+  checks, the paths the executor must not touch, and where the result goes: the branch `sdlc/<change>/<task>` and
+  the trailers `SDLC-Change: <id>` and `SDLC-Task: <n.m>`. Work is handed out only while the plan gate is approved
+  and fresh; otherwise the command is refused with `plan_not_approved`. `--task` picks one task (`unknown_task` for
+  a task the change does not have). With a registry `--executor` is required (`executor_required`; without a
+  registry a passed flag gives `no_executor_registry`, an unknown id `unknown_executor`): the work goes only to an
+  executor allowed for the change — risk order `low < medium < high`, the change risk at most `max_risk`, the kind
+  in `kinds` when given — else `executor_not_allowed`. A refused export logs nothing; an allowed one adds
+  `executor` to every item, the trailer `SDLC-Agent: <executor>/<agent>`, and a `task.exported` log entry per task.
 - `sdlc task check-result --change <id> --branch <ref> [--base <ref>] --json` checks a returned branch (the base
   defaults to the merge-base of the branch and HEAD). A commit without the trailers
   (`missing_trailer`), a task the change does not have (`unknown_task`) or a forbidden path (`forbidden_path`) is a
-  problem, and the command exits 1. Files outside the plan are a warning (`outside_plan`).
+  problem, and the command exits 1. Files outside the plan are a warning (`outside_plan`). With a registry every
+  commit's first `SDLC-Agent` trailer must be `<executor>/<agent>` naming an executor the change allows:
+  `missing_agent`, `unknown_executor` or `executor_not_allowed` otherwise; the result gains `executors` — the
+  distinct executor ids the commits name — and each check is one `task.result_checked` log entry.
 
 Both commands only read: they merge nothing and approve nothing, and anyone, an agent too, may run them. Merging the
 branch, verification and review stay the usual steps of the change. The contract is published as JSON Schemas:
 `schemas/contracts/task.schema.json` and `schemas/contracts/result.schema.json`.
+
+#### The task board
+
+Placement: `sdlc board dispatch --change <id> --task <n.m> --executor <id> [--lease <s>] [--json]`
+reserves one open task for an executor. The lease defaults to 900 seconds (range 1-86400). `board list` shows
+`dispatched`, its executor and `expiresAt`. Only that executor can claim before expiry; expiry returns the task
+to the pool and logs `task.dispatch_expired` once. Dispatch logs `task.dispatched`.
+
+Over HTTP, an executor token exposes `board_list`, `board_claim`, `board_heartbeat`, `board_release` and
+`board_submit`. The server token and stdio expose only `board_list`. The executor comes from the token, and
+claim management checks that the claim belongs to it. A foreign claim id is `claim_unknown`. Calls are scoped
+to the token's project. No MCP tool dispatches or makes a gate decision.
+
+Since 0.21.0, the open tasks of every active change whose plan gate is open sit on a board that the agents of the
+registry's executors claim from, each claim under a lease. The board is `openspec/.sdlc/board.json`
+(`{version: 1, claims, dispatches}`) — a state file, git-ignored through `openspec/.sdlc/.gitignore` next to the log's
+`.gitattributes`, and off-limits to agents (the hook's `boardIntegrity` deny; it also lands in every work item's
+`forbidden`). The committed trail is `openspec/.sdlc/log.jsonl`. Anyone may run the board commands, an agent too —
+they decide no gate and approve nothing:
+
+- `sdlc board list [--change <id>] --json` shows every task with `status` `open` | `dispatched` |
+  `claimed` | `submitted`
+  (and for a claim its executor, agent and lease end). A done task is never listed; the claim id never is either.
+- `sdlc board claim --change <id> --task <n.m> --executor <id> --agent <name> [--lease <s>]` returns the work item
+  of `task export` with `SDLC-Agent: <executor>/<agent>` filled in, plus a claim id — a random secret: whoever
+  holds it may heartbeat, release or submit. The lease is 900 s by default, an integer 1–86400 (`invalid_lease`).
+  The refusals of `task export` apply (`no_executor_registry`, `unknown_executor`, `executor_not_allowed`,
+  `plan_not_approved`, `unknown_task`), plus `invalid_agent`, `task_done`, `task_claimed` (the message names the
+  holder and the lease end) and `task_submitted`. One `task.claimed` log entry.
+- `sdlc board heartbeat --claim <id>` pushes the lease end out by the claim's own lease; `claim_unknown`,
+  `claim_expired`. It writes no log entry — heartbeats are too frequent to log.
+- `sdlc board release --claim <id> [--note <text>]` opens the task again; one `task.released` entry (the note as
+  detail).
+- `sdlc board submit --claim <id> --branch <ref> [--base <ref>]` runs the `check-result` of above and, in
+  addition, wants every commit's `SDLC-Agent` executor to be the claim's (`wrong_executor`). A pass closes the
+  claim (`task.submitted` with branch and head sha, exit 0); a fail exits 1 with the problems and keeps the claim
+  held. It changes no `.sdlc.yaml` and approves nothing.
+- `sdlc board reopen --change <id> --task <n.m> --reason <text> [--escalate] [--json]` reopens a submitted
+  claim. A blank reason is refused (`reason_required`); an unknown task or one without a submitted claim is
+  `unknown_task` or `task_not_submitted`. The board shows the number of earlier attempts and the last reason;
+  the next claim's work item includes `previousAttempts` in order. With `--escalate`, the rejected executor
+  joins `excluded` and cannot claim that task again (`executor_excluded`). The log records `task.reopened` with
+  the reason and, for escalation, `task.escalated`. Anyone, including an agent, may reopen a result. Verification
+  and review still decide the change's gates.
+
+There is no expiry timer: board lease commands first drop held claims whose lease ran out and log one
+`task.lease_expired` per dropped claim — exactly once per claim. Writes are exclusive across processes:
+`openspec/.sdlc/board.lock` (also a state file) serializes them, so two agents cannot claim the same task. A
+broken `board.json` is `board_invalid`, never silently reset. Who splits the work, retries or races executors
+stays outside sdlc.
 
 ### Roles and separation of duties
 
@@ -580,6 +648,11 @@ Since 0.16.1, `sdlc dashboard --watch [--out <file>] [--serve <host:port>] [--de
 `reports/dashboard.html`. With `--serve`, it serves the page with auto-refresh; port 0 selects a free port.
 Stop it with Ctrl+C. `scripts/examples/dashboard-watch.mjs` remains for Windows Task Scheduler setups.
 See [the demo and automation](09-demo-and-automation.md).
+
+When `openspec/executors.yaml` exists, the dashboard shows a task board grouped by change: each task's status,
+executor, agent, lease end, attempts and last reopening reason, plus claimed and submitted counts per executor.
+`sdlc report --format json` includes the same read-only snapshot as `board`; Markdown reports include a short table.
+An expired lease appears open without changing the board file or log. A broken board file shows a warning.
 
 ## 5.7. Updating and uninstalling
 

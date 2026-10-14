@@ -1,10 +1,13 @@
 import picomatch from 'picomatch';
+import { agentEnvironment } from './agent-env.js';
 import { readChangeState } from './change-state.js';
 import type { ChangeRef } from './changes.js';
 import type { SdlcConfig } from './config.js';
 import { SdlcError } from './errors.js';
+import { AGENT_TRAILER, executorRefusal, readExecutors, type Executor } from './executors.js';
 import { toPosix } from './fs-utils.js';
 import { git } from './git.js';
+import { appendLog } from './log.js';
 import { matchesPlanFile, readPlanFiles } from './plan-files.js';
 import { changeTasks, forbiddenPaths } from './task-contract.js';
 import { TRAILER } from './trace.js';
@@ -13,7 +16,7 @@ import { TRAILER } from './trace.js';
  * `sdlc task check-result` (B115): checks a branch an executor returned against the task contract - every commit
  * of `<base>..<branch>` carries `SDLC-Change: <id>` and `SDLC-Task: <a task of the change>`, and no forbidden path
  * is touched; a file outside the plan is a warning only. Read-only: it merges nothing, approves nothing, writes
- * no state and no log.
+ * no state; with an executor registry each check is one `task.result_checked` log entry (B116).
  */
 
 export interface ResultCommit {
@@ -21,15 +24,21 @@ export interface ResultCommit {
   subject: string;
   change?: string;
   task?: string;
+  /** The `SDLC-Agent` trailer value `<executor>/<agent>`, when the commit carries one (B116). */
+  agent?: string;
 }
 
-export type ResultProblemCode = 'missing_trailer' | 'unknown_task' | 'forbidden_path' | 'no_commits';
+export type ResultProblemCode =
+  'missing_trailer' | 'unknown_task' | 'forbidden_path' | 'no_commits' |
+  'missing_agent' | 'unknown_executor' | 'executor_not_allowed' | 'wrong_executor';
 
 export interface ResultProblem {
   code: ResultProblemCode;
   sha?: string;
   file?: string;
   task?: string;
+  /** Executor id named by the `SDLC-Agent` trailer (B116). */
+  executor?: string;
 }
 
 export interface ResultWarning {
@@ -44,6 +53,8 @@ export interface TaskResult {
   files: string[];
   problems: ResultProblem[];
   warnings: ResultWarning[];
+  /** Distinct executor ids the commits' `SDLC-Agent` trailers name, sorted (B116; only with a registry). */
+  executors?: string[];
 }
 
 /** Resolves a user-given ref to a commit; anything that is not one is an error, never a crash. */
@@ -82,6 +93,7 @@ function commitsOf(root: string, base: string, branch: string): ResultCommit[] {
       subject,
       ...(trailers.has('sdlc-change') ? { change: trailers.get('sdlc-change') } : {}),
       ...(trailers.has('sdlc-task') ? { task: trailers.get('sdlc-task') } : {}),
+      ...(trailers.has('sdlc-agent') ? { agent: trailers.get('sdlc-agent') } : {}),
     });
   }
   return commits;
@@ -97,10 +109,28 @@ function changedFiles(root: string, base: string, branch: string): string[] {
   return [...new Set(files)].sort();
 }
 
-/** The verdict for a returned branch: problems fail it, warnings do not. */
+/** The `<executor>/<agent>` a commit's first `SDLC-Agent` trailer must carry (B116). */
+function agentOf(
+  commit: ResultCommit, registry: Map<string, Executor>, state: { risk: string; kind: string },
+): ResultProblem | undefined {
+  const match = commit.agent === undefined ? undefined : AGENT_TRAILER.exec(commit.agent);
+  if (!match) return { code: 'missing_agent', sha: commit.sha };
+  const executor = registry.get(match[1]);
+  if (!executor) return { code: 'unknown_executor', sha: commit.sha, executor: match[1] };
+  if (executorRefusal(executor, state.risk, state.kind)) {
+    return { code: 'executor_not_allowed', sha: commit.sha, executor: match[1] };
+  }
+  return undefined;
+}
+
+/**
+ * The verdict for a returned branch: problems fail it, warnings do not. `expectExecutor` (B118a, the board's
+ * `submit`) makes every commit's `SDLC-Agent` trailer name that executor; a different one is `wrong_executor`.
+ */
 export function checkResult(
-  root: string, ref: ChangeRef, config: SdlcConfig, branch: string, base?: string,
+  root: string, ref: ChangeRef, config: SdlcConfig, branch: string, base?: string, expectExecutor?: string,
 ): TaskResult {
+  const registry = readExecutors(root);
   const branchSha = resolveRef(root, branch);
   const baseSha = base === undefined ? mergeBase(root, branchSha) : resolveRef(root, base);
   const commits = commitsOf(root, baseSha, branchSha);
@@ -119,10 +149,37 @@ export function checkResult(
     } else if (!taskIds.has(commit.task)) {
       problems.push({ code: 'unknown_task', sha: commit.sha, task: commit.task });
     }
+    if (registry !== undefined) {
+      const problem = agentOf(commit, registry, state);
+      if (problem) problems.push(problem);
+    }
+    const who = commit.agent === undefined ? undefined : AGENT_TRAILER.exec(commit.agent)?.[1];
+    if (expectExecutor !== undefined && who !== undefined && who !== expectExecutor) {
+      problems.push({ code: 'wrong_executor', sha: commit.sha, executor: who });
+    }
   }
   for (const file of files) {
     if (isForbidden(file)) problems.push({ code: 'forbidden_path', file });
     else if (!planned.some((entry) => matchesPlanFile(entry, file))) warnings.push({ code: 'outside_plan', file });
   }
-  return { ok: problems.length === 0, base: baseSha, commits, files, problems, warnings };
+  const executors = registry === undefined
+    ? undefined
+    : [...new Set(commits.flatMap((commit) => {
+        const id = commit.agent === undefined ? undefined : AGENT_TRAILER.exec(commit.agent)?.[1];
+        return id === undefined ? [] : [id];
+      }))].sort();
+  if (registry !== undefined) {
+    const detail = problems.length === 0
+      ? 'ok'
+      : [...new Set(problems.map((problem) => problem.code))].join(', ');
+    appendLog(root, config, {
+      event: 'task.result_checked', change: ref.id, detail,
+      ...(executors?.length === 1 ? { executor: executors[0] } : {}),
+      ...(agentEnvironment() ? { agent: agentEnvironment() } : {}),
+    });
+  }
+  return {
+    ok: problems.length === 0, base: baseSha, commits, files, problems, warnings,
+    ...(executors ? { executors } : {}),
+  };
 }

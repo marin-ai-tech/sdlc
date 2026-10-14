@@ -15,6 +15,11 @@
     "change": { "type": "string", "minLength": 1 },
     "risk": { "type": "string", "minLength": 1 },
     "kind": { "type": "string" },
+    "executor": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9._-]{0,63}$",
+      "description": "Id of the executor of openspec/executors.yaml the item is handed to; only with a registry"
+    },
     "task": {
       "type": "object",
       "required": ["id", "text"],
@@ -56,6 +61,22 @@
       }
     },
     "forbidden": { "type": "array", "items": { "type": "string" } },
+    "previousAttempts": {
+      "type": "array",
+      "description": "Earlier submitted claims reopened with a reason, oldest first",
+      "items": {
+        "type": "object",
+        "required": ["executor", "agent", "branch", "reason", "reopenedAt"],
+        "properties": {
+          "executor": { "type": "string", "minLength": 1 },
+          "agent": { "type": "string", "minLength": 1 },
+          "branch": { "type": "string", "minLength": 1 },
+          "reason": { "type": "string", "minLength": 1 },
+          "reopenedAt": { "type": "string", "format": "date-time" }
+        },
+        "additionalProperties": false
+      }
+    },
     "result": {
       "type": "object",
       "required": ["branch", "trailers"],
@@ -66,7 +87,11 @@
           "required": ["SDLC-Change", "SDLC-Task"],
           "properties": {
             "SDLC-Change": { "type": "string" },
-            "SDLC-Task": { "type": "string" }
+            "SDLC-Task": { "type": "string" },
+            "SDLC-Agent": {
+              "type": "string",
+              "description": "`<executor>/<agent>`: the executor fills in its agent name at commit time; only with a registry"
+            }
           },
           "additionalProperties": false
         }

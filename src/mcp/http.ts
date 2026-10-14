@@ -1,14 +1,19 @@
 import * as crypto from 'node:crypto';
 import * as http from 'node:http';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
+import { readExecutors, type Executor } from '../core/executors.js';
 import { SdlcError } from '../core/errors.js';
 import { harnessVersion } from '../core/version.js';
-import { resolveProjects, type ServedProject } from './projects.js';
+import { resolveProjects, type Caller, type ServedProject } from './projects.js';
+import { runCli } from './run-cli.js';
 import { createServer } from './server.js';
 
 /**
- * `sdlc mcp serve --http <host:port>` (B100): the same read-only MCP server over Streamable HTTP at `/mcp`.
- * A bearer token from SDLC_MCP_TOKEN is always required (localhost too). Only `/mcp` is served; other paths are 404.
+ * `sdlc mcp serve --http <host:port>` (B100): the MCP server over Streamable HTTP at `/mcp`.
+ * A bearer token is always required (localhost too): the server token from SDLC_MCP_TOKEN, or (B118) the token of
+ * an executor of a served project's registry — the SHA-256 of the presented token must equal a `token_sha256`,
+ * read at request time so a reissued token or a removed executor stops working at once. Only `/mcp` is served;
+ * other paths are 404.
  */
 
 const MCP_PATH = '/mcp';
@@ -60,9 +65,50 @@ export function tokenMatches(provided: string, expected: string): boolean {
   return crypto.timingSafeEqual(a, b);
 }
 
-function authorized(req: http.IncomingMessage, expected: string): boolean {
+/** The SHA-256 of a presented token: executor tokens are only ever compared as digests. */
+function tokenDigest(token: string): Buffer {
+  return crypto.createHash('sha256').update(token, 'utf8').digest();
+}
+
+/** Constant-time compare of the presented digest with a stored `token_sha256`; unequal lengths never match. */
+function digestMatches(presented: Buffer, storedHex: string): boolean {
+  const stored = Buffer.from(storedHex, 'hex');
+  return stored.length === presented.length && crypto.timingSafeEqual(presented, stored);
+}
+
+/** The executors whose `token_sha256` the served project knows now, read at request time: revocation is immediate. */
+function executorsOf(root: string): Executor[] {
+  try {
+    return [...(readExecutors(root)?.values() ?? [])];
+  } catch {
+    // A broken registry fails closed: no executor token of this project matches. The server token still works.
+    return [];
+  }
+}
+
+/**
+ * The executor a bearer token names (B118): the one whose `token_sha256` equals the token's SHA-256 in a served
+ * project's registry. Every request reads the registry again, so a reissued token or a removed executor stops
+ * working at once. `undefined` when no executor matches — the caller is then only the server token or nothing.
+ */
+function executorCaller(projects: readonly ServedProject[], provided: string): Caller | undefined {
+  const presented = tokenDigest(provided);
+  for (const project of projects) {
+    for (const executor of executorsOf(project.root)) {
+      if (executor.tokenSha256 !== undefined && digestMatches(presented, executor.tokenSha256)) {
+        return { project: project.name, executor: executor.id };
+      }
+    }
+  }
+  return undefined;
+}
+
+/** The caller of a request: the server token gives an empty one, an executor token its identity, else undefined. */
+function callerOf(req: http.IncomingMessage, token: string, projects: readonly ServedProject[]): Caller | undefined {
   const got = bearerToken(req.headers.authorization);
-  return got !== undefined && tokenMatches(got, expected);
+  if (got === undefined) return undefined;
+  if (tokenMatches(got, token)) return {};
+  return executorCaller(projects, got);
 }
 
 function requestPath(req: http.IncomingMessage): string {
@@ -134,8 +180,9 @@ async function handleMcp(
   req: http.IncomingMessage,
   res: http.ServerResponse,
   projects: readonly ServedProject[],
+  caller: Caller,
 ): Promise<void> {
-  const server = createServer(projects);
+  const server = createServer(projects, runCli, caller);
   const transport = new StreamableHTTPServerTransport({
     sessionIdGenerator: undefined,
     enableJsonResponse: true,
@@ -169,7 +216,8 @@ function onRequest(
     send(res, 404, 'Not Found\n');
     return;
   }
-  if (!authorized(req, token)) {
+  const caller = callerOf(req, token, projects);
+  if (caller === undefined) {
     send(res, 401, 'Unauthorized\n');
     return;
   }
@@ -181,7 +229,7 @@ function onRequest(
     send(res, 413, 'Payload Too Large\n');
     return;
   }
-  void handleMcp(req, res, projects);
+  void handleMcp(req, res, projects, caller);
 }
 
 function listenHttp(server: http.Server, address: HttpAddress): Promise<void> {
@@ -212,8 +260,8 @@ function waitForStop(server: http.Server): Promise<void> {
 }
 
 /**
- * Serves over Streamable HTTP at /mcp until SIGINT or SIGTERM. Requires SDLC_MCP_TOKEN (at least 16 characters).
- * Prints the listen URL (`http://<host>:<port>/mcp`) as one line on stderr.
+ * Serves over Streamable HTTP at /mcp until SIGINT or SIGTERM. Requires SDLC_MCP_TOKEN (at least 16 characters);
+ * an executor token alone does not start it. Prints the listen URL (`http://<host>:<port>/mcp`) on stderr.
  */
 export async function serveHttp(
   address: string,

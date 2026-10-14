@@ -1,11 +1,15 @@
 import * as path from 'node:path';
+import type { PreviousAttempt } from './board-reopen.js';
+import { agentEnvironment } from './agent-env.js';
 import { readChangeState } from './change-state.js';
 import type { ChangeRef } from './changes.js';
 import type { SdlcConfig } from './config.js';
 import { SdlcError } from './errors.js';
+import { executorRefusal, readExecutors, type Executor } from './executors.js';
 import { readText } from './fs-utils.js';
 import { headCommit } from './git.js';
 import { evaluateChange, type LifecycleView } from './lifecycle.js';
+import { appendLog } from './log.js';
 import { readPlanFiles, readPlanProof } from './plan-files.js';
 import { STATE_FILES } from './state-files.js';
 import { parseTasks } from './tasks.js';
@@ -31,13 +35,16 @@ export interface TaskItem {
   change: string;
   risk: string;
   kind: string;
+  /** Registry id of the executor the item is handed to (B116; only with a registry). */
+  executor?: string;
   task: { id: string; text: string };
   base: { commit?: string };
   plan: { files: string[]; proof: string[] };
   scenarios: string[];
   checks: TaskCheck[];
   forbidden: string[];
-  result: { branch: string; trailers: { 'SDLC-Change': string; 'SDLC-Task': string } };
+  previousAttempts?: PreviousAttempt[];
+  result: { branch: string; trailers: { 'SDLC-Change': string; 'SDLC-Task': string; 'SDLC-Agent'?: string } };
 }
 
 export interface ChangeTask {
@@ -70,29 +77,69 @@ export function forbiddenPaths(root: string, config: SdlcConfig, testsLocked: bo
 }
 
 /** Handing out work needs an approved (or waived / not applicable) plan gate; pending, blocked and stale refuse. */
-function planOpen(view: LifecycleView): boolean {
+export function planOpen(view: LifecycleView): boolean {
   const gate = view.gates.find((entry) => entry.id === 'plan');
   return !!gate && (gate.status === 'approved' || gate.status === 'waived' || gate.status === 'n/a');
 }
 
-function planStatus(view: LifecycleView): string {
+export function planStatus(view: LifecycleView): string {
   return view.gates.find((entry) => entry.id === 'plan')?.status ?? 'pending';
 }
 
-function workItem(ref: ChangeRef, task: ChangeTask, shared: Omit<TaskItem, 'id' | 'task' | 'result'>): TaskItem {
+function workItem(
+  ref: ChangeRef, task: ChangeTask, shared: Omit<TaskItem, 'id' | 'task' | 'result'>, executor?: Executor,
+): TaskItem {
   return {
     ...shared,
     id: `${ref.id}#${task.id}`,
     task: { id: task.id, text: task.text },
+    ...(executor ? { executor: executor.id } : {}),
     result: {
       branch: `sdlc/${ref.id}/${task.id}`,
-      trailers: { 'SDLC-Change': ref.id, 'SDLC-Task': task.id },
+      trailers: {
+        'SDLC-Change': ref.id,
+        'SDLC-Task': task.id,
+        // The executor fills in its own agent name at commit time: <executor>/<agent>.
+        ...(executor ? { 'SDLC-Agent': `${executor.id}/<agent>` } : {}),
+      },
     },
   };
 }
 
-/** One work item per open (unchecked) task; `only` picks a single task number. */
-export function exportTasks(root: string, ref: ChangeRef, config: SdlcConfig, only?: string): TaskItem[] {
+/**
+ * Resolves the `--executor` flag against the registry (B116): no registry and a flag is `no_executor_registry`, a
+ * registry and no flag is `executor_required`, an unknown id is `unknown_executor`. `undefined` = as in 0.19.0.
+ */
+function resolveExecutor(root: string, executorId: string | undefined): Executor | undefined {
+  const registry = readExecutors(root);
+  if (registry === undefined) {
+    if (executorId !== undefined) {
+      throw new SdlcError('no_executor_registry', { key: 'error.no_executor_registry' });
+    }
+    return undefined;
+  }
+  if (executorId === undefined) {
+    throw new SdlcError('executor_required', { key: 'error.executor_required' });
+  }
+  const executor = registry.get(executorId);
+  if (!executor) {
+    throw new SdlcError(
+      'unknown_executor',
+      { key: 'error.x_is_not_an_executor_of_x', params: { executor: executorId, file: 'openspec/executors.yaml' } },
+    );
+  }
+  return executor;
+}
+
+/**
+ * The validation and the items of `exportTasks`, without the `task.exported` log entries (B118a: the board
+ * reuses it for a claim, whose own log is `task.claimed`). The refusal order is the one `task export` has:
+ * registry, plan gate, task number, executor permission.
+ */
+export function exportItems(
+  root: string, ref: ChangeRef, config: SdlcConfig, only?: string, executorId?: string,
+): { items: TaskItem[]; executor?: Executor } {
+  const executor = resolveExecutor(root, executorId);
   const view = evaluateChange(root, ref, config, { skipFingerprint: true, skipPeople: true });
   if (!planOpen(view)) {
     throw new SdlcError(
@@ -109,6 +156,13 @@ export function exportTasks(root: string, ref: ChangeRef, config: SdlcConfig, on
     );
   }
   const state = readChangeState(ref.dir);
+  const refusal = executor ? executorRefusal(executor, state.risk, state.kind) : undefined;
+  if (executor && refusal) {
+    throw new SdlcError(
+      'executor_not_allowed',
+      { key: 'error.executor_x_cannot_take_x_x', params: { executor: executor.id, change: ref.id, reason: refusal } },
+    );
+  }
   const shared = {
     contract: 'sdlc.task/1' as const,
     change: ref.id,
@@ -120,7 +174,26 @@ export function exportTasks(root: string, ref: ChangeRef, config: SdlcConfig, on
     checks: config.verify.commands.map((check) => ({ name: check.name, run: check.run, required: check.required })),
     forbidden: forbiddenPaths(root, config, state.tests_locked === true),
   };
-  return tasks
+  const items = tasks
     .filter((task) => !task.done && (only === undefined || task.id === only))
-    .map((task) => workItem(ref, task, shared));
+    .map((task) => workItem(ref, task, shared, executor));
+  return { items, executor };
+}
+
+/** One work item per open (unchecked) task; `only` picks a single task number. */
+export function exportTasks(
+  root: string, ref: ChangeRef, config: SdlcConfig, only?: string, executorId?: string,
+): TaskItem[] {
+  const { items, executor } = exportItems(root, ref, config, only, executorId);
+  // Each handed-out task is one log entry; a refused export logs nothing.
+  const agent = agentEnvironment();
+  for (const item of items) {
+    if (executor) {
+      appendLog(root, config, {
+        event: 'task.exported', change: ref.id, task: item.task.id, executor: executor.id,
+        ...(agent ? { agent } : {}),
+      });
+    }
+  }
+  return items;
 }

@@ -118,8 +118,11 @@ OpenCode has no Stop hook, so `verify_before_stop` does not apply there.
 
 ### MCP in both directions (0.9.0)
 
-- **Server** (`sdlc mcp serve`, `src/mcp/server.ts`; the tools in `src/mcp/tools.ts`): low-level SDK `Server`, read-only tools (`status`, `next`, `instructions`, `trace`, `audit`, `help`, `guide`; since 0.19.0 also `explain`, `health` and `report`). Each runs the CLI with `--json` in a child process, never in-process, because stdout is the protocol channel over stdio. No decision is a tool.
-- **HTTP transport (0.19.0)** (`sdlc mcp serve --http <host:port>`, `src/mcp/http.ts`): the same server and tools over MCP Streamable HTTP at `/mcp`. Each request passes four checks before it reaches MCP: the path (only `/mcp`, else 404), the bearer token from `SDLC_MCP_TOKEN` (an exact match, else 401), the `Origin` header against the listen host and port, against DNS rebinding (else 403), and the body size (at most 1 MB, else 413). The token is required on localhost too and has at least 16 characters; without it the server does not start (`token_required`). It is never a flag and is never printed. The listen URL goes to stderr.
+- **Server** (`sdlc mcp serve`, `src/mcp/server.ts`; tools in `src/mcp/tools.ts`): low-level SDK `Server`.
+  Read tools include `status`, `next`, `instructions`, `trace`, `audit`, `help`, `guide`, `explain`, `health`,
+  `report` and `board_list`. An HTTP executor token also exposes board claim, heartbeat, release and submit.
+  Each runs the CLI with `--json` in a child process. No decision is a tool.
+- **HTTP transport (0.19.0)** (`sdlc mcp serve --http <host:port>`, `src/mcp/http.ts`): the same server and tools over MCP Streamable HTTP at `/mcp`. Each request passes four checks before it reaches MCP: the path (only `/mcp`, else 404), the bearer token (else 401), the `Origin` header against the listen host and port, against DNS rebinding (else 403), and the body size (at most 1 MB, else 413). The bearer token is the server token from `SDLC_MCP_TOKEN` (an exact match), or since 0.20.x an executor's token: its SHA-256, compared in constant time, must equal a `token_sha256` of a served project's `openspec/executors.yaml`, read on every request — a reissued token or a removed executor stops working at once, a broken registry fails closed for executor tokens only. An authorized request's executor identity `{ project, executor }` reaches `createServer` as a typed caller; the server token gives an empty one, and tool arguments can never set it. The server token is required on localhost too and has at least 16 characters; without it the server does not start (`token_required`). It is never a flag and is never printed. The listen URL goes to stderr.
 - **Client** (`src/mcp/`): the CLI connects to the registry servers for `sdlc mcp check` and for `verify.mcp` checks. The result is evidence written by the CLI, so an agent cannot forge it. Outside an agent session, results are also written to `openspec/.sdlc/inbox/` for the next agent session.
 - **Registry** (`mcp.servers` in `openspec/sdlc.yaml`): laid out into `.mcp.json`, `opencode.json`, `.cursor/mcp.json`, `.codex/config.toml`, `.qwen/settings.json` and `.gigacode/settings.json`, for the configured tools. Entries written by sdlc are tracked in the manifest. Secrets are only `${VAR}` references, checked with the patterns of the `secret-in-edit` rule.
 - **Events and the outbox** (`src/mcp/events.ts`, `src/mcp/outbox.ts`): an event is queued in `.git/sdlc/outbox/` and delivered to the receivers whose `on` matches; what fails waits for the next command or `sdlc events flush`. Since 0.19.0, a wait (`gate.<g>.awaiting`, `gate.<g>.overdue`) gets its id from `project.name` (when set), the change, the gate, the event and the digest, not from the time, so every clone and CI send the same id; every other event keeps an id of its own entry. Chat handles (`src/mcp/event-chat.ts`) are queued per channel, only for the channels that receivers name, and each receiver gets only its own channel's part. `sdlc events summary` (`src/commands/summary-daily.ts`) builds `summary.daily` from the report model and records it once per local day in the project log; `summary.*` is not in the default patterns of a receiver.
@@ -162,7 +165,7 @@ An answer in chat is never an approval: gate approvals, `track set`, `backlog mo
 
 ## 4.7. CLI commands
 
-`audit --export <dir>` (0.12.0: `src/core/evidence-export.ts`, signatures from `approval-signatures.ts` shared with `approvals verify`), `changelog` (`src/core/changelog.ts`, from `readChangeDeltas`), the `prepare-commit-msg` git hook (`src/integrations/git-hook.ts`; a POSIX script that mirrors `agent-env.ts`, kept in sync by a test), `health`, `explain --change <id>` (0.11.3: `src/core/health/` collects findings per area, `signal.ts` logs `health.degraded`/`health.recovered` and builds the session-start line; `src/core/explain.ts` reads the lifecycle view and writes nothing), `init [--statusline]`, `update`, `uninstall`, `new`, `status [--markdown]`, `help [topic]`, `statusline`, `next`, `instructions`, `approve|reject|waive`, `roles check|who|migrate`, `approvals verify`, `tests lock|unlock`, `verify [--list|--check]`, `review context|check`, `validate`, `archive`, `audit`, `log`, `layout check|scaffold|adapt|convert`, `report`, `dashboard`, `license [set]`, `doctor`, `hook`, `plugin build`, `mcp serve [--http]|check`, `inbox list|done`, `events list|flush|summary`, `triage intake`, `context pull`, `task export|check-result`, `review suggest`, `judge --gate <g>` (0.20.0), `ci init`, `team sync|list|check|accept`, `answer`, `rework`, `takeover`, `release-control`, `openspec …` (pass-through call to the bundled OpenSpec). Every command except `statusline`, `dashboard`, `mcp serve`, `hook` and `openspec` has `--json` with `{severity, code, message, fix}` diagnostics, as in OpenSpec.
+`audit --export <dir>` (0.12.0: `src/core/evidence-export.ts`, signatures from `approval-signatures.ts` shared with `approvals verify`), `changelog` (`src/core/changelog.ts`, from `readChangeDeltas`), the `prepare-commit-msg` git hook (`src/integrations/git-hook.ts`; a POSIX script that mirrors `agent-env.ts`, kept in sync by a test), `health`, `explain --change <id>` (0.11.3: `src/core/health/` collects findings per area, `signal.ts` logs `health.degraded`/`health.recovered` and builds the session-start line; `src/core/explain.ts` reads the lifecycle view and writes nothing), `init [--statusline]`, `update`, `uninstall`, `new`, `status [--markdown]`, `help [topic]`, `statusline`, `next`, `instructions`, `approve|reject|waive`, `roles check|who|migrate`, `approvals verify`, `tests lock|unlock`, `verify [--list|--check]`, `review context|check`, `validate`, `archive`, `audit`, `log`, `layout check|scaffold|adapt|convert`, `report`, `dashboard`, `license [set]`, `doctor`, `hook`, `plugin build`, `mcp serve [--http]|check`, `inbox list|done`, `events list|flush|summary`, `triage intake`, `context pull`, `task executors|export|check-result`, `board list|claim|heartbeat|release|submit`, `review suggest`, `judge --gate <g>` (0.20.0), `ci init`, `team sync|list|check|accept`, `answer`, `rework`, `takeover`, `release-control`, `openspec …` (pass-through call to the bundled OpenSpec). Every command except `statusline`, `dashboard`, `mcp serve`, `hook` and `openspec` has `--json` with `{severity, code, message, fix}` diagnostics, as in OpenSpec.
 
 Planning commands include `sdlc explore <slug> | list`, `sdlc track set <full|lite> --change <id>`, `sdlc defer add | list | close`, `sdlc backlog add | epic add | epic edit | list | next | edit | start | move | drop | done | import --issues`, and `sdlc import bmad <path> (--change <id> | --to-backlog) [--dry-run]`. BMAD PRD, SPEC and architecture spine map to intent, proposal, specs, design and deferred work; with `--to-backlog`, BMAD epics/tickets (or a PRD/SPEC) become backlog epics and items. Imported change artifacts start without approvals and require `sdlc validate`.
 
@@ -177,7 +180,43 @@ and fresh (`plan_not_approved`). Check-result reads the commits of the returned 
 `SDLC-Task` trailers and the files they touch, against the change's tasks, the plan and the forbidden paths. Both
 commands are read-only and are not in `HUMAN_COMMANDS`; merging, verification and review stay the usual steps.
 
+**The executor registry.** `openspec/executors.yaml` (`src/core/executors.ts`) is a state file a person fills:
+each executor has a type (`representative`, `board`, `market`, `mesh`), a `max_risk` and optional `kinds` and
+`capabilities`. The module parses it once at the boundary; any problem is `executors_invalid` naming the executor
+and the field. `executorRefusal` is the single allowed-check: risk order `low < medium < high`, the change risk at
+most `max_risk`, the kind in `kinds` when given; export and check-result share it. `sdlc task executors` lists the
+registry, `task export --executor` hands work to it (`SDLC-Agent: <executor>/<agent>` trailer, a `task.exported`
+log entry per task), `check-result` wants that trailer on every commit (`missing_agent`, `unknown_executor`,
+`executor_not_allowed`; each check a `task.result_checked` log entry). Being a state file (`STATE_FILES`, the
+`policy-shell` regexes, the `hook.executorsIntegrity` deny reason), the registry is off-limits to agents.
+
+**The task board (B118a).** `src/core/board.ts` holds the rules, `src/core/board-store.ts` the file and the lock,
+`src/commands/board.ts` the CLI. The open tasks of every active change whose plan gate is open (the same
+`planOpen` rule export uses) sit on the board in `openspec/.sdlc/board.json` —
+`{version: 1, claims, dispatches}`, parsed at
+the boundary (a broken file is `board_invalid`, never reset), written under `openspec/.sdlc/board.lock`
+(`fs.openSync 'wx'`, ~10 s of retries, a lock older than ~30 s broken as stale, temp + rename) so exactly one
+process wins a claim race; both files are state files (`STATE_FILES`, the `policy-shell` regexes,
+`hook.boardIntegrity`) and git-ignored by `openspec/.sdlc/.gitignore`. A claim holds a lease (default 900 s, at
+most a day) that `heartbeat` renews and `release` ends; `submit` runs `checkResult` and wants every commit's
+`SDLC-Agent` executor to be the claim's (`wrong_executor`, added to `result.schema.json`). Expiry is computed on
+read — no timer: lease commands drop held claims whose lease passed and log one `task.lease_expired` each;
+the claim record stays as a tombstone, so the event logs once and heartbeat still answers `claim_expired`. The
+other log events are `task.claimed`, `task.released` (the note as detail) and `task.submitted` (branch + head
+sha); heartbeats log nothing. A submitted claim stays recorded — the seam where a reopen (B121) lands. The board
+approves nothing and decides no gate. `src/core/board-reopen.ts` reopens only a submitted claim, retaining its
+branch, agent and reason as a terminal `reopened` attempt. List derives `attempts`, `lastReason` and sorted
+`excluded` executors from those records; a new claim carries `previousAttempts` in its work item. Escalation
+refuses the same executor on a later claim. The log adds `task.reopened` with the reason and `task.escalated`
+when requested. Reopen is available to agents too, so its board decision is not a gate approval or rejection.
+
 ## 4.8. Key decisions and trade-offs
+
+Dispatches live beside claims in `board.json`, parsed at the boundary and updated under the same board lock.
+`src/core/board-dispatch.ts` expires reservations on the next board command and logs each expiry once.
+The HTTP MCP server derives the executor and project from the bearer token. It lists board write tools only
+for executor callers; claim management checks ownership inside the board lock. The server token and stdio
+can list the board but cannot call a write tool. No MCP tool handles dispatch or a human decision.
 
 | Decision | Why | Cost |
 |---|---|---|

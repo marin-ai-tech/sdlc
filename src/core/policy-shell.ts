@@ -23,15 +23,16 @@ import { STATE_FILES } from './state-files.js';
 
 /**
  * Harness records only the CLI writes: per-change `.sdlc.yaml`, the project log, roles, the backlog, the inbox
- * of MCP results kept for the agent (`openspec/.sdlc/inbox/<id>.json`) and the record of the accepted roles of the
- * agent team (`openspec/.sdlc/team.json`, B72).
+ * of MCP results kept for the agent (`openspec/.sdlc/inbox/<id>.json`), the record of the accepted roles of the
+ * agent team (`openspec/.sdlc/team.json`, B72), the executor registry (`openspec/executors.yaml`, B116) and the
+ * task board with its lock (`openspec/.sdlc/board.json` / `board.lock`, B118a).
  */
 // Case-insensitive: Windows and macOS file systems ignore case, so `OPENSPEC/Backlog.md` is the same file.
 export const STATE_FILE_WRITE =
-  /\.sdlc\.yaml|\.sdlc\/log\.jsonl|\.sdlc\/team\.json|\.sdlc\/inbox(?:\/|\b)|openspec\/(?:roles\.yaml|backlog\.md)/i;
+  /\.sdlc\.yaml|\.sdlc\/log\.jsonl|\.sdlc\/team\.json|\.sdlc\/board\.(?:json|lock)|\.sdlc\/inbox(?:\/|\b)|openspec\/(?:roles\.yaml|executors\.yaml|backlog\.md)/i;
 export const STATE_FILE = new RegExp(
-  '(^|/)\\.sdlc\\.yaml$|^openspec/\\.sdlc/(?:log\\.jsonl|team\\.json)$|^openspec/\\.sdlc/inbox/[^/]+$' +
-    '|^openspec/(?:roles\\.yaml|backlog\\.md)$',
+  '(^|/)\\.sdlc\\.yaml$|^openspec/\\.sdlc/(?:log\\.jsonl|team\\.json|board\\.json|board\\.lock)$' +
+    '|^openspec/\\.sdlc/inbox/[^/]+$|^openspec/(?:roles\\.yaml|executors\\.yaml|backlog\\.md)$',
   'i'
 );
 /** The backlog's order and removal are a person's decision; agents change the file through `sdlc backlog`. */

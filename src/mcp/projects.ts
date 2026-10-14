@@ -6,7 +6,7 @@ import { t } from '../core/i18n.js';
 import { findProjectRoot, projectPaths } from '../core/project.js';
 import { runCli } from './run-cli.js';
 import { callTool, errorResult, type CliRunner, type ToolResult } from './call-tool.js';
-import { findTool, READ_TOOLS, type ToolInputSchema } from './tools.js';
+import { findTool, READ_TOOLS, WRITE_TOOLS, isWriteTool, type ToolInputSchema } from './tools.js';
 
 /**
  * `sdlc mcp serve --project <path>` (B46): one server for several sdlc projects, started from anywhere. With one
@@ -19,6 +19,18 @@ export interface ServedProject {
   name: string;
   /** The project folder, absolute. */
   root: string;
+}
+
+/**
+ * Who an authorized HTTP request is (B118, epic E16). The bearer token of an executor from a served project's
+ * registry gives `{ project, executor }`; the server token gives an empty caller (no executor). It comes only
+ * from HTTP auth. Board tools use it, and tool arguments can never set it.
+ */
+export interface Caller {
+  /** The served project whose registry holds the token, when the request carried an executor token. */
+  project?: string;
+  /** The executor id the token belongs to, when the request carried an executor token. */
+  executor?: string;
 }
 
 export interface ListedTool {
@@ -76,9 +88,10 @@ function withProject(schema: ToolInputSchema): ToolInputSchema {
 }
 
 /** tools/list: the B13 tools; with several projects each one also takes `project`. */
-export function listedTools(projects: readonly ServedProject[]): ListedTool[] {
+export function listedTools(projects: readonly ServedProject[], caller: Caller = {}): ListedTool[] {
   const several = projects.length > 1;
-  return READ_TOOLS.map(({ name, description, inputSchema }) => {
+  const tools = caller.executor ? [...READ_TOOLS, ...WRITE_TOOLS] : READ_TOOLS;
+  return tools.map(({ name, description, inputSchema }) => {
     return { name, description, inputSchema: several ? withProject(inputSchema) : inputSchema };
   });
 }
@@ -127,22 +140,38 @@ async function callWithoutProject(
   return errorResult('project_required', message);
 }
 
-/** tools/call over the served projects: one project as in B13, several by the `project` argument. */
+/**
+ * tools/call over the served projects: one project as in B13, several by the `project` argument.
+ * `caller` is who the request's bearer token names; board tools use it, never `input`, for identity.
+ */
 export async function callProjectTool(
   name: string,
   input: unknown,
   projects: readonly ServedProject[],
   run: CliRunner = runCli,
+  caller: Caller = {},
 ): Promise<ToolResult> {
-  if (projects.length === 1) return callTool(name, input, projects[0].root, run);
+  if (isWriteTool(name) && !caller.executor) {
+    return errorResult('executor_token_required', t('mcp.executorTokenRequired', {}, 'en'));
+  }
+  if (projects.length === 1) {
+    if (caller.project && caller.project !== projects[0].name) {
+      return errorResult('invalid_arguments', t('mcp.executorProjectMismatch', {}, 'en'));
+    }
+    return callTool(name, input, projects[0].root, run, caller.executor);
+  }
   if (!findTool(name)) return errorResult('unknown_tool', `unknown tool: ${name}`);
   const split = splitProject(input);
   if (typeof split === 'string') return errorResult('invalid_arguments', `${name}: ${split}`);
-  if (split.project === undefined) return callWithoutProject(name, split.rest, projects, run);
-  const target = projects.find((project) => project.name === split.project);
+  if (caller.project && split.project && split.project !== caller.project) {
+    return errorResult('invalid_arguments', t('mcp.executorProjectMismatch', {}, 'en'));
+  }
+  const project = split.project ?? caller.project;
+  if (project === undefined) return callWithoutProject(name, split.rest, projects, run);
+  const target = projects.find((entry) => entry.name === project);
   if (!target) {
-    const message = t('mcp.unknownProject', { project: split.project, projects: namesOf(projects) }, 'en');
+    const message = t('mcp.unknownProject', { project, projects: namesOf(projects) }, 'en');
     return errorResult('unknown_project', message);
   }
-  return callTool(name, split.rest, target.root, run);
+  return callTool(name, split.rest, target.root, run, caller.executor);
 }

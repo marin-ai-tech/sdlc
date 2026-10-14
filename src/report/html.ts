@@ -4,6 +4,7 @@ import { currentLocale, t } from '../core/i18n.js';
 import { STAGES } from '../core/lifecycle.js';
 import { renderFinding } from '../core/health/model.js';
 import { CHANGE_PAGE_CSS, changeAnchor, renderChangePages } from './change-page.js';
+import type { BoardTaskSnapshot } from '../core/board-view.js';
 
 const escapeHtml = (value: unknown): string => String(value ?? '').replace(/[&<>"']/g, (character) => ({
   '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
@@ -154,6 +155,41 @@ function changes(model: ReportModel): string {
     + `<h2 id="changes">${e(t('report.html.changes'))}</h2>${body}</section>`;
 }
 
+function boardRow(task: BoardTaskSnapshot): string {
+  const cells = [
+    `${task.id} ${task.task.text}`,
+    task.status,
+    task.executor,
+    task.agent,
+    task.expiresAt,
+    task.attempts,
+    task.lastReason,
+  ];
+  return `<tr>${cells.map((value) => `<td>${e(value)}</td>`).join('')}</tr>`;
+}
+
+function boardTable(change: string, tasks: BoardTaskSnapshot[]): string {
+  const columns = ['task', 'status', 'executor', 'agent', 'lease', 'attempts', 'reason'];
+  const head = columns.map((column) => `<th scope="col">${e(t(`report.board.${column}`))}</th>`).join('');
+  return `<h3>${e(change)}</h3><table class="board-table"><thead><tr>${head}</tr></thead>`
+    + `<tbody>${tasks.map(boardRow).join('')}</tbody></table>`;
+}
+
+function board(model: ReportModel): string {
+  if (model.boardWarning) return `<p role="alert">${e(t('report.board.warning'))}</p>`;
+  if (!model.board) return '';
+  const groups = new Map<string, BoardTaskSnapshot[]>();
+  for (const task of model.board.tasks) {
+    groups.set(task.change, [...(groups.get(task.change) ?? []), task]);
+  }
+  const tables = [...groups].map(([change, tasks]) => boardTable(change, tasks)).join('');
+  const counts = model.board.byExecutor.map((item) =>
+    `<li>${e(item.executor)}: ${e(t('report.board.counts', item))}</li>`).join('');
+  const empty = groups.size === 0 ? `<p>${e(t('report.board.empty'))}</p>` : '';
+  return `<section id="board"><h2>${e(t('report.board.title'))}</h2>${tables}${empty}`
+    + `<h3>${e(t('report.board.byExecutor'))}</h3><ul>${counts}</ul></section>`;
+}
+
 function leadTimes(model: ReportModel): string {
   const lead = model.metrics.medianLeadTimeHours;
   const rows = [
@@ -295,6 +331,8 @@ function layout(model: ReportModel): string {
 }
 
 const css = `:root{color-scheme:light;--bg:#f4f6fa;--panel:#fff;--text:#18253b;--sub:#52627b;--line:#dbe2eb;--accent:#2858c7;--soft:#eaf0ff;--good:#17644d;--good-bg:#e4f5ed;--bad:#a33239;--bad-bg:#fcecee;--wait:#805312;--wait-bg:#fff3d9;--muted:#586477;--muted-bg:#edf0f4}*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font:15px/1.5 system-ui,-apple-system,Segoe UI,sans-serif;overflow-wrap:anywhere}main,footer{max-width:1200px;margin:auto;padding:0 20px}h1,h2,h3,p{margin-top:0}h1{font-size:clamp(2rem,5vw,3.3rem);line-height:1.1}h2{font-size:1.4rem}h3{font-size:1.15rem;margin-bottom:8px}p{margin-bottom:10px}section{margin:30px 0}section>h2{margin-bottom:15px}.hero{background:linear-gradient(125deg,#142b5c,#265cc3);color:white;padding:48px max(20px,calc((100vw - 1160px)/2));}.hero p{color:#e5eeff}.eyebrow{text-transform:uppercase;letter-spacing:.15em;font-weight:700;font-size:.8rem;margin-bottom:12px}.small{font-size:.85rem}.kpis{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}.kpi,.change,.bars,.timeline,.roles,.pipeline{background:var(--panel);border:1px solid var(--line);border-radius:14px;box-shadow:0 4px 18px #142b5c0a}.kpi{padding:18px}.kpi span{display:block;color:var(--sub);font-size:.85rem}.kpi strong{font-size:1.8rem}.pipeline{list-style:none;display:grid;grid-template-columns:repeat(6,minmax(0,1fr));padding:8px;margin:0;gap:6px}.pipeline li{background:var(--soft);padding:14px;border-radius:10px;min-width:0}.pipeline li span{display:block;font-size:.8rem}.pipeline li strong{font-size:1.45rem}.pipeline .empty{opacity:.6}.changes{display:grid;gap:15px}.change{padding:20px;border-left:5px solid var(--accent)}.change.blocked{border-left-color:var(--bad);background:var(--bad-bg)}.change-top{display:flex;justify-content:space-between;gap:12px;align-items:start}.stage-label{color:var(--sub);text-align:right}.badges{display:flex;flex-wrap:wrap;gap:5px}.pill{display:inline-block;border-radius:99px;padding:2px 9px;font-size:.76rem;font-weight:700;margin:2px}.pill.good{background:var(--good-bg);color:var(--good)}.pill.bad{background:var(--bad-bg);color:var(--bad)}.pill.waiting{background:var(--wait-bg);color:var(--wait)}.pill.muted{background:var(--muted-bg);color:var(--muted)}.stepper{list-style:none;display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:3px;padding:0;margin:16px 0}.stepper li{border-top:4px solid var(--line);padding-top:5px;color:var(--sub);font-size:.72rem}.stepper li.current{border-color:var(--accent);color:var(--text);font-weight:700}.gate-list{margin:14px 0}.change-grid{display:grid;grid-template-columns:2fr 1fr 1fr;gap:15px;align-items:start}.track{height:10px;background:var(--muted-bg);border-radius:10px;overflow:hidden;margin-top:8px}.track span{display:block;height:100%;background:var(--accent);border-radius:10px}.next{background:var(--soft);padding:12px;border-radius:9px}.next p{margin:4px 0}code{display:inline-block;max-width:100%;white-space:normal;background:var(--panel);padding:4px 7px;border-radius:4px}.warnings{color:var(--bad);margin-top:12px}.warnings ul{margin:5px 0}.bars{padding:18px}.bar-row{display:grid;grid-template-columns:170px 1fr 65px;gap:12px;align-items:center;margin:8px 0}.bar-row .track{margin:0}.bar-row strong{text-align:right}.timeline{list-style:none;padding:8px 18px;margin:0}.timeline li{display:grid;grid-template-columns:190px 1fr;gap:16px;padding:12px 0;border-bottom:1px solid var(--line)}.timeline li:last-child{border:0}.timeline time{color:var(--sub);font-size:.85rem}.timeline p{margin:3px 0}.readiness strong{font-size:1.8rem}.meter{height:14px}.roles{list-style:none;padding:8px 18px;margin:15px 0}.roles li{display:grid;grid-template-columns:160px 90px 1fr;gap:12px;padding:9px 0;border-bottom:1px solid var(--line);align-items:center}.roles li:last-child{border:0}.required-missing{color:var(--bad)}footer{padding-top:14px;padding-bottom:35px;color:var(--sub)}a{color:var(--accent)}@media(max-width:750px){.kpis{grid-template-columns:repeat(2,minmax(0,1fr))}.pipeline{grid-template-columns:repeat(3,minmax(0,1fr))}.change-grid{grid-template-columns:1fr 1fr}.stepper{grid-template-columns:repeat(3,minmax(0,1fr))}}@media(max-width:480px){main,footer{padding-left:14px;padding-right:14px}.hero{padding:30px 14px}.kpis{gap:8px}.kpi{padding:12px}.kpi strong{font-size:1.4rem}.pipeline{grid-template-columns:repeat(2,minmax(0,1fr))}.change{padding:13px}.change-top{display:block}.stage-label{text-align:left}.change-grid{grid-template-columns:1fr}.bar-row{grid-template-columns:105px 1fr 48px;gap:6px;font-size:.8rem}.timeline li{grid-template-columns:1fr;gap:2px}.roles li{grid-template-columns:1fr 1fr;gap:2px}.roles li>span:last-child{grid-column:1/-1}}@media (prefers-color-scheme: dark){:root{color-scheme:dark;--bg:#101827;--panel:#1c293b;--text:#eaf0fa;--sub:#aebed3;--line:#33445b;--accent:#88afff;--soft:#233b62;--good:#a4e5c7;--good-bg:#1d4b3e;--bad:#ffb1b6;--bad-bg:#4b2630;--wait:#ffda95;--wait-bg:#57421d;--muted:#c1ccda;--muted-bg:#334154}}`;
+const boardCss = '.board-table{width:100%;border-collapse:collapse;background:var(--panel);margin-bottom:16px}'
+  + '.board-table th,.board-table td{padding:8px;border:1px solid var(--line);text-align:left}';
 
 export function renderReportHtml(model: ReportModel): string {
   const lang = currentLocale();
@@ -302,6 +340,7 @@ export function renderReportHtml(model: ReportModel): string {
   const main = overview(model)
     + pipeline(model)
     + changes(model)
+    + board(model)
     + renderChangePages(model.changes)
     + backlog(model)
     + deferred(model)
@@ -313,7 +352,7 @@ export function renderReportHtml(model: ReportModel): string {
     + `<a href="${PROJECT_URL}">sdlc</a> ${e(model.harness.version)} · ${e(model.harness.license)}`;
   return `<!doctype html><html lang="${lang}"><head><meta charset="utf-8">`
     + `<meta name="viewport" content="width=device-width, initial-scale=1">`
-    + `<title>${e(title)}</title><style>${css}${CHANGE_PAGE_CSS}</style></head>`
+    + `<title>${e(title)}</title><style>${css}${boardCss}${CHANGE_PAGE_CSS}</style></head>`
     + `<body>${header(model)}<main>${main}</main>`
     + `<footer>${footer}</footer></body></html>`;
 }

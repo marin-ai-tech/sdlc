@@ -10,6 +10,7 @@ import {
 
 function cell(value: unknown): string {
   return String(value ?? '-')
+    .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;')
     .replace(/\|/g, '\\|')
@@ -49,6 +50,27 @@ function changes(model: ReportModel): string[] {
     '| --- | --- | --- | --- | --- |',
     ...model.changes.map(changeRow),
     '',
+  ];
+}
+
+function board(model: ReportModel): string[] {
+  if (model.boardWarning) return [t('report.board.warning'), ''];
+  if (!model.board) return [];
+  const columns = ['change', 'task', 'status', 'executor', 'agent', 'lease', 'attempts', 'reason'];
+  const header = columns.map((column) => cell(t(`report.board.${column}`))).join(' | ');
+  const rows = model.board.tasks.map((task) => [
+    task.change, `${task.task.id} ${task.task.text}`, task.status, task.executor,
+    task.agent, task.expiresAt, task.attempts, task.lastReason,
+  ].map(cell).join(' | '));
+  const counts = model.board.byExecutor.map((item) =>
+    `| ${cell(item.executor)} | ${item.claimed} | ${item.submitted} |`);
+  return [
+    `## ${t('report.board.title')}`, '',
+    `| ${header} |`, '| --- | --- | --- | --- | --- | --- | ---: | --- |',
+    ...rows.map((row) => `| ${row} |`), '',
+    `### ${t('report.board.byExecutor')}`, '',
+    `| ${t('report.board.executor')} | ${t('report.board.claimed')} | ${t('report.board.submitted')} |`,
+    '| --- | ---: | ---: |', ...counts, '',
   ];
 }
 
@@ -234,6 +256,7 @@ export function renderReportMarkdown(model: ReportModel): string {
     '',
     ...stages(model),
     ...changes(model),
+    ...board(model),
     ...mermaidDiagrams(model),
     ...backlog(model),
     ...deferred(model),

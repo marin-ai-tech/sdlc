@@ -315,7 +315,13 @@ Find out why a change is stuck and unblock it: open questions, a stale approval,
 | `sdlc triage intake` refuses with `invalid_alert` | the input is not one JSON object with a non-empty `id` and `title` | pass `{"id":"…","title":"…"}` on stdin; `severity` and `url` are optional |
 | `sdlc task export` refuses with `plan_not_approved` | the plan gate is not approved, or `plan.md` changed after the approval | have the plan approved (again), then export |
 | `sdlc task export` or `check-result` names `unknown_task` | the task is not in the change's `tasks.md` | `sdlc task export --change <id> --json` lists the open tasks |
+| `sdlc task export` names `executor_required`, `unknown_executor` or `executor_not_allowed` | the registry is in use: no executor named, the id is not in it, or its `max_risk`/`kinds` do not cover the change | `sdlc task executors` lists the registry; pick an allowed id or have a person extend it |
+| `sdlc task executors` or `export` names `executors_invalid` | `openspec/executors.yaml` is broken (bad id, unknown type or field, missing or bad `max_risk`, a `token_sha256` that is not 64 lowercase hex) | a person fixes the file; the message names the executor and the field |
+| `sdlc task check-result` names `missing_agent`, `unknown_executor` or `executor_not_allowed` | a commit's first `SDLC-Agent` trailer is missing, or names an executor that is not in the registry or not allowed | the executor ends commits with `SDLC-Agent: <executor>/<agent>`; a person updates the registry |
 | `sdlc task check-result` names `missing_trailer` or `forbidden_path` | a commit has no `SDLC-Change` or `SDLC-Task` trailer, or the branch touches a forbidden path | add the trailers to the commits; undo the changes to the forbidden paths |
+| `sdlc board claim` names `task_claimed`, `task_done` or `task_submitted` | a live claim holds the task, it is done, or already submitted | `sdlc board list` shows who holds it and until when |
+| `sdlc board heartbeat`, `release` or `submit` names `claim_unknown` or `claim_expired` | the claim id is wrong or ended, or the lease ran out | only a live claim heartbeats, releases or submits; claim again with `board claim` |
+| a `board` command names `board_invalid` or `board_locked` | `openspec/.sdlc/board.json` is broken, or another process holds the lock | fix the file by hand; a lock older than ~30 s is broken automatically |
 | `sdlc approve` says "cannot be approved yet: waiting for the judge" | the gate has a judge (`gates.<g>.judge`) and no passing verdict for the current artifacts | the agent runs `sdlc judge --gate <g> --change <id>` and reworks until the verdict passes (Lesson 5.11) |
 | `sdlc judge` says "The judge answer was not a verdict" (`judge_invalid_answer`) | the judge printed no JSON verdict `{ pass, route, rework }` | fix the judge (the team's command or tool), then run `sdlc judge` again; nothing was recorded |
 | `sdlc next` hands the gate to a person: "the author-critic loop stopped" | the judge rejected the artifacts `max_loops` times | the person reads the judge's notes and decides: approve, reject or `sdlc rework` |
@@ -426,8 +432,15 @@ Claude Code spelling; in Cursor, OpenCode, Qwen Code and GigaCode use `/sdlc-<na
 | `sdlc takeover`, `sdlc release-control` **(person)** | |
 | `sdlc roles who <gate> --change <id>`, `sdlc explain --change <id>` | |
 | `sdlc backlog import --issues [--json]` (with `issues:` in `openspec/sdlc.yaml`) | |
-| `sdlc task export --change <id> [--task <n.m>] --json` | |
+| `sdlc task executors [--json]` | |
+| `sdlc task executors token <id> [--json]` **(person)** | |
+| `sdlc task export --change <id> [--task <n.m>] [--executor <id>] --json` | |
 | `sdlc task check-result --change <id> --branch <ref> --json` | |
+| `sdlc board list [--change <id>] --json` | |
+| `sdlc board dispatch --change <id> --task <n.m> --executor <id> [--lease <s>] --json` | |
+| `sdlc board claim --change <id> --task <n.m> --executor <id> --agent <name> --json` | |
+| `sdlc board heartbeat|release|submit --claim <id>` | |
+| `sdlc board reopen --change <id> --task <n.m> --reason <text> [--escalate] [--json]` | |
 
 ### Oliver — developer (Claude Code)
 
@@ -543,6 +556,7 @@ Claude Code spelling; in Cursor, OpenCode, Qwen Code and GigaCode use `/sdlc-<na
 | `SDLC-Agent` trailer | the commit line that marks a commit made in an agent's shell |
 | `SDLC-Approval` trailer | the commit line that ties a commit to one approval |
 | `SDLC-Change`, `SDLC-Task` trailers | the commit lines that tie a commit to a change and a task, for `sdlc trace` and `sdlc task check-result` |
+| `SDLC-Agent` trailer | `<executor>/<agent>` on each result commit: which registry executor and which of its agents did the work |
 | roles.yaml | `openspec/roles.yaml`: people, their emails and signing keys, roles, separation rules |
 | separation of duties | rules on who may approve: not the author, different people for gate pairs, a per-person limit |
 | signing | approvals arrive in commits signed by the approver; `sdlc approvals verify` checks it |
@@ -553,6 +567,7 @@ Claude Code spelling; in Cursor, OpenCode, Qwen Code and GigaCode use `/sdlc-<na
 | chat handle | a person's name in a chat, under `people.<id>.chat` in `roles.yaml` (for example `telegram: "@megan_tg"`); a receiver with `chat:` mentions it |
 | daily summary | the event `summary.daily` from `sdlc events summary`: counts and the waiting changes, once per project and day |
 | work item | one open task given to an executor by `sdlc task export`, in the contract `sdlc.task/1` |
+| executor | an agent swarm of type `representative`, `board`, `market` or `mesh` a person lists in `openspec/executors.yaml` with `max_risk`, optional `kinds` and the `token_sha256` of its access token; agents cannot edit the registry |
 | outbox | events that could not be delivered yet, in `.git/sdlc/outbox/`; `sdlc events flush` sends them |
 | inbox | MCP check results from runs outside an agent session, for the agent's next session |
 | health finding | one observation of `sdlc health`: area, level, facts, recommendation |
@@ -657,8 +672,15 @@ commands also take `--json` and, with several active changes, `--change <id>`.
 | `sdlc review context\|check --change <id>` | anyone | the review context (diff, policy, plan drift, lenses), or the open blocking findings |
 | `sdlc review suggest --change <id>` | anyone | suggest a reviewer, owners of the changed files first |
 | `sdlc release check --change <id>` | anyone | run the `release.mcp` checks without approving; writes nothing |
-| `sdlc task export --change <id> [--task <n.m>] --json` | anyone | export the open tasks as `sdlc.task/1` work items (needs an approved plan) |
+| `sdlc task executors` | anyone | list the executors of `openspec/executors.yaml` (read-only) |
+| `sdlc task executors token <id>` | a person | issue the executor a new token for `sdlc mcp serve --http`: printed once, only its SHA-256 is kept; a new token or removing the executor revokes the old one at once |
+| `sdlc task export --change <id> [--task <n.m>] [--executor <id>] --json` | anyone | export the open tasks as `sdlc.task/1` work items (needs an approved plan; with a registry, `--executor` names who gets the work) |
 | `sdlc task check-result --change <id> --branch <ref>` | anyone | check a returned branch: trailers, forbidden paths, files outside the plan (read-only) |
+| `sdlc board list [--change <id>]` | anyone | the open tasks on the board and their claim state (read-only) |
+| `sdlc board dispatch --change <id> --task <n.m> --executor <id>` | anyone | reserve a task for a lease |
+| `sdlc board claim --change <id> --task <n.m> --executor <id> --agent <name>` | anyone | claim one task for an executor's agent under a lease (writes the board state file) |
+| `sdlc board heartbeat|release|submit --claim <id>` | the claim holder | renew the lease, give the task back, or submit the result branch |
+| `sdlc board reopen` | anyone | reopen a submitted result; escalation excludes its executor |
 | `sdlc archive <id>` | anyone | check every required gate, then merge the delta specs into the living specs |
 
 ### Reports and audit (read-only)
