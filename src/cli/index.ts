@@ -335,6 +335,7 @@ export function buildProgram(): Command {
   program.command('help [topic]').description(cmdDesc('cmd.help'))
     .option('--json', 'output JSON').action((topic, opts) => helpCommand(topic, opts));
   program.command('guide [topic] [step]').description(cmdDesc('cmd.guide'))
+    .option('--markdown', cmdDesc('option.guideMarkdown'))
     .option('--json', 'output JSON').action((topic, step, opts) => guideCommand(topic, step, opts));
   program.command('statusline').description(cmdDesc('cmd.statusline'))
     .action(() => statuslineCommand());

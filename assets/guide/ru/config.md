@@ -13,7 +13,7 @@ summary: Основные ключи openspec/sdlc.yaml и кто может и�
 | `rework.max_cycles` | сколько возвратов одного гейта до того, как `next` позовёт человека (по умолчанию 3) |
 | `design.debate` | линза спора: два адвоката спорят о ключевом решении до гейта spec (по умолчанию выкл.; `debate_sides`) |
 | `verify.commands` | проверки проекта: `{ name, run, required }` |
-| `verify.mcp`, `release.mcp` | проверки, которые CLI вызывает на MCP-сервере, для гейтов проверки и релиза |
+| `verify.mcp`, `release.mcp` | проверки, которые CLI вызывает на MCP-сервере, для гейтов verify и release |
 | `project.name` | имя проекта в MCP и событиях (по умолчанию — имя папки) |
 | `events` | получатели событий процесса: `{ server, tool, on, args }` |
 | `gates.<gate>.overdue_hours` | через сколько часов ожидающий гейт даёт событие просрочки |

@@ -21,6 +21,8 @@ const ALLOWED = new Set([
   'block', 'warn', 'off', 'full', 'lite', 'both', 'skills', 'commands', 'true', 'false', 'done', 'dropped', 'init',
   'install', 'new', 'change', 'lock', 'unlock', 'pre-tool', 'session-start', 'stop', 'statusline', 'opsx', 'commit',
   'marketplace', 'enforcement', 'kind', 'risk', 'email', 'add-claims-status-panel', 'ok',
+  // 0.21.2, the owner's rule: stage and gate names stay English in Russian (a changed requirement).
+  'test', 'deploy', 'maintain', 'qa',
 ]);
 
 function untranslated(): string[] {

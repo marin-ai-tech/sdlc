@@ -27,10 +27,11 @@ describe('the stage title in the reader\'s language', () => {
     const status = p.cli(['status', '--change', 'add-farewell']).stdout;
     const stageLine = status.split('\n').find((line) => /^\s+(стадия|stage)\s/.test(line)) ?? '';
     const title = stageLine.replace(/^\s+\S+\s+/, '').trim();
-    expect(title).toMatch(/[А-Яа-яЁё]/);
+    // 0.21.2, the owner's rule: stage names stay English in Russian ("Plan (intent)") — a changed requirement; the
+    // point of this test stays: next and the status line name the stage exactly as status does.
+    expect(title).toBe('Plan (intent)');
     const next = p.cli(['next', '--change', 'add-farewell']).stdout.split('\n')[0];
     expect(next).toContain(title);
-    expect(next).not.toMatch(/\((intent|verification evidence|review \+ release)\)/);
     const statusLine = p.cli(['statusline'], JSON.stringify({ cwd: p.root })).stdout;
     expect(statusLine).toContain(title);
   }, 180000);

@@ -1318,6 +1318,7 @@
   "session.inboxFailed": "failed",
   "hook.mcpStage": "The MCP server {server} is for the stages {stages}; the active changes are at {current}. Call it once a change reaches one of them, or ask a person to add the stage to mcp.servers.{server}.stages.",
   "cmd.guide": "Explain how sdlc works: the topics, one article or one section",
+  "option.guideMarkdown": "print guide content as Markdown",
   "workflow.guide.title": "SDLC: Guide",
   "workflow.guide.description": "Explain how to work with sdlc in this project - stages, gates and approvals, roles, tracks, bug fixes, the backlog, rework and takeover, verification, review, MCP, configuration, and why the hook denied something.",
   "guide.index": "Guide topics:",

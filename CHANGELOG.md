@@ -2,6 +2,16 @@
 
 All notable changes to sdlc. Versions follow [Semantic Versioning](https://semver.org/); while the major version is 0, a minor version may change behavior.
 
+## 0.21.2 — 2026-10-15
+
+### Changed
+- `sdlc guide` prints plain text in a person's terminal: headings underlined, tables as aligned columns, code blocks
+  indented, without Markdown marks. An agent session still gets the Markdown; `--markdown` asks for it anywhere, and
+  `--json` is unchanged.
+- In every locale the names of the stages and the gates stay the English identifiers: a stage title starts with the
+  stage name and its gates, as in "Plan (intent)", and the messages, the report and the built-in guide name the gates
+  as intent, spec, plan, verify, qa, review and release.
+
 ## 0.21.1 — 2026-10-14
 
 ### Changed
