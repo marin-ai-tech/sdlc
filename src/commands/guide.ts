@@ -3,7 +3,7 @@ import { guideArticle, guideIndex, type GuideTopic } from '../core/guide.js';
 import { guideTour, type Tour } from '../core/guide-tour.js';
 import { agentEnvironment } from '../core/agent-env.js';
 import { currentLocale, t } from '../core/i18n.js';
-import { markdownToTerminal } from '../core/md-terminal.js';
+import { markdownToTerminal, terminalWidth } from '../core/md-terminal.js';
 
 interface GuideOptions {
   json?: boolean;
@@ -11,7 +11,7 @@ interface GuideOptions {
 }
 
 function guideText(body: string, opts: GuideOptions): string {
-  return opts.markdown || agentEnvironment() ? body.trimEnd() : markdownToTerminal(body);
+  return opts.markdown || agentEnvironment() ? body.trimEnd() : markdownToTerminal(body, terminalWidth());
 }
 
 function printIndex(topics: GuideTopic[], opts: GuideOptions): void {

@@ -2,6 +2,13 @@
 
 All notable changes to sdlc. Versions follow [Semantic Versioning](https://semver.org/); while the major version is 0, a minor version may change behavior.
 
+## 0.21.3 — 2026-10-15
+
+### Fixed
+- A table in `sdlc guide` fits the terminal window: the widest columns are narrowed and their cells wrap by words
+  within the column, instead of the whole row breaking at the window edge. The width is the terminal's, or `COLUMNS`
+  when the output is not a terminal; output to a file or a pipe keeps the natural width.
+
 ## 0.21.2 — 2026-10-15
 
 ### Changed
