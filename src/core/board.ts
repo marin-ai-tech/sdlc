@@ -16,6 +16,9 @@ import { checkResult, type TaskResult } from './task-result.js';
 import { updateBoard, type Board, type BoardClaim } from './board-store.js';
 import { excludedExecutors, previousAttempts, reopenedClaims } from './board-reopen.js';
 import { activeDispatch, expireDispatches, expireHeldClaims, leaseSeconds, refuseDispatch } from './board-dispatch.js';
+import { refuseAuction, settleAuctions } from './board-market.js';
+import { recordFailure, recordRequest, replayRequest, validateRequest, RequestReplay, type RequestSpec,
+  pruneRequests } from './board-requests.js';
 
 /**
  * The task board (B118a, epic E16): the open tasks of every active change whose plan gate is open, on which the
@@ -39,13 +42,15 @@ export interface BoardTaskView {
   task: { id: string; text: string };
   risk: string;
   kind: string;
-  status: 'open' | 'dispatched' | 'claimed' | 'submitted';
+  status: 'open' | 'auction' | 'dispatched' | 'claimed' | 'submitted';
   executor?: string;
   agent?: string;
   expiresAt?: string;
   attempts?: number;
   lastReason?: string;
   excluded?: string[];
+  closesAt?: string;
+  bids?: Array<{ executor: string; agent: string; minutes: number; cost?: number; at: string }>;
 }
 
 export interface ClaimResult {
@@ -67,12 +72,33 @@ function fail(code: string, key: string, params: Record<string, string>): never 
 }
 
 /** Every board command inside the lock: drop the dead claims, then run `fn` on the rest. */
-function withBoard<T>(root: string, config: SdlcConfig, fn: (board: Board) => T): T {
-  return updateBoard(root, (board) => {
-    expireHeldClaims(root, config, board, Date.now());
-    expireDispatches(root, config, board, Date.now());
-    return fn(board);
-  });
+function withBoard<T>(root: string, config: SdlcConfig, fn: (board: Board) => T, request?: RequestSpec): T {
+  validateRequest(request?.key);
+  try {
+    return updateBoard(root, (board) => {
+      const now = Date.now();
+      board.requests = pruneRequests(board.requests, now);
+      replayRequest<T>(board.requests, request);
+      expireHeldClaims(root, config, board, now);
+      expireDispatches(root, config, board, now);
+      settleAuctions(root, config, board, now);
+      try {
+        const result = fn(board);
+        recordRequest(board.requests, request, result);
+        return result;
+      } catch (error) {
+        recordFailure(board.requests, request, error);
+        throw error;
+      }
+    });
+  } catch (error) {
+    if (error instanceof RequestReplay) {
+      if (error.exitCode === 0) return error.result as T;
+      const diagnostic = (error.result as { status: Array<{ code: string; message: string; fix?: string }> }).status[0];
+      throw new SdlcError(diagnostic.code, diagnostic.message, diagnostic.fix);
+    }
+    throw error;
+  }
 }
 
 function liveClaim(board: Board, item: string, state: 'held' | 'submitted'): BoardClaim | undefined {
@@ -86,12 +112,17 @@ export function taskView(ref: ChangeRef, task: { id: string; text: string }, boa
   const id = `${ref.id}#${task.id}`;
   const claim = liveClaim(board, id, 'submitted') ?? liveClaim(board, id, 'held');
   const dispatch = activeDispatch(board, id);
+  const auction = board.auctions.find((entry) => entry.item === id);
   const view: BoardTaskView = {
     id, change: ref.id, task: { id: task.id, text: task.text },
     risk: state.risk, kind: state.kind,
     status: claim ? (claim.state === 'held' ? 'claimed' : 'submitted')
-      : dispatch ? 'dispatched' : 'open',
+      : auction ? 'auction' : dispatch ? 'dispatched' : 'open',
   };
+  if (auction && !claim) {
+    view.closesAt = auction.closesAt;
+    view.bids = auction.bids;
+  }
   if (claim !== undefined) {
     view.executor = claim.executor;
     view.agent = claim.agent;
@@ -134,6 +165,7 @@ export function boardTasks(
 /** The task one claim holds: `<change>#<task>`; a held claim blocks, a submitted one is terminal. */
 function assertClaimable(board: Board, ref: ChangeRef, taskId: string, executor: string): void {
   const item = `${ref.id}#${taskId}`;
+  refuseAuction(board, item);
   const submitted = liveClaim(board, item, 'submitted');
   if (submitted !== undefined) {
     fail('task_submitted', 'error.task_x_of_x_is_submitted', { task: taskId, change: ref.id });
@@ -160,24 +192,26 @@ function assertClaimable(board: Board, ref: ChangeRef, taskId: string, executor:
  */
 export function claimTask(
   root: string, paths: ProjectPaths, config: SdlcConfig,
-  opts: { change?: string; task: string; executor: string; agent: string; lease?: string },
+  opts: { change?: string; task: string; executor: string; agent: string; lease?: string; request?: string },
 ): ClaimResult {
-  const duration = leaseSeconds(opts.lease);
-  if (!AGENT_NAME.test(opts.agent)) {
-    fail('invalid_agent', 'error.x_is_not_a_valid_agent_name', { agent: opts.agent });
-  }
-  const ref = resolveChange(paths, opts.change);
-  const task = changeTasks(ref).find((entry) => entry.id === opts.task);
-  const { items, executor } = exportItems(root, ref, config, opts.task, opts.executor);
-  if (task !== undefined && task.done) {
-    fail('task_done', 'error.task_x_of_x_is_already_done', { task: opts.task, change: ref.id });
-  }
-  const item = items[0];
-  if (item === undefined || executor === undefined) {
-    fail('unknown_task', 'error.x_is_not_a_task_of_change_x', { task: opts.task, change: ref.id });
-  }
-  item.result.trailers['SDLC-Agent'] = `${executor.id}/${opts.agent}`;
-  const claim = withBoard(root, config, (board) => {
+  const request = { key: opts.request, command: 'claim', args: [opts.change, opts.task,
+    opts.executor, opts.agent, opts.lease] };
+  return withBoard(root, config, (board) => {
+    const duration = leaseSeconds(opts.lease);
+    if (!AGENT_NAME.test(opts.agent)) {
+      fail('invalid_agent', 'error.x_is_not_a_valid_agent_name', { agent: opts.agent });
+    }
+    const ref = resolveChange(paths, opts.change);
+    const task = changeTasks(ref).find((entry) => entry.id === opts.task);
+    const { items, executor } = exportItems(root, ref, config, opts.task, opts.executor);
+    if (task !== undefined && task.done) {
+      fail('task_done', 'error.task_x_of_x_is_already_done', { task: opts.task, change: ref.id });
+    }
+    const item = items[0];
+    if (item === undefined || executor === undefined) {
+      fail('unknown_task', 'error.x_is_not_a_task_of_change_x', { task: opts.task, change: ref.id });
+    }
+    item.result.trailers['SDLC-Agent'] = `${executor.id}/${opts.agent}`;
     assertClaimable(board, ref, opts.task, executor.id);
     const attempts = reopenedClaims(board, `${ref.id}#${opts.task}`);
     if (attempts.length > 0) item.previousAttempts = previousAttempts(attempts);
@@ -194,9 +228,8 @@ export function claimTask(
     appendLog(root, config, {
       event: 'task.claimed', change: ref.id, task: opts.task, executor: executor.id, agent: opts.agent,
     });
-    return created;
-  });
-  return { claim, item };
+    return { claim: created, item };
+  }, request);
 }
 
 function heldClaim(board: Board, claimId: string, executor?: string): BoardClaim {
@@ -212,17 +245,18 @@ function heldClaim(board: Board, claimId: string, executor?: string): BoardClaim
 }
 
 /** A heartbeat pushes the lease end out by the claim's own `leaseSeconds`; it writes no log entry. */
-export function heartbeatClaim(root: string, config: SdlcConfig, claimId: string, executor?: string): BoardClaim {
+export function heartbeatClaim(root: string, config: SdlcConfig, claimId: string,
+  executor?: string, requestKey?: string): BoardClaim {
   return withBoard(root, config, (board) => {
     const claim = heldClaim(board, claimId, executor);
     claim.expiresAt = iso(Date.now() + claim.leaseSeconds * 1000);
     return claim;
-  });
+  }, { key: requestKey, command: 'heartbeat', args: [claimId, executor] });
 }
 
 /** Release gives the task back to the open list; the note lands in the log's `detail`. */
 export function releaseClaim(root: string, config: SdlcConfig, claimId: string,
-  note?: string, executor?: string): BoardClaim {
+  note?: string, executor?: string, requestKey?: string): BoardClaim {
   return withBoard(root, config, (board) => {
     const claim = heldClaim(board, claimId, executor);
     claim.state = 'released';
@@ -233,7 +267,7 @@ export function releaseClaim(root: string, config: SdlcConfig, claimId: string,
       ...(note !== undefined && note !== '' ? { detail: note } : {}),
     });
     return claim;
-  });
+  }, { key: requestKey, command: 'release', args: [claimId, note, executor] });
 }
 
 /**
@@ -243,7 +277,7 @@ export function releaseClaim(root: string, config: SdlcConfig, claimId: string,
  */
 export function submitClaim(
   root: string, paths: ProjectPaths, config: SdlcConfig, claimId: string, branch: string,
-  base?: string, executor?: string,
+  base?: string, executor?: string, requestKey?: string,
 ): SubmitResult {
   return withBoard(root, config, (board) => {
     const claim = heldClaim(board, claimId, executor);
@@ -259,5 +293,5 @@ export function submitClaim(
       detail: `${branch} ${claim.head ?? ''}`.trim(),
     });
     return { claim, result };
-  });
+  }, { key: requestKey, command: 'submit', args: [claimId, branch, base, executor] });
 }

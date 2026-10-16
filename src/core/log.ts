@@ -4,6 +4,7 @@ import type { SdlcConfig } from './config.js';
 import { ensureDir, isFile, readText } from './fs-utils.js';
 import { harnessStamp, type HarnessStamp } from './license.js';
 import { queueEvent, type EventSummary, type QueueConfig } from '../mcp/outbox.js';
+import { agentEnvironment } from './agent-env.js';
 
 /**
  * Append-only project log: one JSON object per line in
@@ -49,6 +50,7 @@ export function appendLog(
   if (!config.log.enabled) return;
   const file = path.join(root, LOG_PATH);
   try {
+    const agent = input.agent ?? agentEnvironment();
     ensureDir(path.dirname(file));
     const attributes = path.join(path.dirname(file), '.gitattributes');
     if (!isFile(attributes)) fs.writeFileSync(attributes, GITATTRIBUTES, 'utf-8');
@@ -58,7 +60,7 @@ export function appendLog(
       ...(input.change ? { change: input.change } : {}),
       ...(input.by ? { by: input.by } : {}),
       ...(input.detail ? { detail: input.detail } : {}),
-      ...(input.agent ? { agent: input.agent } : {}),
+      ...(agent ? { agent } : {}),
       ...(input.waitingFor ? { waitingFor: input.waitingFor } : {}),
       ...(input.summary ? { summary: input.summary } : {}),
       ...(input.task ? { task: input.task } : {}),

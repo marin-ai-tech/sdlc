@@ -30,6 +30,8 @@ import {
 import { shellWriteDestinations } from './policy-shell-writes.js';
 import { patchFiles } from './policy-patch-files.js';
 import { planGateDenial } from './plan-gate.js';
+import { openspecNewChange, openspecWrite } from './openspec-guard.js';
+import { clearedAgentMarkers } from './policy-markers.js';
 
 /**
  * Deterministic guardrails behind the advisory skills - the playbook's
@@ -204,7 +206,8 @@ function evaluateCommand(
   const cmd = joinContinuations(command);
   // First: a command that clears the markers would also slip past the CLI's own agent check.
   if (clearsAgentMarker(cmd)) {
-    return { decision: 'deny', rule: 'agent-marker', reason: t('hook.agentMarker') };
+    return { decision: 'deny', rule: 'agent-marker',
+      reason: t('hook.agentMarker', { markers: clearedAgentMarkers(cmd).join(', ') }) };
   }
   if (ctx.config.enforcement.forbidAgentApprovals && callsHumanCommand(cmd)) {
     return {
@@ -238,6 +241,10 @@ function evaluateCommand(
   if (protectedHit) {
     return { decision: 'deny', rule: 'protected-path', reason: t('hook.protectedPath', { path: protectedHit }) };
   }
+  const creation = openspecNewChange(cmd);
+  if (creation) return soft(creation.rule, creation.reason);
+  const openspec = openspecWrite(written, ctx.paths);
+  if (openspec) return soft(openspec.rule, openspec.reason);
   const gated = codeGateDenial(written, ctx, soft);
   if (gated) return gated;
   return releaseDecision(cmd, ctx, env);
@@ -317,6 +324,8 @@ function evaluateRules(call: ToolCall, ctx: PolicyContext): Decision {
   const secret = secretEditDenial(call.writes, paths.root, call.cwd, config.enforcement.secretAllow);
   if (secret) return secret;
 
+  const openspec = openspecWrite(rels, paths);
+  if (openspec) return soft(openspec.rule, openspec.reason);
   return codeGateDenial(rels, ctx, soft) ?? { decision: 'allow' };
 }
 

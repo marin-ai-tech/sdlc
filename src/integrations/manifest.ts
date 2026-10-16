@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import { isDeepStrictEqual } from 'node:util';
 import { exists, normalizeNewlines, readText, writeTextAtomic } from '../core/fs-utils.js';
 import type { GeneratedFile } from './types.js';
 
@@ -54,7 +55,15 @@ export function readManifest(root: string): Manifest {
 export function writeManifest(root: string, manifest: Manifest): void {
   const sorted: Record<string, ManifestEntry> = {};
   for (const key of Object.keys(manifest.files).sort()) sorted[key] = manifest.files[key];
-  writeTextAtomic(path.join(root, MANIFEST_PATH), `${JSON.stringify({ ...manifest, files: sorted }, null, 2)}\n`);
+  const ordered = { version: manifest.version, harness: manifest.harness,
+    ...(manifest.license ? { license: manifest.license } : {}), files: sorted,
+    ...(manifest.mcpServers ? { mcpServers: manifest.mcpServers } : {}) };
+  const file = path.join(root, MANIFEST_PATH);
+  const content = `${JSON.stringify(ordered, null, 2)}\n`;
+  const existing = readText(file);
+  let same = false;
+  try { same = existing !== undefined && isDeepStrictEqual(JSON.parse(existing), ordered); } catch { /* rewrite */ }
+  if (!same) writeTextAtomic(file, content);
 }
 
 export interface ApplyReport {

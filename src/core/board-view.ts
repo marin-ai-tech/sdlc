@@ -8,6 +8,7 @@ import { taskView, type BoardTaskView } from './board.js';
 import { readExecutors } from './executors.js';
 import { evaluateChange } from './lifecycle.js';
 import { changeTasks, planOpen } from './task-contract.js';
+import { winner } from './board-market.js';
 
 /**
  * The board as the report and the dashboard show it (B122, epic E16). It only reads: no lock, no write of
@@ -23,12 +24,20 @@ export interface BoardSnapshot {
 }
 
 /** A copy of the board as of `now`: expired held claims and dispatches dropped, nothing written. */
-function boardAt(board: Board, now: number): Board {
+function boardAt(root: string, config: SdlcConfig, board: Board, now: number): Board {
   const live = (expiresAt: string) => Date.parse(expiresAt) > now;
+  const elapsed = board.auctions.filter((auction) => !live(auction.closesAt) && auction.bids.length);
+  const awarded = elapsed.map((auction) => ({
+    item: auction.item, change: auction.change, task: auction.task,
+    executor: winner(root, auction.bids, config.board?.market.rule ?? 'fastest').executor,
+    dispatchedAt: new Date(now).toISOString(), expiresAt: new Date(now + 900_000).toISOString(),
+    leaseSeconds: 900,
+  }));
   return {
     ...board,
     claims: board.claims.filter((claim) => claim.state !== 'held' || live(claim.expiresAt)),
-    dispatches: board.dispatches.filter((dispatch) => live(dispatch.expiresAt)),
+    dispatches: [...board.dispatches.filter((dispatch) => live(dispatch.expiresAt)), ...awarded],
+    auctions: board.auctions.filter((auction) => live(auction.closesAt)),
   };
 }
 
@@ -60,7 +69,7 @@ export function boardSnapshot(
 ): BoardSnapshot | undefined {
   const registry = readExecutors(root);
   if (!registry) return undefined;
-  const board = boardAt(readBoard(root), now.getTime());
+  const board = boardAt(root, config, readBoard(root), now.getTime());
   const refs = listActiveChanges(paths).filter((ref) => changeId === undefined || ref.id === changeId);
   const tasks = refs.flatMap((ref) => changeSnapshots(root, ref, config, board));
   return { tasks, byExecutor: executorCounts(tasks, [...registry.keys()]) };

@@ -612,8 +612,8 @@ and regenerate the files without losing local edits.
   The audit then counts the commit as agent work.
 - `sdlc update --tools …` changes the set of tools. In an agent session, fewer tools or `--no-hooks` count as
   weakening the guard and are refused.
-- After an update that changed the hooks, Codex CLI users trust the hooks again in `/hooks`, and Qwen Code users
-  check that the folder is still trusted. `sdlc doctor` reminds them.
+- After an update that changed the hooks, Codex CLI users trust the hooks again in `/hooks`. `sdlc doctor` reminds
+  them. Qwen Code's folder trust does not depend on the hooks, so an update needs no step there.
 - `sdlc uninstall` removes the agent files and hooks and keeps `openspec/`. It is a person's command.
 
 ### On screen (for the video)

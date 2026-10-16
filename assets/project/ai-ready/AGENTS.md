@@ -1,6 +1,7 @@
 # Agent guide for {{project.name}}
 
-This file is the main project guide for coding agents. People read [README.md]({{path:readme}}); Claude Code also loads [CLAUDE.md]({{path:claude-guide}}), which imports this file.
+This file is the main project guide for coding agents. People read [README.md]({{path:readme}}).
+Claude Code also loads [CLAUDE.md]({{path:claude-guide}}), which imports this file.
 
 ## What this project is
 
@@ -12,7 +13,7 @@ This file is the main project guide for coding agents. People read [README.md]({
 |------|------|---------|
 | Claude guide | [CLAUDE.md]({{path:claude-guide}}) | Thin Claude Code entry point: imports AGENTS.md, adds Claude-only notes. |
 | README | [README.md]({{path:readme}}) | What the project is and how a person starts with it. |
-| Review policy | [REVIEW.md]({{path:review-policy}}) | Review passes and severities used by /sdlc:review. |
+| Review policy | [REVIEW.md]({{path:review-policy}}) | Review passes and severities used by the review step. |
 | Architecture | [architecture]({{path:architecture}}) | System map: modules, boundaries, data flows, external dependencies. |
 | Conventions | [conventions]({{path:conventions}}) | Code style, naming, error handling and testing rules. |
 | Glossary | [glossary]({{path:glossary}}) | Domain vocabulary shared by people, specs and code. |
@@ -29,8 +30,7 @@ OpenSpec lives under `openspec/`:
 - `openspec/changes/` — work in progress (proposal, design, tasks, delta specs)
 
 Agent commands:
-- OpenCode: `/sdlc-<step>` (for example `/sdlc-plan`, `/sdlc-build`)
-- Claude Code: `/sdlc:<step>` (for example `/sdlc:plan`, `/sdlc:build`)
+{{agent.commands}}
 
 Orientation:
 - `{{cli}} status` — where the project is in the lifecycle

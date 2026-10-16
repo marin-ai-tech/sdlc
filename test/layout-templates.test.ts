@@ -7,7 +7,7 @@ import { REPO_ROOT } from './helpers.js';
 const TEMPLATES = path.join(REPO_ROOT, 'assets', 'project');
 const read = (rel: string) => fs.readFileSync(path.join(TEMPLATES, rel), 'utf-8');
 const TOKEN = /\{\{([^}]*)\}\}/g;
-const KNOWN = new Set(['project.name', 'cli', 'verify.commands', ...LAYOUT_ROLE_IDS.map((id) => `path:${id}`)]);
+const KNOWN = new Set(['project.name', 'cli', 'verify.commands', 'agent.commands', ...LAYOUT_ROLE_IDS.map((id) => `path:${id}`)]);
 
 describe('AI-ready project templates (assets/project/)', () => {
   it('every role has its template file', () => {

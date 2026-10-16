@@ -141,6 +141,7 @@ describe('policy engine', () => {
 
   it('always allows planning artifacts and markdown', () => {
     const { root, paths, config } = project();
+    write(path.join(root, 'openspec/changes/x/.openspec.yaml'), 'schema: sdlc\n');
     config.enforcement.mode = 'block';
     expect(evaluateToolCall(call(root, 'Write', { file_path: 'openspec/changes/x/plan.md' }), { paths, config }).decision).toBe('allow');
     expect(evaluateToolCall(call(root, 'Write', { file_path: 'docs/guide.md' }), { paths, config }).decision).toBe('allow');

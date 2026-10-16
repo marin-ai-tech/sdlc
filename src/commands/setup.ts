@@ -20,6 +20,7 @@ import { runOpenSpec } from '../core/openspec.js';
 import { findProjectRoot, projectPaths, type ProjectPaths } from '../core/project.js';
 import { detectVerifyCommands } from '../core/verify.js';
 import { readAsset } from '../integrations/assets.js';
+import { readManifest } from '../integrations/manifest.js';
 import {
   ADAPTERS,
   detectTools,
@@ -558,9 +559,18 @@ export function applyUpdate(
   tools: ToolId[],
   opts: { force?: boolean; dryRun?: boolean } = {},
 ): { result: InstallResult; gitHook: GitHookResult } {
+  const previous = readManifest(root);
   const result = installIntegrations(root, config, tools, { force: opts.force, dryRun: opts.dryRun });
   const gitHook = installGitHook(root, { dryRun: opts.dryRun, tools });
-  if (!opts.dryRun) logSetup(root, config, 'harness.updated', tools);
+  const fileChanges = result.files.created.length + result.files.updated.length + result.files.removed.length;
+  const hookChanges = [result.claudeHooks, result.cursorHooks, result.codexHooks,
+    result.qwenHooks, result.gigacodeHooks, result.statusLine, ...Object.values(result.mcp)]
+    .some((state) => ['installed', 'updated', 'removed'].includes(state));
+  const serverChanges = Object.values(result.servers)
+    .some((state) => state.added.length + state.updated.length + state.removed.length > 0);
+  const changed = previous.harness !== harnessStamp(config).version || fileChanges > 0 ||
+    hookChanges || serverChanges;
+  if (!opts.dryRun && changed) logSetup(root, config, 'harness.updated', tools);
   return { result, gitHook };
 }
 

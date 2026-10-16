@@ -21,6 +21,7 @@ import { CURSOR_HOOKS_PATH, cursorHooksInstalled } from '../integrations/cursor-
 import { CODEX_RULES_PATH } from '../integrations/codex.js';
 import { CODEX_HOOKS_PATH, codexHooksInstalled } from '../integrations/codex-hooks.js';
 import { qwenSettingsInstalled, qwenSettingsPath } from '../integrations/qwen-settings.js';
+import { qwenFolderTrusted } from './qwen-trust.js';
 import { CHAIN_LINE, CHAIN_SUFFIX, inspectGitHook } from '../integrations/git-hook.js';
 import { referencedVariables } from '../mcp/registry.js';
 
@@ -194,10 +195,11 @@ function qwenCheck(out: Checks, root: string, id: 'qwen' | 'gigacode'): void {
   const installed = qwenSettingsInstalled(root, id);
   const status = tt(installed ? 'doctor.qwenInstalled' : 'doctor.qwenMissing',
     { path: qwenSettingsPath(id) });
-  const parts = [status, tt('doctor.qwenTrust')];
+  const trusted = id === 'qwen' && qwenFolderTrusted(root);
+  const parts = [status, tt(trusted ? 'doctor.qwenTrusted' : 'doctor.qwenTrust')];
   if (id === 'gigacode') parts.push(tt('doctor.gigacodeExperimental'));
   const fix = tt(installed ? 'doctor.fix.qwenTrust' : 'doctor.fix.update');
-  out.add(id, 'warn', parts.join('; '), fix);
+  out.add(id, trusted && installed ? 'ok' : 'warn', parts.join('; '), fix);
 }
 
 /**

@@ -16,6 +16,8 @@ Answer the user's question about working with sdlc, for this project and its cur
 
 1. **Find the material.** Pick the topic from the list above that answers the question and read it:
    `sdlc guide <topic> --json`. For a hook denial, read the section of its rule: `sdlc guide denials#<rule> --json`
+   This includes `living-specs` and `change-not-created`: write delta specs in a change created by `sdlc new`,
+   and let `sdlc archive` update living specs after approval.
    (the rule is in brackets in the denial, for example `[sdlc:plan-gate]`).
 2. **Look at the real situation** when the question is about a change: `sdlc status --json`, `sdlc next --json`, and
    `sdlc next --me --json` for "what is waiting for me".

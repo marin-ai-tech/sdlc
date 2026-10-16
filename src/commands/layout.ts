@@ -39,7 +39,7 @@ export function layoutCommand(action: 'check' | 'scaffold' | 'adapt' | 'convert'
       return;
     }
     if (action === 'check') {
-      const report = detectLayout(ctx.root, ctx.config.layout);
+      const report = detectLayout(ctx.root, ctx.config.layout, ctx.config.tools);
       if (opts.json) return printJson({ ...report, harness: ctx.stamp });
       line(t('layout.header'));
       for (const r of report.roles) line(`${r.role} | ${r.status} | ${r.path ?? '-'} | ${t(`layout.purpose.${r.role}`)}`);

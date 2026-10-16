@@ -131,7 +131,9 @@ describe('scaffoldLayout', () => {
   });
 
   it('creates every missing role from its template, with no unrendered tokens', () => {
-    const result = scaffoldLayout(root, defaultConfig());
+    const config = defaultConfig();
+    config.tools = ['claude'];
+    const result = scaffoldLayout(root, config);
     for (const r of LAYOUT_ROLES) {
       const file = r.kind === 'dir' ? `${r.path}${path.posix.basename(r.template)}` : r.path;
       expect(exists(root, file), file).toBe(true);
@@ -141,6 +143,11 @@ describe('scaffoldLayout', () => {
     expect(read(path.join(root, 'CLAUDE.md'))).toMatch(/^@AGENTS\.md$/m);
     const agents = read(path.join(root, 'AGENTS.md'));
     for (const r of LAYOUT_ROLES.filter((x) => x.id !== 'agents-guide')) expect(agents, r.id).toContain(`](${r.path})`);
+  });
+
+  it('omits the Claude guide when Claude is not configured', () => {
+    scaffoldLayout(root, defaultConfig());
+    expect(exists(root, 'CLAUDE.md')).toBe(false);
   });
 
   it('negative: never overwrites an existing file, and a second run creates nothing', () => {

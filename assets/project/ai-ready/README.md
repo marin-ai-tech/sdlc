@@ -1,6 +1,7 @@
 # {{project.name}}
 
-{{project.name}} is an AI-ready project that follows the SDLC lifecycle and OpenSpec. This README is for people. Coding agents should start at [AGENTS.md]({{path:agents-guide}}) (Claude Code also loads [CLAUDE.md]({{path:claude-guide}})).
+{{project.name}} is an AI-ready project that follows the SDLC lifecycle and OpenSpec. This README is for people. Coding agents should start at [AGENTS.md]({{path:agents-guide}}).
+Claude Code also loads [CLAUDE.md]({{path:claude-guide}}).
 
 ## Quick start
 

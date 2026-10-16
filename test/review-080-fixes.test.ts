@@ -44,6 +44,7 @@ describe('1-2: more shell writes to state files, file by file or a whole folder'
 
   it('negative: writes inside a change folder to ordinary files, and reads, stay allowed', () => {
     const { root, ctx } = context();
+    write(path.join(root, 'openspec/changes/demo/.openspec.yaml'), 'schema: sdlc\n');
     for (const command of ['rm -rf openspec/changes/demo/tmp', 'cp a.md openspec/changes/demo/notes.md',
       'ls -la openspec/changes/demo', 'git diff -- openspec/changes/demo', 'del build\\out.txt']) {
       expect(evaluateToolCall(bash(root, command), ctx).decision, command).toBe('allow');

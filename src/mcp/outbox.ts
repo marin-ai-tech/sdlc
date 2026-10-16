@@ -53,6 +53,8 @@ export interface EventBody {
   sdlc: string;
   /** The person id from roles.yaml; absent without roles.yaml or when the identity is no person. */
   by?: string;
+  /** Coding agent that wrote the source log entry, when known. */
+  agent?: string;
   waitingFor?: string[];
   /** Present only for `summary.daily` (B99). */
   summary?: EventSummary;
@@ -185,6 +187,7 @@ export function eventBody(root: string, config: QueueConfig, entry: LogEntry): E
     at: entry.ts,
     sdlc: entry.sdlc,
     ...(by ? { by } : {}),
+    ...(entry.agent ? { agent: entry.agent } : {}),
     ...(Array.isArray(entry.waitingFor) ? { waitingFor: [...entry.waitingFor] } : {}),
     ...(entry.summary ? { summary: entry.summary } : {}),
   };

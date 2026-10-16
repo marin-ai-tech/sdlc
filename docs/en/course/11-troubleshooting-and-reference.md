@@ -44,9 +44,8 @@ reference (11.8) and the rows for 0.19.0, 0.20.0 and 0.21.0 were checked against
    ✓ openspec         OpenSpec 1.13.2 (bundled)
    ✓ sdlc.yaml        enforcement block, tools claude, cursor, codex, qwen
    ✓ generated files  159 tracked, 0 missing, 0 edited locally
-   ! qwen             Hooks and permissions.deny installed in .qwen/settings.json; Project hooks run only in a trusted
-                      folder; folder trust is off by default
-                      fix: Turn folder trust on and trust this folder
+   ✓ qwen             Hooks and permissions.deny installed in .qwen/settings.json; folder trust is off, so this folder
+                      is trusted and project settings apply
    ✓ cli on PATH      `sdlc` is on PATH (hooks, plugin and skills call `sdlc`)
    ✓ verify commands  test
    ✓ git hook         prepare-commit-msg in .git/hooks/prepare-commit-msg: commits made in agent sessions get an
@@ -99,8 +98,8 @@ reference (11.8) and the rows for 0.19.0, 0.20.0 and 0.21.0 were checked against
 - `cli on PATH` must be true in the shell the tool uses for hooks: PowerShell for Cursor and Codex on Windows, cmd.exe
   for Qwen Code. A `sdlc` that only Git Bash can find is not enough.
 - A tool that answers `--version` very slowly is still found, but its version may stay unknown.
-- The `!` lines for Cursor, Codex, Qwen Code and GigaCode stay after you do the trust step; they remind, they do not
-  fail.
+- The `!` lines for Cursor, Codex and GigaCode stay after you do the trust step; they remind, they do not fail. The
+  Qwen Code line turns to `✓` once the folder is trusted (or folder trust is off).
 
 ### On screen (for the video)
 
@@ -301,11 +300,11 @@ reference (11.8) and the rows for 0.19.0, 0.20.0 and 0.21.0 were checked against
 
 | Problem | Likely cause | What to do |
 |---|---|---|
-| The agent edits code before the plan is approved, with no denial | `sdlc` is not on the PATH of the tool's shell (the hooks let the call through), the hooks are not trusted (Codex, Qwen Code), or the mode is `off` | `sdlc doctor`; fix `cli on PATH`; trust the hooks; check `enforcement.mode` |
+| The agent edits code before the plan is approved, with no denial | `sdlc` is not on the PATH of the tool's shell (the hooks let the call through), the hooks are not trusted (Codex), the folder is not trusted while folder trust is on (Qwen Code), or the mode is `off` | `sdlc doctor`; fix `cli on PATH`; trust the hooks; check `enforcement.mode` |
 | The plan gate denies an agent's code edit although its change has an approved plan | several changes are active, and the file is not listed under `## Files that change` in an approved plan, or `plan.md` was edited after its approval | add the file to the plan and have the plan approved again, or finish the other change first |
 | `sdlc: command not found` in hooks | sdlc installed per project, or only Git Bash finds it | install globally, or set `cli: npx --no-install sdlc` and run `sdlc update` |
 | Codex ignores the hooks | the hooks are not trusted, or changed since | open `/hooks` in Codex and trust sdlc's hooks |
-| Qwen Code or GigaCode ignores the hooks | folder trust is off (the default) | turn folder trust on and trust the project folder |
+| Qwen Code ignores project hooks and deny rules | folder trust is enabled and the project is untrusted | trust the project folder or turn folder trust off |
 | Cursor's hooks fail on Windows | Cursor runs hooks through PowerShell; a Git Bash terminal can break them | set Cursor's terminal to PowerShell |
 | `sdlc approve` says it "cannot run inside an agent session" | you ran it in the agent's terminal or as `!sdlc approve` | run it in your own terminal |
 | `sdlc approve` refuses with `unknown_person` or `missing_role` | your git email is not in `roles.yaml`, or you do not hold the role | `sdlc roles who <gate> --change <id>`; ask the maintainer to change `roles.yaml` |
@@ -449,6 +448,9 @@ Claude Code spelling; in Cursor, OpenCode, Qwen Code and GigaCode use `/sdlc-<na
 | `sdlc task check-result --change <id> --branch <ref> --json` | |
 | `sdlc board list [--change <id>] --json` | |
 | `sdlc board dispatch --change <id> --task <n.m> --executor <id> [--lease <s>] --json` | |
+| `sdlc board auction --change <id> --task <n.m> [--window <s>] --json` | |
+| `sdlc board bid --change <id> --task <n.m> --executor <id> --agent <name> --minutes <n> [--cost <n>] [--request <key>] --json` | |
+| `sdlc board award --change <id> --task <n.m> --executor <id> --json` | |
 | `sdlc board claim --change <id> --task <n.m> --executor <id> --agent <name> --json` | |
 | `sdlc board heartbeat --claim <id>` | |
 | `sdlc board release --claim <id>` | |

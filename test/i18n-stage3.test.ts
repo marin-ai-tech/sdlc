@@ -12,7 +12,7 @@ const CYRILLIC = /[а-яё]{3}/i;
  * command names and config keys. Everything else is an untranslated word.
  */
 const ALLOWED = new Set([
-  'adr', 'ai-native', 'ai-ready', 'anthropic', 'bmad', 'cli', 'claude', 'code', 'opencode', 'openspec', 'json', 'yaml',
+  'adr', 'ai-native', 'ai-ready', 'anthropic', 'bmad', 'cli', 'claude', 'code', 'opencode', 'openspec', 'qwen', 'json', 'yaml',
   'html', 'id', 'osi', 'path', 'sdlc', 'yyyy-mm-dd', 'codegraph', 'git', 'npm', 'ssh', 'stdin', 'playbook', 'community',
   'license', 'open', 'source', 'kebab-case', 'worktree', 'config',
   'intent', 'spec', 'specs', 'plan', 'build', 'verify', 'review', 'release', 'archive', 'triage', 'explore', 'help', 'next',

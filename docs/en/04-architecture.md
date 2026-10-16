@@ -95,12 +95,15 @@ One engine (`src/core/policy.ts`) and one dispatcher (`sdlc hook pre-tool | sess
 | Rule | Class | Behavior |
 |---|---|---|
 | Code cannot be written without an approved plan (`require_approved_plan`) | process | `warn`: a reminder to the agent once per session; `block`: deny |
+| Agent writes to living specs (`living-specs`) | process | Remind in `warn`, deny in `block`; `sdlc archive` merges approved delta specs |
+| Agent writes to an uncreated change (`change-not-created`) | process | Remind in `warn`, deny in `block`; create with `sdlc new` or `sdlc backlog start` |
 | Protected paths (`protected_paths`) | hard | deny |
 | Tests locked (`sdlc tests lock` during a bug fix) | hard | deny edits to `test_paths` |
 | Agent approves a gate / edits `.sdlc.yaml`, `openspec/roles.yaml` or the project log | hard | deny |
 | Agent edits the guard's own configuration (`openspec/sdlc.yaml`, `.claude/settings*.json`, `.opencode/plugins/sdlc.js`, `.mcp.json`, `opencode.json(c)`, `.cursor/hooks.json`, `.cursor/mcp.json`, `.codex/hooks.json`, `.codex/config.toml`, `.codex/rules/sdlc.rules`, `.qwen/settings.json`, `.gigacode/settings.json`, the generated `sdlc-*` files, the manifest, the review policy, the sdlc schema, `openspec/config.yaml`; user-level `~/.claude/settings.json`, `$CLAUDE_CONFIG_DIR/settings.json`, `~/.config/opencode/opencode.json(c)`, `$OPENCODE_CONFIG`, `~/.codex/config.toml` and `~/.codex/hooks.json` (or under `CODEX_HOME`), Cursor's `~/.cursor/hooks.json`, `~/.qwen/settings.json`, `~/.gigacode/settings.json`), by edit or shell; runs `sdlc uninstall`, or `sdlc init`/`update` with flags that weaken the guard (lower mode, fewer tools, `--no-hooks`, another `--cli`) | hard | deny (rule `guard-config`; the CLI refuses with `agent_cannot_weaken_guard`); `init`/`update` without such flags still restore the files |
 | Agent adds a key, token or password in an edit or a shell write (`secret_allow` exempts test data) | hard | deny (rule `secret-in-edit`; the reason names the kind and the file, never the value) |
 | Agent calls a registry MCP server outside its `stages` (`mcp.servers`) | process | `warn`: a reminder; `block`: deny (rule `mcp-stage`) |
+| Agent attribution in the log | audit | CLI entries in an agent session add optional `agent`; `by` remains the git identity |
 | Production release without authorization (`release.commands`) | hard | deny until there is a `release` approval or `SDLC_RELEASE_APPROVAL` |
 | Stopping without fresh verification (`verify_before_stop`) | optional | Claude Code, Codex CLI, Qwen Code, GigaCode: `Stop → decision: block`; Cursor: stop answers a `followup_message`; OpenCode: none |
 | Session context | — | Claude Code, Codex CLI, Qwen Code, GigaCode: `SessionStart.additionalContext`; Cursor: sessionStart `additional_context`; OpenCode: `experimental.chat.system.transform` |
@@ -189,6 +192,12 @@ registry, `task export --executor` hands work to it (`SDLC-Agent: <executor>/<ag
 log entry per task), `check-result` wants that trailer on every commit (`missing_agent`, `unknown_executor`,
 `executor_not_allowed`; each check a `task.result_checked` log entry). Being a state file (`STATE_FILES`, the
 `policy-shell` regexes, the `hook.executorsIntegrity` deny reason), the registry is off-limits to agents.
+
+Market state and request receipts are parsed with other `board.json` fields at the boundary.
+`board-market.ts` settles elapsed auctions during locked board commands and logs one award or expiry.
+`board-requests.ts` keeps a command, argument digest, response and exit code for 24 hours; an identical
+retry replays its response without another write. The read-only board snapshot projects auctions and
+elapsed awards without changing the file or log. HTTP `board_bid` derives the executor from its token.
 
 **The task board (B118a).** `src/core/board.ts` holds the rules, `src/core/board-store.ts` the file and the lock,
 `src/commands/board.ts` the CLI. The open tasks of every active change whose plan gate is open (the same

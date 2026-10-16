@@ -2,6 +2,36 @@
 
 All notable changes to sdlc. Versions follow [Semantic Versioning](https://semver.org/); while the major version is 0, a minor version may change behavior.
 
+## 0.22.0 — 2026-10-15
+
+### Added
+- Market mode for the task board (B119): a person or the lead agent opens a timed auction for an open task
+  (`sdlc board auction`); executors of the registry bid with an estimate (`sdlc board bid … --minutes [--cost]`, also
+  the MCP tool `board_bid` for an executor token); when the window ends the next board command reserves the task for
+  the winner by `board.market.rule` (`fastest`, `cheapest` or `first`); a person may award at once or reassign
+  (`sdlc board award`). Auctions, bids and awards are in the log.
+- Mesh executors (B120): every board write takes a request key (`--request <key>`, MCP argument `request`); a relayed
+  or retried call with the same key and arguments answers as the first one and writes nothing new, the same key with
+  other arguments is refused with `request_conflict`.
+- Two process rules for agents (deny in `block`, a reminder in `warn`): `living-specs` — the living specs
+  (`openspec/specs/**`) change only through `sdlc archive`, never by an agent's edit or shell write;
+  `change-not-created` — an agent writes into a change folder only after `sdlc new` (or `sdlc backlog start`)
+  created it; `openspec new change` from an agent's shell gets the same answer.
+- The log records the agent of every CLI step run in an agent session (`agent`, next to the person's `by`); `sdlc log`
+  shows it, and `sdlc audit` counts the agent's entries (`agentEvents`) next to the commit trailers.
+
+### Fixed
+- `sdlc backlog start` with a title without Latin letters starts the change as `b<n>` instead of failing on an empty
+  id; a refused id points to `--change`.
+- `sdlc update` in a fresh clone installs the local git hook and leaves the working tree clean: the manifest keeps one
+  key order and is not rewritten, and nothing is logged, when nothing changed.
+- `sdlc doctor` reads Qwen Code's folder trust: with folder trust off (Qwen Code's default) every folder is trusted;
+  with it on, doctor warns only when the project folder is not trusted, the case where Qwen Code ignores the
+  project's hooks and deny rules. The documentation said the opposite and is corrected.
+- The `agent-marker` refusal names the variables the command clears, Qwen Code's and Codex CLI's included.
+- A project without the `claude` tool gets no `CLAUDE.md` from the AI-ready layout, and its `AGENTS.md` lists the
+  commands of the project's own agents.
+
 ## 0.21.3 — 2026-10-15
 
 ### Fixed

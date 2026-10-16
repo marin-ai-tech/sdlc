@@ -367,8 +367,8 @@ lessons to read for your role.
    | OpenCode | `opencode` | `/sdlc-next` | plugin `.opencode/plugins/sdlc.js` | `OPENCODE=1`, `AGENT=1`, `SDLC_AGENT` | — |
    | Cursor | `cursor` | `/sdlc-next` | hooks in `.cursor/hooks.json` | `CURSOR_AGENT=1` | — |
    | Codex CLI | `codex` | `$sdlc-next` | hooks in `.codex/hooks.json`, rules in `.codex/rules/sdlc.rules` | `CODEX_CI=1`, `CODEX_SESSION_ID` | trust sdlc's hooks in `/hooks` |
-   | Qwen Code | `qwen` | `/sdlc-next` | hooks and `permissions.deny` in `.qwen/settings.json` | `QWEN_CODE=1` | trust the project folder |
-   | GigaCode (experimental) | `gigacode` | `/sdlc-next` | hooks and `permissions.deny` in `.gigacode/settings.json` | `QWEN_CODE=1` | trust the project folder |
+   | Qwen Code | `qwen` | `/sdlc-next` | hooks and `permissions.deny` in `.qwen/settings.json` | `QWEN_CODE=1` | if folder trust is on, trust the project folder |
+   | GigaCode (experimental) | `gigacode` | `/sdlc-next` | hooks and `permissions.deny` in `.gigacode/settings.json` | `QWEN_CODE=1` | trust the project folder (not verified) |
 
    Northwind uses Claude Code. One later lesson shows the differences for the other tools.
 

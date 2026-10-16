@@ -57,6 +57,16 @@ Codex CLI, Qwen Code и GigaCode или плагин OpenCode. Отказ наз
 `sdlc takeover`, `sdlc track set`, `sdlc backlog move`, `sdlc uninstall`…). **Что делать:** дать человеку точную
 команду для его терминала — не команду с `!` в чате агента.
 
+## living-specs
+
+Правило процесса. Живые спецификации в `openspec/specs/` обновляет только `sdlc archive` после утверждения.
+**Что делать:** подготовить дельта-спецификацию в `openspec/changes/<id>/specs/<capability>/spec.md`.
+
+## change-not-created
+
+Правило процесса. В папке изменения нет ни `.sdlc.yaml`, ни `.openspec.yaml`.
+**Что делать:** создать изменение командой `sdlc new <id>` или `sdlc backlog start B<n> --change <id>`.
+
 ## agent-marker
 
 Жёсткое правило. Команда сбрасывает `CLAUDECODE`, `OPENCODE`, `AGENT`, `SDLC_AGENT`, `CURSOR_AGENT`, `CODEX_CI`, `QWEN_CODE` или

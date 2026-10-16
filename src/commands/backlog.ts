@@ -327,9 +327,16 @@ export function backlogStart(id: string, opts: Options): void {
         { key: 'error.x_is_not_ready_x', params: { id: id, p2: missing.join(', ') } }
       );
     }
-    const changeId = text(opts.change) ?? item.title.toLowerCase().normalize('NFKD')
+    const derived = item.title.toLowerCase().normalize('NFKD')
       .replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
-    assertValidChangeId(changeId);
+    const changeId = text(opts.change) ?? (derived || id.toLowerCase());
+    try {
+      assertValidChangeId(changeId);
+    } catch {
+      throw new SdlcError('invalid_change_name',
+        { key: 'error.change_name_x_must_be_lowercase_kebab_case_lette', params: { id: changeId } },
+        { key: 'fix.change_id_option' });
+    }
     const { dir } = createChange(changeId, { kind: item.kind, risk: item.risk,
       sourceType: 'backlog', sourceRef: id });
     writeTextAtomic(path.join(dir, 'intent.md'), draftIntent(item));

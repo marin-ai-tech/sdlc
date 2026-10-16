@@ -31,6 +31,10 @@ function changeOption(change: string | undefined): string[] {
   return change === undefined ? [] : ['--change', change];
 }
 
+function requestOption(request: string | undefined): string[] {
+  return request === undefined ? [] : ['--request', request];
+}
+
 const CHANGE = 'change id (defaults to the only active change)';
 
 export const READ_TOOLS: readonly ReadTool[] = [
@@ -126,30 +130,41 @@ export const WRITE_TOOLS: readonly ReadTool[] = [
     name: 'board_claim',
     description: 'Claim a board task as the token executor.',
     inputSchema: schema({ change: CHANGE, task: 'task number', agent: 'agent name',
-      lease: 'lease in seconds' }, ['change', 'task', 'agent']),
+      lease: 'lease in seconds', request: 'idempotency key' }, ['change', 'task', 'agent']),
     argv: (a) => ['board', 'claim', '--change', a.change ?? '', '--task', a.task ?? '',
-      '--agent', a.agent ?? '', ...(a.lease ? ['--lease', a.lease] : [])],
+      '--agent', a.agent ?? '', ...(a.lease ? ['--lease', a.lease] : []), ...requestOption(a.request)],
   },
   {
     name: 'board_heartbeat',
     description: 'Extend a claim lease.',
-    inputSchema: schema({ claim: 'secret claim id' }, ['claim']),
-    argv: (a) => ['board', 'heartbeat', '--claim', a.claim ?? ''],
+    inputSchema: schema({ claim: 'secret claim id', request: 'idempotency key' }, ['claim']),
+    argv: (a) => ['board', 'heartbeat', '--claim', a.claim ?? '', ...requestOption(a.request)],
   },
   {
     name: 'board_release',
     description: 'Release a claim to the board.',
-    inputSchema: schema({ claim: 'secret claim id', note: 'release note' }, ['claim']),
+    inputSchema: schema({ claim: 'secret claim id', note: 'release note', request: 'idempotency key' }, ['claim']),
     argv: (a) => ['board', 'release', '--claim', a.claim ?? '',
-      ...(a.note ? ['--note', a.note] : [])],
+      ...(a.note ? ['--note', a.note] : []), ...requestOption(a.request)],
   },
   {
     name: 'board_submit',
     description: 'Submit a claim result branch.',
     inputSchema: schema({ claim: 'secret claim id', branch: 'result branch',
-      base: 'base ref' }, ['claim', 'branch']),
+      base: 'base ref', request: 'idempotency key' }, ['claim', 'branch']),
     argv: (a) => ['board', 'submit', '--claim', a.claim ?? '', '--branch', a.branch ?? '',
-      ...(a.base ? ['--base', a.base] : [])],
+      ...(a.base ? ['--base', a.base] : []), ...requestOption(a.request)],
+  },
+  {
+    name: 'board_bid',
+    description: 'Bid for an open auction as the token executor.',
+    inputSchema: schema({ change: CHANGE, task: 'task number', agent: 'agent name',
+      minutes: 'estimated minutes', cost: 'estimated cost', note: 'bid note',
+      request: 'idempotency key' }, ['change', 'task', 'agent', 'minutes']),
+    argv: (a) => ['board', 'bid', '--change', a.change ?? '', '--task', a.task ?? '',
+      '--agent', a.agent ?? '', '--minutes', a.minutes ?? '',
+      ...(a.cost === undefined ? [] : ['--cost', a.cost]),
+      ...(a.note === undefined ? [] : ['--note', a.note]), ...requestOption(a.request)],
   },
 ];
 

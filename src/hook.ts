@@ -1,6 +1,7 @@
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
+import { createHash } from 'node:crypto';
 import { recordAwaiting } from './core/awaiting.js';
 import { loadConfig } from './core/config.js';
 import { isFile, isWithin, toPosix } from './core/fs-utils.js';
@@ -58,10 +59,11 @@ function write(obj: unknown): void {
 }
 
 /** One reminder per session and rule, so `warn` mode does not repeat itself on every edit. */
-function firstTimeThisSession(sessionId: string | undefined, key: string): boolean {
+function firstTimeThisSession(sessionId: string | undefined, key: string, root: string): boolean {
   if (!sessionId) return true;
   const safe = sessionId.replace(/[^A-Za-z0-9_-]/g, '').slice(0, 80) || 'default';
-  const file = path.join(os.tmpdir(), `sdlc-hook-${safe}.json`);
+  const project = createHash('sha256').update(root).digest('hex').slice(0, 12);
+  const file = path.join(os.tmpdir(), `sdlc-hook-${project}-${safe}.json`);
   let seen: string[] = [];
   try {
     seen = JSON.parse(fs.readFileSync(file, 'utf-8')) as string[];
@@ -85,7 +87,7 @@ function hookReason(decision: Decision): string {
 }
 
 /** Cursor's answer: deny, or allow with the warning once per conversation (like the Claude Code reminder). */
-function respondCursor(decision: Decision, sessionId: string | undefined): boolean {
+function respondCursor(decision: Decision, sessionId: string | undefined, root: string): boolean {
   if (decision.decision === 'allow') {
     write(cursorAllow());
     return false;
@@ -95,21 +97,21 @@ function respondCursor(decision: Decision, sessionId: string | undefined): boole
     write(cursorDeny(reason));
     return true;
   }
-  const first = firstTimeThisSession(sessionId, decision.rule ?? 'warn');
+  const first = firstTimeThisSession(sessionId, decision.rule ?? 'warn', root);
   write(cursorAllow(first ? reason : undefined));
   return first;
 }
 
 /** Answers the agent; returns true when a denial or a (first) warning was delivered. */
-function respondPreTool(agent: Agent, decision: Decision, sessionId: string | undefined): boolean {
-  if (agent === 'cursor') return respondCursor(decision, sessionId);
+function respondPreTool(agent: Agent, decision: Decision, sessionId: string | undefined, root: string): boolean {
+  if (agent === 'cursor') return respondCursor(decision, sessionId, root);
   if (decision.decision === 'allow') {
     if (agent === 'opencode') write({ decision: 'allow' });
     return false;
   }
   const reason = hookReason(decision);
   if (agent === 'opencode') {
-    if (decision.decision === 'warn' && !firstTimeThisSession(sessionId, decision.rule ?? 'warn')) {
+    if (decision.decision === 'warn' && !firstTimeThisSession(sessionId, decision.rule ?? 'warn', root)) {
       write({ decision: 'allow' });
       return false;
     }
@@ -120,7 +122,7 @@ function respondPreTool(agent: Agent, decision: Decision, sessionId: string | un
     write({ hookSpecificOutput: { hookEventName: 'PreToolUse', permissionDecision: 'deny', permissionDecisionReason: reason } });
     return true;
   }
-  if (firstTimeThisSession(sessionId, decision.rule ?? 'warn')) {
+  if (firstTimeThisSession(sessionId, decision.rule ?? 'warn', root)) {
     write({ hookSpecificOutput: { hookEventName: 'PreToolUse', additionalContext: reason } });
     return true;
   }
@@ -207,7 +209,7 @@ function preTool(agent: Agent, input: HookInput, project: HookProject): void {
   const call = normalizeToolCall(String(input.tool_name ?? ''), input.tool_input ?? {}, project.cwd);
   const decision = evaluateToolCall(call, { paths: project.paths, config });
   const logged = !(input as { skip_log?: boolean }).skip_log;
-  if (respondPreTool(agent, decision, input.session_id) && config.log.hookDecisions && logged) {
+  if (respondPreTool(agent, decision, input.session_id, root) && config.log.hookDecisions && logged) {
     appendLog(root, config, {
       event: decision.decision === 'deny' ? 'hook.denied' : 'hook.warned',
       agent,

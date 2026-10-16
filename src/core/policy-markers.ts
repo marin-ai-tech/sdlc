@@ -123,3 +123,16 @@ export function clearsAgentMarker(command: string): boolean {
   }
   return assignsCleared(command);
 }
+
+/** Marker names involved in a refused command, for its explanation only. */
+export function clearedAgentMarkers(command: string): string[] {
+  const paths = [...command.matchAll(ENV_PATH)].map((match) => match[1]);
+  const found = AGENT_MARKERS.filter((marker) => {
+    if (new RegExp(`\\b${marker}\\b`, 'i').test(command)) return true;
+    return paths.some((name) => {
+      const pattern = name.replace(/[.+^${}()|\\]/g, '\\$&').replace(/\*/g, '.*').replace(/\?/g, '.');
+      try { return new RegExp(`^${pattern}$`, 'i').test(marker); } catch { return true; }
+    });
+  });
+  return found.length > 0 ? found : [...AGENT_MARKERS];
+}

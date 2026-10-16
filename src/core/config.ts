@@ -12,6 +12,7 @@ import { parsePacksConfig, type PackConfig } from '../team/pack-config.js';
 import { parseQuestionsConfig, type QuestionsConfig } from './questions-config.js';
 import { parseDesignConfig, type DesignConfig } from './debate.js';
 import { parseJudgeConfig, serializeJudgeConfig, type JudgeConfig } from './judge-config.js';
+import { parseMarket, type MarketConfig } from './board-market-config.js';
 import { parseTeamConfig, type TeamConfig } from '../team/team-config.js';
 import { parseStages, type StagesConfig } from './stage-config.js';
 import { readYamlObject } from './yaml-io.js';
@@ -72,6 +73,7 @@ export interface VerifyCommand {
 }
 
 export interface SdlcConfig {
+  board?: { market: MarketConfig };
   version: 1;
   /** OpenSpec schema used for new changes created by `sdlc new`. */
   schema: string;
@@ -317,6 +319,8 @@ function asString(value: unknown, where: string): string | undefined {
  */
 export function parseConfig(raw: Raw, file = 'openspec/sdlc.yaml'): SdlcConfig {
   const config = defaultConfig();
+  const market = parseMarket(raw.board);
+  if (market) config.board = { market };
   const where = (key: string) => `${file}: ${key}`;
 
   if (raw.version !== undefined && raw.version !== 1) {

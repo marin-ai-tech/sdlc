@@ -19,6 +19,7 @@ function project(policy?: string) {
     'docs/notes.md', 'openspec/changes/a/review.md']) {
     write(path.join(root, rel), 'x\n');
   }
+  write(path.join(root, 'openspec/changes/a/.openspec.yaml'), 'schema: sdlc\n');
   const config = defaultConfig();
   config.enforcement.mode = 'warn';
   config.enforcement.requireApprovedPlan = false;

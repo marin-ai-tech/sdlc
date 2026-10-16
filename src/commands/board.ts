@@ -6,6 +6,7 @@ import {
 import type { BoardClaim } from '../core/board-store.js';
 import { reopenTask } from '../core/board-reopen.js';
 import { dispatchTask } from '../core/board-dispatch.js';
+import { openAuction, bidTask, awardTask, type BidOptions } from '../core/board-market.js';
 import { t } from '../core/i18n.js';
 import type { ResultProblem } from '../core/task-result.js';
 
@@ -26,12 +27,14 @@ interface ClaimOptions {
   executor: string;
   agent: string;
   lease?: string;
+  request?: string;
   json?: boolean;
 }
 
 interface ClaimIdOptions {
   claim: string;
   executor?: string;
+  request?: string;
   json?: boolean;
 }
 
@@ -54,6 +57,39 @@ export function boardDispatchCommand(opts: DispatchOptions): void {
     line(t('board.dispatch.done', {
       item: dispatch.item, executor: dispatch.executor, at: dispatch.expiresAt,
     }));
+  } catch (error) {
+    reportFailure(error, opts.json);
+  }
+}
+
+export function boardAuctionCommand(opts: { change: string; task: string; window?: string; json?: boolean }): void {
+  try {
+    const ctx = loadProject();
+    const auction = openAuction(ctx.root, ctx.paths, ctx.config, opts);
+    if (opts.json) printJson({ auction });
+    else line(t('board.auction.done', { item: auction.item, at: auction.closesAt }));
+  } catch (error) {
+    reportFailure(error, opts.json);
+  }
+}
+
+export function boardBidCommand(opts: BidOptions & { json?: boolean }): void {
+  try {
+    const ctx = loadProject();
+    const bid = bidTask(ctx.root, ctx.paths, ctx.config, opts);
+    if (opts.json) printJson({ bid });
+    else line(t('board.bid.done', { executor: bid.executor, minutes: String(bid.minutes) }));
+  } catch (error) {
+    reportFailure(error, opts.json);
+  }
+}
+
+export function boardAwardCommand(opts: { change: string; task: string; executor: string; json?: boolean }): void {
+  try {
+    const ctx = loadProject();
+    const dispatch = awardTask(ctx.root, ctx.paths, ctx.config, opts);
+    if (opts.json) printJson({ dispatch });
+    else line(t('board.award.done', { item: dispatch.item, executor: dispatch.executor }));
   } catch (error) {
     reportFailure(error, opts.json);
   }
@@ -134,7 +170,7 @@ export function boardClaimCommand(opts: ClaimOptions): void {
 export function boardHeartbeatCommand(opts: ClaimIdOptions): void {
   try {
     const ctx = loadProject();
-    const claim = heartbeatClaim(ctx.root, ctx.config, opts.claim, opts.executor);
+    const claim = heartbeatClaim(ctx.root, ctx.config, opts.claim, opts.executor, opts.request);
     if (opts.json) {
       printJson({ claim: publicClaim(claim) });
       return;
@@ -148,7 +184,7 @@ export function boardHeartbeatCommand(opts: ClaimIdOptions): void {
 export function boardReleaseCommand(opts: ReleaseOptions): void {
   try {
     const ctx = loadProject();
-    const claim = releaseClaim(ctx.root, ctx.config, opts.claim, opts.note, opts.executor);
+    const claim = releaseClaim(ctx.root, ctx.config, opts.claim, opts.note, opts.executor, opts.request);
     if (opts.json) {
       printJson({ claim: publicClaim(claim) });
       return;
@@ -169,7 +205,7 @@ export function boardSubmitCommand(opts: SubmitOptions): void {
   try {
     const ctx = loadProject();
     const { claim, result } = submitClaim(
-      ctx.root, ctx.paths, ctx.config, opts.claim, opts.branch, opts.base, opts.executor,
+      ctx.root, ctx.paths, ctx.config, opts.claim, opts.branch, opts.base, opts.executor, opts.request,
     );
     if (!result.ok) process.exitCode = 1;
     if (opts.json) {

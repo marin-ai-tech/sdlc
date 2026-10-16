@@ -312,6 +312,16 @@ describe('demo: a team builds a calculator with sdlc (every command)', { timeout
     step('board-release', 'build', 'agent',
       ['board', 'release', '--claim', JSON.parse(second.stdout).claim.id, '--note', 'coder-2 took a different task', '--json'],
       'The claim is released with a note for the log: task 1.2 is open again.');
+    step('board-auction', 'build', 'alice',
+      ['board', 'auction', '--change', 'basic-arithmetic', '--task', '1.2', '--json'],
+      'Alice opens a timed auction for task 1.2.');
+    step('board-bid', 'build', 'agent',
+      ['board', 'bid', '--change', 'basic-arithmetic', '--task', '1.2', '--executor', 'calc-swarm',
+        '--agent', 'coder-2', '--minutes', '30', '--json'],
+      'The swarm bids with an estimated completion time.');
+    step('board-award', 'build', 'alice',
+      ['board', 'award', '--change', 'basic-arithmetic', '--task', '1.2', '--executor', 'calc-swarm', '--json'],
+      'Alice awards the auction to calc-swarm before the window closes.');
     write(path.join(root, 'test/calc.test.js'), TEST);
     write(path.join(root, 'src/calc.js'), CODE);
     write(path.join(change('basic-arithmetic'), 'tasks.md'), TASKS.replace(/- \[ \]/g, '- [x]'));

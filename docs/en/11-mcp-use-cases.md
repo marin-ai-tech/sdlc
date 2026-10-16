@@ -316,6 +316,12 @@ Chapter 10.11 has the configuration.
 
 ### A representative works the board
 
+For market placement, a person or lead agent opens an auction with `sdlc board auction`; an executor
+token can call `board_bid` with `change`, `task`, `agent`, `minutes`, and optional `cost`, `note`, and
+`request`. The bearer token supplies the executor. The server offers no auction or award tool.
+`board_claim`, `board_heartbeat`, `board_release`, and `board_submit` also accept `request` for
+idempotent peer retries.
+
 After a person or lead agent runs `sdlc board dispatch --change add-export --task 1.2 --executor swarm-a`,
 the representative connects over HTTP with its executor token. It calls `board_list` to find the reservation,
 then `board_claim` with `{ "change": "add-export", "task": "1.2", "agent": "leader-1" }`. The response

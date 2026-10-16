@@ -108,7 +108,10 @@ function currentMapping(root: string): LayoutMapping {
 /** Which roles are missing, which are under another name and which are in place (detectLayout). */
 export function diagnoseLayout(root: string, mapping: LayoutMapping = currentMapping(root)): LayoutDiagnosis {
   const diagnosis: LayoutDiagnosis = { missing: [], aliases: [], canonical: [] };
-  for (const found of detectLayout(root, mapping).roles) {
+  const file = projectPaths(root).sdlcConfig;
+  let tools: string[] | undefined;
+  try { if (isFile(file)) tools = loadConfig(file).tools; } catch { /* init reports invalid config */ }
+  for (const found of detectLayout(root, mapping, tools).roles) {
     if (found.status === 'missing') diagnosis.missing.push(found.role);
     else if (found.status === 'canonical') diagnosis.canonical.push(found.role);
     else diagnosis.aliases.push({ role: found.role, path: found.path ?? '' });

@@ -211,9 +211,8 @@ Make each tool's hooks actually run, know what happens when a hook cannot run, a
                       `/hooks` ...
                       fix: Open `/hooks` in Codex and trust sdlc's hooks; never run the agent with `--ignore-rules` or
                       `features.hooks=false`.
-   ! qwen             Hooks and permissions.deny installed in .qwen/settings.json; Project hooks run only in a trusted
-                      folder; folder trust is off by default
-                      fix: Turn folder trust on and trust this folder
+   ✓ qwen             Hooks and permissions.deny installed in .qwen/settings.json; folder trust is off, so this folder
+                      is trusted and project settings apply
    ✓ cli on PATH      `sdlc` is on PATH (hooks, plugin and skills call `sdlc`)
    ```
 
@@ -224,7 +223,7 @@ Make each tool's hooks actually run, know what happens when a hook cannot run, a
    | Tool | What a person does once | Until then |
    |---|---|---|
    | Codex CLI | open `/hooks` in Codex and trust sdlc's hooks, after `sdlc init` and after an `sdlc update` that changed them | only the command rules and the CLI's refusal hold; the plan gate is not held for edits |
-   | Qwen Code, GigaCode | turn folder trust on and trust the project folder | only `permissions.deny` and the CLI's refusal hold; the plan gate is not held for edits |
+   | Qwen Code | when folder trust is enabled, trust the project folder | without trust, project hooks and `permissions.deny` are ignored; the CLI still refuses human commands |
    | Cursor | check that the agent's terminal sets `CURSOR_AGENT` (`echo $env:CURSOR_AGENT`); on Windows, set Cursor's terminal to PowerShell if hooks misbehave | the hooks still deny a person's commands by their text; the CLI cannot tell the agent's terminal from yours |
    | Claude Code, OpenCode | nothing | — |
 
@@ -621,6 +620,14 @@ start the server — an executor token alone does not start it.
    work: verification, then Paul's review approval in his own terminal. An executor never approves a gate.
 
 #### The task board
+
+`sdlc board auction --change <id> --task <n.m> [--window <s>]` opens a market window.
+Executors use `sdlc board bid --change <id> --task <n.m> --executor <id> --agent <name> --minutes <n>`.
+The next board command after closing awards by `board.market.rule` (`fastest`, `cheapest`, or `first`);
+`sdlc board award` closes early or reassigns. `board.market.window_seconds` sets the default window.
+The `--request` option on claim, heartbeat, release, submit, and bid makes a repeated peer request
+return its original answer for 24 hours. MCP executor tokens may use `board_bid`; no auction or award
+tool is exposed.
 
 A person or lead agent can reserve one task for a representative with
 `sdlc board dispatch --change <id> --task <n.m> --executor <id> [--lease <s>]`.

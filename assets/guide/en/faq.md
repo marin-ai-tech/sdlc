@@ -44,10 +44,14 @@ Read the rule in brackets and `sdlc guide denials`. To relax the process rules f
 
 **Is everything installed correctly?**
 `sdlc doctor`.
+For Qwen Code, folder trust off means every folder is trusted. When enabled, trust the project folder;
+an untrusted folder ignores project `.qwen/settings.json`, including hooks and `permissions.deny`.
 
 **Where is the history of decisions?**
 `sdlc audit --change <id>`, `sdlc log`, and `sdlc trace <id>` from intent to evidence. The audit also compares the
 people's decisions the track planned with what happened (approvals, reworks, takeovers, waivers, answers, waits).
+CLI log entries made in an agent session include optional `agent` alongside the git identity in `by`.
+`sdlc audit --json` counts them as `agentEvents: { agent, total, byAgent }`, separately from `agentCommits`.
 
 **An auditor asks for evidence.**
 `sdlc audit --export <folder> [--since <date>]`: every approval with its signature and trailer status, the change

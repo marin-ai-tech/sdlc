@@ -56,6 +56,16 @@ Hard rule. The command records a person's decision (`sdlc approve`, `sdlc reject
 `sdlc takeover`, `sdlc track set`, `sdlc backlog move`, `sdlc uninstall`…). **Do:** give the person the exact command
 for their own terminal — not a `!` command in the agent chat.
 
+## living-specs
+
+Process rule. Living specs under `openspec/specs/` change only when `sdlc archive` merges an approved change.
+**Do:** write the delta spec at `openspec/changes/<id>/specs/<capability>/spec.md`.
+
+## change-not-created
+
+Process rule. The change folder has neither `.sdlc.yaml` nor `.openspec.yaml`.
+**Do:** create it with `sdlc new <id>` or `sdlc backlog start B<n> --change <id>`.
+
 ## agent-marker
 
 Hard rule. The command clears `CLAUDECODE`, `OPENCODE`, `AGENT`, `SDLC_AGENT`, `CURSOR_AGENT`, `CODEX_CI`, `QWEN_CODE` or

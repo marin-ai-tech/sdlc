@@ -29,8 +29,10 @@ sdlc doctor
 Every generated file is recorded in the manifest; `sdlc update` refreshes them and `sdlc uninstall` removes them.
 sdlc's hooks, deny entries and MCP servers in `settings.json` sit next to your own; only sdlc's are replaced or removed.
 
-**Trust the folder.** Qwen Code loads a project's hooks only in a trusted folder, and folder trust is off by default:
-turn folder trust on and trust the project folder. `sdlc doctor` reminds you. The deny rules hold without it.
+**Folder trust.** When Qwen Code's `security.folderTrust.enabled` is off (the default), every folder is trusted and
+project hooks and `permissions.deny` apply. When it is on, trust the project folder or an ancestor. An untrusted
+folder causes Qwen Code to ignore the project's `.qwen/settings.json`, including hooks and deny rules.
+`sdlc doctor` reads the user trust settings and warns only when the project is untrusted.
 
 ## 17.2. What is enforced
 
@@ -71,8 +73,8 @@ plan is denied (see 17.4).
 
 ## 17.4. Limits we accept
 
-- **Folder trust.** Untrusted folders do not run the project's hooks. Until the folder is trusted, only the deny rules
-  and the CLI's own refusal hold; the plan gate is not held for edits.
+- **Folder trust.** With folder trust enabled, untrusted folders ignore the project's settings, including hooks and
+  `permissions.deny`. The CLI's own refusal still applies in agent shells carrying `QWEN_CODE=1`.
 - **A hook that cannot run.** Qwen Code lets the call through when a hook fails, times out or answers bad JSON.
   When sdlc's pre-tool hook fails to load or throws, the sdlc command answers a JSON `deny` itself, so the call is
   blocked. `sdlc` missing from the PATH of the tool's shell (`sdlc doctor` checks it) and a timeout still let the

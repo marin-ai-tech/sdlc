@@ -277,13 +277,14 @@ function printCommit(commit: CommitInfo): void {
 }
 
 /** The commits touching the change folder and the agents' share of the change's commits (B104). */
-function printChangeCommits(audit: ChangeAudit, change: string): void {
+function printChangeCommits(audit: ChangeAudit, change: string, events: ReturnType<typeof agentEvents>): void {
   if (audit.commits.length > 0) {
     line(c.bold(`  ${t('audit.commits')}`));
     for (const commit of audit.commits) printCommit(commit);
   }
   const share = audit.agentCommits;
   line(`  ${t('audit.changeAgentCommits', { agent: share.agent, total: share.total, change })}`);
+  line(`  ${t('audit.agentEvents', { agent: events.agent, total: events.total })}`);
 }
 
 /** Lead times, verify runs, flow and participation of one change. */
@@ -311,11 +312,13 @@ function auditOneChange(ctx: ProjectContext, id: string, since: string | undefin
   const audit = auditChange(ctx.paths, ref, since);
   const state = audit.state;
   const metrics = changeMetrics(state, changeLog(readLog(ctx.root), ref.id), ctx.config);
+  const events = agentEvents(ctx.root, since, ref.id);
   if (json) {
     printJson({
       change: ref.id, archived: ref.archived, kind: state.kind, risk: state.risk, track: state.track,
       source: state.source, ...(state.harness ? { recordedWith: state.harness } : {}), ...(since ? { since } : {}),
-      history: audit.history, commits: audit.commits, agentCommits: audit.agentCommits, metrics, harness: ctx.stamp,
+      history: audit.history, commits: audit.commits, agentCommits: audit.agentCommits,
+      agentEvents: events, metrics, harness: ctx.stamp,
     });
     return;
   }
@@ -325,7 +328,7 @@ function auditOneChange(ctx: ProjectContext, id: string, since: string | undefin
   for (const h of audit.history) {
     line(`  ${h.at}  ${h.event.padEnd(26)} ${h.by ?? ''}${h.detail ? c.dim(` - ${h.detail}`) : ''}${stampSuffix(h)}`);
   }
-  printChangeCommits(audit, ref.id);
+  printChangeCommits(audit, ref.id, events);
   printChangeMetrics(metrics);
 }
 
@@ -348,6 +351,17 @@ function projectRows(ctx: ProjectContext, refs: ChangeRef[]) {
 
 type ProjectAudit = ReturnType<typeof projectRows>;
 
+function agentEvents(root: string, since: string | undefined, change?: string) {
+  const entries = readLog(root).filter((entry) => (!since || entry.ts >= since)
+    && (!change || entry.change === change));
+  const byAgent: Record<string, number> = {};
+  for (const entry of entries) {
+    if (entry.agent) byAgent[entry.agent] = (byAgent[entry.agent] ?? 0) + 1;
+  }
+  return { agent: Object.values(byAgent).reduce((total, count) => total + count, 0),
+    total: entries.length, byAgent };
+}
+
 /** The aggregate over the rows; `since` (B104) limits the agents' commits to the period. */
 function projectAggregate(ctx: ProjectContext, audit: ProjectAudit, since: string | undefined) {
   const rows = audit.rows;
@@ -357,6 +371,7 @@ function projectAggregate(ctx: ProjectContext, audit: ProjectAudit, since: strin
     ...aggregateMetrics(rows),
     /** Commits reachable from HEAD and those made in agent sessions (`SDLC-Agent:` trailer, B24). */
     agentCommits: agentCommits(ctx.root, since),
+    agentEvents: agentEvents(ctx.root, since),
     /** sdlc versions and licenses recorded in the change histories. */
     recordedWith: { versions: audit.versions, licenses: audit.licenses },
   };
@@ -382,6 +397,9 @@ function printProjectAudit(
   })}`);
   const commits = aggregate.agentCommits;
   line(`  ${t('audit.agentCommits', { agent: commits.agent, total: commits.total })}`);
+  line(`  ${t('audit.agentEvents', {
+    agent: aggregate.agentEvents.agent, total: aggregate.agentEvents.total,
+  })}`);
   printProjectFlow(aggregate);
   printProjectParticipation(audit.rows, aggregate.participation);
   if (audit.versions.length > 0) {
@@ -397,7 +415,8 @@ function auditProject(ctx: ProjectContext, since: string | undefined, json?: boo
   const audit = projectRows(ctx, changesInPeriod(ctx.paths, since));
   const aggregate = projectAggregate(ctx, audit, since);
   if (json) {
-    printJson({ ...(since ? { since } : {}), aggregate, changes: audit.rows, harness: ctx.stamp });
+    printJson({ ...(since ? { since } : {}), aggregate, agentEvents: aggregate.agentEvents,
+      changes: audit.rows, harness: ctx.stamp });
     return;
   }
   printProjectAudit(ctx, audit, aggregate, since);
@@ -453,7 +472,7 @@ export async function logCommand(opts: LogOptions): Promise<void> {
       line(c.dim(t('log.truncated', { shown: shown.length, total: entries.length })));
     }
     for (const e of shown) {
-      const who = e.by ?? (e.agent ? `agent:${e.agent}` : '');
+      const who = `${e.by ?? ''}${e.agent ? ` (agent ${e.agent})` : ''}`;
       line(`${e.ts}  ${e.event.padEnd(26)} ${e.change ? `${e.change} ` : ''}${who}${e.detail ? c.dim(` - ${e.detail}`) : ''}` +
         c.dim(` [sdlc ${e.sdlc ?? '?'} · ${(e.license ?? '?').split(' ')[0]}]`));
     }

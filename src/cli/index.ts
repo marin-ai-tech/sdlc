@@ -43,7 +43,7 @@ import {
 } from '../commands/task.js';
 import {
   boardClaimCommand, boardHeartbeatCommand, boardListCommand, boardReleaseCommand, boardSubmitCommand,
-  boardReopenCommand, boardDispatchCommand,
+  boardReopenCommand, boardDispatchCommand, boardAuctionCommand, boardBidCommand, boardAwardCommand,
 } from '../commands/board.js';
 import { mcpCheckCommand, mcpServeCommand } from '../commands/mcp.js';
 import { contextPullCommand } from '../commands/context.js';
@@ -504,23 +504,49 @@ export function buildProgram(): Command {
     .option('--lease <seconds>', 'lease in seconds (default: 900, max: 86400)')
     .option('--json', 'output JSON')
     .action((opts) => boardDispatchCommand(opts));
+  board.command('auction').description(cmdDesc('cmd.board.auction'))
+    .requiredOption('--change <id>', 'change id')
+    .requiredOption('--task <n.m>', 'task id')
+    .option('--window <seconds>', 'bidding window in seconds')
+    .option('--json', 'output JSON')
+    .action((opts) => boardAuctionCommand(opts));
+  board.command('bid').description(cmdDesc('cmd.board.bid'))
+    .requiredOption('--change <id>', 'change id')
+    .requiredOption('--task <n.m>', 'task id')
+    .requiredOption('--executor <id>', 'executor id')
+    .requiredOption('--agent <name>', 'agent name')
+    .requiredOption('--minutes <n>', 'estimated minutes')
+    .option('--cost <n>', 'estimated cost')
+    .option('--note <text>', 'bid note')
+    .option('--request <key>', 'idempotency key')
+    .option('--json', 'output JSON')
+    .action((opts) => boardBidCommand(opts));
+  board.command('award').description(cmdDesc('cmd.board.award'))
+    .requiredOption('--change <id>', 'change id')
+    .requiredOption('--task <n.m>', 'task id')
+    .requiredOption('--executor <id>', 'executor id')
+    .option('--json', 'output JSON')
+    .action((opts) => boardAwardCommand(opts));
   board.command('claim').description(cmdDesc('cmd.board.claim'))
     .requiredOption('--change <id>', 'change id')
     .requiredOption('--task <n.m>', 'task id to claim (e.g. 1.2)')
     .requiredOption('--executor <id>', 'executor id from openspec/executors.yaml')
     .requiredOption('--agent <name>', 'agent name inside the executor')
     .option('--lease <seconds>', 'lease in seconds (default: 900, max: 86400)')
+    .option('--request <key>', 'idempotency key')
     .option('--json', 'output JSON')
     .action((opts) => boardClaimCommand(opts));
   board.command('heartbeat').description(cmdDesc('cmd.board.heartbeat'))
     .requiredOption('--claim <id>', 'claim id from board claim')
     .option('--executor <id>', 'require the claim to belong to this executor')
+    .option('--request <key>', 'idempotency key')
     .option('--json', 'output JSON')
     .action((opts) => boardHeartbeatCommand(opts));
   board.command('release').description(cmdDesc('cmd.board.release'))
     .requiredOption('--claim <id>', 'claim id from board claim')
     .option('--executor <id>', 'require the claim to belong to this executor')
     .option('--note <text>', 'note written to the log entry')
+    .option('--request <key>', 'idempotency key')
     .option('--json', 'output JSON')
     .action((opts) => boardReleaseCommand(opts));
   board.command('submit').description(cmdDesc('cmd.board.submit'))
@@ -528,6 +554,7 @@ export function buildProgram(): Command {
     .option('--executor <id>', 'require the claim to belong to this executor')
     .requiredOption('--branch <ref>', 'result branch to check')
     .option('--base <ref>', 'base ref (default: merge-base of branch and HEAD)')
+    .option('--request <key>', 'idempotency key')
     .option('--json', 'output JSON')
     .action((opts) => boardSubmitCommand(opts));
   board.command('reopen').description(cmdDesc('cmd.board.reopen'))

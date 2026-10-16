@@ -26,8 +26,8 @@ Claude Code and OpenCode. The tools are compared in [Supported tools](#supported
 For Cursor, see [15. Cursor IDE](15-cursor.md): `sdlc init --tools cursor --mcp` sets up skills, commands, subagents,
 a rule, the MCP server and Cursor's own hooks. For Codex CLI, see [16. Codex CLI](16-codex.md):
 `sdlc init --tools codex --mcp`, then trust sdlc's hooks once in Codex's `/hooks`. For Qwen Code and GigaCode, see
-[17. Qwen Code and GigaCode](17-qwen-gigacode.md): `sdlc init --tools qwen --mcp` (or `gigacode`, experimental), then
-trust the project folder.
+[17. Qwen Code and GigaCode](17-qwen-gigacode.md): `sdlc init --tools qwen --mcp` (or `gigacode`, experimental); if you turned Qwen
+Code's folder trust on, trust the project folder.
 
 From git, install the `release` branch, which carries the built code: `npm install -g github:marin-ai-tech/sdlc#release`. Never `npm install -g sdlc`: the registry package of that name is unrelated.
 
@@ -74,8 +74,8 @@ where it is set).
 | OpenCode | `opencode` | `/sdlc-next` | the plugin `.opencode/plugins/sdlc.js` | `OPENCODE=1` or `AGENT=1`; the plugin adds `SDLC_AGENT` | no Stop hook, so no check of verification before the agent stops | [4.5](04-architecture.md#45-deterministic-enforcement-hooks-and-plugin) |
 | Cursor | `cursor` | `/sdlc-next` | hooks in `.cursor/hooks.json` and the rule `.cursor/rules/sdlc.mdc` | `CURSOR_AGENT=1` | the marker is documented for the Cursor CLI, not confirmed for the IDE | [15](15-cursor.md) |
 | Codex CLI | `codex` | `$sdlc-next` | hooks in `.codex/hooks.json` and command rules in `.codex/rules/sdlc.rules` | `CODEX_CI=1`, `CODEX_SESSION_ID` | the hooks run only after you trust them in `/hooks` | [16](16-codex.md) |
-| Qwen Code | `qwen` | `/sdlc-next` | hooks and `permissions.deny` in `.qwen/settings.json` | `QWEN_CODE=1` | the hooks run only in a trusted folder | [17](17-qwen-gigacode.md) |
-| GigaCode (experimental) | `gigacode` | `/sdlc-next` | hooks and `permissions.deny` in `.gigacode/settings.json` | `QWEN_CODE=1` (GigaCode's own is not documented) | not checked on a live installation; trusted folder as in Qwen Code | [17](17-qwen-gigacode.md) |
+| Qwen Code | `qwen` | `/sdlc-next` | hooks and `permissions.deny` in `.qwen/settings.json` | `QWEN_CODE=1` | all folders trusted when folder trust is off; trust this folder when enabled | [17](17-qwen-gigacode.md) |
+| GigaCode (experimental) | `gigacode` | `/sdlc-next` | hooks and `permissions.deny` in `.gigacode/settings.json` | `QWEN_CODE=1` (GigaCode's own is not documented) | folder trust semantics not verified on a live installation | [17](17-qwen-gigacode.md) |
 
 In every tool, the CLI itself refuses a person's decision in the agent's shell, the agent cannot edit the guard's
 configuration, and commits made in the agent's shell carry `SDLC-Agent: <agent>`.
@@ -416,6 +416,21 @@ branch, verification and review stay the usual steps of the change. The contract
 
 #### The task board
 
+Market mode opens a timed auction with `sdlc board auction --change <id> --task <n.m> [--window <s>]`.
+The default window is 300 seconds. An executor bids with `sdlc board bid --change <id> --task <n.m>
+--executor <id> --agent <name> --minutes <n> [--cost <n>] [--note <text>]`.
+While open, the board shows `auction`, `closesAt` and the bids. On the next board command after closing,
+it reserves the winner for a default dispatch lease. Set `board.market.rule` in `openspec/sdlc.yaml` to
+`fastest` (default), `cheapest`, or `first`, and `window_seconds` for the default window. Ties favor higher
+`max_risk`, then the earlier bid. With no bids, the task returns to open. A person or lead agent can award
+early or reassign with `sdlc board award --change <id> --task <n.m> --executor <id>`.
+
+Claim, heartbeat, release, submit, and bid accept `--request <key>` for peer retries. The key is 8–128
+letters, digits, `.`, `_`, `:`, or `-`. A repeated key and identical arguments return the stored answer for
+24 hours without a second state change or log entry; different arguments yield `request_conflict`.
+The same write tools take `request` over MCP, and executor tokens can call `board_bid`.
+MCP does not expose auction, award, or dispatch.
+
 Placement: `sdlc board dispatch --change <id> --task <n.m> --executor <id> [--lease <s>] [--json]`
 reserves one open task for an executor. The lease defaults to 900 seconds (range 1-86400). `board list` shows
 `dispatched`, its executor and `expiresAt`. Only that executor can claim before expiry; expiry returns the task
@@ -627,6 +642,9 @@ sdlc events flush                     # deliver the queued events now (the job f
 Use `sdlc log --event hook.warned --json` to inspect warnings before switching enforcement to block.
 `--event` accepts `*` as any text, for example `hook.*` or `gate.*.approved`.
 `sdlc log --since <date>` filters by date; both filters work with `--change` and `--limit`.
+CLI log entries made in an agent session include an optional `agent` name alongside the person's git identity in `by`.
+`sdlc audit --json` includes `agentEvents: { agent, total, byAgent }` counted from the log in the audited period;
+`agentCommits` remains the separate count of commits with an `SDLC-Agent` trailer.
 In JSON, `total` counts the filtered entries.
 
 For `claude -p`, allow the required tools in advance: `--allowedTools "Bash(sdlc *),Read,Write,Edit"`. In CI, it is convenient to add `sdlc status --markdown` to the PR description.

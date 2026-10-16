@@ -225,6 +225,26 @@ export interface TemplateContext {
   verifyCommands: Array<{ name: string; run: string }>;
   /** How agents call the CLI (`sdlc`, `npx --no-install sdlc`), for `{{cli}}`. */
   cli: string;
+  tools?: string[];
+}
+
+const AGENT_COMMANDS = [
+  { tool: 'opencode', name: 'OpenCode', form: '/sdlc-<step>', example: '/sdlc-plan' },
+  { tool: 'claude', name: 'Claude Code', form: '/sdlc:<step>', example: '/sdlc:plan' },
+  { tool: 'qwen', name: 'Qwen Code', form: '/sdlc-<step>', example: '/sdlc-plan' },
+  { tool: 'gigacode', name: 'GigaCode', form: '/sdlc-<step>', example: '/sdlc-plan' },
+  { tool: 'cursor', name: 'Cursor', form: '/sdlc-<step>', example: '/sdlc-plan' },
+  { tool: 'codex', name: 'Codex CLI', form: '$sdlc-<step>', example: '$sdlc-plan' },
+];
+
+/** The Claude Code guide (CLAUDE.md) belongs to projects with the claude tool; every other role always applies. */
+export function roleApplies(id: string, tools?: string[]): boolean {
+  return id !== 'claude-guide' || !tools || tools.includes('claude');
+}
+
+function agentCommands(tools?: string[]): string {
+  return AGENT_COMMANDS.filter((entry) => !tools || tools.includes(entry.tool))
+    .map((entry) => `- ${entry.name}: \`${entry.form}\` (for example \`${entry.example}\`)`).join('\n');
 }
 
 function notImplemented(what: string): never {
@@ -232,7 +252,7 @@ function notImplemented(what: string): never {
 }
 
 /** Finds each role in `root`, honouring the `layout:` mapping. Read-only. */
-export function detectLayout(root: string, mapping: LayoutMapping = {}): LayoutReport {
+export function detectLayout(root: string, mapping: LayoutMapping = {}, tools?: string[]): LayoutReport {
   const find = (candidate: string, kind: 'file' | 'dir'): string | undefined => {
     let current = root;
     const parts = candidate.replace(/\/$/, '').split('/');
@@ -250,7 +270,8 @@ export function detectLayout(root: string, mapping: LayoutMapping = {}): LayoutR
     return `${actual.join('/')}${kind === 'dir' ? '/' : ''}`;
   };
   const warnings: string[] = [];
-  const roles = LAYOUT_ROLES.map((role): DetectedRole => {
+  const active = LAYOUT_ROLES.filter((role) => roleApplies(role.id, tools));
+  const roles = active.map((role): DetectedRole => {
     const mapped = mapping[role.id];
     const candidates: string[] = [];
     const paths = [...(mapped ? [mapped] : []), role.path, ...role.aliases];
@@ -273,13 +294,17 @@ export function detectLayout(root: string, mapping: LayoutMapping = {}): LayoutR
 /**
  * Replaces `{{project.name}}`, `{{cli}}`, `{{path:<role>}}` (a path relative to
  * the file being written, so links work from any folder) and
- * `{{verify.commands}}` (a Markdown bullet list, or a one-line hint when empty).
+ * `{{verify.commands}}` (a Markdown bullet list, or a one-line hint when empty) and `{{agent.commands}}` (the
+ * command form of each configured agent).
  * Unknown `{{…}}` tokens are an error, so a template can never ship a hole.
  */
 export function renderLayoutTemplate(text: string, targetPath: string, ctx: TemplateContext): string {
-  return text.replace(/\{\{([^{}]+)\}\}/g, (_match, token: string) => {
+  const lines = text.split('\n').filter((line) => [...line.matchAll(/\{\{path:([^{}]+)\}\}/g)]
+    .every((match) => roleApplies(match[1], ctx.tools)));
+  return lines.join('\n').replace(/\{\{([^{}]+)\}\}/g, (_match, token: string) => {
     if (token === 'project.name') return ctx.projectName;
     if (token === 'cli') return ctx.cli;
+    if (token === 'agent.commands') return agentCommands(ctx.tools);
     if (token === 'verify.commands') return ctx.verifyCommands.length
       ? ctx.verifyCommands.map((c) => `- ${c.name}: \`${c.run}\``).join('\n')
       : 'Add verification commands to openspec/sdlc.yaml.';
@@ -301,11 +326,12 @@ function writeMissing(root: string, config: SdlcConfig, opts: { dryRun?: boolean
   const created: string[] = [];
   const kept: string[] = [];
   const paths = Object.fromEntries(LAYOUT_ROLES.map((role) => {
-    const found = report.roles.find((r) => r.role === role.id)!;
-    return [role.id, found.path ?? role.path];
+    const found = report.roles.find((r) => r.role === role.id);
+    return [role.id, found?.path ?? role.path];
   })) as Record<LayoutRoleId, string>;
-  const ctx: TemplateContext = { projectName: path.basename(root), paths, verifyCommands: config.verify.commands, cli: config.cli };
-  for (const role of LAYOUT_ROLES) {
+  const ctx: TemplateContext = { projectName: path.basename(root), paths,
+    verifyCommands: config.verify.commands, cli: config.cli, tools: config.tools };
+  for (const role of LAYOUT_ROLES.filter((role) => roleApplies(role.id, config.tools))) {
     const rel = role.kind === 'dir' ? role.path + path.posix.basename(role.template) : role.path;
     const target = path.resolve(root, rel);
     if (!isWithin(root, target)) throw new SdlcError(
@@ -330,7 +356,7 @@ function writeMissing(root: string, config: SdlcConfig, opts: { dryRun?: boolean
 
 /** Creates every missing role at its canonical path from its template. Never overwrites. */
 export function scaffoldLayout(root: string, config: SdlcConfig, opts: { dryRun?: boolean } = {}): LayoutWriteResult {
-  return writeMissing(root, config, opts, detectLayout(root, config.layout));
+  return writeMissing(root, config, opts, detectLayout(root, config.layout, config.tools));
 }
 
 /**
@@ -340,11 +366,12 @@ export function scaffoldLayout(root: string, config: SdlcConfig, opts: { dryRun?
  * Moves nothing.
  */
 export function adaptLayout(root: string, config: SdlcConfig, opts: { dryRun?: boolean } = {}): AdaptResult {
-  const report = detectLayout(root, config.layout);
+  const report = detectLayout(root, config.layout, config.tools);
   for (const found of report.roles) {
     if (found.status === 'alias' && found.path) config.layout[found.role] = found.path;
   }
-  return { ...writeMissing(root, config, opts, detectLayout(root, config.layout)), mapping: { ...config.layout } };
+  const updated = detectLayout(root, config.layout, config.tools);
+  return { ...writeMissing(root, config, opts, updated), mapping: { ...config.layout } };
 }
 
 /** Plans the moves to canonical paths. Read-only. */

@@ -2,6 +2,8 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { SdlcError } from './errors.js';
 import { ensureDir, readText, writeTextAtomic } from './fs-utils.js';
+import { parseAuctions, type BoardAuction } from './board-market-state.js';
+import { parseRequests, pruneRequests, RequestReplay, type BoardRequest } from './board-requests.js';
 
 /**
  * The board file and its lock (B118a, epic E16): `openspec/.sdlc/board.json` holds the claims the agents of the
@@ -57,6 +59,8 @@ export interface Board {
   version: 1;
   claims: BoardClaim[];
   dispatches: BoardDispatch[];
+  auctions: BoardAuction[];
+  requests: BoardRequest[];
 }
 
 function dispatchOf(value: unknown): BoardDispatch {
@@ -136,7 +140,7 @@ function claimOf(value: unknown): BoardClaim {
 /** The board, parsed at the boundary; a missing file is an empty board, a broken one is `board_invalid`. */
 export function readBoard(root: string): Board {
   const text = readText(path.join(root, BOARD_PATH));
-  if (text === undefined) return { version: 1, claims: [], dispatches: [] };
+  if (text === undefined) return { version: 1, claims: [], dispatches: [], auctions: [], requests: [] };
   let parsed: unknown;
   try {
     parsed = JSON.parse(text);
@@ -149,7 +153,8 @@ export function readBoard(root: string): Board {
   if (!Array.isArray(raw.claims)) invalid('claims must be a list');
   if (raw.dispatches !== undefined && !Array.isArray(raw.dispatches)) invalid('dispatches must be a list');
   return { version: 1, claims: raw.claims.map(claimOf),
-    dispatches: (raw.dispatches ?? []).map(dispatchOf) };
+    dispatches: (raw.dispatches ?? []).map(dispatchOf),
+    auctions: parseAuctions(raw.auctions), requests: pruneRequests(parseRequests(raw.requests), Date.now()) };
 }
 
 /** `openspec/.sdlc/.gitignore` keeps board.json and board.lock out of every commit; extended, never replaced. */
@@ -213,12 +218,16 @@ export function updateBoard<T>(root: string, fn: (board: Board) => T, writeOnErr
   try {
     const board = readBoard(root);
     let completed = false;
+    let replayed = false;
     try {
       const result = fn(board);
       completed = true;
       return result;
+    } catch (error) {
+      replayed = error instanceof RequestReplay;
+      throw error;
     } finally {
-      if (completed || writeOnError) {
+      if (!replayed && (completed || writeOnError)) {
         ensureGitignore(root);
         writeTextAtomic(file, `${JSON.stringify(board)}\n`);
       }

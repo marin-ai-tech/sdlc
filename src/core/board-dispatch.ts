@@ -7,6 +7,7 @@ import type { ProjectPaths } from './project.js';
 import { changeTasks, exportItems } from './task-contract.js';
 import { excludedExecutors, reopenedClaims } from './board-reopen.js';
 import { updateBoard, type Board, type BoardDispatch } from './board-store.js';
+import { refuseAuction, settleAuctions } from './board-market.js';
 
 export function leaseSeconds(value?: string): number {
   if (value === undefined) return 900;
@@ -54,6 +55,7 @@ export function expireHeldClaims(root: string, config: SdlcConfig, board: Board,
 
 function assertOpen(board: Board, ref: ChangeRef, task: string, executor: string): void {
   const item = `${ref.id}#${task}`;
+  refuseAuction(board, item);
   const submitted = board.claims.find((claim) => claim.item === item && claim.state === 'submitted');
   if (submitted) throw new SdlcError('task_submitted', {
     key: 'error.task_x_of_x_is_submitted', params: { task, change: ref.id },
@@ -89,6 +91,7 @@ export function dispatchTask(
   return updateBoard(root, (board) => {
     expireHeldClaims(root, config, board, Date.now());
     expireDispatches(root, config, board, Date.now());
+    settleAuctions(root, config, board, Date.now());
     assertOpen(board, ref, opts.task, executor.id);
     const now = Date.now();
     const dispatch = { item: `${ref.id}#${opts.task}`, change: ref.id, task: opts.task,
