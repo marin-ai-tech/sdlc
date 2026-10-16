@@ -327,8 +327,9 @@ spec gate.
    ✓ add-due-dates
    ```
 
-   `sdlc validate` runs `openspec validate --strict` and sdlc's own delta checks, and warns about other active
-   changes that touch the same requirements.
+   `sdlc validate` reports OpenSpec and delta errors and warnings. Warnings alone leave the change valid.
+   `sdlc approve spec` runs the same check and refuses errors; show warnings to the approver verbatim.
+   It also warns about other active changes that touch the same requirements.
 
 3. The agent stops at the gate. `sdlc next` shows:
 
@@ -724,7 +725,7 @@ the agent inside the rules.
 
 ### Check yourself
 
-- `sdlc status --change add-due-dates` shows the task bar filling up (`2/3` before verify).
+- `sdlc status --change add-due-dates` shows the implementation tasks complete before verify.
 - `git log` shows `SDLC-Change: add-due-dates` and `SDLC-Task:` trailers.
 - No file outside the plan's "Files that change" was edited (lesson 5.8 checks this as plan drift).
 
@@ -1315,17 +1316,15 @@ record the change leaves behind.
    Tasks:
      1.1 [x] Failing tests for the four scenarios in test/tasks.test.js — no commit
      1.2 [x] Implement src/tasks.js until the tests pass — commits: 0bedd0f
-     2.1 [x] Run sdlc verify and confirm every required check passes — no commit
    Review findings:
      F1 fixed — Updating an unknown task crashes
      F2 accepted — Overdue is computed in UTC
-   Gaps (2):
+   Gaps (1):
      task without a commit: 1.1
-     task without a commit: 2.1
    ```
 
-   The gaps are honest: the tests of task 1.1 went into the same commit as task 1.2, and task 2.1 has no code. A gap
-   is a question for the reviewer, not a failure.
+   The gap is honest: the tests of task 1.1 went into the same commit as task 1.2. A gap is a question for the
+   reviewer, not a failure.
 
 6. Check the approvals. This output is from the trial with sdlc 0.14.4. Since 0.15.4, approvals committed while the
    change was active retain their status before the archive move is committed:

@@ -21,6 +21,7 @@ import { readManifest } from '../integrations/manifest.js';
 import { packLenses, reviewLenses, withPackChecks } from '../team/pack-effect.js';
 import { reviewSuggest } from './review-suggest.js';
 import { t } from '../core/i18n.js';
+import { completeVerifyTasks } from '../core/verify-tasks.js';
 
 export interface VerifyOptions {
   change?: string;
@@ -173,6 +174,7 @@ export async function verifyCommand(opts: VerifyOptions): Promise<void> {
     const mcpDetail = (run.mcp ?? []).map((m) => `${m.name}=${m.ok ? 'ok' : 'failed'}`);
     recordChangeEvent(ctx, ref, state, `verify.${run.status}`, formatIdentity(gitIdentity(ctx.root)),
       [...run.checks.map((ch) => `${ch.name}=${ch.exit_code ?? 'timeout'}`), ...mcpDetail].join(' '));
+    if (run.status === 'passed' && !only) completeVerifyTasks(ref.dir);
     // Outside an agent session the MCP results are also kept for the agent (the inbox).
     keepForAgent(ctx.root, ref.id, run);
     const next = resolveNext(ctx, ref.id);

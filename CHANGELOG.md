@@ -2,6 +2,23 @@
 
 All notable changes to sdlc. Versions follow [Semantic Versioning](https://semver.org/); while the major version is 0, a minor version may change behavior.
 
+## 0.22.1 — 2026-10-16
+
+### Fixed
+- An open rejection stays visible: a gate whose latest decision is a rejection shows it on its row in `sdlc status`,
+  with the person and the note, even while an earlier gate blocks it, and `sdlc next` carries the note until the gate
+  is approved. Before, a qa rejection that sent a change back to build disappeared from both.
+- `sdlc approve spec` validates the delta specs first: errors (a requirement without a scenario, no deltas) refuse the
+  approval as `spec_invalid`; warnings such as the RFC 2119 "SHALL or MUST" advice are shown to the approver and
+  recorded with the approval. `sdlc validate` judges the same way, so requirements written in another language than
+  English are valid.
+- The tasks template no longer ends with a "Run sdlc verify" task, which the verify gate itself kept blocked. In a
+  change that still has such a task, a passing `sdlc verify` ticks it once every other task is done.
+
+### Added
+- Two worked examples in the documentation: a team adopting sdlc on an existing project, and a team building an
+  application from scratch.
+
 ## 0.22.0 — 2026-10-15
 
 ### Added

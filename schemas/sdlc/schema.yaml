@@ -231,8 +231,7 @@ artifacts:
         do not collect testing or docs into a final group.
       - For a bug fix, task 1.1 writes the failing test that reproduces the bug
         and confirms it fails for the expected reason.
-      - The final group holds only integration checks, ending with
-        `- [ ] N.M Run sdlc verify and confirm every required check passes`.
+      - The verify gate runs the configured checks and needs no task in tasks.md.
 
       Check design.md Open questions first: resolve with the user anything that
       would change what gets built.

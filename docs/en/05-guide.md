@@ -236,7 +236,11 @@ Record postponed work with `sdlc defer add <title> --why <text> [--change <id>] 
 
 `sdlc rework <gate> --change <id> --reason <category> --note "<what has to change>"` sends a change back to the stage of a gate (intent, spec, plan, review). The gate counts as rejected until it is approved again, and approvals made before the rework stop counting, the later gates' too. Reasons come from `rework.reasons` in `sdlc.yaml` (default: missing-requirement, wrong-assumption, design-flaw, implementation-bug, test-gap, scope-change, other); the audit counts them. Approving a gate records a checkpoint (`refs/sdlc/<change>/<gate>`; branches and HEAD stay); `--reset` restores from it only the files listed under "Files that change" in plan.md and the change folder, and refuses when they have uncommitted edits. External actions are not undone. Approving the gate again with nothing changed since the approval before the rework needs `--note` (why nothing had to change; `--preview` shows `unchangedSinceRework`). After `rework.max_cycles` reworks of one gate (default 3), `sdlc next` asks a person to take the change over or review its scope instead of another agent round.
 
-After a rework, `sdlc next` first asks the agent to revise. Once the agent has changed the gate's artifacts, the gate waits for a person again: `sdlc next` names them, `sdlc next --me` lists it, and the `gate.<g>.awaiting` event is sent. A rejected review works the same way: the agent fixes what review.md asks, then the reviewer decides again.
+After a rework, `sdlc next` first asks the agent to revise. Once the agent has changed the gate's artifacts,
+the gate waits for a person again: `sdlc next` names them, `sdlc next --me` lists it, and the
+`gate.<g>.awaiting` event is sent. A rejected review works the same way: the agent fixes what review.md asks,
+then the reviewer decides again. An open rejection remains on its row in `sdlc status` even while an earlier
+gate blocks it; `sdlc next` carries the person's note until that gate is approved.
 
 `sdlc takeover --change <id> --note "<why>"` takes a change from the agent: until `sdlc release-control --change <id> --note "<for the agent>"`, the hook denies agent edits in the change folder and in the plan's files, and `next` says to wait for you. The agent sees the hand-back note. Both commands, like rework, are a person's.
 

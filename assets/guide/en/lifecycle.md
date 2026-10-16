@@ -20,6 +20,10 @@ explore → intent → spec → plan → build → verify → review → (releas
 
 ## How a change moves
 
+`sdlc approve spec` runs the same validation as `sdlc validate`: errors refuse approval and warnings are shown.
+An open rejection remains visible in `sdlc status`, with its note in `sdlc next`, until approval.
+The verify gate needs no task in tasks.md.
+
 - The stage is computed from the gates; nobody sets it by hand. `sdlc status --change <id>` shows the stepper.
 - A gate opens when its artifacts exist and the previous gates are satisfied.
 - An approval is bound to the content: edit an approved artifact and the approval goes stale, so the gate needs a new

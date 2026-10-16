@@ -162,10 +162,13 @@ describe('B83: a Qwen Code agent session', () => {
     write(p.file('openspec/changes/demo/intent.md'), INTENT);
     const refused = p.cli(['approve', 'intent', '--change', 'demo', '--json'], { QWEN_CODE: '1' });
     expect(refused.json().status[0].code).toBe('agent_cannot_approve');
-    const doctor = p.cli(['doctor', '--json']).json();
+    // Doctor reads Qwen Code's user settings: a temporary home keeps the result independent of this machine's
+    // ~/.qwen. Without settings folder trust is off, so every folder is trusted (0.22.0, Н6).
+    const doctor = p.cli(['doctor', '--json'], p.homeEnv).json();
     const check = doctor.checks.find((c: { check: string }) => c.check === 'qwen');
     expect(check).toBeDefined();
-    expect(String(check.message)).toMatch(/trust/i);
+    expect(check.status).toBe('ok');
+    expect(String(check.message)).toMatch(/permissions\.deny/);
   }, 180000);
 
   it('a commit from a Qwen Code agent session carries SDLC-Agent: qwen', () => {

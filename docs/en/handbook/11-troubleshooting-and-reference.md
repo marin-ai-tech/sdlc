@@ -661,7 +661,7 @@ commands also take `--json` and, with several active changes, `--change <id>`.
 | `sdlc explain --change <id>` | anyone | why a change is where it is and what unblocks it (read-only) |
 | `sdlc next [--change <id>] [--me]` | anyone | the next action and who performs it; `--me` lists what waits for you |
 | `sdlc instructions <artifact>` | anyone | the instructions for an artifact (intent, proposal, specs, design, plan, tasks, apply, verification, review, release) |
-| `sdlc validate` | anyone | `openspec validate --strict` plus the harness checks and overlaps between changes |
+| `sdlc validate` | anyone | OpenSpec and harness checks; errors fail, warnings are reported; overlaps between changes |
 | `sdlc judge --gate <gate> --change <id>` | anyone | run the gate's judge and record its verdict (Lesson 5.11) |
 | `sdlc answer <n> --change <id> --text "…"` | a person | answer an open question of an intent, proposal or design |
 | `sdlc approve <gate> --change <id> [--preview]` | a person | approve a gate, bound to the current content |

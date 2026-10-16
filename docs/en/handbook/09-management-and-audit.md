@@ -406,11 +406,9 @@ log.
    Tasks:
      1.1 [x] Tests for both scenarios — commits: 3df78b2
      1.2 [x] List tasks by project id — commits: a61a8aa
-     2.1 [x] Run sdlc verify and confirm every required check passes — no commit
-   Gaps (3):
+   Gaps (2):
      scenario without evidence: A project with two tasks
      scenario without evidence: Another project's tasks are never listed
-     task without a commit: 2.1
    ```
 
 2. Read the gaps. A scenario has evidence when `verification.md` has a behavioral verification row for it. A task has

@@ -24,6 +24,7 @@ import { approvalCommitMessage, assertChangedSinceRework } from '../core/approva
 import { assertQuestionsAnswered } from '../core/answers.js';
 import { assertDebateRecorded } from '../core/debate.js';
 import { assertJudgeCleared } from '../core/judge-gate.js';
+import { validateOne } from '../core/validate-change.js';
 
 /**
  * Gate decisions: approve, reject, waive, and the test lock. These record
@@ -218,6 +219,12 @@ export async function approveCommand(gateArg: string, opts: DecisionOptions): Pr
     assertQuestionsAnswered(ctx.config, ref.id, ref.dir, state, gate);
     assertDebateRecorded(ctx.config, ref.dir, gate);
     assertJudgeCleared(ctx.config, state, gate, evaluation.digest);
+    const validation = gate === 'spec' ? validateOne(ctx, ref) : undefined;
+    if (validation && !validation.valid) {
+      const errors = validation.issues.filter((issue) => issue.level === 'error');
+      throw new SdlcError('spec_invalid', errors.map((issue) => issue.message).join('\n'));
+    }
+    const warnings = validation?.issues.filter((issue) => issue.level === 'warning') ?? [];
     // B47: the release checks run after every other check and before anything is written.
     const checks = gate === 'release' ? await approvalChecks(ctx.config, ctx.root, ref.id) : undefined;
 
@@ -229,7 +236,8 @@ export async function approveCommand(gateArg: string, opts: DecisionOptions): Pr
     approvals.push(approvalRecord(ctx, ref, state, gate, fields));
     state.gates[gate] = { ...current, approvals };
     recordChangeEvent(
-      ctx, ref, state, `gate.${gate}.approved`, identity, `role ${role}${opts.note ? `: ${opts.note}` : ''}`,
+      ctx, ref, state, `gate.${gate}.approved`, identity,
+      `role ${role}${opts.note ? `: ${opts.note}` : ''}${warnings.length ? `; ${warnings.length} validation warning(s)` : ''}`,
     );
     // The approved artifacts record which sdlc version and license approved them.
     const stamping = tryStampArtifacts(ref.dir, approvedFiles(view, gate, ref.dir), ctx.stamp);
@@ -244,12 +252,14 @@ export async function approveCommand(gateArg: string, opts: DecisionOptions): Pr
     if (opts.json) {
       printJson({
         change: ref.id, gate, role, by: identity, status: status.status,
-        missingRoles: status.missingRoles, ...(checks ? { checks } : {}), commitMessage, ...(next ? { next } : {}),
+        missingRoles: status.missingRoles, ...(checks ? { checks } : {}),
+        warnings: warnings.map((issue) => issue.message), commitMessage, ...(next ? { next } : {}),
       });
       return;
     }
     line(`${c.green(t('gate.approvedLine', { gate, identity, role }))} `
       + c.dim(`(${evaluation.digest.slice(7, 19)})`));
+    for (const issue of warnings) warn(issue.message);
     if (status.status !== 'approved') {
       line(`  ${t('gate.stillNeeded', { roles: stillNeeded(status) })}`);
     }

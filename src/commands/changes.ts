@@ -185,7 +185,11 @@ function actorLabel(view: LifecycleView): string {
 }
 
 function nextText(view: LifecycleView): string {
-  if (view.next.key) return t(view.next.key, view.next.params);
+  if (view.next.key) {
+    const message = t(view.next.key, view.next.params);
+    return view.next.rejectionNotes
+      ? `${message} ${t('next.openRejections', { notes: view.next.rejectionNotes })}` : message;
+  }
   return view.next.message;
 }
 

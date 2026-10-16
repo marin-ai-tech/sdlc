@@ -68,7 +68,9 @@ export function nextAction(
         { artifact: missing.id, file: missing.generates, gate: id },
       );
     }
-    if (g.status === 'rejected') {
+    const rejection = state.gates[id]?.rejection;
+    const revisionOpen = !rejection?.digest || rejection.digest === g.digest;
+    if (g.status === 'rejected' && revisionOpen) {
       return reviseNext(id, mapping[id].join(', '), g.reason ?? '');
     }
     const awaited = awaitedRoles(g.missingRoles, config.gates[id]);

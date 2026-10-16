@@ -4,6 +4,10 @@ summary: Стадии изменения, артефакты каждой и к�
 ---
 # Жизненный цикл и стадии
 
+`sdlc approve spec` запускает ту же проверку, что и `sdlc validate`: ошибки запрещают утверждение,
+а предупреждения показываются человеку. Открытое отклонение видно в `sdlc status`, а его примечание —
+в `sdlc next` до повторного утверждения. Для гейта verify отдельная задача в tasks.md не нужна.
+
 ```
 explore → intent → spec → plan → build → verify → review → (release) → archive
   Plan      Plan    Design  Build  Build   Test     Deploy    Deploy     Maintain

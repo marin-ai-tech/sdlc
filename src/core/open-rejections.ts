@@ -1,0 +1,24 @@
+import type { ChangeState } from './change-state.js';
+import { decidedAfter, decidedAfterAll } from './decision-order.js';
+import { t } from './i18n.js';
+import type { GateEvaluation } from './lifecycle.js';
+
+/** A rejection stays open until a later approval of the same gate. */
+export function markOpenRejections(gates: GateEvaluation[], state: ChangeState): GateEvaluation[] {
+  return gates.map((gate) => {
+    const record = state.gates[gate.id];
+    const rejection = record?.rejection;
+    if (!rejection || !decidedAfterAll(rejection, record?.approvals ?? [])) return gate;
+    if (record?.waived && decidedAfter(record.waived, rejection)) return gate;
+    if (gate.status === 'rejected') return gate;
+    const key = rejection.note ? 'gate.rejectedNote' : 'gate.rejected';
+    const params = { by: rejection.by, note: rejection.note ?? '' };
+    return { ...gate, status: 'rejected', satisfied: false,
+      reason: t(key, params, 'en'), reasonKey: key, reasonParams: params };
+  });
+}
+
+export function openRejectionNotes(gates: GateEvaluation[]): string[] {
+  return gates.filter((gate) => gate.status === 'rejected' && gate.reason)
+    .map((gate) => `${gate.id}: ${gate.reasonParams?.note ?? gate.reason}`);
+}

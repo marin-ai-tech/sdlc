@@ -25,6 +25,7 @@ Implement the approved plan - Stage 3 (Build). Every step checks its own work be
    - when the implementation departs from plan.md, update plan.md in the same commit
    - end each commit message with the trailers `SDLC-Change: <id>` and `SDLC-Task: <n.m>` (the task number from tasks.md), so `sdlc trace <id>` links the task to its commit
 6. **Pause** when a task is unclear, when the design turns out wrong (propose an artifact update), when the work grows beyond the spec, or on any error you cannot resolve. Do not absorb scope silently.
-7. **Finish.** When every task is checked, run the {{cmd:verify}} workflow (it records `sdlc verify` evidence and gets an independent verification).
+7. **Finish.** When every implementation task is checked, run the {{cmd:verify}} workflow.
+   The verify gate records the checks and needs no task of its own.
 
 **Output while working**: `Working on task N/M: <task>` ... `✓ done (<check> passed)`; on pause, the issue and options.

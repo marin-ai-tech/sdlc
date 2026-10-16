@@ -45,7 +45,8 @@ never evidence.
    `sdlc init` detected `npm test` from `package.json` of the course copy. The `tasklet` of Module 1 also has
    `build` and `lint`. A person adds checks under `verify.commands`.
 
-2. The agent runs the verify workflow (`/sdlc:verify`, or `/sdlc:next` after the last task). Its first step is the
+2. The agent runs the verify workflow (`/sdlc:verify`, or `/sdlc:next` after the last task). The verify gate
+   needs no task in tasks.md. Its first step is the
    CLI:
 
    ```bash
@@ -290,13 +291,11 @@ follow a change from intent to evidence in one command.
      1.1 [x] Tests for the due-date scenarios (fail first) — commits: 574c5ff
      1.2 [x] Accept and validate `due` in addTask — commits: 6c54191
      1.3 [x] Sort overdue tasks first in listTasks — commits: 891963f
-     2.1 [x] Run sdlc verify and confirm every required check passes — no commit
    Review findings:
      F1 fixed — Impossible dates are accepted
      F2 accepted — package.json is not in the plan
      F3 accepted — Task titles have no length limit
-   Gaps (1):
-     task without a commit: 2.1
+   Gaps: none
    ```
 
    The task-to-commit links come from the `SDLC-Change` and `SDLC-Task` trailers (Module 6, Lesson 6.8).
@@ -333,7 +332,7 @@ follow a change from intent to evidence in one command.
 
 - The behavioural table is written by the agent from the verifier's report. Grace reads it against the attachments
   and her own spot checks; it is not machine evidence like the block above it.
-- A task with no code (like "run sdlc verify") shows as a gap "task without a commit". Read the gaps, do not chase a
+- A legacy task with no code (like "run sdlc verify") may show as a gap "task without a commit". Read the gaps, do not chase a
   zero.
 - Since 0.15.2, `sdlc trace` shows `Status: deferred (D1)` as `deferred (D1)` and keeps the D1 link.
 - Since 0.18.0, `verify.require_behaviour: true` makes the verify gate wait for the behavioural table: one row per

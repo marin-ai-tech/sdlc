@@ -6,7 +6,7 @@ import {
   type ChangeState,
   type TakeoverRecord,
 } from './change-state.js';
-import type { MessageParams } from './i18n.js';
+import { t, type MessageParams } from './i18n.js';
 import type { ChangeRef } from './changes.js';
 import { isFile, readText } from './fs-utils.js';
 import { isGitRepo, worktreeFingerprint } from './git.js';
@@ -36,6 +36,7 @@ import { evaluateVerifyGate } from './verify-gate.js';
 import { evaluateReviewGate } from './review-gate.js';
 import { evaluateReleaseGate } from './release-gate.js';
 import { nextAction } from './next-action.js';
+import { markOpenRejections, openRejectionNotes } from './open-rejections.js';
 import { STAGE_TITLES, type StageId } from './stages.js';
 
 export { STAGES, STAGE_TITLES, GATE_STAGE } from './stages.js';
@@ -114,6 +115,7 @@ export interface NextAction {
   params?: MessageParams;
   /** With openspec/roles.yaml, an approve-gate step: the people who may take the decision now. */
   people?: NamedApprover[];
+  rejectionNotes?: string;
 }
 
 export interface LifecycleView {
@@ -246,7 +248,9 @@ export function evaluateChange(
     warnings.push('not a git repository: verification and review freshness cannot be checked');
   }
 
-  const evaluated = markAutoWaived(markReworks(revisedGates(gates, state, config), state), state, config);
+  const evaluated = markOpenRejections(
+    markAutoWaived(markReworks(revisedGates(gates, state, config), state), state, config), state,
+  );
   const stage = deriveStage(ref, evaluated, tasks);
   const view: LifecycleView = {
     change: ref.id,
@@ -282,6 +286,13 @@ export function evaluateChange(
     judgeNext(view, config, state,
       debateNext(view, config, draftIntentNext(view, verifyBehaviourNext(view, advice)))));
   view.next = held || options.skipPeople ? next : nameApprovers(root, config, view, state, next);
+  // A rejection at the current stage is already in the hint itself; only the others are added.
+  const inHint = (note: string) => view.next.message.includes(note.slice(note.indexOf(': ') + 2));
+  const rejectionNotes = openRejectionNotes(evaluated).filter((note) => !inHint(note));
+  if (rejectionNotes.length) {
+    view.next.rejectionNotes = rejectionNotes.join('; ');
+    view.next.message += ` ${t('next.openRejections', { notes: view.next.rejectionNotes }, 'en')}`;
+  }
   return view;
 }
 

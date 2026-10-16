@@ -55,7 +55,11 @@ export function resolveNext(ctx: ProjectContext, changeId?: string): NextHint | 
 }
 
 function nextMessage(next: NextHint): string {
-  if (next.key) return t(next.key, next.params);
+  if (next.key) {
+    const message = t(next.key, next.params);
+    return next.rejectionNotes
+      ? `${message} ${t('next.openRejections', { notes: next.rejectionNotes })}` : message;
+  }
   return next.message;
 }
 

@@ -7,12 +7,11 @@ import { emitNextHint, resolveNext } from '../cli/next-hint.js';
 import { agentEnvironment } from '../core/agent-env.js';
 import { appendHistory, readChangeState, writeChangeState, type ChangeState, type HistoryEvent } from '../core/change-state.js';
 import { listActiveChanges, resolveChange, type ChangeRef } from '../core/changes.js';
-import { checkDeltaTargets, findOverlaps, readChangeDeltas, type DeltaIssue } from '../core/deltas.js';
+import { checkDeltaTargets, findOverlaps, readChangeDeltas } from '../core/deltas.js';
 import { SdlcError } from '../core/errors.js';
 import { formatIdentity, gitIdentity, type CommitInfo } from '../core/git.js';
 import { evaluateChange } from '../core/lifecycle.js';
 import { openspecFailure, runOpenSpecJson } from '../core/openspec.js';
-import { readOpenSpecMetadata } from '../core/openspec-schema.js';
 import { isFile, readText, writeTextAtomic } from '../core/fs-utils.js';
 import { stampText, stampTextLocalized } from '../core/license.js';
 import { appendLog, readLog } from '../core/log.js';
@@ -30,54 +29,7 @@ import { queueIssueClose } from '../mcp/issues.js';
 import { auditExportCommand, type AuditExportOptions } from './audit-export.js';
 import { closeDeferred, readDeferred } from '../core/deferred.js';
 import { parseSince } from '../report/model.js';
-
-interface ValidationIssue {
-  source: 'openspec' | 'sdlc';
-  level: 'error' | 'warning' | 'info';
-  path?: string;
-  line?: number;
-  message: string;
-  textKey?: string;
-}
-
-interface OpenSpecValidateItem {
-  id: string;
-  valid: boolean;
-  issues: Array<{ level: string; path?: string; message: string; line?: number }>;
-}
-
-function validateOne(ctx: ProjectContext, ref: ChangeRef): { change: string; valid: boolean; issues: ValidationIssue[] } {
-  const issues: ValidationIssue[] = [];
-  const deltas = readChangeDeltas(ref.dir);
-  const skipSpecs = readOpenSpecMetadata(ref.dir).skip_specs === true;
-  if (deltas.length === 0 && !skipSpecs) {
-    issues.push({
-      source: 'sdlc', level: 'info',
-      message: t('validate.noDeltaSpecs', undefined, 'en'),
-      textKey: 'validate.noDeltaSpecs',
-    });
-  } else {
-    const result = runOpenSpecJson<{ items?: OpenSpecValidateItem[] }>(['validate', ref.id, '--type', 'change', '--strict', '--no-interactive'], ctx.root);
-    const item = result.data?.items?.[0];
-    if (!item) {
-      issues.push({ source: 'openspec', level: 'error', message: `openspec validate failed: ${openspecFailure(result.data, result.raw)}` });
-    } else {
-      for (const i of item.issues) {
-        const level = i.level.toLowerCase() === 'error' ? 'error' : i.level.toLowerCase() === 'warning' ? 'warning' : 'info';
-        issues.push({ source: 'openspec', level, ...(i.path ? { path: i.path } : {}), ...(i.line ? { line: i.line } : {}), message: i.message });
-      }
-      if (!item.valid && !item.issues.some((i) => i.level.toLowerCase() === 'error')) {
-        issues.push({
-          source: 'openspec', level: 'error',
-          message: t('validate.openspecInvalid', undefined, 'en'),
-          textKey: 'validate.openspecInvalid',
-        });
-      }
-    }
-    issues.push(...checkDeltaTargets(ctx.paths, deltas).map((i: DeltaIssue) => ({ source: 'sdlc' as const, level: i.level, path: i.file, line: i.line, message: i.message })));
-  }
-  return { change: ref.id, valid: !issues.some((i) => i.level === 'error'), issues };
-}
+import { validateOne } from '../core/validate-change.js';
 
 export async function validateCommand(opts: { change?: string; all?: boolean; json?: boolean }): Promise<void> {
   try {
