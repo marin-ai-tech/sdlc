@@ -2,6 +2,36 @@
 
 All notable changes to sdlc. Versions follow [Semantic Versioning](https://semver.org/); while the major version is 0, a minor version may change behavior.
 
+## 0.22.2 — 2026-10-16
+
+### Added
+- Changes on other branches are named as a hint: `sdlc next --me` (`otherBranches` in JSON), `sdlc health` (the
+  `info` finding `flow.branches`), `sdlc report` and the dashboard list the changes found on other local and
+  remote-tracking branches as of the last fetch, with the branch to switch to. Health and the report still count only
+  the checked-out branch.
+- The health finding `quality.rejections`: a gate of one change rejected two times or more inside the window, with
+  the threshold `health.rejections`.
+- The dashboard shows the agent's share of the log ("Agent log events") next to the agent's commits.
+- The first tour step opens with what a person joining a project that already uses sdlc runs: clone, `npm install`,
+  `sdlc doctor --fix`, an entry in `openspec/roles.yaml`, `sdlc next --me`.
+- Two worked examples in the documentation: a newcomer's first change, and the dashboard and the process health.
+
+### Changed
+- `sdlc report` in Markdown lists the events newest first: the latest 20, or with `--since` the whole period.
+- `sdlc trace` reports one `tasks-without-trailers` gap for a change whose commits name none of its tasks, instead of
+  one gap per task.
+- `sdlc guide lifecycle` shows the qa gate and says how the agent's workflows are called in each tool; they are not
+  `sdlc` subcommands.
+- The health workflow gives the exact `sdlc backlog move` forms a person runs to order the drafted items.
+
+### Fixed
+- Fractional day thresholds (`stalled_days`, `lock_days`, `deferred_days`) work: the age is no longer rounded down to
+  whole days before the comparison, and facts show it to one decimal.
+- `sdlc explain` with no active change points to the ready backlog item instead of `sdlc new`.
+- `sdlc backlog start` names the change `b<n>` when the item's title has no Latin letters, instead of an id made of
+  its digits only.
+- On the lite track the stepper no longer marks intent as the current step.
+
 ## 0.22.1 — 2026-10-16
 
 ### Fixed

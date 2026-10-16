@@ -3,6 +3,10 @@ title: Set up the project
 ---
 # 1. Set up the project
 
+Joining a project that already uses sdlc? Clone it, run `npm install`, then `sdlc doctor` and
+`sdlc doctor --fix` (the git hook is not cloned). Ask the tech lead to add you to `openspec/roles.yaml`,
+then run `sdlc next --me` to see what waits for you.
+
 The tour follows the calculator demo: a small team builds a calculator for a shop till. Alice is the product owner,
 Bob the engineer, Carol the code owner who reviews. The agent writes the artifacts and the code; people decide.
 

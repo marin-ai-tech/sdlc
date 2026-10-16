@@ -211,15 +211,26 @@ function deferred(model: ReportModel): string[] {
 }
 
 function events(model: ReportModel): string[] {
+  const ordered = [...model.events].reverse();
+  const shown = model.period.since ? ordered : ordered.slice(0, 20);
+  const earlier = ordered.length - shown.length;
   return [
     `## ${t('report.recentEvents')}`, '',
-    ...model.events.map((event) => {
+    ...shown.map((event) => {
       const who = event.change ? `${cell(event.change)}: ` : '';
       const detail = event.detail ? ` — ${cell(event.detail)}` : '';
       return `- ${event.ts} ${who}${cell(event.event)}${detail}`;
     }),
+    ...(earlier > 0 ? [t('report.earlierEvents', { count: earlier })] : []),
     '',
   ];
+}
+
+function otherBranches(model: ReportModel): string[] {
+  if (model.otherBranches.length === 0) return [];
+  const safe = (value: string) => cell(value).replace(/([\\`*_{}\[\]()#+.!])/g, '\\$1');
+  const entries = model.otherBranches.map(({ id, branch }) => `${safe(id)} (${safe(branch)})`).join(', ');
+  return [t('report.otherBranches', { changes: entries }), ''];
 }
 
 function layout(model: ReportModel): string[] {
@@ -256,6 +267,7 @@ export function renderReportMarkdown(model: ReportModel): string {
     '',
     ...stages(model),
     ...changes(model),
+    ...otherBranches(model),
     ...board(model),
     ...mermaidDiagrams(model),
     ...backlog(model),

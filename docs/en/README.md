@@ -21,8 +21,10 @@ Research and design of the SDLC harness for Claude Code, OpenCode, Cursor, Codex
 17. [Qwen Code and GigaCode: setup, what is enforced, use cases](17-qwen-gigacode.md)
 18. [Example: a team adopts sdlc on an existing project](18-team-example.md)
 19. [Example: a team builds an application from scratch with sdlc](19-team-greenfield-example.md)
-20. [The sdlc handbook](handbook/README.md) — the user guide for every role, to read: a new project and the conversion of an existing one
-21. [sdlc in practice: the video course](course/README.md) — the same material as scripts for short training videos
+20. [Example: a newcomer learns sdlc from its hints](20-onboarding-example.md)
+21. [Example: the dashboard, the report and the process health](21-dashboard-health-example.md)
+22. [The sdlc handbook](handbook/README.md) — the user guide for every role, to read: a new project and the conversion of an existing one
+23. [sdlc in practice: the video course](course/README.md) — the same material as scripts for short training videos
 
 In short: **OpenSpec is the specification subsystem** (deltas, living specs, validation, archive), and **`sdlc` is
 the process layer** that follows the Anthropic playbook. It adds stages, gates with human approvals, verification

@@ -129,11 +129,15 @@ export function windowMetrics(ctx: HealthContext): ChangeRow[] {
   });
 }
 
-/** Whole days (rounded down) from `at` to now; undefined for a missing or bad timestamp. */
+/** Fractional days from `at` to now; undefined for a missing or bad timestamp. */
 export function daysSince(ctx: HealthContext, at: string | undefined): number | undefined {
   const ms = Date.parse(at ?? '');
   if (!Number.isFinite(ms)) return undefined;
-  return Math.floor((ctx.now - ms) / DAY_MS);
+  return (ctx.now - ms) / DAY_MS;
+}
+
+export function displayDays(days: number): number {
+  return Math.round(days * 10) / 10;
 }
 
 export function hoursSince(ctx: HealthContext, at: string | undefined): number | undefined {

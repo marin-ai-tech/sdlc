@@ -16,6 +16,7 @@ export interface HealthThresholds {
   reworkShare: number;
   waiverShare: number;
   reapprovals: number;
+  rejections: number;
   denials: number;
   lockDays: number;
 }
@@ -37,6 +38,7 @@ const FIELDS: Record<string, Field> = {
   rework_share: { name: 'reworkShare', kind: 'share' },
   waiver_share: { name: 'waiverShare', kind: 'share' },
   reapprovals: { name: 'reapprovals', kind: 'count' },
+  rejections: { name: 'rejections', kind: 'count' },
   denials: { name: 'denials', kind: 'count' },
   lock_days: { name: 'lockDays', kind: 'positive' },
 };
@@ -52,6 +54,7 @@ export const DEFAULT_HEALTH: Readonly<HealthThresholds> = Object.freeze({
   reworkShare: 0.5,
   waiverShare: 0.3,
   reapprovals: 3,
+  rejections: 2,
   denials: 5,
   lockDays: 7,
 });

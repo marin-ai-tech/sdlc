@@ -89,6 +89,9 @@ describe('sdlc guide', () => {
         const text = article(locale, topic);
         expect(Buffer.byteLength(text), `${locale}/${topic}`).toBeLessThanOrEqual(topic === 'denials' ? 3 * MAX_BYTES : MAX_BYTES);
         for (const m of text.matchAll(/`sdlc ([a-z][a-z-]*)(?: ([a-z][a-z-]*))?/g)) {
+          if (topic === 'lifecycle' && m[1] === 'intent' && (
+            text.includes('no `sdlc intent` command') || text.includes('команды `sdlc intent` нет')
+          )) continue;
           const two = m[2] ? `${m[1]} ${m[2]}` : undefined;
           const known = commands.has(m[1]) || (two !== undefined && commands.has(two));
           expect(known, `${locale}/${topic}: sdlc ${m[1]}`).toBe(true);

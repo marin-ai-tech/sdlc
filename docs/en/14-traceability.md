@@ -111,3 +111,8 @@ one summary per project and day, so run it once a day from a scheduler or a CI j
 - The agent marker comes from the environment of the agent's terminal; a commit made outside it (for example, a person
   committing what an agent wrote) is a person's commit.
 - The debate is recorded text: sdlc checks that both positions and the decision are there, not how good they are.
+
+## 14.4. Trace gaps without task trailers
+
+When a change has tasks but no commit names any of them with an `SDLC-Task` trailer, `sdlc trace` reports one
+`tasks-without-trailers` gap with the task count. Once a commit names a task, unnamed tasks are listed individually.

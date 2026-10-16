@@ -585,3 +585,8 @@ and regenerate the files without losing local edits.
 - After an update that changed the hooks, Codex CLI users trust the hooks again in `/hooks`. `sdlc doctor` reminds
   them. Qwen Code's folder trust does not depend on the hooks, so an update needs no step there.
 - `sdlc uninstall` removes the agent files and hooks and keeps `openspec/`. It is a person's command.
+
+## Joining an existing sdlc project
+
+Clone the project, run `npm install`, `sdlc doctor`, and `sdlc doctor --fix` to restore the git hook that is not
+cloned. Ask the tech lead for an entry in `openspec/roles.yaml`, then run `sdlc next --me`.

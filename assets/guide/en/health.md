@@ -17,7 +17,8 @@ sdlc health --json
   recommended improvement. There is no single score: a number hides what to do.
 - Flow: gates that wait too long or are overdue, changes with no activity, deferred work that never closes.
 - Quality: verification that rarely passes the first time, the most common rework reason, plan drift, open review
-  findings, spec scenarios without a verification row.
+  findings, spec scenarios without a verification row, repeated gate rejections.
+- Changes on other branches appear as hints as of the last fetch. Health counts only the checked-out branch.
 - Discipline: frequent waivers, the lite track on behaviour changes, forced archives, gates approved again and again,
   repeated hook denials of one rule, long test locks.
 - Configuration: no verification commands, enforcement off or warn, one person holding every role, signing off, stale
@@ -36,6 +37,7 @@ health:
   rework_share: 0.5    # one rework reason this common is a finding
   waiver_share: 0.3
   reapprovals: 3
+  rejections: 2        # repeated rejections of one gate on one change
   denials: 5           # denials of one hook rule in the window
   lock_days: 7
 ```
@@ -43,6 +45,10 @@ health:
 When a `bad` finding appears, the agent's session start says so in one line, `health.degraded` is logged and sent to
 event receivers, and `health.recovered` follows when it is gone. The dashboard (`sdlc report --format html`) has a
 health section.
+
+Day thresholds compare fractional ages, and facts show one decimal when needed. `quality.rejections` counts
+rejections of each gate on each change within the window. Bring the reviewer in earlier, record lessons in the
+conventions, and sharpen acceptance criteria when a gate repeatedly fails.
 
 ## The health workflow
 
@@ -59,3 +65,5 @@ sdlc explain --change add-export
 One answer to "why is this change here": the stage, the open gate and its reason, what it waits for (an artifact, a
 person, a check, review findings, a rework, a takeover), the steps that unblock it with their commands, and the latest
 decisions. It writes nothing; anyone may run it.
+
+With no active change, `sdlc explain` points to the ready backlog item when one exists.

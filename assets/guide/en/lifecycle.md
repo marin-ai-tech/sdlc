@@ -5,8 +5,8 @@ summary: The stages of a change, the artifacts of each, and how a change moves o
 # Lifecycle and stages
 
 ```
-explore → intent → spec → plan → build → verify → review → (release) → archive
-  Plan      Plan    Design  Build  Build   Test     Deploy    Deploy     Maintain
+explore → intent → spec → plan → build → verify → (qa) → review → (release) → archive
+ Plan      Plan   Design Build   Build    Test    Test   Deploy    Deploy    Maintain
 ```
 
 | Stage | What is written | Gate at the end |
@@ -14,7 +14,7 @@ explore → intent → spec → plan → build → verify → review → (releas
 | plan | `intent.md`: problem, outcome, success measures | intent (product owner) |
 | design | `proposal.md`, `specs/`, `design.md` | spec (product owner; tech lead when the risk is high) |
 | build | `plan.md`, `tasks.md`, then the code | plan (engineer), before any code |
-| test | `verification.md` from `sdlc verify` | verify (the evidence must be fresh) |
+| test | `verification.md` from `sdlc verify`, then the qa check | verify (the evidence must be fresh); qa (qa) when `gates.qa.required` |
 | deploy | `review.md`, then `release.md` | review (code owner), release (release manager) |
 | maintain | `sdlc archive` merges the spec deltas into the living specs | — |
 
@@ -34,5 +34,7 @@ The verify gate needs no task in tasks.md.
 
 The agent's workflows follow the stages: explore, intent, spec, plan, build, verify, review, release, archive, and triage
 for incidents. `sdlc next` always says which one comes next.
+These are the agent's workflows, not `sdlc` subcommands: there is no `sdlc intent` command. Call the intent workflow
+as `/sdlc:intent` in Claude Code, `$sdlc-intent` in Codex CLI, or `/sdlc-intent` in the other tools.
 
 See also: `sdlc guide gates`, `sdlc guide tracks`.

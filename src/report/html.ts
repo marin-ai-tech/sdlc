@@ -37,7 +37,8 @@ function header(model: ReportModel): string {
 }
 
 /** The share of agent-session commits: `40% (2/5)`; a dash without commits. */
-function agentShare(commits: ReportModel['metrics']['agentCommits']): string {
+/** "40% (4/10)": the agent's share of commits or of log entries. */
+function agentShare(commits: { agent: number; total: number } | undefined): string {
   if (commits === undefined || commits.total === 0) return '—';
   const percent = Math.round(commits.agent / commits.total * 100);
   return `${percent}% (${commits.agent}/${commits.total})`;
@@ -55,12 +56,15 @@ function overview(model: ReportModel): string {
     [t('report.html.verifyFirstPass'), firstPass],
     [t('report.html.medianCreated'), median],
     [t('report.html.agentCommits'), agentShare(model.metrics.agentCommits)],
+    [t('report.html.agentEvents'), agentShare(model.metrics.agentEvents)],
   ];
   const kpis = values.map(([label, value]) =>
     `<div class="kpi"><span>${e(label)}</span><strong>${e(value)}</strong></div>`).join('');
+  const branches = model.otherBranches.length === 0 ? '' : `<p>${e(t('report.html.otherBranches'))}: `
+    + model.otherBranches.map(({ id, branch }) => `${e(id)} (${e(branch)})`).join(', ') + '</p>';
   return `<section aria-labelledby="overview">`
     + `<h2 id="overview">${e(t('report.html.overview'))}</h2>`
-    + `<div class="kpis">${kpis}</div></section>`;
+    + `<div class="kpis">${kpis}</div>${branches}</section>`;
 }
 
 function pipeline(model: ReportModel): string {

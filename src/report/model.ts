@@ -19,6 +19,8 @@ import { readChangeState } from '../core/change-state.js';
 import { evaluateChange, sharedFingerprint, STAGES, STAGE_TITLES } from '../core/lifecycle.js';
 import { aggregateMetrics, changeMetrics } from '../core/metrics.js';
 import { agentCommits, type AgentCommits } from '../core/agent-commits.js';
+import { agentEvents } from '../core/agent-events.js';
+import { otherBranchChanges, type BranchChange } from '../core/branch-changes.js';
 import type { Participation, ParticipationTotals } from '../core/participation.js';
 import { changeLog } from '../core/awaiting.js';
 import { readLog } from '../core/log.js';
@@ -101,7 +103,9 @@ export interface ReportModel {
     participation?: ParticipationTotals;
     /** Commits reachable from HEAD in the period and those made in agent sessions (B24). */
     agentCommits?: AgentCommits;
+    agentEvents?: ReturnType<typeof agentEvents>;
   };
+  otherBranches: BranchChange[];
   changes: ReportChange[];
   /** Project log entries inside the period, oldest first, at most 200 (newest kept). */
   events: LogEntry[];
@@ -267,7 +271,9 @@ export function buildReport(ctx: ProjectContext, opts: ReportOptions = {}): Repo
     project: { name: projectName(ctx.root), root: ctx.root.replace(/\\/g, '/') },
     harness: ctx.stamp,
     summary: summarize(changes),
-    metrics: { ...aggregateMetrics(rows.map((row) => row.metrics)), agentCommits: agentCommits(ctx.root, since) },
+    metrics: { ...aggregateMetrics(rows.map((row) => row.metrics)), agentCommits: agentCommits(ctx.root, since),
+      agentEvents: agentEvents(ctx.root, since, opts.change) },
+    otherBranches: otherBranchChanges(ctx.root),
     changes,
     events: periodEvents(ctx.root, since, opts.change),
     layout: detectLayout(ctx.root, ctx.config.layout),

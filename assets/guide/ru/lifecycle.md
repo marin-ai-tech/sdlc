@@ -9,8 +9,8 @@ summary: Стадии изменения, артефакты каждой и к�
 в `sdlc next` до повторного утверждения. Для гейта verify отдельная задача в tasks.md не нужна.
 
 ```
-explore → intent → spec → plan → build → verify → review → (release) → archive
-  Plan      Plan    Design  Build  Build   Test     Deploy    Deploy     Maintain
+explore → intent → spec → plan → build → verify → (qa) → review → (release) → archive
+ Plan      Plan   Design Build   Build    Test    Test   Deploy    Deploy    Maintain
 ```
 
 | Стадия | Что пишется | Гейт в конце |
@@ -18,7 +18,7 @@ explore → intent → spec → plan → build → verify → review → (releas
 | plan | `intent.md`: проблема, результат, мера успеха | intent (владелец продукта) |
 | design | `proposal.md`, `specs/`, `design.md` | spec (владелец продукта; техлид при высоком риске) |
 | build | `plan.md`, `tasks.md`, потом код | plan (инженер), до любого кода |
-| test | `verification.md` из `sdlc verify` | verify (доказательства должны быть свежими) |
+| test | `verification.md` из `sdlc verify`, затем проверка qa | verify (доказательства должны быть свежими); qa (qa), если `gates.qa.required` |
 | deploy | `review.md`, потом `release.md` | review (владелец кода), release (релиз-менеджер) |
 | maintain | `sdlc archive` вливает дельты спецификаций в живые спецификации | — |
 
@@ -34,5 +34,8 @@ explore → intent → spec → plan → build → verify → review → (releas
 
 Процессы агента идут по стадиям: explore, intent, spec, plan, build, verify, review, release, archive и triage для
 инцидентов. `sdlc next` всегда говорит, какой следующий.
+
+Это процессы агента, а не подкоманды `sdlc`: команды `sdlc intent` нет. Процесс intent вызывается как
+`/sdlc:intent` в Claude Code, `$sdlc-intent` в Codex CLI и `/sdlc-intent` в остальных инструментах.
 
 См. также: `sdlc guide gates`, `sdlc guide tracks`.

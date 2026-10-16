@@ -1,11 +1,19 @@
 import { awaitedGate, type AwaitedGate } from '../awaiting.js';
 import { readDeferred } from '../deferred.js';
+import { otherBranchChanges } from '../branch-changes.js';
 import type { MessageRef } from '../i18n.js';
 import type { LogEntry } from '../log.js';
-import { daysSince, hoursSince, HOUR_MS, windowMetrics, type HealthContext } from './context.js';
+import { daysSince, displayDays, hoursSince, HOUR_MS, windowMetrics, type HealthContext } from './context.js';
 import type { FindingDraft } from './model.js';
 
 /** Flow findings: gates that wait for people, changes that stand still, deferred work nobody revisits. */
+
+export function branchesFinding(ctx: HealthContext): FindingDraft {
+  const facts = otherBranchChanges(ctx.root).map(({ id, branch }) => ({
+    key: 'health.fact.branch', params: { change: id, branch },
+  }));
+  return { id: 'flow.branches', area: 'flow', level: 'info', facts };
+}
 
 function waiting(ctx: HealthContext): AwaitedGate[] {
   const out: AwaitedGate[] = [];
@@ -75,7 +83,7 @@ export function stalledFinding(ctx: HealthContext): FindingDraft {
     const days = daysSince(ctx, last?.at ?? info.state.created);
     if (days === undefined || days < ctx.thresholds.stalledDays) continue;
     const event = last?.event ?? 'change.created';
-    facts.push({ key: 'health.fact.stalled', params: { change: info.ref.id, days, event } });
+    facts.push({ key: 'health.fact.stalled', params: { change: info.ref.id, days: displayDays(days), event } });
   }
   return { id: 'flow.stalled', area: 'flow', level: 'warn', params: { days: ctx.thresholds.stalledDays }, facts };
 }
@@ -91,7 +99,7 @@ export function deferredFinding(ctx: HealthContext): FindingDraft {
     const date = createdDate(item.created);
     const days = date ? daysSince(ctx, `${date}T00:00:00Z`) : undefined;
     if (days === undefined || days < ctx.thresholds.deferredDays) continue;
-    facts.push({ key: 'health.fact.deferred', params: { id: item.id, title: item.title, days } });
+    facts.push({ key: 'health.fact.deferred', params: { id: item.id, title: item.title, days: displayDays(days) } });
   }
   return { id: 'flow.deferred', area: 'flow', level: 'warn', params: { days: ctx.thresholds.deferredDays }, facts };
 }

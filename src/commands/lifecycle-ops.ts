@@ -19,6 +19,7 @@ import { filterLog } from '../core/log-filter.js';
 import { changeMarkdown, tryStampArtifacts } from '../core/stamp.js';
 import { aggregateMetrics, changeMetrics } from '../core/metrics.js';
 import { agentCommits } from '../core/agent-commits.js';
+import { agentEvents } from '../core/agent-events.js';
 import { auditChange, changesInPeriod, type ChangeAudit } from '../core/audit-change.js';
 import { changeLog } from '../core/awaiting.js';
 import {
@@ -302,17 +303,6 @@ function projectRows(ctx: ProjectContext, refs: ChangeRef[]) {
 }
 
 type ProjectAudit = ReturnType<typeof projectRows>;
-
-function agentEvents(root: string, since: string | undefined, change?: string) {
-  const entries = readLog(root).filter((entry) => (!since || entry.ts >= since)
-    && (!change || entry.change === change));
-  const byAgent: Record<string, number> = {};
-  for (const entry of entries) {
-    if (entry.agent) byAgent[entry.agent] = (byAgent[entry.agent] ?? 0) + 1;
-  }
-  return { agent: Object.values(byAgent).reduce((total, count) => total + count, 0),
-    total: entries.length, byAgent };
-}
 
 /** The aggregate over the rows; `since` (B104) limits the agents' commits to the period. */
 function projectAggregate(ctx: ProjectContext, audit: ProjectAudit, since: string | undefined) {

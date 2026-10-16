@@ -224,7 +224,15 @@ into backlog items that Megan orders.
    ```
 
    The other keys and their defaults: `stalled_days: 14`, `deferred_days: 30`, `first_pass_rate: 0.5`,
-   `waiver_share: 0.3`, `reapprovals: 3`, `denials: 5`, `lock_days: 7`.
+   `waiver_share: 0.3`, `reapprovals: 3`, `rejections: 2`, `denials: 5`, `lock_days: 7`.
+
+   The report's Markdown lists the newest 20 events unless `--since` asks for the full period; JSON keeps the
+   latest 200 events. The dashboard shows agent log events beside agent commits. `sdlc trace` groups missing task trailers
+   into one gap when no task has a named commit.
+
+   Fractional day thresholds compare the full age; facts round it to one decimal. Repeated rejections of one gate
+   on one change produce `quality.rejections`. Branch hints name changes as of the last fetch, while health counts
+   only the checked-out branch.
 
 4. Ask the agent to explain the findings and draft improvements. In Claude Code:
 

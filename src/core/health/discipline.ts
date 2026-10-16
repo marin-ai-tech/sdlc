@@ -1,7 +1,7 @@
 import { readChangeDeltas } from '../deltas.js';
 import type { MessageRef } from '../i18n.js';
 import {
-  daysSince, recentHistory, windowChanges, windowMetrics, type ChangeInfo, type HealthContext,
+  daysSince, displayDays, recentHistory, windowChanges, windowMetrics, type ChangeInfo, type HealthContext,
 } from './context.js';
 import type { FindingDraft } from './model.js';
 
@@ -96,7 +96,7 @@ export function testLockFinding(ctx: HealthContext): FindingDraft {
   for (const info of ctx.active.filter((entry) => entry.state.tests_locked === true)) {
     const days = daysSince(ctx, lockedAt(info));
     if (days === undefined || days < ctx.thresholds.lockDays) continue;
-    facts.push({ key: 'health.fact.testLock', params: { change: info.ref.id, days } });
+    facts.push({ key: 'health.fact.testLock', params: { change: info.ref.id, days: displayDays(days) } });
   }
   const params = { days: ctx.thresholds.lockDays };
   return { id: 'discipline.test_lock', area: 'discipline', level: 'warn', params, facts };

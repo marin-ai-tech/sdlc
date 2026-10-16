@@ -1,6 +1,8 @@
 import { loadProject } from '../cli/context.js';
 import { c, line, printJson, reportFailure } from '../cli/output.js';
 import { resolveChange } from '../core/changes.js';
+import { listActiveChanges } from '../core/changes.js';
+import { formatNextLine, resolveNext } from '../cli/next-hint.js';
 import {
   draftExplanation,
   explanationJson,
@@ -22,6 +24,17 @@ export interface ExplainOptions {
 export async function explainCommand(opts: ExplainOptions): Promise<void> {
   try {
     const ctx = loadProject();
+    if (!opts.change && listActiveChanges(ctx.paths).length === 0) {
+      const next = resolveNext(ctx);
+      if (next) {
+        if (opts.json) printJson({ change: null, next });
+        else {
+          line(t('explain.noActive'));
+          line(formatNextLine(ctx, next) ?? next.cli ?? next.message);
+        }
+        return;
+      }
+    }
     const ref = resolveChange(ctx.paths, opts.change, { allowArchived: true });
     const draft = draftExplanation(ctx.root, ref, ctx.config);
     if (opts.json) {

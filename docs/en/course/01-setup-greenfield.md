@@ -621,3 +621,8 @@ and regenerate the files without losing local edits.
 - `git status` before the commit: a long list of new files, grouped by folder.
 - Oliver's first Claude Code session: the MCP approval prompt, the session summary, the status line.
 - The dry run with the "kept … edited locally" warning; highlight `--force`.
+
+## Joining an existing sdlc project
+
+Clone the project, run `npm install`, `sdlc doctor`, and `sdlc doctor --fix` to restore the git hook that is not
+cloned. Ask the tech lead for an entry in `openspec/roles.yaml`, then run `sdlc next --me`.

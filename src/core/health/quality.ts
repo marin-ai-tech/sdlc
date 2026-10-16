@@ -33,6 +33,24 @@ export function firstPassFinding(ctx: HealthContext): FindingDraft {
   return { id: 'quality.first_pass', area: 'quality', level: 'warn', params, facts };
 }
 
+/** A change repeatedly rejected at the same gate inside the health window. */
+export function rejectionsFinding(ctx: HealthContext): FindingDraft {
+  const facts: MessageRef[] = [];
+  for (const info of [...ctx.active, ...ctx.archived]) {
+    const counts = new Map<string, number>();
+    for (const event of info.state.history.filter((entry) => Date.parse(entry.at) >= ctx.since)) {
+      const gate = /^gate\.(\w+)\.rejected$/.exec(event.event)?.[1];
+      if (gate) counts.set(gate, (counts.get(gate) ?? 0) + 1);
+    }
+    for (const [gate, count] of counts) {
+      if (count < ctx.thresholds.rejections) continue;
+      facts.push({ key: 'health.fact.rejections', params: { change: info.ref.id, gate, count } });
+    }
+  }
+  return { id: 'quality.rejections', area: 'quality', level: 'warn',
+    params: { count: ctx.thresholds.rejections }, facts };
+}
+
 const KNOWN_REASONS = [
   'missing-requirement', 'wrong-assumption', 'design-flaw', 'implementation-bug', 'test-gap', 'scope-change',
 ];

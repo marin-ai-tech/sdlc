@@ -63,7 +63,12 @@ export function includeQa(view: ProgressView): boolean {
 /** Ordered lifecycle steps for this change (qa and release omitted when unused). */
 export function progressSteps(view: ProgressView): ProgressStepId[] {
   const used = (step: ProgressStepId) => step !== 'qa' || includeQa(view);
-  return STEPS.filter((step) => used(step) && (step !== 'release' || includeRelease(view)));
+  const applicable = (step: ProgressStepId) => {
+    if (step !== 'intent' && step !== 'spec') return true;
+    const gate = gateOf(view, step);
+    return !gate || gate.required || isStepDone(step, view);
+  };
+  return STEPS.filter((step) => used(step) && applicable(step) && (step !== 'release' || includeRelease(view)));
 }
 
 /**

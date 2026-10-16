@@ -329,7 +329,7 @@ export function backlogStart(id: string, opts: Options): void {
     }
     const derived = item.title.toLowerCase().normalize('NFKD')
       .replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
-    const changeId = text(opts.change) ?? (derived || id.toLowerCase());
+    const changeId = text(opts.change) ?? (/[a-z]/.test(derived) ? derived : id.toLowerCase());
     try {
       assertValidChangeId(changeId);
     } catch {

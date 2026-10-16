@@ -18,7 +18,7 @@ export interface TraceRequirement { name: string; file: string; scenarios: Trace
 export interface TraceTask { id: string; text: string; done: boolean; commits: string[] }
 export interface TraceFinding { id: string; title: string; status?: string; deferredTo?: string }
 export type GapKind = 'requirement-without-scenario' | 'scenario-without-evidence' | 'task-without-commit'
-  | 'finding-without-status';
+  | 'tasks-without-trailers' | 'finding-without-status';
 export interface TraceGap { kind: GapKind; ref: string }
 
 export interface Trace {
@@ -133,8 +133,12 @@ function findGaps(trace: Omit<Trace, 'gaps'>): TraceGap[] {
       if (scenario.evidence.length === 0) gaps.push({ kind: 'scenario-without-evidence', ref: scenario.name });
     }
   }
-  for (const task of trace.tasks.filter((entry) => entry.commits.length === 0)) {
-    gaps.push({ kind: 'task-without-commit', ref: task.id });
+  if (trace.tasks.length > 0 && trace.tasks.every((task) => task.commits.length === 0)) {
+    gaps.push({ kind: 'tasks-without-trailers', ref: String(trace.tasks.length) });
+  } else {
+    for (const task of trace.tasks.filter((entry) => entry.commits.length === 0)) {
+      gaps.push({ kind: 'task-without-commit', ref: task.id });
+    }
   }
   for (const finding of trace.findings.filter((entry) => entry.status === undefined)) {
     gaps.push({ kind: 'finding-without-status', ref: finding.id });

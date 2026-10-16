@@ -592,7 +592,7 @@ packs:                        # from git or npm; pin a commit or an exact versio
   - { name: corp, git: https://git.corp.example/sdlc-pack.git, ref: 0123456789abcdef0123456789abcdef01234567 }
 health:                       # thresholds of sdlc health; every key has a default
   wait_hours: 48              # also: window_days 90, stalled_days 14, deferred_days 30, first_pass_rate 0.5,
-  rework_share: 0.5           #   waiver_share 0.3, reapprovals 3, denials 5, lock_days 7
+  rework_share: 0.5           #   waiver_share 0.3, reapprovals 3, rejections 2, denials 5, lock_days 7
 log:
   enabled: true               # log in openspec/.sdlc/log.jsonl
   hook_decisions: true        # write hook denials and warnings to the log

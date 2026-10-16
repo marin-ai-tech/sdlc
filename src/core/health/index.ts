@@ -8,12 +8,12 @@ import { loadHealthContext, type HealthContext, type HealthOptions } from './con
 import {
   denialsFinding, forcedArchiveFinding, liteBehaviourFinding, restaleFinding, testLockFinding, waiversFinding,
 } from './discipline.js';
-import { deferredFinding, overdueFinding, stalledFinding, waitFinding } from './flow.js';
+import { branchesFinding, deferredFinding, overdueFinding, stalledFinding, waitFinding } from './flow.js';
 import {
   countFindings, orderFindings, renderFinding, type Finding, type FindingDraft, type HealthCounts,
 } from './model.js';
 import {
-  firstPassFinding, openFindingsFinding, planDriftFinding, reworkReasonFinding, traceFinding,
+  firstPassFinding, openFindingsFinding, planDriftFinding, rejectionsFinding, reworkReasonFinding, traceFinding,
 } from './quality.js';
 
 /**
@@ -41,7 +41,9 @@ const COLLECTORS: CollectorEntry[] = [
   { id: 'flow.wait', run: waitFinding, cost: 'normal' },
   { id: 'flow.stalled', run: stalledFinding, cost: 'normal' },
   { id: 'flow.deferred', run: deferredFinding, cost: 'normal' },
+  { id: 'flow.branches', run: branchesFinding, cost: 'normal' },
   { id: 'quality.first_pass', run: firstPassFinding, cost: 'normal' },
+  { id: 'quality.rejections', run: rejectionsFinding, cost: 'normal' },
   { id: 'quality.rework_reason', run: reworkReasonFinding, cost: 'normal' },
   { id: 'quality.open_findings', run: openFindingsFinding, cost: 'normal' },
   { id: 'quality.plan_drift', run: planDriftFinding, cost: 'expensive' },
