@@ -55,6 +55,7 @@ export interface SeparationRules {
 
 export interface RolesFile {
   signing: SigningMode;
+  signingSince?: string;
   people: Person[];
   /** role → person ids. */
   roles: Record<string, string[]>;
@@ -162,7 +163,12 @@ export function parseRolesFile(text: string, file = ROLES_PATH): RolesFile {
   const raw = mapping(parsed, file, 'root');
   if (raw.version !== 1) invalid(file, 'version', 'must be 1');
   if (!SIGNING_MODES.includes(raw.signing as SigningMode)) invalid(file, 'signing', 'must be off, warn or required');
+  if (raw.signing_since !== undefined
+    && (typeof raw.signing_since !== 'string' || !raw.signing_since.trim())) {
+    invalid(file, 'signing_since', 'must be a nonempty git commit reference');
+  }
   return { signing: raw.signing as SigningMode, people: parsePeople(raw.people, file),
+    ...(raw.signing_since === undefined ? {} : { signingSince: raw.signing_since as string }),
     roles: parseRoles(raw.roles, raw.people, file), separation: parseSeparation(raw.separation, file) };
 }
 
@@ -233,7 +239,8 @@ export function approvalEmails(state: ChangeState | undefined): Record<string, s
 /** Reads `openspec/roles.yaml` under root; undefined when the file does not exist. */
 export function readRolesFile(root: string): RolesFile | undefined {
   const file = path.join(root, ROLES_PATH);
-  return fs.existsSync(file) ? parseRolesFile(fs.readFileSync(file, 'utf8'), file) : undefined;
+  if (!fs.existsSync(file)) return undefined;
+  return parseRolesFile(fs.readFileSync(file, 'utf8'), file);
 }
 
 /** The person owning an email (case-insensitive), if any. */

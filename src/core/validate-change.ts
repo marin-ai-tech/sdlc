@@ -1,7 +1,11 @@
+import * as path from 'node:path';
 import type { ProjectContext } from '../cli/context.js';
 import type { ChangeRef } from './changes.js';
+import { readChangeState } from './change-state.js';
 import { checkDeltaTargets, readChangeDeltas } from './deltas.js';
+import { isDirectory, isFile } from './fs-utils.js';
 import { t } from './i18n.js';
+import { evaluateChange } from './lifecycle.js';
 import { openspecFailure, runOpenSpecJson } from './openspec.js';
 import { readOpenSpecMetadata } from './openspec-schema.js';
 
@@ -20,13 +24,26 @@ interface OpenSpecValidateItem {
   issues: Array<{ level: string; path?: string; message: string; line?: number }>;
 }
 
+function needsDeltaSpecs(ctx: ProjectContext, ref: ChangeRef): boolean {
+  const state = readChangeState(ref.dir);
+  if (state.track !== 'full' || readOpenSpecMetadata(ref.dir).skip_specs === true) return false;
+  const view = evaluateChange(ctx.root, ref, ctx.config, { skipFingerprint: true, skipPeople: true });
+  const spec = view.gates.find((gate) => gate.id === 'spec');
+  if (!spec?.required || spec.status === 'n/a' || spec.status === 'waived') return false;
+  const intent = view.gates.find((gate) => gate.id === 'intent');
+  if (intent?.status === 'approved' || intent?.status === 'waived') return true;
+  const specArtifacts = ['proposal.md', 'design.md', 'spec.md'];
+  return specArtifacts.some((name) => isFile(path.join(ref.dir, name)))
+    || isDirectory(path.join(ref.dir, 'specs'));
+}
+
 export function validateOne(ctx: ProjectContext, ref: ChangeRef): {
   change: string; valid: boolean; issues: ValidationIssue[];
 } {
   const issues: ValidationIssue[] = [];
   const deltas = readChangeDeltas(ref.dir);
   const skipSpecs = readOpenSpecMetadata(ref.dir).skip_specs === true;
-  if (deltas.length === 0 && !skipSpecs) {
+  if (deltas.length === 0 && !skipSpecs && needsDeltaSpecs(ctx, ref)) {
     issues.push({ source: 'sdlc', level: 'error',
       message: t('validate.noDeltaSpecs', undefined, 'en'), textKey: 'validate.noDeltaSpecs' });
   } else if (deltas.length > 0) {

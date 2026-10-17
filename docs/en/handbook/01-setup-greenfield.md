@@ -303,6 +303,7 @@ shows a healthy installation.
    | `openspec/sdlc.yaml` | gates, verify commands, review policy, release commands, enforcement, license, MCP |
    | `openspec/specs/`, `openspec/changes/archive/` | where the living specs and archived changes will live |
    | `openspec/.sdlc/log.jsonl` | the project log; `.gitattributes` there sets `merge=union`, so branches merge |
+   | `openspec/.sdlc/hook-log.jsonl` | ignored local queue for hook decisions; the next CLI log write moves them to the project log |
    | `openspec/.sdlc/manifest.json` | checksums of the generated files, so `sdlc update` never overwrites your edits |
    | `.claude/skills/sdlc-*/`, `.claude/commands/sdlc/` | the 18 workflows (`/sdlc:intent`, `/sdlc:next`, …) |
    | `.claude/agents/sdlc-*.md` | subagents: verifier, reviewer, researcher, simplifier, health, advocate |

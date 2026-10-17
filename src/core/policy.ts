@@ -68,7 +68,11 @@ export interface Decision {
 const EDIT_TOOLS = new Set(['edit', 'write', 'write_file', 'replace', 'multiedit', 'notebookedit', 'patch',
   'apply_patch', 'str_replace_based_edit_tool', 'create', 'update']);
 const BASH_TOOLS = new Set(['bash', 'shell', 'powershell', 'terminal', 'run_command', 'run_shell_command']);
-const READ_TOOLS = new Set(['read', 'read_file', 'grep', 'glob', 'ls', 'list', 'webfetch', 'websearch']);
+const READ_TOOLS = new Set([
+  'read', 'read_file', 'read_many_files', 'grep', 'grep_search', 'search_file_content',
+  'glob', 'ls', 'list', 'list_directory', 'webfetch', 'web_fetch', 'websearch',
+  'google_web_search',
+]);
 
 /** An edit tool's input with Codex's patch text (`command`, B82) under `patch`, so its written text is checked. */
 function patchInput(input: Record<string, unknown>, lower: string): Record<string, unknown> {

@@ -22,6 +22,7 @@ function currentValue(doc: Document, path: Path): unknown {
 }
 
 function applyKey(doc: Document, path: Path, previous: unknown, next: unknown): boolean {
+  if (previous !== undefined && !doc.hasIn(path) && isDeepStrictEqual(previous, next)) return false;
   if (isPlain(next) && isMap(doc.getIn(path, true))) {
     return applyMap(doc, path, isPlain(previous) ? previous : {}, next);
   }

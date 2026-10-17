@@ -2,6 +2,36 @@
 
 All notable changes to sdlc. Versions follow [Semantic Versioning](https://semver.org/); while the major version is 0, a minor version may change behavior.
 
+## 0.23.1 — 2026-10-17
+
+### Added
+- `signing_since: <commit>` in `openspec/roles.yaml`: with `signing: warn` or `required`, approvals recorded in that
+  commit or before it count as pre-signing, so a project with history can require signatures from now on. `sdlc
+  approvals verify` names the cutoff; a value git cannot resolve is refused there, in the evidence export and in a
+  roles.yaml proposal, and `sdlc doctor` reports it. A proposal that adds the key or moves it later is a weakening.
+
+### Changed
+- `sdlc guide bugfix` follows the plan gate: the plan names the test that reproduces the bug, a person approves the
+  plan, then the agent writes the failing test, `sdlc tests lock`, the fix. The plan workflow says the same.
+- The gates topic of the guide describes the judge: it runs before the person, records a verdict and never approves;
+  its answer needs `pass`, `route` and `rework`, and `route` is recorded as advice.
+- With `signing: off`, `sdlc approvals verify` says that signatures are not checked and how to turn signing on; the
+  CI files from `sdlc ci init` say so next to the step.
+- Hook decisions (`hook.denied`, `hook.warned`) go to the git-ignored `openspec/.sdlc/hook-log.jsonl` and move into
+  the shared log with the next CLI command that writes it, so an agent's denied attempts no longer leave the working
+  copy dirty. `sdlc log`, `health`, `audit`, the report and the dashboard read both; agents cannot write the queue.
+- The log of config proposals names the person as `Name <email>`, like every other event; `sdlc config show` of an
+  applied or dismissed proposal shows the diff as it was then.
+
+### Fixed
+- The read and search tools of Qwen Code and GigaCode (`grep_search`, `read_many_files`, `list_directory`,
+  `search_file_content`, `web_fetch`, `google_web_search`) are reads: they work before the plan is approved and
+  during a takeover, as the denials guide says.
+- `sdlc validate` and `--all`, the CI step, report missing delta specs only for a full-track change that reached its
+  spec stage; a new change and a lite or docs change pass. `sdlc approve spec` still refuses a gate without deltas.
+- `sdlc license set` changes only the license block of `openspec/sdlc.yaml`; the YAML writer no longer adds default
+  values the file did not have.
+
 ## 0.23.0 — 2026-10-17
 
 ### Added

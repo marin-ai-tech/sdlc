@@ -29,9 +29,14 @@ import { STATE_FILES } from './state-files.js';
  */
 // Case-insensitive: Windows and macOS file systems ignore case, so `OPENSPEC/Backlog.md` is the same file.
 export const STATE_FILE_WRITE =
-  /\.sdlc\.yaml|\.sdlc\/log\.jsonl|\.sdlc\/team\.json|\.sdlc\/board\.(?:json|lock)|\.sdlc\/inbox(?:\/|\b)|openspec\/(?:roles\.yaml|executors\.yaml|backlog\.md)/i;
+  new RegExp(
+    '\\.sdlc\\.yaml|\\.sdlc\\/(?:hook-)?log\\.jsonl|\\.sdlc\\/team\\.json|' +
+    '\\.sdlc\\/board\\.(?:json|lock)|\\.sdlc\\/inbox(?:\\/|\\b)|' +
+    'openspec\\/(?:roles\\.yaml|executors\\.yaml|backlog\\.md)', 'i',
+  );
 export const STATE_FILE = new RegExp(
-  '(^|/)\\.sdlc\\.yaml$|^openspec/\\.sdlc/(?:log\\.jsonl|team\\.json|board\\.json|board\\.lock)$' +
+  '(^|/)\\.sdlc\\.yaml$|^openspec/\\.sdlc/(?:hook-)?log\\.jsonl$|' +
+    '^openspec/\\.sdlc/(?:team\\.json|board\\.json|board\\.lock)$' +
     '|^openspec/\\.sdlc/inbox/[^/]+$|^openspec/(?:roles\\.yaml|executors\\.yaml|backlog\\.md)$',
   'i'
 );

@@ -703,7 +703,8 @@ the agent inside the rules.
 
 6. When every implementation task is ticked, the agent continues with `/sdlc:verify` ([lesson 5.7](#s5-7)).
 
-7. Mention the bug-fix protocol, which `add-due-dates` does not need. For `kind: bugfix`, the first task writes a test
+7. Mention the bug-fix protocol, which `add-due-dates` does not need. The plan names the reproducing test and files
+   to change; a person approves it before the first task writes a test. For `kind: bugfix`, that test
    that reproduces the bug; after it fails for the right reason and is committed, the agent runs
    `sdlc tests lock --change <id>`. From then on the hook denies edits to test files (`denials#tests-locked`); only a
    person can run `sdlc tests unlock`.

@@ -4,6 +4,8 @@
 
 An agent or person runs `sdlc config propose --set <key>=<yaml> --reason <text>` and then
 `sdlc config show <id>`. The show command presents the proposed diff, validation and weakening warnings.
+Applied and dismissed proposals retain the diff at the decision; older records without a saved diff
+compare with the current file and say so. Config log events identify the proposer and decision maker by name and email.
 Use `--target roles` for `openspec/roles.yaml`. Only a person runs `sdlc config apply <id>` or
 `sdlc config dismiss <id> --note <text>` in their own terminal; applying requires the `maintainer` role when
 `roles.yaml` exists. A changed target makes the proposal stale. Weakening changes, such as lower enforcement,
@@ -225,6 +227,8 @@ sdlc new fix-null-name --kind bugfix --risk low --track lite [--skip-specs]
 The intent and the spec are optional: the change starts with plan.md and tasks.md, followed by the same verify and review steps. Run by a person, `--track lite` applies the track; from an agent session it is only recorded as a suggestion until a person runs `sdlc track set lite`. `--skip-specs` sets `skip_specs: true` for a change that does not alter external behavior.
 
 ### Bug-fix protocol
+The plan names the reproducing test and files to change. A person approves it with
+`sdlc approve plan --change <id>` before the agent writes any test.
 1. The first task is a test that reproduces the bug. Make sure it fails for the right reason, and commit it.
 2. `sdlc tests lock --change <id>` — from then on, hooks do not let the agent change the tests.
 3. Fix the code. Only a human can remove the lock: `sdlc tests unlock`.
@@ -293,8 +297,10 @@ gates:
 
 `sdlc judge --gate spec --change <id>` sends `{ change, gate, rubric, artifacts: [{ path, content }] }` (a command
 reads it on stdin and prints the verdict as JSON; a tool gets it as arguments) and records the verdict
-`{ pass, route, rework }`, bound to the digest of the artifacts. Anyone may run it, the agent too: `sdlc next` asks
-the agent to. Until a verdict passes for the current artifacts, the gate is blocked and a person cannot approve; after
+`{ pass, route, rework }`, bound to the digest of the artifacts. The JSON requires all three fields: `pass` is a
+boolean, `route` is a string naming who or where the judge thinks work goes next, and `rework` is a string (empty
+on a pass). The route is recorded as advice; `sdlc next` uses pass and rework. Anyone may run the judge, the agent
+too: `sdlc next` asks the agent to. Until a verdict passes for the current artifacts, the gate is blocked; after
 a failing verdict, `sdlc next` gives the agent the judge's rework instruction. A changed artifact makes the verdict
 stale. A passing verdict is evidence only: a person still approves. After `max_loops` failing verdicts the
 author-critic loop stops and `sdlc next` hands the gate to a person, who may approve. A command judge runs as an agent
@@ -623,8 +629,17 @@ health:                       # thresholds of sdlc health; every key has a defau
   rework_share: 0.5           #   waiver_share 0.3, reapprovals 3, rejections 2, denials 5, lock_days 7
 log:
   enabled: true               # log in openspec/.sdlc/log.jsonl
-  hook_decisions: true        # write hook denials and warnings to the log
+  hook_decisions: true        # queue hook denials and warnings locally until the next log write
 ```
+
+The hook decision queue is `openspec/.sdlc/hook-log.jsonl`. Git ignores this local file, so denials do not dirty the
+working copy. `sdlc log`, `sdlc health`, audit, reports and the dashboard read queued decisions immediately. The next
+CLI command that writes the shared log moves them into `openspec/.sdlc/log.jsonl` in order. Set
+`log.hook_decisions: false` to disable decision logging.
+
+`sdlc validate --all` is safe to run in CI while a change is still at intent. It requires delta specs only for a
+full-track change whose spec gate applies and whose intent is decided or proposal/spec artifacts exist. At that point
+missing deltas fail validation; `sdlc approve spec` still refuses them.
 
 Since 0.17.0, the build workflow runs the `sdlc-simplifier` subagent after the last task and before `sdlc verify`.
 You do not need to list it in `stages.build.agents`. `stages.build.simplify: false` turns this step off. Only the
@@ -684,6 +699,7 @@ For `claude -p`, allow the required tools in advance: `--allowedTools "Bash(sdlc
 Since 0.17.0, a person writes the CI configuration with `sdlc ci init --provider github|gitlab [--check <server>]
 [--force]`. GitHub gets `.github/workflows/sdlc.yml`; GitLab gets `.gitlab/sdlc.yml` and, when there is none, a
 `.gitlab-ci.yml` that includes it. The job runs `sdlc validate --all` and `sdlc approvals verify` on a full clone.
+With `signing: off`, the approval step checks no signatures; the generated CI files say so beside the step.
 An existing file is kept; `--force` rewrites it. `--check <server>` adds a `ci-green` check to `verify.mcp`. The
 command is refused in an agent session. See chapter 10.3.
 

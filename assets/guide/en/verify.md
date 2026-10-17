@@ -6,6 +6,10 @@ summary: sdlc verify, fresh evidence, MCP checks and the inbox.
 
 The verify gate passes on recorded evidence, not on the agent's word.
 
+CI runs `sdlc validate --all`. A new change before its spec stage, or a change whose spec gate does not apply,
+passes without delta specs. A full-track change at its spec stage needs deltas, and `sdlc approve spec` refuses
+missing deltas.
+
 ```bash
 sdlc verify --change add-export           # runs every check in verify.commands and verify.mcp
 sdlc verify --list                        # the configured checks

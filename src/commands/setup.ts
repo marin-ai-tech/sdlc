@@ -15,7 +15,7 @@ import { ensureDir, exists, isDirectory, isFile, readText, writeTextAtomic } fro
 import { formatIdentity, gitIdentity } from '../core/git.js';
 import { ignoredProcessPaths, ignoreFix } from '../core/process-gitignore.js';
 import { harnessStamp, stampTextLocalized } from '../core/license.js';
-import { appendLog } from '../core/log.js';
+import { appendLog, ensureHookIgnore } from '../core/log.js';
 import { assessLicense, detectProjectLicense } from '../core/project-license.js';
 import { runOpenSpec } from '../core/openspec.js';
 import { findProjectRoot, projectPaths, type ProjectPaths } from '../core/project.js';
@@ -459,6 +459,7 @@ async function setupProject(
   deps?: InitDeps,
 ): Promise<InitOutcome> {
   const { paths, openspecCreated, hadConfig, config, tools, detectedCommands } = writeSettings(root, opts);
+  ensureHookIgnore(root);
   const rolesNote = resolved.roles ? `roles: ${writeStarterRoles(root)} openspec/roles.yaml` : undefined;
   // New OpenSpec roots default to the sdlc schema so OpenSpec's own /opsx
   // workflows produce SDLC changes too; existing roots keep their default.
@@ -565,6 +566,7 @@ export function applyUpdate(
   tools: ToolId[],
   opts: { force?: boolean; dryRun?: boolean } = {},
 ): { result: InstallResult; gitHook: GitHookResult } {
+  if (!opts.dryRun) ensureHookIgnore(root);
   const previous = readManifest(root);
   const result = installIntegrations(root, config, tools, { force: opts.force, dryRun: opts.dryRun });
   const gitHook = installGitHook(root, { dryRun: opts.dryRun, tools });

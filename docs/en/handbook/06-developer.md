@@ -259,6 +259,8 @@ an edit, and how to read any denial in two steps.
 - `sdlc guide denials#plan-gate` prints the section.
 - Docs (`**/*.md`) and files under `openspec/` stay writable before the plan: they are in `enforcement.exempt_paths`.
 - `sdlc log` shows a `hook.denied` line with `plan-gate` and the file.
+- Read and search tools remain available before plan approval, even when their input names a path. Hook decisions
+  first enter an ignored local queue; `sdlc log` reads that queue before the next CLI log write moves them.
 
 ### Pitfalls
 
@@ -399,6 +401,7 @@ something by hand.
 
 - `sdlc explain --change fix-due-today` says "Waiting for: person" while Oliver holds the change.
 - An agent edit of `src/tasks.js` is denied with `[sdlc:takeover]` until `sdlc release-control`.
+- The agent may still use read and search tools during the takeover, including reads inside the held change.
 - `sdlc audit --change fix-due-today` counts one takeover.
 
 ### Pitfalls

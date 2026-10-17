@@ -18,6 +18,7 @@ export interface ConfigProposal {
   when: string;
   baseDigest: string;
   content: string;
+  reviewedDiff?: string;
   status: ProposalStatus;
   note?: string;
   integrity?: string;
@@ -47,7 +48,7 @@ export function validateContent(text: string, target: ConfigTarget): void {
     throw new SdlcError('invalid_config', { key: 'config.error.mapping' });
   }
   const keys = target === 'roles'
-    ? ['version', 'signing', 'people', 'roles', 'separation']
+    ? ['version', 'signing', 'signing_since', 'people', 'roles', 'separation']
     : ['version', 'schema', 'cli', 'statusline', 'stages', 'project', 'mcp', 'events', 'issues',
       'team', 'packs', 'board', 'context', 'tools', 'delivery', 'gates', 'roles', 'verify',
       'review', 'release', 'enforcement', 'license', 'log', 'rework', 'health', 'questions',
@@ -162,11 +163,12 @@ export function readProposal(root: string, id: string): ConfigProposal {
   }
   const p = document.toJS() as Partial<ConfigProposal>;
   const allowed = ['id', 'target', 'reason', 'by', 'agent', 'when', 'baseDigest', 'content', 'status',
-    'note', 'integrity'];
+    'note', 'reviewedDiff', 'integrity'];
   const valid = p && p.id === id && (p.target === 'sdlc' || p.target === 'roles')
     && typeof p.reason === 'string' && !!p.reason.trim() && typeof p.by === 'string'
     && typeof p.when === 'string' && typeof p.baseDigest === 'string'
     && /^sha256:[a-f0-9]{64}$/.test(p.baseDigest) && typeof p.content === 'string'
+    && (p.reviewedDiff === undefined || typeof p.reviewedDiff === 'string')
     && ['open', 'applied', 'dismissed'].includes(p.status ?? '');
   const { integrity, ...body } = p;
   if (!valid || Object.keys(p).some((key) => !allowed.includes(key))

@@ -20,6 +20,9 @@ test paths, lite `auto_waive`, lower approval count, weaker signing or an empty 
 `openspec/sdlc.yaml` configures the process. **Only a person edits it**: the hook denies agent edits, because the file
 also controls the guard itself.
 
+`log.hook_decisions: false` disables the local hook decision queue. With it enabled, the ignored
+`openspec/.sdlc/hook-log.jsonl` holds decisions until another CLI log write moves them to the shared log.
+
 | Key | What it does |
 |---|---|
 | `gates.<gate>` | `required`, `approvers` (roles), `high_risk_approvers`, `min_approvals`, `auto_waive` (kinds, tracks; intent, spec, plan only; a kind an agent chose does not count) |

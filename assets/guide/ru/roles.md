@@ -9,6 +9,7 @@ summary: openspec/roles.yaml, кто какой гейт может утверд
 ```yaml
 version: 1
 signing: warn                 # off | warn | required
+signing_since: abc123         # необязательный коммит: прежние утверждения — pre-signing
 people:
   alice: { name: Alice Walker, emails: [alice@corp.example] }
   bob:   { name: Bob Turner,   emails: [bob@corp.example] }
@@ -46,3 +47,6 @@ separation:
 - `sdlc roles migrate` — перенести `roles:` из `sdlc.yaml` в `roles.yaml` (команда человека).
 
 Агент не может править `roles.yaml`; защитите его ещё и в git через CODEOWNERS и защиту ветки.
+При `signing: off` команда `approvals verify` не проверяет подписи. Включите `signing: warn` или
+`signing: required`. Для проекта с историей задайте `signing_since`: утверждения в указанном коммите
+и его предках имеют статус `pre-signing`.

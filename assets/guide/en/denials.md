@@ -7,20 +7,22 @@ summary: Every hook rule - why it stopped the agent, and what to do.
 The guard of your tool checks every edit, shell command and MCP call of the agent: the hooks of Claude Code, Cursor,
 Codex CLI, Qwen Code and GigaCode, or the OpenCode plugin. A denial names its rule in brackets, for example
 `[sdlc:plan-gate]`. Hard rules apply in `warn` mode too; process rules deny only in `block` mode and remind in `warn`.
+Hook denials and warnings first append to the ignored local queue. `sdlc log` and `sdlc health` read them immediately;
+the next CLI command that writes the shared log moves them there in order.
 
 ## plan-gate
 
-With several active changes, code may be written only to files listed under "## Files that change" in an approved
-plan, including matching globs; with one active change, an approved plan opens code edits as before.
-
 Process rule. Code was about to be written with no approved plan. **Do:** write `plan.md` and `tasks.md` (the plan
 workflow) and have a person run `sdlc approve plan --change <id>`. Docs and `openspec/` are exempt.
+With several active changes, code may be written only to files listed under "## Files that change" in an approved
+plan, including matching globs; with one active change, an approved plan opens code edits as before.
 Since 0.14.0 a shell command counts too, in every tool: the files it writes (`>`, `tee`, `cp`, `mv`,
 `Set-Content`/`sc`, `Tee-Object`, `Out-File`, `New-Item`, `Copy-Item`/`Move-Item`, `Rename-Item`,
 `.NET File` writers, `sed -i`, `perl -i`, `touch`, `truncate`, `dd of=`, `git checkout`/`restore`/`mv`/`apply`, `patch`,
 `curl -o`, `wget -O`, `Invoke-WebRequest -OutFile`, `node -e`, `python -c`, commands inside `iex` and
 `Start-Process`, and `apply_patch`) are checked like an edit;
-reading never is.
+reading never is. Read and search tools stay available before plan approval and during a takeover, even when their
+input names a path. Tools that can write remain subject to the guard.
 
 ## protected-path
 
@@ -34,7 +36,8 @@ wrong, a person runs `sdlc tests unlock --change <id>`.
 
 ## state-integrity
 
-Hard rule. `.sdlc.yaml`, `openspec/roles.yaml`, the log, the inbox, the team record, the backlog,
+Hard rule. `.sdlc.yaml`, `openspec/roles.yaml`, the shared log, the local hook decision queue
+`openspec/.sdlc/hook-log.jsonl`, the inbox, the team record, the backlog,
 `openspec/.sdlc/board.json` and its lock `openspec/.sdlc/board.lock` are records only the CLI writes.
 Only a person edits the executor registry `openspec/executors.yaml`.
 **Do:** use `sdlc approve` (a person), `sdlc backlog add|edit` or `sdlc verify` for their records.

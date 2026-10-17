@@ -10,19 +10,21 @@ import { historyErrors } from '../core/history-trust.js';
 import type { ProjectPaths } from '../core/project.js';
 import { readRolesFile, SIGNING_MODES, type RolesFile, type SigningMode } from '../core/roles.js';
 import { t } from '../core/i18n.js';
+import { resolveSigningSince } from '../core/signing-since.js';
 
 interface Result { status: SignatureStatus; commit?: string; signer?: string }
 
 type Results = Array<Record<string, unknown> & Result>;
 
-function verify(root: string, paths: ProjectPaths, roles: RolesFile, signers: string): Results {
+function verify(root: string, paths: ProjectPaths, roles: RolesFile, signers: string,
+  signingSince?: string): Results {
   const results: Results = [];
   const trailers = approvalTrailers(root);
   for (const site of approvalSites(root, allChanges(paths))) {
     const { ref, gate, record } = site;
     const trailer = trailerStatus(trailers, ref.id, gate, record.digest);
     const base = { change: ref.id, gate, role: record.role, by: record.by, person: record.person, trailer };
-    results.push({ ...base, ...approvalSignature(root, roles, signers, site) });
+    results.push({ ...base, ...approvalSignature(root, roles, signers, site, signingSince) });
   }
   results.push(...rolesSignatures(root, signers));
   return results;
@@ -32,7 +34,7 @@ function passing(status: SignatureStatus): boolean {
   return status === 'valid' || status === 'pre-signing' || status === 'bootstrap' || status === 'merge';
 }
 
-function printResults(results: ReturnType<typeof verify>, mode: string): void {
+function printResults(results: ReturnType<typeof verify>, mode: string, cutoff?: string): void {
   for (const result of results) {
     const subject = result.file ?? `${result.change}/${result.gate}`;
     const mark = passing(result.status) ? '✓' : '✗';
@@ -45,6 +47,7 @@ function printResults(results: ReturnType<typeof verify>, mode: string): void {
   const failures = results.filter((result) => !passing(result.status));
   const blocking = mode === 'warn' ? t('approvals.warnNotBlocking') : '';
   line(t('approvals.summary', { approvals, invalid: failures.length, blocking }));
+  if (cutoff) line(t('approvals.signingSince', { commit: cutoff }));
   if (failures.length) line(t('approvals.signHint'));
 }
 
@@ -84,14 +87,15 @@ function printWarnings(problems: SdlcError[]): void {
   for (const problem of problems) warn(`${problem.localizedMessage()} ${problem.localizedFix() ?? ''}`.trimEnd());
 }
 
-function printOutcome(mode: SigningMode, results: Results, problems: SdlcError[], json: boolean | undefined): void {
+function printOutcome(mode: SigningMode, results: Results, problems: SdlcError[], json: boolean | undefined,
+  cutoff?: string): void {
   const ok = results.every((result) => passing(result.status));
   const warnings = problems.length ? { warnings: problems.map(asWarning) } : {};
   if (json) {
-    printJson({ mode, ok, results, ...warnings });
+    printJson({ mode, ok, results, ...warnings, ...(cutoff ? { signingSince: cutoff } : {}) });
   } else {
     printWarnings(problems);
-    printResults(results, mode);
+    printResults(results, mode, cutoff);
   }
   if (mode === 'required' && !ok) process.exitCode = 1;
 }
@@ -107,10 +111,11 @@ export function approvalsVerify(opts: { mode?: string; json?: boolean }): void {
       printOff(mode, opts.json);
       return;
     }
+    const signingSince = roles?.signingSince ? resolveSigningSince(ctx.root, roles.signingSince) : undefined;
     const results = roles
-      ? withAllowedSigners(roles, (signers) => verify(ctx.root, ctx.paths, roles, signers))
+      ? withAllowedSigners(roles, (signers) => verify(ctx.root, ctx.paths, roles, signers, signingSince))
       : verifyRolesHistory(ctx.root);
-    printOutcome(mode, results, problems, opts.json);
+    printOutcome(mode, results, problems, opts.json, roles?.signingSince);
   } catch (error) {
     reportFailure(error, opts.json);
   }

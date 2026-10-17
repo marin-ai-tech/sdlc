@@ -12,6 +12,7 @@ import { git } from '../core/git.js';
 import { t, type MessageParams } from '../core/i18n.js';
 import { appendLog } from '../core/log.js';
 import { parseRolesFile, personByEmail, readRolesFile } from '../core/roles.js';
+import { resolveSigningSince, isPreSigningCommit } from '../core/signing-since.js';
 import { parse } from 'yaml';
 
 interface Options { json?: boolean; target?: string; set?: string[]; file?: string; reason?: string; yes?: boolean;
@@ -21,6 +22,18 @@ function identity(root: string): { name: string; email: string } {
   const name = git(root, ['config', 'user.name']).stdout;
   const email = git(root, ['config', 'user.email']).stdout.toLowerCase();
   return { name: name || email || 'unknown', email };
+}
+
+function namedIdentity(root: string): string {
+  const person = identity(root);
+  return `${person.name} <${person.email}>`;
+}
+
+function validateProposalCommit(root: string, target: ConfigTarget, content: string): string | undefined {
+  if (target !== 'roles') return undefined;
+  const since = parseRolesFile(content).signingSince;
+  if (since) resolveSigningSince(root, since);
+  return since;
 }
 
 function target(value: string | undefined): ConfigTarget {
@@ -56,6 +69,14 @@ function warnings(root: string, proposal: ConfigProposal): string[] {
     const result: string[] = [];
     const rank = { off: 0, warn: 1, required: 2 };
     if (rank[after.signing] < rank[before.signing]) result.push('signing is lower');
+    const beforeSince = before.signingSince ? resolveSigningSince(root, before.signingSince) : undefined;
+    const afterSince = after.signingSince === before.signingSince
+      ? beforeSince : after.signingSince ? resolveSigningSince(root, after.signingSince) : undefined;
+    const movesCutoff = beforeSince && afterSince && afterSince !== beforeSince
+      && isPreSigningCommit(root, beforeSince, afterSince);
+    if (after.signingSince && (!before.signingSince || movesCutoff)) {
+      result.push('signing_since is later or newly added');
+    }
     for (const [role, people] of Object.entries(before.roles)) {
       if (people.length && !(after.roles[role]?.length)) result.push(`${role} role is empty`);
     }
@@ -67,6 +88,7 @@ function warnings(root: string, proposal: ConfigProposal): string[] {
 function localizedWarning(warning: string): string {
   if (warning === 'enforcement mode is lower') return t('config.warning.enforcement');
   if (warning === 'signing is lower') return t('config.warning.signing');
+  if (warning === 'signing_since is later or newly added') return t('config.warning.signingSince');
   const patterns: Array<[RegExp, string, string]> = [
     [/^(.+) gate is no longer required$/, 'config.warning.gate', 'gate'],
     [/^(.+) gate auto_waive includes lite$/, 'config.warning.autoWaive', 'gate'],
@@ -97,16 +119,21 @@ export function proposeConfig(opts: Options): void {
       throw new SdlcError('invalid_config', { key: 'config.error.proposeArgs' });
     }
     const current = fs.readFileSync(targetFile(ctx.root, chosen), 'utf8');
+    const currentSince = validateProposalCommit(ctx.root, chosen, current);
     const raw = proposedContent(current, opts.set ?? [], opts.file);
     const content = preserveHeader(current, raw, chosen);
     validateContent(content, chosen);
+    const proposedSince = chosen === 'roles' ? parseRolesFile(content).signingSince : undefined;
+    if (proposedSince !== currentSince) validateProposalCommit(ctx.root, chosen, content);
     const proposal: ConfigProposal = {
       id: nextProposalId(ctx.root), target: chosen, reason: opts.reason.trim(),
       by: identity(ctx.root).name, ...(agentEnvironment() ? { agent: agentEnvironment() } : {}),
       when: new Date().toISOString(), baseDigest: digest(current), content, status: 'open',
+      reviewedDiff: unifiedDiff(current, content),
     };
     writeProposal(ctx.root, proposal, true);
-    appendLog(ctx.root, ctx.config, { event: 'config.proposed', by: proposal.by, detail: proposal.id }, ctx.stamp);
+    appendLog(ctx.root, ctx.config, { event: 'config.proposed', by: namedIdentity(ctx.root),
+      detail: proposal.id }, ctx.stamp);
     if (opts.json) printJson({ id: proposal.id });
     else line(t('config.proposed', { id: proposal.id }));
   } catch (error) { reportFailure(error, opts.json); }
@@ -129,16 +156,20 @@ export function showConfig(id: string | undefined, opts: Options): void {
       return;
     }
     const proposal = readProposal(ctx.root, id);
-    const current = fs.readFileSync(targetFile(ctx.root, proposal.target), 'utf8');
-    const diff = unifiedDiff(current, proposal.content);
-    const alerts = warnings(ctx.root, proposal);
+    const closed = proposal.status !== 'open';
+    const current = closed && proposal.reviewedDiff ? undefined
+      : fs.readFileSync(targetFile(ctx.root, proposal.target), 'utf8');
+    const diff = current === undefined ? proposal.reviewedDiff! : unifiedDiff(current, proposal.content);
+    const alerts = closed ? [] : warnings(ctx.root, proposal);
     const result = { id, status: status(ctx.root, proposal), reason: proposal.reason,
-      by: proposal.by, diff, validation: 'valid', warnings: alerts, weakens: alerts.length > 0 };
+      by: proposal.by, diff, validation: 'valid', warnings: alerts, weakens: alerts.length > 0,
+      ...(closed && !proposal.reviewedDiff ? { diffNote: t('config.legacyDiff') } : {}) };
     if (opts.json) printJson(result);
     else {
       line(t('config.showItem', { id, status: { key: `config.status.${result.status}` },
         reason: safeText(proposal.reason), by: safeText(proposal.by) }));
       line(diff.replace('--- current\n+++ proposed', t('config.diffHeader')));
+      if (closed && !proposal.reviewedDiff) line(t('config.legacyDiff'));
       line(t('config.validation', { validation: { key: 'config.status.valid' } }));
       for (const warning of alerts) line(t('config.warning', { warning: safeText(localizedWarning(warning)) }));
     }
@@ -176,10 +207,11 @@ export function applyConfig(id: string, opts: Options): void {
       }
     }
     validateContent(proposal.content, proposal.target);
+    proposal.reviewedDiff = unifiedDiff(current, proposal.content);
     writeTextAtomic(file, proposal.content);
     proposal.status = 'applied';
     writeProposal(ctx.root, proposal);
-    appendLog(ctx.root, ctx.config, { event: 'config.applied', by: identity(ctx.root).name,
+    appendLog(ctx.root, ctx.config, { event: 'config.applied', by: namedIdentity(ctx.root),
       detail: id }, ctx.stamp);
     const message = `Apply config proposal ${id}: ${proposal.reason}`;
     if (opts.json) printJson({ id, status: 'applied', suggested_commit: message });
@@ -199,10 +231,12 @@ export function dismissConfig(id: string, opts: Options): void {
         params: { id, status: { key: `config.status.${proposal.status}` } } },
       { key: 'config.fix.closed' });
     }
+    const current = fs.readFileSync(targetFile(ctx.root, proposal.target), 'utf8');
+    proposal.reviewedDiff = unifiedDiff(current, proposal.content);
     proposal.status = 'dismissed';
     proposal.note = opts.note.trim();
     writeProposal(ctx.root, proposal);
-    appendLog(ctx.root, ctx.config, { event: 'config.dismissed', by: identity(ctx.root).name,
+    appendLog(ctx.root, ctx.config, { event: 'config.dismissed', by: namedIdentity(ctx.root),
       detail: `${id}: ${proposal.note}` }, ctx.stamp);
     if (opts.json) printJson({ id, status: 'dismissed' });
     else line(t('config.dismissed', { id }));

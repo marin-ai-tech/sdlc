@@ -9,6 +9,7 @@ Without `openspec/roles.yaml`, anyone with a git identity may approve. With it, 
 ```yaml
 version: 1
 signing: warn                 # off | warn | required
+signing_since: abc123         # optional commit: approvals through it are pre-signing
 people:
   alice: { name: Alice Walker, emails: [alice@corp.example] }
   bob:   { name: Bob Turner,   emails: [bob@corp.example] }
@@ -46,3 +47,5 @@ The token is printed once; only its SHA-256 hash is kept in the registry.
 - `sdlc roles migrate` — moves `roles:` from `sdlc.yaml` into `roles.yaml` (a person's command).
 
 Agents cannot edit `roles.yaml`; protect it in git with CODEOWNERS and branch protection as well.
+With `signing: off`, `approvals verify` checks no signatures. Set `signing: warn` or `signing: required` to enable it.
+For a project with history, set `signing_since` to a commit; approvals in it or its ancestors are `pre-signing`.

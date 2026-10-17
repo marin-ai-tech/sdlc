@@ -12,6 +12,7 @@ import type { HarnessStamp } from './license.js';
 import { LOG_PATH, readLog, type LogEntry } from './log.js';
 import type { ProjectPaths } from './project.js';
 import { readRolesFile, type RolesFile } from './roles.js';
+import { resolveSigningSince } from './signing-since.js';
 import { evidenceIndexMarkdown } from './evidence-index-md.js';
 
 /**
@@ -126,14 +127,15 @@ function toExportApproval(site: ApprovalSite, signature: ExportApproval['signatu
 }
 
 /** Every approval of `refs` with the status `sdlc approvals verify` computes, or `not-checked` without signing. */
-export function exportApprovals(root: string, refs: ChangeRef[]): ExportApproval[] {
+export function exportApprovals(root: string, refs: ChangeRef[], loadedRoles?: RolesFile): ExportApproval[] {
   const sites = approvalSites(root, refs);
   const trailers = approvalTrailers(root);
   const trailerOf = (site: ApprovalSite) => trailerStatus(trailers, site.ref.id, site.gate, site.record.digest);
-  const roles = signingRoles(root);
+  const roles = loadedRoles ?? signingRoles(root);
   if (!roles) return sites.map((site) => toExportApproval(site, 'not-checked', trailerOf(site)));
+  const signingSince = roles.signingSince ? resolveSigningSince(root, roles.signingSince) : undefined;
   return withAllowedSigners(roles, (signers) => sites.map((site) => {
-    const signature = approvalSignature(root, roles, signers, site).status;
+    const signature = approvalSignature(root, roles, signers, site, signingSince).status;
     return toExportApproval(site, signature, trailerOf(site));
   }));
 }
@@ -201,7 +203,7 @@ function buildIndex(project: ExportProject, refs: ChangeRef[], since: string | u
     project: project.name,
     harness: project.stamp,
     changes: refs.map(bundleId),
-    approvals: exportApprovals(project.root, refs),
+    approvals: exportApprovals(project.root, refs, roles),
     rolesCommits,
   };
 }

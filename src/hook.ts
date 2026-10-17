@@ -6,7 +6,7 @@ import { recordAwaiting } from './core/awaiting.js';
 import { loadConfig } from './core/config.js';
 import { isFile, isWithin, toPosix } from './core/fs-utils.js';
 import { resolveLocale, setLocale, systemLocale, t } from './core/i18n.js';
-import { appendLog } from './core/log.js';
+import { appendHookLog } from './core/log.js';
 import { evaluateToolCall, normalizeToolCall, sessionSummary, stopCheck, type Decision, type ToolCall } from './core/policy.js';
 import { findProjectRoot, projectPaths } from './core/project.js';
 import { sessionHealthLine } from './core/health/signal.js';
@@ -210,7 +210,7 @@ function preTool(agent: Agent, input: HookInput, project: HookProject): void {
   const decision = evaluateToolCall(call, { paths: project.paths, config });
   const logged = !(input as { skip_log?: boolean }).skip_log;
   if (respondPreTool(agent, decision, input.session_id, root) && config.log.hookDecisions && logged) {
-    appendLog(root, config, {
+    appendHookLog(root, config, {
       event: decision.decision === 'deny' ? 'hook.denied' : 'hook.warned',
       agent,
       detail: decisionDetail(root, call, decision),

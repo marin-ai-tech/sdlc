@@ -614,12 +614,17 @@ commands also take `--json` and, with several active changes, `--change <id>`.
 | `sdlc layout adapt` | anyone | adapt an existing layout to the recommended one |
 | `sdlc layout convert` | anyone | convert the project layout |
 | `sdlc ci init --provider github\|gitlab` | a person | write a starter CI configuration that runs the sdlc checks and ends with `sdlc events flush` |
+
 | `sdlc plugin build [dir]` | anyone | render the workflows, subagents and hooks as a Claude Code plugin (default `./plugin`) |
 | `sdlc hook pre-tool\|session-start\|stop` | anyone | the policy dispatcher the agent tools call; reads JSON on stdin (you do not run it by hand) |
 | `sdlc statusline` | anyone | print the Claude Code status line |
 | `sdlc openspec [args]` | anyone | run the bundled OpenSpec CLI, for example `sdlc openspec list --specs` |
 | `sdlc license` | anyone | show the sdlc version and the license the project uses sdlc under |
 | `sdlc license set community\|commercial` | a person | record a change of the license |
+
+The generated CI step runs `sdlc validate --all`. Before a change reaches its spec stage, missing delta specs do not
+fail validation. A full-track change with an applicable spec gate needs deltas once intent is decided or proposal/spec
+artifacts exist; `sdlc approve spec` also refuses missing deltas.
 
 ### Roles and the agent team
 

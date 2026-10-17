@@ -29,7 +29,9 @@ sdlc audit --export evidence-q3 --since 2026-07-01
 change (intent, specs, design, plan, verification evidence, review, the change record) and `log.jsonl` with the
 decisions of the period. Each approval shows who gave it, in which role, the digest of what was signed, the signature
 status (`valid`, `unsigned`, `wrong-signer`, … with `roles.yaml` and signing on; `not-checked` otherwise) and whether
-the commit with its `SDLC-Approval` trailer exists. Nothing from outside openspec/ goes in — no source code, no
+the commit with its `SDLC-Approval` trailer exists. With `signing_since` in `roles.yaml`, approvals recorded through
+a chosen commit are `pre-signing`; later approvals use the configured mode. With `signing: off`, no signatures are
+checked. Nothing from outside openspec/ goes in — no source code, no
 secrets — and an existing folder with files in it is refused, so the export never mixes into something else.
 
 ### Release notes that match the specs

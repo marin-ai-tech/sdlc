@@ -12,6 +12,7 @@ import { openspecVersion, resolveOpenSpec, runOpenSpec } from './openspec.js';
 import { projectPaths, type ProjectPaths } from './project.js';
 import { assessLicense, detectProjectLicense } from './project-license.js';
 import { readRolesFile } from './roles.js';
+import { resolveSigningSince } from './signing-since.js';
 import { ignoredProcessPaths, ignoreFix } from './process-gitignore.js';
 import { conflictedRecords } from './record-conflicts.js';
 import { hooksDisabledFiles } from './user-guard.js';
@@ -326,6 +327,15 @@ function projectChecks(out: Checks, root: string, env: NodeJS.ProcessEnv): void 
   out.add('project', 'ok', out.tt('doctor.root', { root }));
   const roles = readRolesFile(root);
   if (roles) out.add('approval signing', 'ok', out.tt('doctor.signingMode', { mode: roles.signing }));
+  if (roles?.signingSince) {
+    try {
+      resolveSigningSince(root, roles.signingSince);
+    } catch {
+      const status = roles.signing === 'off' ? 'warn' : 'error';
+      out.add('signing_since', status, out.tt('doctor.signingSinceInvalid', { ref: roles.signingSince }),
+        out.tt('doctor.fix.signingSince'));
+    }
+  }
   const config = configCheck(out, paths);
   openspecChecks(out, root, paths);
   generatedFilesCheck(out, root, config);

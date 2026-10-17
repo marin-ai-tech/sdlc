@@ -16,6 +16,7 @@ import { agentEnvironment } from './agent-env.js';
  * concurrently without merge conflicts.
  */
 export const LOG_PATH = 'openspec/.sdlc/log.jsonl';
+export const HOOK_LOG_PATH = 'openspec/.sdlc/hook-log.jsonl';
 
 export interface LogEntry {
   ts: string;
@@ -41,6 +42,62 @@ export type LogInput = Omit<LogEntry, 'ts' | 'sdlc' | 'license'>;
 
 const GITATTRIBUTES = 'log.jsonl merge=union\n';
 
+export function ensureHookIgnore(root: string): void {
+  const file = path.join(root, 'openspec/.sdlc/.gitignore');
+  ensureDir(path.dirname(file));
+  const text = readText(file) ?? '';
+  if (text.split(/\r?\n/).includes('hook-log.jsonl')) return;
+  const separator = text && !text.endsWith('\n') ? '\n' : '';
+  fs.writeFileSync(file, `${text}${separator}hook-log.jsonl\n`, 'utf-8');
+}
+
+function logEntry(config: Pick<SdlcConfig, 'license'>, input: LogInput, stamp: HarnessStamp): LogEntry {
+  const agent = input.agent ?? agentEnvironment();
+  return {
+    ts: new Date().toISOString(), event: input.event,
+    ...(input.change ? { change: input.change } : {}),
+    ...(input.by ? { by: input.by } : {}),
+    ...(input.detail ? { detail: input.detail } : {}),
+    ...(agent ? { agent } : {}),
+    ...(input.waitingFor ? { waitingFor: input.waitingFor } : {}),
+    ...(input.summary ? { summary: input.summary } : {}),
+    ...(input.task ? { task: input.task } : {}),
+    ...(input.executor ? { executor: input.executor } : {}),
+    sdlc: stamp.version, license: stamp.license,
+  };
+}
+
+/** Hook processes only append; the next ordinary log write drains the local queue. */
+export function appendHookLog(root: string, config: SdlcConfig & QueueConfig, input: LogInput): void {
+  if (!config.log.enabled || !config.log.hookDecisions) return;
+  try {
+    const file = path.join(root, HOOK_LOG_PATH);
+    ensureDir(path.dirname(file));
+    ensureHookIgnore(root);
+    const entry = logEntry(config, input, harnessStamp(config));
+    fs.appendFileSync(file, `${JSON.stringify(entry)}\n`, 'utf-8');
+    queueEvent(root, config, entry);
+  } catch {
+    // Logging cannot prevent a hook decision.
+  }
+}
+
+function drainHookLog(root: string, file: string): void {
+  const queue = path.join(root, HOOK_LOG_PATH);
+  const drained = `${queue}.${process.pid}.${Date.now()}.drain`;
+  try {
+    fs.renameSync(queue, drained);
+  } catch {
+    return;
+  }
+  try {
+    fs.appendFileSync(file, fs.readFileSync(drained));
+    fs.rmSync(drained);
+  } catch {
+    try { fs.renameSync(drained, queue); } catch { /* keep the drain for recovery */ }
+  }
+}
+
 export function appendLog(
   root: string,
   config: Pick<SdlcConfig, 'license' | 'log'> & QueueConfig,
@@ -50,24 +107,12 @@ export function appendLog(
   if (!config.log.enabled) return;
   const file = path.join(root, LOG_PATH);
   try {
-    const agent = input.agent ?? agentEnvironment();
     ensureDir(path.dirname(file));
+    ensureHookIgnore(root);
     const attributes = path.join(path.dirname(file), '.gitattributes');
     if (!isFile(attributes)) fs.writeFileSync(attributes, GITATTRIBUTES, 'utf-8');
-    const entry: LogEntry = {
-      ts: new Date().toISOString(),
-      event: input.event,
-      ...(input.change ? { change: input.change } : {}),
-      ...(input.by ? { by: input.by } : {}),
-      ...(input.detail ? { detail: input.detail } : {}),
-      ...(agent ? { agent } : {}),
-      ...(input.waitingFor ? { waitingFor: input.waitingFor } : {}),
-      ...(input.summary ? { summary: input.summary } : {}),
-      ...(input.task ? { task: input.task } : {}),
-      ...(input.executor ? { executor: input.executor } : {}),
-      sdlc: stamp.version,
-      license: stamp.license,
-    };
+    drainHookLog(root, file);
+    const entry = logEntry(config, input, stamp);
     fs.appendFileSync(file, `${JSON.stringify(entry)}\n`, 'utf-8');
     queueEvent(root, config, entry);
   } catch {
@@ -75,9 +120,10 @@ export function appendLog(
   }
 }
 
-/** Entries in file order; malformed lines (for example a bad merge) are skipped. */
+/** Shared entries in file order, followed by local queue entries in file order; malformed lines are skipped. */
 export function readLog(root: string): LogEntry[] {
-  const text = readText(path.join(root, LOG_PATH));
+  const text = [readText(path.join(root, LOG_PATH)), readText(path.join(root, HOOK_LOG_PATH))]
+    .filter((part): part is string => part !== undefined).join('\n');
   if (!text) return [];
   const entries: LogEntry[] = [];
   for (const line of text.split(/\r?\n/)) {

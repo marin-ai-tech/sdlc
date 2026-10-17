@@ -7,6 +7,7 @@ import { listActiveChanges, listArchivedChanges, type ChangeRef } from './change
 import { requiredGit, trustedGit } from './history-trust.js';
 import type { ProjectPaths } from './project.js';
 import { allowedSigners, parseRolesFile, personByEmail, ROLES_PATH, type RolesFile } from './roles.js';
+import { isPreSigningCommit } from './signing-since.js';
 
 /**
  * Signature checks of approvals and of roles.yaml commits (`sdlc approvals verify`, B21 evidence export). An approval
@@ -96,7 +97,8 @@ function approverOf(roles: RolesFile, record: ApprovalRecord) {
 }
 
 /** The signature status of one approval: the first commit that recorded it must be signed by the approver. */
-export function approvalSignature(root: string, roles: RolesFile, signers: string, site: ApprovalSite): SignatureCheck {
+export function approvalSignature(root: string, roles: RolesFile, signers: string, site: ApprovalSite,
+  signingSince?: string): SignatureCheck {
   const { file, record } = site;
   const history = trustedGit(root, ['log', '--reverse', '--format=%H', `-S${record.at}`, '--', 'openspec/changes']);
   const sha = history.ok ? history.stdout.split('\n')[0] : '';
@@ -109,6 +111,9 @@ export function approvalSignature(root: string, roles: RolesFile, signers: strin
     : fallback?.ok === true && fallback.stdout.includes(record.at);
   if (!sha || !inHead) {
     return { status: 'not-committed', commit: sha || undefined, signer: undefined };
+  }
+  if (signingSince && isPreSigningCommit(root, sha, signingSince)) {
+    return { status: 'pre-signing', commit: sha };
   }
   const checked = commitSignature(root, sha, signers);
   if (checked.status !== 'valid') return { commit: sha, ...checked };

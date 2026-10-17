@@ -3,7 +3,7 @@ import * as path from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { parse, stringify } from 'yaml';
 import { FILES } from './farewell-fixture.js';
-import { git, humanEnv, initGitRepo, read, runCli, tempDir, write } from './helpers.js';
+import { type CliResult, git, humanEnv, initGitRepo, read, runCli, tempDir, write } from './helpers.js';
 
 /**
  * B119 (epic E16): market mode. A person or the lead agent opens an auction for one open task
@@ -92,11 +92,14 @@ function project(market?: Record<string, unknown>) {
 const code = (r: { json: <T>() => T }) => r.json<{ status: { code: string }[] }>().status[0].code;
 const pause = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 /** A window long enough for several CLI calls on a slow machine (each starts a Node process). */
-const WINDOW = '12';
+const WINDOW = '20';
 
-/** Waits until the auction's close time has passed, read from the board itself. */
-async function untilClosed(p: ReturnType<typeof project>): Promise<void> {
-  const closesAt = p.status()?.closesAt;
+/**
+ * Waits until the auction's close time has passed, read from the answer of the command that opened it: on a loaded
+ * machine the window can end before a later `board list`, and the board rightly no longer shows the auction then.
+ */
+async function untilClosed(opened: CliResult): Promise<void> {
+  const closesAt = opened.json<{ auction?: { closesAt?: string } }>().auction?.closesAt;
   expect(closesAt).toBeDefined();
   await pause(Math.max(0, Date.parse(closesAt as string) - Date.now()) + 500);
 }
@@ -115,7 +118,7 @@ describe('B119: an auction for a task', () => {
     expect(during?.bids?.map((b) => [b.executor, b.minutes])).toEqual([['swarm-a', 30], ['swarm-b', 20]]);
     expect(code(p.board(['claim', '--change', 'add-farewell', '--task', '1.2', '--executor', 'swarm-a',
       '--agent', 'coder-1']))).toBe('task_auction');
-    await untilClosed(p);
+    await untilClosed(opened);
     expect(p.status()).toMatchObject({ status: 'dispatched', executor: 'swarm-b' });
     expect(events(p, 'task.auction_opened')).toHaveLength(1);
     expect(events(p, 'task.bid').map((e) => e.executor)).toEqual(['swarm-a', 'swarm-b']);
@@ -137,25 +140,28 @@ describe('B119: an auction for a task', () => {
 
   it('the rule in sdlc.yaml: cheapest picks the least cost, first the earliest bid', async () => {
     const cheap = project({ rule: 'cheapest' });
-    expect(cheap.auction(['--window', WINDOW]).code).toBe(0);
+    const cheapOpened = cheap.auction(['--window', WINDOW]);
+    expect(cheapOpened.code).toBe(0);
     expect(cheap.bid('swarm-a', '30', ['--cost', '5']).code).toBe(0);
     expect(cheap.bid('swarm-b', '20', ['--cost', '9']).code).toBe(0);
-    await untilClosed(cheap);
+    await untilClosed(cheapOpened);
     const first = project({ rule: 'first' });
-    expect(first.auction(['--window', WINDOW]).code).toBe(0);
+    const firstOpened = first.auction(['--window', WINDOW]);
+    expect(firstOpened.code).toBe(0);
     expect(first.bid('swarm-a', '30').code).toBe(0);
     expect(first.bid('swarm-b', '20').code).toBe(0);
-    await untilClosed(first);
+    await untilClosed(firstOpened);
     expect(cheap.status()).toMatchObject({ status: 'dispatched', executor: 'swarm-a' });
     expect(first.status()).toMatchObject({ status: 'dispatched', executor: 'swarm-a' });
   }, 240000);
 
   it('a person awards at once, and may reassign after an automatic award', async () => {
     const p = project();
-    expect(p.auction(['--window', WINDOW]).code).toBe(0);
+    const opened = p.auction(['--window', WINDOW]);
+    expect(opened.code).toBe(0);
     expect(p.bid('swarm-a', '30').code).toBe(0);
     expect(p.bid('swarm-b', '20').code).toBe(0);
-    await untilClosed(p);
+    await untilClosed(opened);
     expect(p.status()?.executor).toBe('swarm-b');
     const reassigned = p.award('swarm-a');
     expect(reassigned.code, reassigned.stdout + reassigned.stderr).toBe(0);
@@ -181,13 +187,14 @@ describe('B119: an auction for a task', () => {
   it('negative: no auction, a closed one, a disallowed executor, a bad bid, a busy task, a bad rule', async () => {
     const p = project();
     expect(code(p.bid('swarm-a', '30'))).toBe('no_auction');
-    expect(p.auction(['--window', WINDOW]).code).toBe(0);
+    const opened = p.auction(['--window', WINDOW]);
+    expect(opened.code).toBe(0);
     expect(code(p.auction())).toBe('task_auction');
     expect(code(p.bid('junior', '30'))).toBe('executor_not_allowed');
     expect(code(p.bid('swarm-a', '0'))).toBe('invalid_bid');
     expect(code(p.bid('swarm-a', 'soon'))).toBe('invalid_bid');
     expect(code(p.bid('swarm-a', '30', ['--cost', '-1']))).toBe('invalid_bid');
-    await untilClosed(p);
+    await untilClosed(opened);
     expect(code(p.bid('swarm-a', '30'))).toBe('no_auction');
     expect(p.board(['claim', '--change', 'add-farewell', '--task', '1.2', '--executor', 'swarm-a',
       '--agent', 'coder-1']).code).toBe(0);

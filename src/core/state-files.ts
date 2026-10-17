@@ -4,5 +4,6 @@
  */
 export const STATE_FILES = [
   'openspec/backlog.md', 'openspec/roles.yaml', 'openspec/executors.yaml', 'openspec/.sdlc/log.jsonl',
+  'openspec/.sdlc/hook-log.jsonl',
   'openspec/.sdlc/team.json', 'openspec/.sdlc/board.json', 'openspec/.sdlc/board.lock',
 ];

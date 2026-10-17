@@ -29,6 +29,11 @@ sdlc approve review --change add-export --as code-owner
 
 ## Other decisions
 
+A judge (`gates.<gate>.judge`) runs a command or MCP tool against a rubric before a person decides. It records a
+verdict and never approves. Its JSON answer requires all three fields: `pass` (boolean), `route` (who or where work
+should go next, as the judge sees it), and `rework` (string, empty on a pass). `route` is recorded
+as advice; `sdlc next` uses `pass` and `rework` to choose the next action, not `route`.
+
 - `sdlc reject <gate> --change <id> --note "…"` — not acceptable as it is.
 - `sdlc waive <gate> --change <id> --note "…"` — this gate does not apply (for example, a docs-only change).
 - `sdlc rework <gate> …` — send the change back to an earlier stage (`sdlc guide rework`).

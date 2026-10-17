@@ -2,6 +2,7 @@ import { execFileSync } from 'node:child_process';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { describe, expect, it } from 'vitest';
+import { readLog } from '../src/core/log.js';
 import { git, humanEnv, initGitRepo, read, runCli, tempDir, write } from './helpers.js';
 
 /**
@@ -121,11 +122,11 @@ describe('B80: Cursor payloads that tried to slip through', () => {
     const p = project();
     const hooks = JSON.parse(read(p.file('.cursor/hooks.json')));
     expect(hooks.hooks.preToolUse.every((entry: { matcher?: string }) => entry.matcher === undefined)).toBe(true);
-    const log = p.file('openspec/.sdlc/log.jsonl');
-    const before = read(log).split('\n').filter((l) => l.includes('hook.denied')).length;
+    const denied = () => readLog(p.root).filter((entry) => entry.event === 'hook.denied').length;
+    const before = denied();
     p.hook('pre-tool', { hook_event_name: 'preToolUse', tool_name: 'Shell', tool_input: { command: 'sdlc approve intent' } });
     p.hook('pre-tool', { hook_event_name: 'beforeShellExecution', command: 'sdlc approve intent' });
-    const after = read(log).split('\n').filter((l) => l.includes('hook.denied')).length;
+    const after = denied();
     expect(after - before).toBe(1);
   }, 180000);
 });

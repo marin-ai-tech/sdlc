@@ -19,6 +19,7 @@ denies the command, as it does `sdlc roles migrate`.
 ```yaml
 version: 1
 signing: warn                 # off | warn | required
+signing_since: abc123         # optional commit; earlier approvals are pre-signing
 people:
   alice: { name: Alice Walker, emails: [alice@corp.example], signing_key: "ssh-ed25519 AAAA… alice@corp" }
   bob:   { name: Bob Turner,   emails: [bob@corp.example],   signing_key: "ssh-ed25519 AAAA… bob@corp" }
@@ -97,6 +98,15 @@ A git email is easy to fake. Signing closes that gap: every approval must arrive
 | `required` | reports problems, exits 1 — use it in CI |
 
 `--mode` overrides the file, so CI can require signatures while local work only warns: `sdlc approvals verify --mode required`.
+
+With `signing: off`, signatures are not checked. Set `signing: warn` or `signing: required` in
+`openspec/roles.yaml` to turn signing on. In a project with history, `signing_since` may name a full or short
+SHA or any reference Git resolves to a commit. Approvals recorded in that commit or its ancestors pass as
+`pre-signing`; later approvals follow the configured signing mode. `sdlc approvals verify`, evidence export, and
+roles.yaml config proposals resolve the reference and refuse an unknown commit. `sdlc doctor` reports an invalid
+reference with a fix; ordinary roles reads and approval recording do not resolve it. This cutoff
+applies to approval records; the existing rules for `roles.yaml` commits still apply. Moving the cutoff later
+or adding it is a weakening warning on a config proposal. Keep `roles.yaml` under maintainer review.
 
 Statuses of an approval: `valid`, `unsigned`, `wrong-signer`, `bad-signature`, `not-committed`.
 For `roles.yaml` commits: `valid`, `unsigned`, `not-maintainer`, `pre-signing`, `bootstrap`, `merge`,

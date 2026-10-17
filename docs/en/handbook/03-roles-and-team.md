@@ -387,8 +387,9 @@ every change to `roles.yaml` is signed by a maintainer. Check it locally and in 
   `bootstrap-conflict`. Protect the main branch from force pushes and keep `roles.yaml` under CODEOWNERS.
 - Commit the change folder after `sdlc archive`. Since 0.15.4, approvals committed while the change was active keep
   their status before the archive move is committed.
-- With `signing: off`, `sdlc approvals verify` prints "Approval signing is off." and checks nothing. Use
-  `--mode warn` to see the state before you switch it on.
+- With `signing: off`, `sdlc approvals verify` checks no signatures. Set `signing: warn` or `signing: required`
+  in `openspec/roles.yaml` to turn it on. For an existing project, set `signing_since` to a commit: approvals
+  in that commit or its ancestors become `pre-signing`. Adding or moving it later warns on a config proposal.
 - Signing does not protect against someone who can disable CI. Protect the default branch.
 
 

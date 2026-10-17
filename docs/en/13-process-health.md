@@ -91,6 +91,10 @@ A change created with `--kind docs` by a person has the spec gate waived; the lo
 and the audit counts it as a policy waiver, not a person's. A kind an agent chose does not count, and verify, review
 and release can never be waived by policy.
 
+CI can run `sdlc validate --all` before this stage: an undecided intent and a change without a spec gate do not
+raise `No delta specs`. When a full-track change reaches its spec stage, missing deltas are an error, and the spec
+approval still refuses them.
+
 `auto_waive` matches the kind **or** the track. `tracks: [lite]` waives that gate for every lite
 change, including features; `sdlc doctor` warns about this broad policy.
 
