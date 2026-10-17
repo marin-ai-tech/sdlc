@@ -1,8 +1,15 @@
 # Module 5. One change from idea to archive (tasklet)
 
+After rework, the agent revises the named gate's artifacts, then a person approves. A repeated approval for the
+same digest by the same person and role writes nothing. A waived plan with no tasks.md still needs fresh passing
+verification. `sdlc drop <change> --note "why"` closes a mistaken change without merging its delta specs.
+
 This module follows one change through every stage: **"Add due dates to tasks"** (`add-due-dates`) in the
 `tasklet` API. Every person of the team appears at their gate. Oliver drives the agent; the others decide in their own
 terminals.
+
+For a high-risk change, `approve --preview` names every required role, including high-risk extras,
+and the roles still missing. `status` and `next` flag a remaining gate when no one may approve it.
 
 In this module:
 

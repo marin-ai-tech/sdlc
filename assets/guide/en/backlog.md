@@ -15,6 +15,7 @@ sdlc backlog add "Card payments" --epic E1 --outcome "Customers pay by card" --a
 sdlc backlog list
 sdlc backlog next               # the next ready item (its dependencies are done)
 sdlc backlog start B3           # creates the change and links it to the item
+sdlc backlog link B3 --change add-export  # links an existing active change
 sdlc backlog edit B3 --outcome "…"
 ```
 
@@ -22,6 +23,8 @@ sdlc backlog edit B3 --outcome "…"
 - **Order and removal are a person's decisions**: `sdlc backlog move B3 --top`, `sdlc backlog drop B3 --note "…"`. The
   agent proposes them and gives the command.
 - Archiving the change closes its item; an item that depended on it becomes ready.
+- Dropping the change with `sdlc drop <change> --note "why"` returns its linked item to open.
+- An archived change id cannot be reused by `sdlc new` or `sdlc backlog start`.
 - With no active change, `sdlc next` proposes the next ready item.
 
 ## Importing

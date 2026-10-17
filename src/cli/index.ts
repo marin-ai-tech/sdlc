@@ -15,6 +15,8 @@ import { releaseControlCommand, takeoverCommand } from '../commands/takeover.js'
 import { answerCommand } from '../commands/answer.js';
 import { judgeCommand } from '../commands/judge.js';
 import { reworkCommand } from '../commands/rework.js';
+import { dropCommand } from '../commands/drop.js';
+import { backlogLink } from '../commands/backlog-link.js';
 import { initCommand, uninstallCommand, updateCommand } from '../commands/setup.js';
 import { reviewCommand, verifyCommand } from '../commands/verify.js';
 import { runOpenSpec } from '../core/openspec.js';
@@ -181,6 +183,10 @@ export function buildProgram(): Command {
     .option('--change <id>', 'change id')
     .option('--json', 'output JSON')
     .action((id, opts) => backlogStart(id, opts));
+  backlog.command('link <B-id>').description(cmdDesc('cmd.backlog.link'))
+    .requiredOption('--change <id>', 'change id')
+    .option('--json', 'output JSON')
+    .action((id, opts) => backlogLink(id, opts));
   backlog.command('move <B-id>').description(cmdDesc('cmd.backlog.move'))
     .option('--top', 'move to the top')
     .option('--before <B-id>', 'place before this item')
@@ -591,6 +597,13 @@ export function buildProgram(): Command {
     .option('--all', 'all active changes')
     .option('--json', 'output JSON')
     .action((opts) => validateCommand(opts));
+
+  program
+    .command('drop <change>')
+    .description(cmdDesc('cmd.drop'))
+    .requiredOption('--note <text>', 'reason for dropping')
+    .option('--json', 'output JSON')
+    .action((change, opts) => dropCommand(change, opts));
 
   program
     .command('archive [change]')

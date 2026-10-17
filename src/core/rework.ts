@@ -64,13 +64,12 @@ export function reviseNext(gate: GateId, artifacts: string, reason: string): Nex
 /** A review rejection remains an agent task even when review.md has independent coverage blockers. */
 export function activeReviewRevision(gate: GateEvaluation, state: ChangeState): string | undefined {
   if (gate.id !== 'review' || gate.satisfied || !gate.digest) return undefined;
-  const record = state.gates.review;
-  const rework = record?.rework;
+  const record = effectiveGates(state).review;
   const rejection = record?.rejection;
-  const useRework = rework && (!rejection || decidedAfter(rework, rejection));
-  const decision = useRework ? rework : rejection;
-  if (!decision || (decision.digest && decision.digest !== gate.digest)) return undefined;
-  if (!decidedAfterAll(decision, record?.approvals ?? [])) return undefined;
+  if (!rejection || (rejection.digest && rejection.digest !== gate.digest)) return undefined;
+  if (!decidedAfterAll(rejection, record?.approvals ?? [])) return undefined;
+  const rework = record?.rework;
+  const useRework = rework && !decidedAfter(rejection, rework) && !decidedAfter(rework, rejection);
   if (useRework) {
     return t('gate.reworkNote', { by: rework.by, reason: rework.reason, note: rework.note }, 'en');
   }
@@ -80,11 +79,13 @@ export function activeReviewRevision(gate: GateEvaluation, state: ChangeState): 
 }
 
 function afterCutoff(gate: GateState, cutoff: Ordered): GateState {
+  const rejection = gate.rejection && decidedAfter(gate.rejection, cutoff) ? gate.rejection : undefined;
+  const ownRework = gate.rework && !decidedAfter(cutoff, gate.rework) ? gate.rework : undefined;
   return {
     ...gate,
     approvals: (gate.approvals ?? []).filter((a) => decidedAfter(a, cutoff)),
     waived: gate.waived && decidedAfter(gate.waived, cutoff) ? gate.waived : undefined,
-    rejection: reworkRejection(gate),
+    rejection: ownRework ? reworkRejection({ ...gate, rejection }) : rejection,
   };
 }
 

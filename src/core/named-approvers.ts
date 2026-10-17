@@ -60,6 +60,18 @@ export function openGateDeciders(root: string, config: SdlcConfig, view: Lifecyc
   return { gate: gate.id, people: allowedNow(root, config, roles, gate, state) };
 }
 
+/** Remaining required decisions for which every configured person is ineligible now. */
+export function gatesWithoutApprovers(root: string, config: SdlcConfig, view: LifecycleView,
+  state: ChangeState): string[] {
+  if (view.archived) return [];
+  const roles = rolesOrNothing(root);
+  if (!roles) return [];
+  return view.gates
+    .filter((gate) => gate.required && !gate.satisfied && gate.id !== 'verify')
+    .filter((gate) => allowedNow(root, config, roles, gate, state).length === 0)
+    .map((gate) => gate.id);
+}
+
 /**
  * roles.yaml, or undefined when it is absent or cannot be read: a broken file is reported by the commands that
  * decide (`sdlc approve`, `sdlc roles check`); the hint then names the role as before.

@@ -70,10 +70,14 @@ The optional `qa` gate (`gates.qa: { required: true }`, since 0.18.0) sits betwe
 Ask before trying:
 
 ```bash
-sdlc roles who review --change add-calc      # who may approve, and why the others may not
+sdlc roles who review --change add-calc      # required roles, who may approve, and why others may not
 sdlc roles check --change add-calc           # the same for every gate
 sdlc roles check                             # people and their roles
 ```
+
+On a high-risk change, `roles who` and `approve --preview` list the extra required roles and the roles
+still missing. `sdlc status` and `sdlc next` warn when no person may approve a remaining required gate;
+use the named `roles who <gate> --change <id>` command to inspect role and separation rules.
 
 Move from the allow-lists in `sdlc.yaml` with `sdlc roles migrate` (a person runs it; it writes `roles.yaml` with `signing: off` and the default separation, and never overwrites an existing file).
 

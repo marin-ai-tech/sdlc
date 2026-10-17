@@ -4,6 +4,9 @@ Steven, the platform engineer, sets up sdlc for `tasklet`, a new project that st
 of the team joins. By the end of the chapter the repository has the sdlc files, the team's roles, working checks and a
 clean `sdlc doctor`.
 
+After init, review any `.gitignore` warning: Git must include `openspec/` and generated agent files for the
+team to share the process. `sdlc doctor` lists ignored paths and the exception lines to add.
+
 ## Contents
 
 - [1.1 Install the CLI](#s1-1)

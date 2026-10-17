@@ -19,6 +19,10 @@ approves a gate. The outputs come from a trial run of `tasklet` with sdlc 0.14.4
 <a id="s3-1"></a>
 ## 3.1 `roles.yaml`: people, roles and the gates they approve
 
+For a high-risk change, `roles who <gate> --change <id>` names the extra required roles.
+`approve --preview` shows which roles are still missing. If separation rules leave no eligible person,
+`status` and `next` warn and point back to `roles who`.
+
 *Steven (writes the files), the whole team (reads them)  ·  tasklet  · needs: sdlc initialized in `tasklet` (Chapter 1);
 every person has a git identity with their work email*
 

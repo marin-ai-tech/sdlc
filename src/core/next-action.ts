@@ -10,7 +10,7 @@ import { isFile } from './fs-utils.js';
 import { t } from './i18n.js';
 import { awaitedRoles } from './approval-quorum.js';
 import { qaNext } from './qa-gate.js';
-import { activeReviewRevision, reviseNext } from './rework.js';
+import { activeReviewRevision, effectiveGates, reviseNext } from './rework.js';
 import type { GateEvaluation, LifecycleView, NextAction } from './lifecycle.js';
 
 function capitalize(text: string): string {
@@ -68,7 +68,7 @@ export function nextAction(
         { artifact: missing.id, file: missing.generates, gate: id },
       );
     }
-    const rejection = state.gates[id]?.rejection;
+    const rejection = effectiveGates(state)[id]?.rejection;
     const revisionOpen = !rejection?.digest || rejection.digest === g.digest;
     if (g.status === 'rejected' && revisionOpen) {
       return reviseNext(id, mapping[id].join(', '), g.reason ?? '');
@@ -89,7 +89,8 @@ export function nextAction(
 
   const verify = gate(view, 'verify');
   if (!verify.satisfied) {
-    if (view.tasks.remaining > 0 || view.tasks.total === 0) {
+    const planWaived = gate(view, 'plan').status === 'waived';
+    if (view.tasks.remaining > 0 || (view.tasks.total === 0 && !planWaived)) {
       if (view.tasks.total === 0) {
         return withKey(
           { actor: 'agent', action: 'implement', workflow: 'build' },

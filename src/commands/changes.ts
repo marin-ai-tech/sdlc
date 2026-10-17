@@ -21,6 +21,7 @@ import {
 } from '../core/change-state.js';
 import {
   assertValidChangeId,
+  assertUnusedArchivedId,
   listActiveChanges,
   listArchivedChanges,
   resolveChange,
@@ -38,6 +39,7 @@ import { SdlcError } from '../core/errors.js';
 import { isFile, isWithin } from '../core/fs-utils.js';
 import { formatIdentity, gitIdentity } from '../core/git.js';
 import { evaluateChange, sharedFingerprint, type LifecycleView } from '../core/lifecycle.js';
+import { approvalAvailabilityWarnings } from '../core/approval-availability.js';
 import { recordAwaiting } from '../core/awaiting.js';
 import { openspecFailure, runOpenSpec, runOpenSpecJson } from '../core/openspec.js';
 import { loadSchemaInfo } from '../core/openspec-schema.js';
@@ -85,6 +87,7 @@ export function createChange(name: string, opts: NewOptions): { ctx: ProjectCont
   assertValidChangeId(name);
   const ctx = loadProject();
   const { root, config } = ctx;
+  assertUnusedArchivedId(ctx.paths, name);
   const kind = oneOf<ChangeKind>(opts.kind, CHANGE_KINDS, '--kind') ?? 'feature';
   const risk = oneOf<RiskLevel>(opts.risk, RISK_LEVELS, '--risk') ?? 'medium';
   const suggested = suggestTrack(kind, risk);
@@ -165,7 +168,7 @@ function overlapsFor(ctx: ProjectContext): Overlap[] {
 
 /** Extra, cross-cutting warnings for one change (base drift, overlaps). */
 function changeWarnings(ctx: ProjectContext, view: LifecycleView, overlaps: Overlap[]): string[] {
-  const warnings = [...view.warnings];
+  const warnings = [...view.warnings, ...approvalAvailabilityWarnings(ctx.root, ctx.config, view)];
   const state = readChangeState(view.dir);
   const base = state.gates.spec?.approvals?.at(-1)?.base;
   for (const cap of changedBases(ctx.paths, base)) {
@@ -346,14 +349,17 @@ export async function nextCommand(opts: { change?: string; json?: boolean }): Pr
     }
     const ref = resolveChange(ctx.paths, opts.change);
     const view = evaluateChange(ctx.root, ref, ctx.config);
+    const warnings = [...view.warnings, ...approvalAvailabilityWarnings(ctx.root, ctx.config, view)];
     recordAwaiting(ctx.root, ctx.config, view, ctx.stamp);
     if (opts.json) {
-      printJson({ change: view.change, stage: view.stage, stageTitle: view.stageTitle, track: view.track, next: view.next, root: { path: ctx.root } });
+      printJson({ change: view.change, stage: view.stage, stageTitle: view.stageTitle,
+        track: view.track, next: view.next, warnings, root: { path: ctx.root } });
       return;
     }
     line(`${c.bold(view.change)}: ${stageTitleText(view)}`);
     line(`${actorLabel(view)}: ${nextText(view)}`);
     if (view.next.cli) line(c.cyan(`$ ${view.next.cli}`));
+    for (const warning of warnings) warn(warning);
   } catch (error) {
     reportFailure(error, opts.json, { next: null });
   }

@@ -94,7 +94,9 @@ function ciFiles(root: string): string[] {
 /** Bots commit and own files too, but they never approve: `dependabot[bot]`, `...@users.noreply.github.com`. */
 function isBot(name: string, email: string): boolean {
   const bracketed = /\[bot\]/i;
-  return bracketed.test(name) || bracketed.test(email) || email.includes('noreply');
+  const botName = /\b(?:bot|robot)\b/i.test(name);
+  const botAddress = email.split('@')[0].split(/[.+_-]/).some((part) => part.toLowerCase() === 'bot');
+  return bracketed.test(name) || bracketed.test(email) || email.includes('noreply') || botName || botAddress;
 }
 
 function gitPeople(root: string): Map<string, AdoptPerson> {

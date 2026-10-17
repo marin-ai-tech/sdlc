@@ -27,6 +27,10 @@ sdlc 0.21.0.
 
 Run `sdlc doctor`, read each line, and apply the fix it names.
 
+After `sdlc init`, check that Git does not ignore `openspec/` or generated agent files. `sdlc doctor`
+names ignored paths and `.gitignore` exceptions. It also flags conflict markers in change records:
+keep both sides' gate decisions and history entries in time order, then run `sdlc status --change <id>`.
+
 ### Procedure
 
 1. Run it in the project folder:
@@ -622,7 +626,7 @@ commands also take `--json` and, with several active changes, `--change <id>`.
 | Command | Who | What it does |
 |---|---|---|
 | `sdlc roles check` | anyone | check who can approve each gate |
-| `sdlc roles who <gate> --change <id>` | anyone | show the people who may approve a gate |
+| `sdlc roles who <gate> --change <id>` | anyone | show required roles and the people who may approve a gate |
 | `sdlc roles migrate` | a person | move the roles of `sdlc.yaml` into `roles.yaml` |
 | `sdlc team sync` | anyone | write role drafts from the registry, the packs and the built-in set; report the packs |
 | `sdlc team accept <role> \| --skill <id> \| --pack <name>` | a person | accept a role, a skill or a pack (with `roles.yaml`, the maintainer) |

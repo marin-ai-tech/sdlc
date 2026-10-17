@@ -15,7 +15,7 @@ for newcomers.
 | Endless rework loops stop | after `rework.max_cycles` reworks of a gate, `next` asks a person to take over or review the scope | 0.11.2 |
 | Commits are traceable to approvals | `sdlc approve` proposes a commit with an `SDLC-Approval` trailer; `approvals verify` finds it | 0.11.2 |
 | Evidence says what it does not cover | `verification.md` has "Not run / limits"; untouched planned files and attachments are listed | 0.11.2 |
-| Small changes skip what does not apply | `gates.<gate>.auto_waive` waives intent, spec or plan for chosen kinds or tracks, logged as policy | 0.11.2 |
+| Policy waiver | `auto_waive` matches kind OR track for intent, spec or plan | 0.11.2 |
 | The team sees where the process suffers | `sdlc health`: findings with facts and a recommendation, no score | 0.11.3 |
 | Improvements reach the backlog | `/sdlc:health` drafts backlog items; a person orders them | 0.11.3 |
 | Someone notices when it gets bad | a line at the agent's session start, `health.degraded` to the event receivers, a dashboard section | 0.11.3 |
@@ -30,6 +30,9 @@ for newcomers.
 ## 13.2. Use cases
 
 ### A rework answered by the same "yes"
+
+The next action after rework is the agent's revision of that gate's artifacts. Once their digest changes, the
+person approves. Repeating the same approval before any change records no extra approval event.
 
 Alice sends the spec back: "Say what 10 / 0 shows on the till". Later she runs `sdlc approve spec` again without
 anyone touching the spec. sdlc refuses with `unchanged_after_rework`: nothing the gate covers changed since the
@@ -87,6 +90,9 @@ gates:
 A change created with `--kind docs` by a person has the spec gate waived; the log records `gate.spec.auto_waived` once
 and the audit counts it as a policy waiver, not a person's. A kind an agent chose does not count, and verify, review
 and release can never be waived by policy.
+
+`auto_waive` matches the kind **or** the track. `tracks: [lite]` waives that gate for every lite
+change, including features; `sdlc doctor` warns about this broad policy.
 
 ### A monthly look at the process
 

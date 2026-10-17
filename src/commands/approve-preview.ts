@@ -44,6 +44,10 @@ function printPreview(preview: ApprovePreview, cli: string): void {
   line(c.bold(t('preview.header', { gate: preview.gate, change: preview.change, status })));
   printArtifacts(preview);
   line(t('preview.approvals', { count: preview.approvals, min: preview.needed }));
+  line(t('preview.requiredRoles', { roles: preview.requiredRoles.join(', ') || t('preview.none') }));
+  if (preview.missingRoles.length > 0) {
+    line(t('preview.missingRoles', { roles: preview.missingRoles.join(', ') }));
+  }
   if (preview.openFindings) printFindings(preview.openFindings);
   if (preview.verification) {
     const { status: verified, at } = preview.verification;

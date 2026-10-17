@@ -32,6 +32,9 @@ sdlc approve review --change add-export --as code-owner
 - `sdlc reject <gate> --change <id> --note "…"` — not acceptable as it is.
 - `sdlc waive <gate> --change <id> --note "…"` — this gate does not apply (for example, a docs-only change).
 - `sdlc rework <gate> …` — send the change back to an earlier stage (`sdlc guide rework`).
+- `sdlc drop <change> --note "why"` closes a mistaken change without merging its delta specs. Only a person may run it.
+- Approving the same digest again as the same person and role says "already approved" and records no second decision.
+- When the plan gate is waived and there is no tasks.md, fresh passing verification is enough for the verify gate.
 
 ## Stale approvals
 

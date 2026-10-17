@@ -28,6 +28,9 @@ summary: Основные ключи openspec/sdlc.yaml и кто может и�
 | `cli` | как агенты вызывают sdlc (`sdlc` или `npx --no-install sdlc`) |
 | `tools` | claude, opencode, cursor, codex, qwen, gigacode (экспериментально) |
 
+`auto_waive` срабатывает, если совпал вид **или** трек. `tracks: [lite]` снимает гейт для всех
+изменений lite, включая features; `sdlc doctor` предупреждает об этом.
+
 ## После изменения
 
 Выполните `sdlc update`, чтобы перегенерировать файлы агентов и хуки. `sdlc doctor` проверит установку.

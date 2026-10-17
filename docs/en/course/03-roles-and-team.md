@@ -24,6 +24,10 @@ in that run were small local stand-ins with the same tool names, so the answers 
 **Role:** Steven (writes the files), the whole team (reads them)   **Project:** tasklet
 **You need:** sdlc initialized in `tasklet` (Module 1); every person has a git identity with their work email
 
+For a high-risk change, `roles who <gate> --change <id>` names the extra required roles.
+`approve --preview` shows which roles are still missing. If separation rules leave no eligible person,
+`status` and `next` warn and point back to `roles who`.
+
 **Goal.** Write `openspec/roles.yaml` for the Northwind team, connect its roles to the gates in
 `openspec/sdlc.yaml`, and check the result with `sdlc roles check`.
 

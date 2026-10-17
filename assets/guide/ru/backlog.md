@@ -13,10 +13,15 @@ summary: Запланированная работа в openspec/backlog.md, з�
 sdlc backlog epic add "Checkout" --goal "Клиенты платят без звонка в поддержку"
 sdlc backlog add "Оплата картой" --epic E1 --outcome "Клиенты платят картой" --accept "при отказе карты видна причина"
 sdlc backlog list
+sdlc backlog link B3 --change add-export
 sdlc backlog next               # следующий готовый пункт (его зависимости выполнены)
 sdlc backlog start B3           # создаёт изменение и связывает его с пунктом
 sdlc backlog edit B3 --outcome "…"
 ```
+
+Связать существующее активное изменение с готовым открытым пунктом может тот же участник, что и начать пункт.
+Архивация завершает пункт;
+`sdlc drop <change> --note "причина"` возвращает связанный пункт в open. Архивные id не используются повторно.
 
 - Агент может добавлять и уточнять пункты и запускать следующий.
 - **Порядок и удаление — решения человека**: `sdlc backlog move B3 --top`, `sdlc backlog drop B3 --note "…"`. Агент

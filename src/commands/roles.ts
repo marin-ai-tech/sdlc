@@ -50,6 +50,7 @@ function forJson(view: ReturnType<typeof matrix>) {
 }
 
 function textMatrix(result: ReturnType<typeof matrix>): void {
+  line(t('roles.required', { roles: result.roles.join(', ') }));
   const who = result.allowed
     .map((person) => `${person.name} (${person.id})`).join(', ') || t('roles.noOne');
   const subject = `${result.gate}${result.change ? ` · ${result.change}` : ''}`;
@@ -86,8 +87,7 @@ export function rolesWho(gate: string, opts: Options): void {
     }
     const view = matrix(gate as ApprovalGateId, opts);
     if (opts.json) {
-      const { roles: _roles, ...result } = forJson(view);
-      printJson(result);
+      printJson(forJson(view));
     } else {
       textMatrix(view);
     }

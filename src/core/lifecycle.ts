@@ -220,6 +220,7 @@ export function evaluateChange(
     ref, config, state, decided: decided.verify, fingerprint,
     skipFingerprint: options.skipFingerprint, schema, tracks, taskProgress,
     remaining: tasks.remaining, upstreamOpen,
+    planWaived: planning.gates.find((gate) => gate.id === 'plan')?.status === 'waived',
   });
   gates.push(verifyGate.evaluation);
   upstreamOpen = verifyGate.upstreamOpen;

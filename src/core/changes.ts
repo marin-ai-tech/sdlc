@@ -55,6 +55,14 @@ export function listArchivedChanges(paths: ProjectPaths): ChangeRef[] {
   });
 }
 
+export function assertUnusedArchivedId(paths: ProjectPaths, id: string): void {
+  const previous = listArchivedChanges(paths).find((change) => change.id === id);
+  if (previous) {
+    throw new SdlcError('archived_change_id',
+      { key: 'error.archivedChangeId', params: { id, folder: previous.archivedAs ?? '' } });
+  }
+}
+
 /**
  * Resolves the change a command should act on. With no id, a single active
  * change is selected automatically (the same convenience OpenSpec's apply

@@ -1,5 +1,9 @@
 # 4. Backlog and planning
 
+An existing active change can be attached to an open item with `sdlc backlog link B1 --change add-export`.
+The same actor who may start a backlog item may link it. Archiving completes the item; dropping the
+change with `sdlc drop add-export --note "Created by mistake"` returns it to open. Archived ids cannot be reused.
+
 This chapter is about planned work before it becomes a change. It is for **Megan**, the product owner, who plans the
 `tasklet` backlog with Claude Code and decides the order. Oliver and Ethan read the first two lessons to see where their
 changes come from. The outputs come from a trial run of `tasklet` with sdlc 0.14.4.

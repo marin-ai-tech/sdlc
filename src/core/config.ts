@@ -679,6 +679,7 @@ export function serializeConfig(config: SdlcConfig): Record<string, unknown> {
 export const CONFIG_HEADER = `# SDLC harness configuration (https://github.com/marin-ai-tech/sdlc)
 # Lives next to OpenSpec's config.yaml; OpenSpec itself never reads this file.
 # Gates follow Anthropic's AI-native SDLC playbook: intent -> spec -> plan -> verify -> review -> release.
+# gates.<gate>.auto_waive: { kinds: [docs], tracks: [lite] } waives the gate when the kind OR the track matches.
 # enforcement.mode: off | warn (remind, never block) | block (hooks deny actions that skip a gate).
 # license.type: community (free: noncommercial use and open source projects) | commercial (paid, royalties).
 # See LICENSE and COMMERCIAL-LICENSE.md in the sdlc package; change it with \`sdlc license set\`.

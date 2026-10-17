@@ -12,6 +12,8 @@ import { openspecVersion, resolveOpenSpec, runOpenSpec } from './openspec.js';
 import { projectPaths, type ProjectPaths } from './project.js';
 import { assessLicense, detectProjectLicense } from './project-license.js';
 import { readRolesFile } from './roles.js';
+import { ignoredProcessPaths, ignoreFix } from './process-gitignore.js';
+import { conflictedRecords } from './record-conflicts.js';
 import { hooksDisabledFiles } from './user-guard.js';
 import { harnessVersion } from './version.js';
 import { readYamlObject } from './yaml-io.js';
@@ -252,6 +254,11 @@ function projectConfigChecks(
   env: NodeJS.ProcessEnv,
 ): void {
   const { tt } = out;
+  for (const [gate, settings] of Object.entries(config.gates)) {
+    if ('autoWaive' in settings && settings.autoWaive?.tracks?.includes('lite')) {
+      out.add(`auto_waive ${gate}`, 'warn', tt('doctor.autoWaiveLite', { gate }));
+    }
+  }
   const license = assessLicense(config.license, detectProjectLicense(root), out.loc);
   out.add('license', license.status, license.message, license.fix);
   const logMessage = config.log.enabled
@@ -322,6 +329,15 @@ function projectChecks(out: Checks, root: string, env: NodeJS.ProcessEnv): void 
   const config = configCheck(out, paths);
   openspecChecks(out, root, paths);
   generatedFilesCheck(out, root, config);
+  const ignored = ignoredProcessPaths(root);
+  if (ignored.length > 0) {
+    out.add('gitignore', 'warn', out.tt('doctor.ignoredProcess', { paths: ignored.join(', ') }),
+      out.tt('doctor.fix.ignoredProcess', { lines: ignoreFix(ignored) }));
+  }
+  for (const change of conflictedRecords(root)) {
+    out.add(`record conflict ${change}`, 'error', out.tt('doctor.recordConflict', { change }),
+      out.tt('doctor.fix.recordConflict', { change }));
+  }
   if (config) projectConfigChecks(out, root, paths, config, env);
   gitCheck(out, root, config?.tools);
 }

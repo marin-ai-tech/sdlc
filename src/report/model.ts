@@ -52,6 +52,7 @@ export interface ReportGate {
 export interface ReportChange {
   id: string;
   archived: boolean;
+  dropped?: ChangeState['dropped'];
   kind: string;
   risk: string;
   track: string;
@@ -185,6 +186,7 @@ function toReportChange(ref: ChangeRef, view: LifecycleView, state: ChangeState,
   return {
     id: ref.id,
     archived: ref.archived,
+    ...(state.dropped ? { dropped: state.dropped } : {}),
     kind: view.kind,
     risk: view.risk,
     track: view.track,

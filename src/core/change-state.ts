@@ -158,12 +158,11 @@ export interface TakeoverRecord {
 }
 
 /**
- * Record format: 3 when the record carries `answers` (0.11.4), else 2 when it carries a gate `rework` or a
- * `takeover`, else 1. An older CLI refuses a version it does not know with its "unsupported version" error instead of
- * reading the record without those fields and writing it back without them; this one reads all three.
+ * Record format: 4 for a dropped change, 3 with answers, 2 with rework or takeover, else 1.
+ * Older CLIs refuse a version they do not know rather than erase its fields on write.
  */
-export type StateVersion = 1 | 2 | 3;
-const SUPPORTED_VERSIONS: readonly unknown[] = [1, 2, 3];
+export type StateVersion = 1 | 2 | 3 | 4;
+const SUPPORTED_VERSIONS: readonly unknown[] = [1, 2, 3, 4];
 
 export interface ChangeState {
   version: StateVersion;
@@ -180,6 +179,7 @@ export interface ChangeState {
   /** The kind was chosen inside an agent session (`sdlc new --kind`): an auto_waive policy by kind ignores it. */
   kind_by_agent?: boolean;
   takeover?: TakeoverRecord;
+  dropped?: { by: string; at: string; note: string };
   /** A person's answers to the open questions of intent, proposal and design (B62); see `answer-record.ts`. */
   answers?: AnswerRecord[];
   /** The last decision order number the CLI gave in this record (B39); see `decision-order.ts`. */
@@ -270,7 +270,7 @@ export function readChangeState(changeDir: string): ChangeState {
   const harness = raw.harness && typeof raw.harness === 'object' ? (raw.harness as Record<string, unknown>) : undefined;
   const suggestion = raw.track_suggestion && typeof raw.track_suggestion === 'object' ? raw.track_suggestion as Record<string, unknown> : undefined;
   return {
-    version: raw.version === 3 ? 3 : raw.version === 2 ? 2 : 1,
+    version: raw.version === 4 ? 4 : raw.version === 3 ? 3 : raw.version === 2 ? 2 : 1,
     ...(harness && typeof harness.sdlc === 'string' && typeof harness.license === 'string'
       ? { harness: { sdlc: harness.sdlc, license: harness.license } }
       : {}),
@@ -293,6 +293,8 @@ export function readChangeState(changeDir: string): ChangeState {
     ...(raw.tests_locked === true ? { tests_locked: true } : {}),
     ...(raw.kind_by_agent === true ? { kind_by_agent: true } : {}),
     ...takeoverOf(raw.takeover),
+    ...(raw.dropped && typeof raw.dropped === 'object'
+      ? { dropped: raw.dropped as { by: string; at: string; note: string } } : {}),
     ...answersOf(raw.answers),
     ...(isSeq(raw.seq) ? { seq: raw.seq } : {}),
     gates,
@@ -301,8 +303,9 @@ export function readChangeState(changeDir: string): ChangeState {
   };
 }
 
-/** The format a record needs: 3 with answers, 2 with a gate rework or a takeover (fields older CLIs lack), else 1. */
-export function stateVersion(state: Pick<ChangeState, 'gates' | 'takeover' | 'answers'>): StateVersion {
+/** The oldest record format that preserves every field in this state. */
+export function stateVersion(state: Pick<ChangeState, 'gates' | 'takeover' | 'answers' | 'dropped'>): StateVersion {
+  if (state.dropped) return 4;
   if ((state.answers ?? []).length > 0) return 3;
   const reworked = Object.values(state.gates).some((gate) => gate?.rework !== undefined);
   return reworked || state.takeover !== undefined ? 2 : 1;
@@ -325,6 +328,7 @@ export function writeChangeState(changeDir: string, state: ChangeState, stamp?: 
     ...(state.tests_locked ? { tests_locked: true } : {}),
     ...(state.kind_by_agent ? { kind_by_agent: true } : {}),
     ...(state.takeover ? { takeover: state.takeover } : {}),
+    ...(state.dropped ? { dropped: state.dropped } : {}),
     ...(state.answers && state.answers.length > 0 ? { answers: state.answers } : {}),
     ...(state.seq !== undefined ? { seq: state.seq } : {}),
     gates: state.gates,

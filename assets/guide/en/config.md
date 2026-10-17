@@ -28,6 +28,9 @@ also controls the guard itself.
 | `cli` | how agents call sdlc (`sdlc` or `npx --no-install sdlc`) |
 | `tools` | claude, opencode, cursor, codex, qwen, gigacode (experimental) |
 
+`auto_waive` matches the kind **or** the track. `tracks: [lite]` waives that gate for every lite change,
+including features; `sdlc doctor` warns about this policy.
+
 ## After a change
 
 Run `sdlc update` to regenerate the agent files and hooks. `sdlc doctor` checks the setup.

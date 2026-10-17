@@ -91,6 +91,7 @@ function changeBadges(change: ReportChange, blocked: boolean): string {
     pill(risk, change.risk === 'high' ? 'pending' : 'n/a'),
     pill(change.track, 'n/a'),
   ];
+  if (change.dropped) parts.push(pill(t('report.dropped'), 'n/a'));
   if (blocked) parts.push(pill(t('report.html.blockedPill'), 'failed'));
   return parts.join(' ');
 }
@@ -141,7 +142,7 @@ function changeCard(change: ReportChange): string {
   return `<article class="change ${blocked ? 'blocked' : ''}">`
     + `<div class="change-top"><div><h3><a href="#${e(changeAnchor(change.id))}">${e(change.id)}</a></h3>`
     + `<p class="badges">${changeBadges(change, blocked)}</p></div>`
-    + `<span class="stage-label">${e(stageLabel(change.stage))}</span></div>`
+    + `<span class="stage-label">${e(change.dropped ? t('report.dropped') : stageLabel(change.stage))}</span></div>`
     + `<ol class="stepper" aria-label="Lifecycle stages">${changeStepper(change)}</ol>`
     + `<div class="gate-list"><strong>${e(t('report.html.gates'))}</strong> ${changeGates(change)}</div>`
     + changeGrid(change, progress)

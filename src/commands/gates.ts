@@ -25,6 +25,7 @@ import { assertQuestionsAnswered } from '../core/answers.js';
 import { assertDebateRecorded } from '../core/debate.js';
 import { assertJudgeCleared } from '../core/judge-gate.js';
 import { validateOne } from '../core/validate-change.js';
+import { effectiveGates } from '../core/rework.js';
 
 /**
  * Gate decisions: approve, reject, waive, and the test lock. These record
@@ -215,6 +216,15 @@ export async function approveCommand(gateArg: string, opts: DecisionOptions): Pr
     );
     const identity = approvalIdentity(ctx.root, roles, opts.by);
     if (!roles) assertRoleMember(ctx.config, role, identity);
+    const existing = effectiveGates(state)[gate]?.approvals?.find((approval) =>
+      sameApprover(approval, identity, person) && approval.role === role
+      && approval.digest === evaluation.digest);
+    if (existing && evaluation.status !== 'rejected' && evaluation.status !== 'stale') {
+      if (opts.json) printJson({ change: ref.id, gate, role, by: identity,
+        digest: evaluation.digest, alreadyApproved: true });
+      else line(t('gate.alreadyApproved', { gate, identity, role, digest: evaluation.digest }));
+      return;
+    }
     assertChangedSinceRework(state, gate, evaluation.digest, opts.note);
     assertQuestionsAnswered(ctx.config, ref.id, ref.dir, state, gate);
     assertDebateRecorded(ctx.config, ref.dir, gate);

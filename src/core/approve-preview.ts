@@ -48,6 +48,9 @@ export interface ApprovePreview {
   approvals: number;
   /** People the gate needs (`min_approvals`, default 1). */
   needed: number;
+  /** Roles required on this change, including high-risk additions. */
+  requiredRoles: string[];
+  missingRoles: string[];
   artifacts: PreviewArtifact[];
   changedSinceApproval: string[];
   /** After a rework of the gate, the digest is the one approved before it (B56): approving needs `--note`. */
@@ -85,6 +88,9 @@ export function previewApproval(input: PreviewInput): ApprovePreview {
     refusals,
     approvals: new Set(evaluation.approvals.map(approverKey)).size,
     needed: evaluation.minApprovals ?? input.config.gates[input.gate].minApprovals ?? 1,
+    requiredRoles: [...input.config.gates[input.gate].approvers,
+      ...(state.risk === 'high' ? input.config.gates[input.gate].highRiskApprovers : [])],
+    missingRoles: evaluation.missingRoles,
     artifacts,
     changedSinceApproval: approvedBefore ? changedSinceCheckpoint(input, artifacts) : [],
     unchangedSinceRework: unchangedSinceRework(state, input.gate, evaluation.digest),

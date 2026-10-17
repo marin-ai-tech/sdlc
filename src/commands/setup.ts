@@ -13,6 +13,7 @@ import {
 import { SdlcError } from '../core/errors.js';
 import { ensureDir, exists, isDirectory, isFile, readText, writeTextAtomic } from '../core/fs-utils.js';
 import { formatIdentity, gitIdentity } from '../core/git.js';
+import { ignoredProcessPaths, ignoreFix } from '../core/process-gitignore.js';
 import { harnessStamp, stampTextLocalized } from '../core/license.js';
 import { appendLog } from '../core/log.js';
 import { assessLicense, detectProjectLicense } from '../core/project-license.js';
@@ -526,6 +527,11 @@ function printInitText(o: InitOutcome): void {
   if (o.opsx) line(t('init.opsxLine', { opsx: stateLabel(o.opsx) }));
   line(`  ${stampTextLocalized(harnessStamp(config))}`);
   printGitHookInstall(o.root, o.gitHook);
+  const ignored = ignoredProcessPaths(o.root);
+  if (ignored.length > 0) {
+    warn(t('doctor.ignoredProcess', { paths: ignored.join(', ') }));
+    line(t('doctor.fix.ignoredProcess', { lines: ignoreFix(ignored) }));
+  }
   if (license.status !== 'ok') warn(`${license.message}. ${license.fix ?? ''}`.trim());
   printInstall(result, config);
   if (result.statusLine === 'kept (user-defined)') warn(t('init.keptStatusline'));

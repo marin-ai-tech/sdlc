@@ -2,6 +2,37 @@
 
 All notable changes to sdlc. Versions follow [Semantic Versioning](https://semver.org/); while the major version is 0, a minor version may change behavior.
 
+## 0.22.3 — 2026-10-16
+
+### Added
+- `sdlc drop <change> --note <text>`, a person's decision: closes a change created by mistake. It is logged, moved
+  to the archive with the reason (the record says `dropped`), its deltas never reach the living specs, and its backlog
+  item goes back to open. Agents are refused, as for approvals.
+- `sdlc backlog link <B-id> --change <id>` ties a change created with `sdlc new` to a backlog item: the item is in
+  progress with the change, and archiving the change marks the item done.
+- `sdlc init` and `sdlc doctor` say when git ignores the process files (`openspec/`, the agent folders, REVIEW.md) and
+  which lines to add to `.gitignore`; projects whose `.gitignore` is an allow-list need them.
+- `sdlc doctor` names a change record with git conflict markers and how to merge it, and warns when an `auto_waive`
+  policy lists the `lite` track, which waives the gate for every change on lite.
+- `sdlc status` and `sdlc next` warn when a gate of the change has no one who may approve it (roles, distinct
+  approvers, the per-person limit), pointing to `sdlc roles who <gate> --change <id>`.
+- Two worked examples in the documentation: adopting a large existing codebase, and tracks, small changes and human
+  decisions.
+
+### Changed
+- On a high-risk change, `sdlc approve --preview` and `sdlc roles who` name every role the gate needs, so the product
+  owner sees that the tech lead must approve as well.
+- The guide and the `openspec/sdlc.yaml` header say that `auto_waive` matches the kind or the track.
+- The adoption draft leaves out bots named "bot" or "robot" and addresses such as `npm-cli+bot@github.com`.
+
+### Fixed
+- After `sdlc rework`, the next step is the agent revising the artifact from the rework note, also when the gate had
+  been rejected and approved before; the person is asked to approve only once the artifact changed.
+- `sdlc new` and `sdlc backlog start --change` refuse the id of an archived change instead of creating a second change
+  with the same id.
+- A change whose plan gate was waived needs no tasks.md: a passing `sdlc verify` satisfies the verify gate.
+- Running `sdlc approve` again for content you already approved records nothing and says "already approved".
+
 ## 0.22.2 — 2026-10-16
 
 ### Added

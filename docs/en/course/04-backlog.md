@@ -1,5 +1,9 @@
 # Module 4. Backlog and planning
 
+To attach an existing active change to a ready open item, run `sdlc backlog link B1 --change add-export`.
+Archiving completes the item. Dropping a mistaken change with `sdlc drop add-export --note "Created by mistake"`
+returns the item to open. An archived change id cannot be reused.
+
 This module is about planned work before it becomes a change. It is for **Megan**, the product owner, who plans the
 `tasklet` backlog with Claude Code and decides the order. Oliver and Ethan watch the first two lessons to see where
 their changes come from.

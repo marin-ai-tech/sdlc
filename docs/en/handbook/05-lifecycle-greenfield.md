@@ -1,8 +1,16 @@
 # 5. One change from idea to archive (tasklet)
 
+After `sdlc rework`, the agent revises the named gate's artifacts before a person approves again. Repeating an
+approval for the same digest as the same person and role records nothing. When plan is waived and tasks.md is absent,
+fresh passing verification satisfies verify; open tasks still block it. A person can drop a mistaken change with
+`sdlc drop <change> --note "why"`, preserving its reason in the archive without merging delta specs.
+
 This chapter follows one change through every stage: **"Add due dates to tasks"** (`add-due-dates`) in the `tasklet`
 API. Every person of the team appears at their gate. Oliver drives the agent; the others decide in their own terminals.
 All outputs come from a trial run of `tasklet` with sdlc 0.14.4 and the configuration of Chapters 1 to 3.
+
+For a high-risk change, `approve --preview` names every required role, including high-risk extras,
+and the roles still missing. `status` and `next` flag a remaining gate when no one may approve it.
 
 ## Contents
 

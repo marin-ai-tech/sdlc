@@ -461,6 +461,15 @@ describe('demo: a team builds a calculator with sdlc (every command)', { timeout
     step('plugin', 'visibility', 'bob', ['plugin', 'build', path.join(tempDir('sdlc-demo-plugin-'), 'plugin')], 'The same workflows as a Claude Code plugin.');
     step('ci-init', 'visibility', 'alice', ['ci', 'init', '--provider', 'github'],
       'Alice adds the sdlc checks to CI: a workflow on a full clone that validates and verifies approvals.');
+    const mistaken = step('add-mistake', 'visibility', 'agent', ['backlog', 'add', 'Export prototype',
+      '--outcome', 'Export sums', '--accept', 'Exported sums are readable', '--json'],
+      'The agent adds a ready item before trying an existing change.');
+    const item = JSON.parse(mistaken.stdout).item.id as string;
+    step('new-mistake', 'visibility', 'agent', ['new', 'accidental-export'], 'An existing change needs a backlog source.');
+    step('backlog-link', 'visibility', 'agent', ['backlog', 'link', item, '--change', 'accidental-export'],
+      'The agent links the existing change to the ready item.');
+    step('drop-mistake', 'visibility', 'alice', ['drop', 'accidental-export', '--note', 'Created by mistake'],
+      'Alice drops the change without merging its deltas, returning the item to open.');
     step('uninstall', 'visibility', 'alice', ['uninstall', '--dry-run'], 'Uninstall keeps every planning file.');
   });
 

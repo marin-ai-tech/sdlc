@@ -13,6 +13,9 @@ sdlc rework spec --change add-export --reason missing-requirement --note "Нет
 sdlc rework plan --change add-export --reason design-flaw --note "Используйте очередь" --reset
 ```
 
+После возврата `sdlc next` просит агента изменить артефакты этого гейта. Когда digest изменится,
+очередь переходит к человеку для утверждения.
+
 - `--reason` — категория из `rework.reasons`: missing-requirement, wrong-assumption, design-flaw, implementation-bug,
   test-gap, scope-change, other. Аудит их считает, и команда видит, откуда берутся возвраты.
 - Утверждения до возврата перестают действовать; последующие гейты ждут новых утверждений.

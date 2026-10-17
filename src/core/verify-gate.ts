@@ -24,6 +24,7 @@ export interface VerifyGateInput {
   tracks: string;
   taskProgress?: TaskProgress;
   remaining: number;
+  planWaived: boolean;
   upstreamOpen?: LocalizedReason;
 }
 
@@ -59,7 +60,7 @@ export function evaluateVerifyGate(input: VerifyGateInput): {
   } else if (upstreamOpen) {
     status = 'blocked';
     info = upstreamOpen;
-  } else if (!taskProgress && schema.apply) {
+  } else if (!taskProgress && schema.apply && !input.planWaived) {
     status = 'blocked';
     info = lr('gate.noTasksFile', { file: tracks });
   } else if (remaining > 0) {

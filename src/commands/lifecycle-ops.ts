@@ -268,7 +268,8 @@ function auditOneChange(ctx: ProjectContext, id: string, since: string | undefin
   const events = agentEvents(ctx.root, since, ref.id);
   if (json) {
     printJson({
-      change: ref.id, archived: ref.archived, kind: state.kind, risk: state.risk, track: state.track,
+      change: ref.id, archived: ref.archived, ...(state.dropped ? { dropped: state.dropped } : {}),
+      kind: state.kind, risk: state.risk, track: state.track,
       source: state.source, ...(state.harness ? { recordedWith: state.harness } : {}), ...(since ? { since } : {}),
       history: audit.history, commits: audit.commits, agentCommits: audit.agentCommits,
       agentEvents: events, metrics, harness: ctx.stamp,
@@ -277,6 +278,7 @@ function auditOneChange(ctx: ProjectContext, id: string, since: string | undefin
   }
   line(c.bold(t('audit.trail', { change: ref.id }))
     + c.dim(t('audit.meta', { kind: state.kind, risk: state.risk, track: state.track })));
+  if (state.dropped) line(t('audit.dropped', { by: state.dropped.by, note: state.dropped.note }));
   if (since) line(`  ${t('audit.period', { since })}`);
   for (const h of audit.history) {
     line(`  ${h.at}  ${h.event.padEnd(26)} ${h.by ?? ''}${h.detail ? c.dim(` - ${h.detail}`) : ''}${stampSuffix(h)}`);
@@ -297,7 +299,8 @@ function projectRows(ctx: ProjectContext, refs: ChangeRef[]) {
       if (h.license) licenses.add(h.license);
     }
     const metrics = changeMetrics(state, changeLog(log, ref.id), ctx.config);
-    return { change: ref.id, archived: ref.archived, kind: state.kind, track: state.track, ...metrics };
+    return { change: ref.id, archived: ref.archived,
+      ...(state.dropped ? { dropped: state.dropped } : {}), kind: state.kind, track: state.track, ...metrics };
   });
   return { rows, versions: [...versions].sort(), licenses: [...licenses].sort() };
 }
@@ -344,6 +347,9 @@ function printProjectAudit(
   })}`);
   printProjectFlow(aggregate);
   printProjectParticipation(audit.rows, aggregate.participation);
+  for (const row of audit.rows) {
+    if (row.dropped) line(`  ${row.change}: ${t('audit.dropped', row.dropped)}`);
+  }
   if (audit.versions.length > 0) {
     line(`  ${t('audit.recordedWith', {
       versions: audit.versions.join(', '),

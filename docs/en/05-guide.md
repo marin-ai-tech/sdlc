@@ -82,6 +82,16 @@ configuration, and commits made in the agent's shell carry `SDLC-Agent: <agent>`
 
 ## 5.2. Working with sdlc: from init to an empty backlog
 
+An existing active change can be attached to an open backlog item with
+`sdlc backlog link B1 --change add-export`. The item becomes in progress and archiving the change marks it done.
+An archived change id cannot be reused by `sdlc new` or `sdlc backlog start`.
+To close a mistaken change without merging its delta specs, a person runs
+`sdlc drop add-export --note "Created by mistake"`. Its linked backlog item returns to open. The archived record
+retains the drop reason, and reports and audits identify it as dropped.
+Approving unchanged content twice as the same person and role records one approval. After a rework, the agent
+first revises the gate's artifacts; after they change, the person approves. A waived plan with no tasks.md needs
+fresh passing verification, while any open tasks still block the verify gate.
+
 The usual path for an existing project. Workflows are shown as Claude Code (`/sdlc:adopt`) and as OpenCode, Cursor,
 Qwen Code and GigaCode call them (`/sdlc-adopt`); in Codex CLI they are `$sdlc-adopt` and so on
 ([Supported tools](#supported-tools)).
@@ -234,7 +244,7 @@ Record postponed work with `sdlc defer add <title> --why <text> [--change <id>] 
 
 ### Send a change back, take it over
 
-`sdlc rework <gate> --change <id> --reason <category> --note "<what has to change>"` sends a change back to the stage of a gate (intent, spec, plan, review). The gate counts as rejected until it is approved again, and approvals made before the rework stop counting, the later gates' too. Reasons come from `rework.reasons` in `sdlc.yaml` (default: missing-requirement, wrong-assumption, design-flaw, implementation-bug, test-gap, scope-change, other); the audit counts them. Approving a gate records a checkpoint (`refs/sdlc/<change>/<gate>`; branches and HEAD stay); `--reset` restores from it only the files listed under "Files that change" in plan.md and the change folder, and refuses when they have uncommitted edits. External actions are not undone. Approving the gate again with nothing changed since the approval before the rework needs `--note` (why nothing had to change; `--preview` shows `unchangedSinceRework`). After `rework.max_cycles` reworks of one gate (default 3), `sdlc next` asks a person to take the change over or review its scope instead of another agent round.
+`sdlc rework <gate> --change <id> --reason <category> --note "<what has to change>"` sends a change back to the stage of a gate (intent, spec, plan, qa, review). The gate counts as rejected until it is approved again, and approvals made before the rework stop counting, the later gates' too. Reasons come from `rework.reasons` in `sdlc.yaml` (default: missing-requirement, wrong-assumption, design-flaw, implementation-bug, test-gap, scope-change, other); the audit counts them. Approving a gate records a checkpoint (`refs/sdlc/<change>/<gate>`; branches and HEAD stay); `--reset` restores from it only the files listed under "Files that change" in plan.md and the change folder, and refuses when they have uncommitted edits. External actions are not undone. Approving the gate again with nothing changed since the approval before the rework needs `--note` (why nothing had to change; `--preview` shows `unchangedSinceRework`). After `rework.max_cycles` reworks of one gate (default 3), `sdlc next` asks a person to take the change over or review its scope instead of another agent round.
 
 After a rework, `sdlc next` first asks the agent to revise. Once the agent has changed the gate's artifacts,
 the gate waits for a person again: `sdlc next` names them, `sdlc next --me` lists it, and the
@@ -308,7 +318,16 @@ accept. A pack with workflows or checks must be pinned to a git commit (40 hex d
 
 ### Approvals in commits, evidence limits, gates that do not apply
 
-`sdlc approve` prints a ready `git commit` with the trailer `SDLC-Approval: <change>:<gate>:<digest>` (JSON `commitMessage`); `sdlc approvals verify` reports `trailer: found | missing` for each approval. The evidence in `verification.md` warns about files listed under "Files that change" that the change did not touch (`planDrift.untouched`, never a failure), has a `## Not run / limits` section for the tester, and lists the files of the change's `verification/` folder (screenshots, browser results) as links. `gates.<gate>.auto_waive: { kinds, tracks }` waives the intent, spec or plan gate for matching changes, logged once as `gate.<gate>.auto_waived` and counted in the audit as a policy waiver; a kind chosen by an agent does not count. Use cases: [13. Process hygiene and project health](13-process-health.md).
+`sdlc approve` prints a ready `git commit` with the trailer
+`SDLC-Approval: <change>:<gate>:<digest>` (JSON `commitMessage`). `sdlc approvals verify` reports
+`trailer: found | missing` for each approval. The evidence in `verification.md` warns about untouched files
+listed under "Files that change" (`planDrift.untouched`, never a failure), has a `## Not run / limits` section,
+and links the change's `verification/` folder (screenshots and browser results).
+
+`gates.<gate>.auto_waive: { kinds, tracks }` waives intent, spec or plan when the kind **or** track matches.
+It is logged once as `gate.<gate>.auto_waived` and counted as a policy waiver; an agent-chosen kind does not count.
+`tracks: [lite]` waives every lite change, including features, and raises a doctor warning.
+See [13. Process hygiene and project health](13-process-health.md).
 
 ### Project health and explaining a change
 
@@ -529,7 +548,7 @@ gates:
   spec:    { required: true,  approvers: [product-owner], high_risk_approvers: [tech-lead] }
   plan:    { required: true,  approvers: [engineer],      high_risk_approvers: [tech-lead] }
   review:  { required: true,  approvers: [code-owner], min_approvals: 2 }   # two different people (default 1)
-  # spec:  { auto_waive: { kinds: [docs], tracks: [lite] } }   # waive for matching changes, logged as policy (intent, spec, plan only; not a kind an agent chose)
+  # spec:  { auto_waive: { kinds: [docs], tracks: [lite] } }   # kind OR track; lite waives all lite changes
   # spec:  { judge: { run: node tools/judge.mjs, rubric: docs/rubrics/spec.md } }   # a judge before the person (0.20.0)
   # plan:  { overdue_hours: 24 }   # a wait longer than this raises gate.plan.overdue (unset: never overdue)
   release: { required: false, approvers: [release-manager] }

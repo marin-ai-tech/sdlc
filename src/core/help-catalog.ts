@@ -17,6 +17,8 @@ const EXAMPLES: Record<string, string> = {
   'track set': 'sdlc track set lite --change docs-only',
   'backlog move': 'sdlc backlog move B2 --top',
   'backlog drop': 'sdlc backlog drop B2 --note "No longer needed"',
+  'backlog link': 'sdlc backlog link B2 --change add-export',
+  drop: 'sdlc drop add-export --note "Created by mistake"',
   'license set': 'sdlc license set community',
   'roles migrate': 'sdlc roles migrate',
   'ci init': 'sdlc ci init --provider github --check github',

@@ -1,14 +1,17 @@
 import type { ChangeState } from './change-state.js';
 import { decidedAfter, decidedAfterAll } from './decision-order.js';
+import { effectiveGates } from './rework.js';
 import { t } from './i18n.js';
 import type { GateEvaluation } from './lifecycle.js';
 
 /** A rejection stays open until a later approval of the same gate. */
 export function markOpenRejections(gates: GateEvaluation[], state: ChangeState): GateEvaluation[] {
+  const effective = effectiveGates(state);
   return gates.map((gate) => {
-    const record = state.gates[gate.id];
+    const record = effective[gate.id];
     const rejection = record?.rejection;
     if (!rejection || !decidedAfterAll(rejection, record?.approvals ?? [])) return gate;
+    if (rejection.digest && gate.digest && rejection.digest !== gate.digest) return gate;
     if (record?.waived && decidedAfter(record.waived, rejection)) return gate;
     if (gate.status === 'rejected') return gate;
     const key = rejection.note ? 'gate.rejectedNote' : 'gate.rejected';

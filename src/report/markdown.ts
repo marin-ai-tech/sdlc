@@ -29,7 +29,7 @@ function stages(model: ReportModel): string[] {
 }
 
 function changeRow(change: ReportChange): string {
-  const stage = cell(t(`stage.${change.stage}`));
+  const stage = cell(change.dropped ? t('report.dropped') : t(`stage.${change.stage}`));
   const tasks = `${change.tasks.complete}/${change.tasks.total}`;
   const verify = cell(change.verification);
   const next = cell(change.next.message);
