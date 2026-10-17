@@ -100,7 +100,9 @@ the gates and the main limit of each are in the [supported tools](docs/en/05-gui
   [a newcomer's first change](docs/en/20-onboarding-example.md),
   [the dashboard and process health](docs/en/21-dashboard-health-example.md),
   [adopting a large codebase](docs/en/22-adopt-large-codebase-example.md),
-  [tracks and human decisions](docs/en/23-tracks-and-decisions-example.md)
+  [tracks and human decisions](docs/en/23-tracks-and-decisions-example.md),
+  [a bug fix from an alert](docs/en/24-bugfix-incident-example.md),
+  [CI, release protection and upgrading](docs/en/25-ci-release-upgrade-example.md)
 - [The AI-ready project layout](docs/en/07-ai-ready-project.md),
   [roles and signed approvals](docs/en/08-roles-and-signing.md),
   [integrations and MCP](docs/en/10-integrations.md), [the agent team](docs/en/12-agent-team.md),
