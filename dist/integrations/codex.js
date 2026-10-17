@@ -1,0 +1,95 @@
+import { generatedNotice } from '../core/license.js';
+import { roleBody, subagentName } from '../team/render.js';
+import { AGENT_IDS, loadAgent, WORKFLOW_IDS } from './assets.js';
+import { renderBody } from './render.js';
+import { cliSpellings, SECOND_LAYER_COMMANDS } from './second-layer.js';
+import { skillFile } from './skills.js';
+/**
+ * Codex CLI integration (B82, 0.14.0):
+ * - skills `.agents/skills/sdlc-<id>/SKILL.md` (Agent Skills format, rendered for Codex); in Codex the skills are the
+ *   commands (`$sdlc-<id>`), so they are written whatever `delivery` says;
+ * - subagents `.codex/agents/sdlc-<agent>.toml` (`name`, `description`, `developer_instructions`);
+ * - command rules `.codex/rules/sdlc.rules`: a person's commands (second-layer.ts) are `forbidden` for the agent.
+ * The hooks (`.codex/hooks.json`, see codex-hooks.ts) and the MCP servers (`.codex/config.toml`, see codex-toml.ts)
+ * are merged into files a person may share, so they are not generated files of the manifest.
+ */
+const SKILLS_ROOT = '.agents/skills';
+export const CODEX_RULES_PATH = '.codex/rules/sdlc.rules';
+const SEPARATION = "a person's decision; see `sdlc guide denials#separation-of-duties`";
+function codexExtra() {
+    return { head: [], tail: [] };
+}
+function skillTarget(ctx) {
+    const compatibility = `Requires the sdlc CLI (${ctx.cli}) from the sdlc package; written for Codex CLI.`;
+    return { root: SKILLS_ROOT, surface: 'codex-skill', tool: 'codex', extra: codexExtra, compatibility };
+}
+/** A TOML basic string: JSON's escapes (`\"`, `\\`, `\n`, `\uXXXX`) are TOML's too. */
+export function tomlString(value) {
+    return JSON.stringify(value);
+}
+/** A subagent `.codex/agents/<name>.toml`; a read-only one runs in Codex's read-only sandbox. */
+function agentFile(agent, body, notice) {
+    const lines = [
+        notice,
+        `name = ${tomlString(agent.name)}`,
+        `description = ${tomlString(agent.description)}`,
+        ...(agent.readonly ? ['sandbox_mode = "read-only"'] : []),
+        `developer_instructions = ${tomlString(body.trimEnd())}`,
+    ];
+    return { path: `.codex/agents/${agent.name}.toml`, content: `${lines.join('\n')}\n`, tool: 'codex', kind: 'agent' };
+}
+function roleAgent(role, ctx, notice) {
+    const agent = { name: subagentName(role), description: role.description, readonly: role.readonly };
+    return agentFile(agent, roleBody(role, ctx), notice);
+}
+/** The built-in subagents, then one per accepted role (B70); a role named like a built-in one takes its file. */
+function agentFiles(ctx, notice) {
+    const team = ctx.team ?? [];
+    const names = new Set(team.map(subagentName));
+    const files = [];
+    for (const id of AGENT_IDS) {
+        const agent = loadAgent(id);
+        if (names.has(agent.name))
+            continue;
+        const body = renderBody(agent.body, { surface: 'codex-agent', cli: ctx.cli });
+        files.push(agentFile(agent, body, notice));
+    }
+    for (const role of team)
+        files.push(roleAgent(role, ctx, notice));
+    return files;
+}
+/** The words of a person's command as Codex matches them: `config.cli`'s words, then the command's. */
+export function humanCommandPatterns(cli) {
+    const prefixes = cliSpellings(cli).map((spelling) => spelling.split(/\s+/));
+    return prefixes.flatMap((prefix) => SECOND_LAYER_COMMANDS.map((command) => [...prefix, ...command.split(' ')]));
+}
+function prefixRule(words) {
+    return [
+        'prefix_rule(',
+        `    pattern = [${words.map(tomlString).join(', ')}],`,
+        '    decision = "forbidden",',
+        `    justification = ${tomlString(SEPARATION)},`,
+        ')',
+    ].join('\n');
+}
+/** `.codex/rules/sdlc.rules` (Starlark): every person's command is forbidden for the agent (most restrictive wins). */
+function rulesFile(ctx, notice) {
+    const rules = humanCommandPatterns(ctx.cli).map(prefixRule);
+    const content = [notice, "# A person's commands: Codex refuses them for the agent (sdlc, B82).", ...rules].join('\n');
+    return { path: CODEX_RULES_PATH, content: `${content}\n`, tool: 'codex', kind: 'rule' };
+}
+export const codexAdapter = {
+    id: 'codex',
+    name: 'Codex CLI',
+    detectPaths: ['.codex'],
+    invocation(workflow) {
+        return `$sdlc-${workflow}`;
+    },
+    render(ctx) {
+        const notice = generatedNotice(ctx.stamp, 'yaml');
+        const files = WORKFLOW_IDS.map((id) => skillFile(id, ctx, skillTarget(ctx)));
+        files.push(...agentFiles(ctx, notice));
+        files.push(rulesFile(ctx, notice));
+        return files;
+    },
+};
