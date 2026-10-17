@@ -12,6 +12,7 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { readAsset } from '../integrations/assets.js';
 import { isWithin, toPosix } from './fs-utils.js';
+import { projectNameFromManifest } from './project-name.js';
 
 export const LAYOUT_ROLE_IDS = [
   'agents-guide',
@@ -329,7 +330,7 @@ function writeMissing(root: string, config: SdlcConfig, opts: { dryRun?: boolean
     const found = report.roles.find((r) => r.role === role.id);
     return [role.id, found?.path ?? role.path];
   })) as Record<LayoutRoleId, string>;
-  const ctx: TemplateContext = { projectName: path.basename(root), paths,
+  const ctx: TemplateContext = { projectName: projectNameFromManifest(root), paths,
     verifyCommands: config.verify.commands, cli: config.cli, tools: config.tools };
   for (const role of LAYOUT_ROLES.filter((role) => roleApplies(role.id, config.tools))) {
     const rel = role.kind === 'dir' ? role.path + path.posix.basename(role.template) : role.path;

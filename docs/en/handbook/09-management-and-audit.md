@@ -322,6 +322,10 @@ waits per gate, reworks, people's participation and the agents' share of commits
    | rework reasons | why work went back (`missing-requirement`, `test-gap`, ...) |
    | participation | per change: the decisions the track planned against what people did |
 
+   Planned approvals include each required gate's minimum and, for high-risk changes, one approval per additional
+   `high_risk_approvers` role. In the default configuration, a high-risk full-track change plans six approvals
+   across intent, spec, plan, and review; a low- or medium-risk one plans four.
+
    `add-task-list` planned four approvals and got five: Ethan approved the plan twice because he sent it back once.
 
 3. Read the timeline of one change:

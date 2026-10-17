@@ -2,6 +2,21 @@
 
 All notable changes to sdlc. Versions follow [Semantic Versioning](https://semver.org/); while the major version is 0, a minor version may change behavior.
 
+## 0.22.4 — 2026-10-17
+
+### Changed
+- The adoption draft shows each person's last commit; `sdlc adopt --apply` writes into roles.yaml only people with a
+  commit in the last 12 months, the current git identity and people CODEOWNERS resolved, and says how many it left out.
+- `sdlc new` prints the track it suggests, why, and the command a person runs (`sdlc track set lite --change <id>`).
+- Scaffolded documents take the project name from package.json, pyproject.toml, Cargo.toml or go.mod instead of the
+  folder name.
+
+### Fixed
+- `sdlc init` no longer adds a verify command that the test script's `pretest` or `posttest` already runs, so
+  lint does not run twice; the summary says where it runs.
+- The audit plans the high-risk approvals: on a change with risk high, a gate with `high_risk_approvers` counts one
+  more approval per extra role.
+
 ## 0.22.3 — 2026-10-16
 
 ### Added

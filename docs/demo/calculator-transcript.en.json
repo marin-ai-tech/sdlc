@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "generatedAt": "2026-10-17T01:44:02.024Z",
+  "generatedAt": "2026-10-17T07:52:13.636Z",
   "people": {
     "alice": {
       "name": "Alice Walker",
@@ -116,7 +116,7 @@
       "actor": "alice",
       "command": "sdlc init --tools claude,opencode --statusline",
       "exit": 0,
-      "output": "SDLC harness initialized in till-calculator\n  OpenSpec: created openspec/ (via openspec init), default schema: sdlc\n  config: created openspec/sdlc.yaml (enforcement: warn)\n  verify.commands detected: npm test (package.json scripts.test)\n  review policy: created REVIEW.md\n  tools: Claude Code, OpenCode\n  sdlc 0.22.3, license: community (PolyForm-Noncommercial-1.0.0 + sdlc-Additional-Permissions-1.0)\n  git hook .git/hooks/prepare-commit-msg: installed (commits made in agent sessions get an SDLC-Agent trailer)\n  files: 74 created, 0 updated, 0 unchanged, 0 removed\n  Claude Code hooks: installed in .claude/settings.json\n\nStart a change:\n  Claude Code  /sdlc:intent \"<your idea>\"   then /sdlc:next\n  OpenCode     /sdlc-intent \"<your idea>\"   then /sdlc-next\n\nExisting project: prepare it for agents (documents from the code, settings draft):\n  Claude Code  /sdlc:adopt\n  OpenCode     /sdlc-adopt\n\nCompared with the AI-ready layout:\n  missing: AGENTS.md, CLAUDE.md, docs/architecture.md, docs/conventions.md, docs/glossary.md, docs/runbook.md, docs/security.md, docs/decisions/\nMake it AI-ready: `sdlc init --layout adapt` (here, moves nothing) or `sdlc init --layout worktree --worktree <path>` (in a new worktree, this copy stays as it is)\n\nwarning: community license, but the project declares no OSI-approved license. The Community License covers noncommercial use, public open source projects and a 30-day evaluation; other commercial use needs a commercial license (COMMERCIAL-LICENSE.md). Record one with `sdlc license set commercial --agreement <id>`.",
+      "output": "SDLC harness initialized in till-calculator\n  OpenSpec: created openspec/ (via openspec init), default schema: sdlc\n  config: created openspec/sdlc.yaml (enforcement: warn)\n  verify.commands detected: npm test (package.json scripts.test)\n  review policy: created REVIEW.md\n  tools: Claude Code, OpenCode\n  sdlc 0.22.4, license: community (PolyForm-Noncommercial-1.0.0 + sdlc-Additional-Permissions-1.0)\n  git hook .git/hooks/prepare-commit-msg: installed (commits made in agent sessions get an SDLC-Agent trailer)\n  files: 74 created, 0 updated, 0 unchanged, 0 removed\n  Claude Code hooks: installed in .claude/settings.json\n\nStart a change:\n  Claude Code  /sdlc:intent \"<your idea>\"   then /sdlc:next\n  OpenCode     /sdlc-intent \"<your idea>\"   then /sdlc-next\n\nExisting project: prepare it for agents (documents from the code, settings draft):\n  Claude Code  /sdlc:adopt\n  OpenCode     /sdlc-adopt\n\nCompared with the AI-ready layout:\n  missing: AGENTS.md, CLAUDE.md, docs/architecture.md, docs/conventions.md, docs/glossary.md, docs/runbook.md, docs/security.md, docs/decisions/\nMake it AI-ready: `sdlc init --layout adapt` (here, moves nothing) or `sdlc init --layout worktree --worktree <path>` (in a new worktree, this copy stays as it is)\n\nwarning: community license, but the project declares no OSI-approved license. The Community License covers noncommercial use, public open source projects and a 30-day evaluation; other commercial use needs a commercial license (COMMERCIAL-LICENSE.md). Record one with `sdlc license set commercial --agreement <id>`.",
       "note": "Alice installs sdlc for Claude Code and OpenCode, with the status line.",
       "name": "init"
     },
@@ -126,7 +126,7 @@
       "actor": "alice",
       "command": "sdlc doctor",
       "exit": 0,
-      "output": "Required Notice: Copyright (c) 2026 marin-ai technologies (https://github.com/marin-ai-tech/sdlc)\n✓ node             Node.js 24.21.0\n✓ harness          sdlc 0.22.3\n✓ openspec         OpenSpec 1.13.2 (bundled)\n✓ openspec cli     1.13.2\n✓ codegraph        1.6.1 - not indexed (codegraph init --yes)\n✓ project          root till-calculator\n✓ sdlc.yaml        enforcement warn, tools claude, opencode\n✓ openspec config  default schema sdlc\n✓ sdlc schema      openspec/schemas/sdlc is valid\n✓ generated files  74 tracked, 0 missing, 0 edited locally\n! license          community license, but the project declares no OSI-approved license\n                   fix: The Community License covers noncommercial use, public open source projects and a 30-day evaluation; other commercial use needs a commercial license (COMMERCIAL-LICENSE.md). Record one with `sdlc license set commercial --agreement <id>`.\n✓ project log      1 entries in openspec/.sdlc/log.jsonl\n✓ claude hooks     installed in .claude/settings.json\n✓ opencode plugin  .opencode/plugins/sdlc.js\n✓ cli on PATH      `sdlc` is on PATH (hooks, plugin and skills call `sdlc`)\n✓ verify commands  test\n✓ review policy    REVIEW.md\n✓ git              identity Alice Walker <alice@calc.example>\n✓ git hook         prepare-commit-msg in .git/hooks/prepare-commit-msg: commits made in agent sessions get an SDLC-Agent trailer",
+      "output": "Required Notice: Copyright (c) 2026 marin-ai technologies (https://github.com/marin-ai-tech/sdlc)\n✓ node             Node.js 24.21.0\n✓ harness          sdlc 0.22.4\n✓ openspec         OpenSpec 1.13.2 (bundled)\n✓ openspec cli     1.13.2\n✓ codegraph        1.6.1 - not indexed (codegraph init --yes)\n✓ project          root till-calculator\n✓ sdlc.yaml        enforcement warn, tools claude, opencode\n✓ openspec config  default schema sdlc\n✓ sdlc schema      openspec/schemas/sdlc is valid\n✓ generated files  74 tracked, 0 missing, 0 edited locally\n! license          community license, but the project declares no OSI-approved license\n                   fix: The Community License covers noncommercial use, public open source projects and a 30-day evaluation; other commercial use needs a commercial license (COMMERCIAL-LICENSE.md). Record one with `sdlc license set commercial --agreement <id>`.\n✓ project log      1 entries in openspec/.sdlc/log.jsonl\n✓ claude hooks     installed in .claude/settings.json\n✓ opencode plugin  .opencode/plugins/sdlc.js\n✓ cli on PATH      `sdlc` is on PATH (hooks, plugin and skills call `sdlc`)\n✓ verify commands  test\n✓ review policy    REVIEW.md\n✓ git              identity Alice Walker <alice@calc.example>\n✓ git hook         prepare-commit-msg in .git/hooks/prepare-commit-msg: commits made in agent sessions get an SDLC-Agent trailer",
       "note": "Installation health.",
       "name": "doctor"
     },
@@ -146,7 +146,7 @@
       "actor": "alice",
       "command": "sdlc license",
       "exit": 0,
-      "output": "sdlc 0.22.3, license: community (PolyForm-Noncommercial-1.0.0 + sdlc-Additional-Permissions-1.0)\n  declared in openspec/sdlc.yaml (license.type); change it with `sdlc license set`\n  project license: none declared\n  ! community license, but the project declares no OSI-approved license\n    The Community License covers noncommercial use, public open source projects and a 30-day evaluation; other commercial use needs a commercial license (COMMERCIAL-LICENSE.md). Record one with `sdlc license set commercial --agreement <id>`.\n  terms: PolyForm Noncommercial 1.0.0 (https://polyformproject.org/licenses/noncommercial/1.0.0) with the sdlc Additional Permissions, or a commercial license; see https://github.com/marin-ai-tech/sdlc\n  Required Notice: Copyright (c) 2026 marin-ai technologies (https://github.com/marin-ai-tech/sdlc)\n  license files: <sdlc>\\LICENSE, <sdlc>\\COMMERCIAL-LICENSE.md",
+      "output": "sdlc 0.22.4, license: community (PolyForm-Noncommercial-1.0.0 + sdlc-Additional-Permissions-1.0)\n  declared in openspec/sdlc.yaml (license.type); change it with `sdlc license set`\n  project license: none declared\n  ! community license, but the project declares no OSI-approved license\n    The Community License covers noncommercial use, public open source projects and a 30-day evaluation; other commercial use needs a commercial license (COMMERCIAL-LICENSE.md). Record one with `sdlc license set commercial --agreement <id>`.\n  terms: PolyForm Noncommercial 1.0.0 (https://polyformproject.org/licenses/noncommercial/1.0.0) with the sdlc Additional Permissions, or a commercial license; see https://github.com/marin-ai-tech/sdlc\n  Required Notice: Copyright (c) 2026 marin-ai technologies (https://github.com/marin-ai-tech/sdlc)\n  license files: <sdlc>\\LICENSE, <sdlc>\\COMMERCIAL-LICENSE.md",
       "note": "Which license the project uses sdlc under.",
       "name": "license"
     },
@@ -216,7 +216,7 @@
       "actor": "agent",
       "command": "sdlc adopt",
       "exit": 0,
-      "output": "Adoption draft\nStack: node\nCI: -\nPerson: Alice Walker <alice@calc.example>\nPerson: Bob Turner <bob@calc.example>\nRoles (written to openspec/roles.yaml only if it does not exist):\n  product-owner: bob (to check)\n  tech-lead: bob (to check)\n  engineer: bob (to check)\n  code-owner: bob (to check)\n  release-manager: bob (to check)\n  maintainer: bob (to check)\nA person can apply this draft with: sdlc adopt --apply",
+      "output": "Adoption draft\nStack: node\nCI: -\nPerson: Alice Walker <alice@calc.example> — last commit: 2026-10-17\nPerson: Bob Turner <bob@calc.example> — last commit: none\n0 inactive person(s) will be left out of roles.yaml; add them by hand if needed.\nRoles (written to openspec/roles.yaml only if it does not exist):\n  product-owner: bob (to check)\n  tech-lead: bob (to check)\n  engineer: bob (to check)\n  code-owner: bob (to check)\n  release-manager: bob (to check)\n  maintainer: bob (to check)\nA person can apply this draft with: sdlc adopt --apply",
       "note": "The agent drafts settings and roles from the repository: stack, CI, CODEOWNERS, git authors.",
       "name": "adopt"
     },
@@ -236,7 +236,7 @@
       "actor": "alice",
       "command": "sdlc update --dry-run",
       "exit": 0,
-      "output": "Would update SDLC harness files in till-calculator (sdlc 0.22.3, license: community (PolyForm-Noncommercial-1.0.0 + sdlc-Additional-Permissions-1.0))\n  files: 0 created, 0 updated, 74 unchanged, 0 removed\n\nStart a change:\n  Claude Code  /sdlc:intent \"<your idea>\"   then /sdlc:next\n  OpenCode     /sdlc-intent \"<your idea>\"   then /sdlc-next\n\nExisting project: prepare it for agents (documents from the code, settings draft):\n  Claude Code  /sdlc:adopt\n  OpenCode     /sdlc-adopt",
+      "output": "Would update SDLC harness files in till-calculator (sdlc 0.22.4, license: community (PolyForm-Noncommercial-1.0.0 + sdlc-Additional-Permissions-1.0))\n  files: 0 created, 0 updated, 74 unchanged, 0 removed\n\nStart a change:\n  Claude Code  /sdlc:intent \"<your idea>\"   then /sdlc:next\n  OpenCode     /sdlc-intent \"<your idea>\"   then /sdlc-next\n\nExisting project: prepare it for agents (documents from the code, settings draft):\n  Claude Code  /sdlc:adopt\n  OpenCode     /sdlc-adopt",
       "note": "Generated files are up to date.",
       "name": "update"
     },
@@ -526,7 +526,7 @@
       "actor": "alice",
       "command": "sdlc approve intent --change basic-arithmetic",
       "exit": 0,
-      "output": "✓ intent gate: Alice Walker <alice@calc.example> approved as product-owner (3f632e3f37b9)\nSuggested commit message (its trailer ties the commit to this approval):\n  $ git commit -m \"chore(basic-arithmetic): approve the intent gate\" -m \"SDLC-Approval: basic-arithmetic:intent:3f632e3f37b9\"\nNext: agent — Write proposal (proposal.md) for the spec gate. (/sdlc:spec)",
+      "output": "✓ intent gate: Alice Walker <alice@calc.example> approved as product-owner (b6d7eb14bb6b)\nSuggested commit message (its trailer ties the commit to this approval):\n  $ git commit -m \"chore(basic-arithmetic): approve the intent gate\" -m \"SDLC-Approval: basic-arithmetic:intent:b6d7eb14bb6b\"\nNext: agent — Write proposal (proposal.md) for the spec gate. (/sdlc:spec)",
       "note": "Alice approves the intent.",
       "name": "approve"
     },
@@ -596,7 +596,7 @@
       "actor": "bob",
       "command": "sdlc explain --change basic-arithmetic",
       "exit": 0,
-      "output": "basic-arithmetic: Design (requirements + design spec)\nOpen gate: spec (pending): awaiting approval (product-owner; 0 of 1).\n\nWaiting for: person (Alice Walker, product-owner).\n\nWhat unblocks it:\n  1. person: Alice Walker (product-owner) must review and approve the spec gate (proposal, specs, design).\n     $ sdlc approve spec --change basic-arithmetic --as product-owner\n  2. agent: After the approval the agent writes the plan and the tasks for the plan gate.\n\nLatest decisions (newest last):\n  2026-10-17T01:41:04.510Z  question.answered  Alice Walker <alice@calc.example>: intent 1: Must the till show the operation on the receipt?\n  2026-10-17T01:41:07.847Z  gate.intent.approved  Alice Walker <alice@calc.example>: role product-owner\n  2026-10-17T01:41:18.630Z  gate.spec.approved  Alice Walker <alice@calc.example>: role product-owner\n  2026-10-17T01:41:22.820Z  gate.plan.approved  Bob Turner <bob@calc.example>: role engineer\n  2026-10-17T01:41:26.001Z  gate.spec.rework  Alice Walker <alice@calc.example>: missing-requirement: Say what 10 / 0 shows on the till",
+      "output": "basic-arithmetic: Design (requirements + design spec)\nOpen gate: spec (pending): awaiting approval (product-owner; 0 of 1).\n\nWaiting for: person (Alice Walker, product-owner).\n\nWhat unblocks it:\n  1. person: Alice Walker (product-owner) must review and approve the spec gate (proposal, specs, design).\n     $ sdlc approve spec --change basic-arithmetic --as product-owner\n  2. agent: After the approval the agent writes the plan and the tasks for the plan gate.\n\nLatest decisions (newest last):\n  2026-10-17T07:49:20.065Z  question.answered  Alice Walker <alice@calc.example>: intent 1: Must the till show the operation on the receipt?\n  2026-10-17T07:49:23.421Z  gate.intent.approved  Alice Walker <alice@calc.example>: role product-owner\n  2026-10-17T07:49:34.068Z  gate.spec.approved  Alice Walker <alice@calc.example>: role product-owner\n  2026-10-17T07:49:38.314Z  gate.plan.approved  Bob Turner <bob@calc.example>: role engineer\n  2026-10-17T07:49:41.570Z  gate.spec.rework  Alice Walker <alice@calc.example>: missing-requirement: Say what 10 / 0 shows on the till",
       "note": "Bob asks why the change is back at the spec: the rework, its note and what unblocks it.",
       "name": "explain"
     },
@@ -686,7 +686,7 @@
       "actor": "agent",
       "command": "sdlc task export --change basic-arithmetic --executor calc-swarm --json",
       "exit": 0,
-      "output": "{\n  \"items\": [\n    {\n      \"contract\": \"sdlc.task/1\",\n      \"change\": \"basic-arithmetic\",\n      \"risk\": \"low\",\n      \"kind\": \"feature\",\n      \"base\": {\n        \"commit\": \"4839dd83109773c6dee897705e9481f3fe475239\"\n      },\n      \"plan\": {\n        \"files\": [\n          \"src/calc.js\",\n          \"test/calc.test.js\"\n        ],\n        \"proof\": [\n          \"`npm test`\"\n        ]\n      },\n      \"scenarios\": [\n        \"Add\",\n        \"Divide\"\n      ],\n      \"checks\": [\n        {\n          \"name\": \"test\",\n          \"run\": \"npm test\",\n          \"required\": true\n        }\n      ],\n      \"forbidden\": [\n        \"openspec/backlog.md\",\n        \"openspec/roles.yaml\",\n        \"openspec/executors.yaml\",\n        \"openspec/.sdlc/log.jsonl\",\n        \"openspec/.sdlc/team.json\",\n        \"openspec/.sdlc/board.json\",\n        \"openspec/.sdlc/board.lock\",\n        \".sdlc.yaml\",\n        \"openspec/sdlc.yaml\",",
+      "output": "{\n  \"items\": [\n    {\n      \"contract\": \"sdlc.task/1\",\n      \"change\": \"basic-arithmetic\",\n      \"risk\": \"low\",\n      \"kind\": \"feature\",\n      \"base\": {\n        \"commit\": \"409e6dca45884fa7287c30d459070979710020b2\"\n      },\n      \"plan\": {\n        \"files\": [\n          \"src/calc.js\",\n          \"test/calc.test.js\"\n        ],\n        \"proof\": [\n          \"`npm test`\"\n        ]\n      },\n      \"scenarios\": [\n        \"Add\",\n        \"Divide\"\n      ],\n      \"checks\": [\n        {\n          \"name\": \"test\",\n          \"run\": \"npm test\",\n          \"required\": true\n        }\n      ],\n      \"forbidden\": [\n        \"openspec/backlog.md\",\n        \"openspec/roles.yaml\",\n        \"openspec/executors.yaml\",\n        \"openspec/.sdlc/log.jsonl\",\n        \"openspec/.sdlc/team.json\",\n        \"openspec/.sdlc/board.json\",\n        \"openspec/.sdlc/board.lock\",\n        \".sdlc.yaml\",\n        \"openspec/sdlc.yaml\",",
       "note": "The open tasks as work items for the executor calc-swarm: checks, forbidden paths, the result branch and trailers.",
       "name": "task export"
     },
@@ -706,7 +706,7 @@
       "actor": "alice",
       "command": "sdlc board dispatch --change basic-arithmetic --task 1.1 --executor calc-swarm --json",
       "exit": 0,
-      "output": "{\n  \"dispatch\": {\n    \"item\": \"basic-arithmetic#1.1\",\n    \"change\": \"basic-arithmetic\",\n    \"task\": \"1.1\",\n    \"executor\": \"calc-swarm\",\n    \"dispatchedAt\": \"2026-10-17T01:41:52.815Z\",\n    \"expiresAt\": \"2026-10-17T01:56:52.815Z\",\n    \"leaseSeconds\": 900\n  }\n}",
+      "output": "{\n  \"dispatch\": {\n    \"item\": \"basic-arithmetic#1.1\",\n    \"change\": \"basic-arithmetic\",\n    \"task\": \"1.1\",\n    \"executor\": \"calc-swarm\",\n    \"dispatchedAt\": \"2026-10-17T07:50:07.850Z\",\n    \"expiresAt\": \"2026-10-17T08:05:07.850Z\",\n    \"leaseSeconds\": 900\n  }\n}",
       "note": "Alice reserves task 1.1 for the swarm representative under a lease.",
       "name": "board dispatch"
     },
@@ -716,7 +716,7 @@
       "actor": "agent",
       "command": "sdlc board claim --change basic-arithmetic --task 1.1 --executor calc-swarm --agent coder-1 --json",
       "exit": 0,
-      "output": "{\n  \"claim\": {\n    \"id\": \"3fe973ea07cf14789c3a12b715d378d0\",\n    \"item\": \"basic-arithmetic#1.1\",\n    \"executor\": \"calc-swarm\",\n    \"agent\": \"coder-1\",\n    \"claimedAt\": \"2026-10-17T01:41:54.102Z\",\n    \"expiresAt\": \"2026-10-17T01:56:54.102Z\",\n    \"leaseSeconds\": 900,\n    \"state\": \"held\"\n  },\n  \"item\": {\n    \"contract\": \"sdlc.task/1\",\n    \"change\": \"basic-arithmetic\",\n    \"risk\": \"low\",\n    \"kind\": \"feature\",\n    \"base\": {\n      \"commit\": \"4839dd83109773c6dee897705e9481f3fe475239\"\n    },\n    \"plan\": {\n      \"files\": [\n        \"src/calc.js\",\n        \"test/calc.test.js\"\n      ],\n      \"proof\": [\n        \"`npm test`\"\n      ]\n    },\n    \"scenarios\": [\n      \"Add\",\n      \"Divide\"\n    ],\n    \"checks\": [\n      {\n        \"name\": \"test\",\n        \"run\": \"npm test\",\n        \"required\": true\n      }\n    ],\n    \"forbidden\": [",
+      "output": "{\n  \"claim\": {\n    \"id\": \"bd07ed24171241d5324f5c99c4416436\",\n    \"item\": \"basic-arithmetic#1.1\",\n    \"executor\": \"calc-swarm\",\n    \"agent\": \"coder-1\",\n    \"claimedAt\": \"2026-10-17T07:50:09.152Z\",\n    \"expiresAt\": \"2026-10-17T08:05:09.152Z\",\n    \"leaseSeconds\": 900,\n    \"state\": \"held\"\n  },\n  \"item\": {\n    \"contract\": \"sdlc.task/1\",\n    \"change\": \"basic-arithmetic\",\n    \"risk\": \"low\",\n    \"kind\": \"feature\",\n    \"base\": {\n      \"commit\": \"409e6dca45884fa7287c30d459070979710020b2\"\n    },\n    \"plan\": {\n      \"files\": [\n        \"src/calc.js\",\n        \"test/calc.test.js\"\n      ],\n      \"proof\": [\n        \"`npm test`\"\n      ]\n    },\n    \"scenarios\": [\n      \"Add\",\n      \"Divide\"\n    ],\n    \"checks\": [\n      {\n        \"name\": \"test\",\n        \"run\": \"npm test\",\n        \"required\": true\n      }\n    ],\n    \"forbidden\": [",
       "note": "The agent claims task 1.1 for the executor calc-swarm: a lease and the work item.",
       "name": "board claim"
     },
@@ -724,9 +724,9 @@
       "id": "board-heartbeat",
       "section": "build",
       "actor": "agent",
-      "command": "sdlc board heartbeat --claim 3fe973ea07cf14789c3a12b715d378d0 --json",
+      "command": "sdlc board heartbeat --claim bd07ed24171241d5324f5c99c4416436 --json",
       "exit": 0,
-      "output": "{\n  \"claim\": {\n    \"id\": \"3fe973ea07cf14789c3a12b715d378d0\",\n    \"item\": \"basic-arithmetic#1.1\",\n    \"executor\": \"calc-swarm\",\n    \"agent\": \"coder-1\",\n    \"claimedAt\": \"2026-10-17T01:41:54.102Z\",\n    \"expiresAt\": \"2026-10-17T01:56:55.226Z\",\n    \"leaseSeconds\": 900,\n    \"state\": \"held\"\n  }\n}",
+      "output": "{\n  \"claim\": {\n    \"id\": \"bd07ed24171241d5324f5c99c4416436\",\n    \"item\": \"basic-arithmetic#1.1\",\n    \"executor\": \"calc-swarm\",\n    \"agent\": \"coder-1\",\n    \"claimedAt\": \"2026-10-17T07:50:09.152Z\",\n    \"expiresAt\": \"2026-10-17T08:05:10.276Z\",\n    \"leaseSeconds\": 900,\n    \"state\": \"held\"\n  }\n}",
       "note": "A heartbeat pushes the lease end out; it writes no log entry.",
       "name": "board heartbeat"
     },
@@ -736,7 +736,7 @@
       "actor": "agent",
       "command": "sdlc board claim --change basic-arithmetic --task 1.2 --executor calc-swarm --agent coder-2 --json",
       "exit": 0,
-      "output": "{\n  \"claim\": {\n    \"id\": \"db2eb26dd1de10a2685b4d65114f616e\",\n    \"item\": \"basic-arithmetic#1.2\",\n    \"executor\": \"calc-swarm\",\n    \"agent\": \"coder-2\",\n    \"claimedAt\": \"2026-10-17T01:41:56.526Z\",\n    \"expiresAt\": \"2026-10-17T01:56:56.526Z\",\n    \"leaseSeconds\": 900,\n    \"state\": \"held\"\n  },\n  \"item\": {\n    \"contract\": \"sdlc.task/1\",\n    \"change\": \"basic-arithmetic\",\n    \"risk\": \"low\",\n    \"kind\": \"feature\",\n    \"base\": {\n      \"commit\": \"4839dd83109773c6dee897705e9481f3fe475239\"\n    },\n    \"plan\": {\n      \"files\": [\n        \"src/calc.js\",\n        \"test/calc.test.js\"\n      ],\n      \"proof\": [\n        \"`npm test`\"\n      ]\n    },\n    \"scenarios\": [\n      \"Add\",\n      \"Divide\"\n    ],\n    \"checks\": [\n      {\n        \"name\": \"test\",\n        \"run\": \"npm test\",\n        \"required\": true\n      }\n    ],\n    \"forbidden\": [",
+      "output": "{\n  \"claim\": {\n    \"id\": \"9dc8f330e7f52d859d3cfd2272b6a1f1\",\n    \"item\": \"basic-arithmetic#1.2\",\n    \"executor\": \"calc-swarm\",\n    \"agent\": \"coder-2\",\n    \"claimedAt\": \"2026-10-17T07:50:11.532Z\",\n    \"expiresAt\": \"2026-10-17T08:05:11.532Z\",\n    \"leaseSeconds\": 900,\n    \"state\": \"held\"\n  },\n  \"item\": {\n    \"contract\": \"sdlc.task/1\",\n    \"change\": \"basic-arithmetic\",\n    \"risk\": \"low\",\n    \"kind\": \"feature\",\n    \"base\": {\n      \"commit\": \"409e6dca45884fa7287c30d459070979710020b2\"\n    },\n    \"plan\": {\n      \"files\": [\n        \"src/calc.js\",\n        \"test/calc.test.js\"\n      ],\n      \"proof\": [\n        \"`npm test`\"\n      ]\n    },\n    \"scenarios\": [\n      \"Add\",\n      \"Divide\"\n    ],\n    \"checks\": [\n      {\n        \"name\": \"test\",\n        \"run\": \"npm test\",\n        \"required\": true\n      }\n    ],\n    \"forbidden\": [",
       "note": "A second agent of the swarm claims task 1.2.",
       "name": "board claim"
     },
@@ -744,9 +744,9 @@
       "id": "board-release",
       "section": "build",
       "actor": "agent",
-      "command": "sdlc board release --claim db2eb26dd1de10a2685b4d65114f616e --note coder-2 took a different task --json",
+      "command": "sdlc board release --claim 9dc8f330e7f52d859d3cfd2272b6a1f1 --note coder-2 took a different task --json",
       "exit": 0,
-      "output": "{\n  \"claim\": {\n    \"id\": \"db2eb26dd1de10a2685b4d65114f616e\",\n    \"item\": \"basic-arithmetic#1.2\",\n    \"executor\": \"calc-swarm\",\n    \"agent\": \"coder-2\",\n    \"claimedAt\": \"2026-10-17T01:41:56.526Z\",\n    \"expiresAt\": \"2026-10-17T01:56:56.526Z\",\n    \"leaseSeconds\": 900,\n    \"state\": \"released\"\n  }\n}",
+      "output": "{\n  \"claim\": {\n    \"id\": \"9dc8f330e7f52d859d3cfd2272b6a1f1\",\n    \"item\": \"basic-arithmetic#1.2\",\n    \"executor\": \"calc-swarm\",\n    \"agent\": \"coder-2\",\n    \"claimedAt\": \"2026-10-17T07:50:11.532Z\",\n    \"expiresAt\": \"2026-10-17T08:05:11.532Z\",\n    \"leaseSeconds\": 900,\n    \"state\": \"released\"\n  }\n}",
       "note": "The claim is released with a note for the log: task 1.2 is open again.",
       "name": "board release"
     },
@@ -756,7 +756,7 @@
       "actor": "alice",
       "command": "sdlc board auction --change basic-arithmetic --task 1.2 --json",
       "exit": 0,
-      "output": "{\n  \"auction\": {\n    \"item\": \"basic-arithmetic#1.2\",\n    \"change\": \"basic-arithmetic\",\n    \"task\": \"1.2\",\n    \"openedAt\": \"2026-10-17T01:41:58.902Z\",\n    \"closesAt\": \"2026-10-17T01:46:58.902Z\",\n    \"bids\": []\n  }\n}",
+      "output": "{\n  \"auction\": {\n    \"item\": \"basic-arithmetic#1.2\",\n    \"change\": \"basic-arithmetic\",\n    \"task\": \"1.2\",\n    \"openedAt\": \"2026-10-17T07:50:13.866Z\",\n    \"closesAt\": \"2026-10-17T07:55:13.866Z\",\n    \"bids\": []\n  }\n}",
       "note": "Alice opens a timed auction for task 1.2.",
       "name": "board auction"
     },
@@ -766,7 +766,7 @@
       "actor": "agent",
       "command": "sdlc board bid --change basic-arithmetic --task 1.2 --executor calc-swarm --agent coder-2 --minutes 30 --json",
       "exit": 0,
-      "output": "{\n  \"bid\": {\n    \"executor\": \"calc-swarm\",\n    \"agent\": \"coder-2\",\n    \"minutes\": 30,\n    \"at\": \"2026-10-17T01:42:00.045Z\"\n  }\n}",
+      "output": "{\n  \"bid\": {\n    \"executor\": \"calc-swarm\",\n    \"agent\": \"coder-2\",\n    \"minutes\": 30,\n    \"at\": \"2026-10-17T07:50:14.962Z\"\n  }\n}",
       "note": "The swarm bids with an estimated completion time.",
       "name": "board bid"
     },
@@ -776,7 +776,7 @@
       "actor": "alice",
       "command": "sdlc board award --change basic-arithmetic --task 1.2 --executor calc-swarm --json",
       "exit": 0,
-      "output": "{\n  \"dispatch\": {\n    \"item\": \"basic-arithmetic#1.2\",\n    \"change\": \"basic-arithmetic\",\n    \"task\": \"1.2\",\n    \"executor\": \"calc-swarm\",\n    \"dispatchedAt\": \"2026-10-17T01:42:01.351Z\",\n    \"expiresAt\": \"2026-10-17T01:57:01.351Z\",\n    \"leaseSeconds\": 900\n  }\n}",
+      "output": "{\n  \"dispatch\": {\n    \"item\": \"basic-arithmetic#1.2\",\n    \"change\": \"basic-arithmetic\",\n    \"task\": \"1.2\",\n    \"executor\": \"calc-swarm\",\n    \"dispatchedAt\": \"2026-10-17T07:50:16.268Z\",\n    \"expiresAt\": \"2026-10-17T08:05:16.268Z\",\n    \"leaseSeconds\": 900\n  }\n}",
       "note": "Alice awards the auction to calc-swarm before the window closes.",
       "name": "board award"
     },
@@ -786,7 +786,7 @@
       "actor": "agent",
       "command": "sdlc verify --change basic-arithmetic",
       "exit": 0,
-      "output": "✓ test (1.0s)\nVerification passed - evidence recorded in openspec\\changes\\basic-arithmetic\\verification.md\nNext: agent — Run the multi-pass review (bugs, security, compliance with spec and plan) and record findings in review.md. (/sdlc:review)\n\nrunning test: npm test",
+      "output": "✓ test (0.9s)\nVerification passed - evidence recorded in openspec\\changes\\basic-arithmetic\\verification.md\nNext: agent — Run the multi-pass review (bugs, security, compliance with spec and plan) and record findings in review.md. (/sdlc:review)\n\nrunning test: npm test",
       "note": "Real checks, recorded evidence.",
       "name": "verify"
     },
@@ -806,7 +806,7 @@
       "actor": "agent",
       "command": "sdlc task check-result --change basic-arithmetic --branch sdlc/basic-arithmetic/1.1 --json",
       "exit": 0,
-      "output": "{\n  \"ok\": true,\n  \"base\": \"43feb2386d844d9e868adc1e4bc4c24cb989844d\",\n  \"commits\": [\n    {\n      \"sha\": \"14f91a689cfcf05f79b72549e11f632e66028792\",\n      \"subject\": \"Add pow\",\n      \"change\": \"basic-arithmetic\",\n      \"task\": \"1.1\",\n      \"agent\": \"calc-swarm/coder-1\"\n    }\n  ],\n  \"files\": [\n    \"src/calc.js\"\n  ],\n  \"problems\": [],\n  \"warnings\": [],\n  \"executors\": [\n    \"calc-swarm\"\n  ]\n}",
+      "output": "{\n  \"ok\": true,\n  \"base\": \"465b14cedfefeb8639ed2cf9d61f63b7acb2ccfd\",\n  \"commits\": [\n    {\n      \"sha\": \"6f8d6f5ae0023c33c871c974da2301cee44f3b8d\",\n      \"subject\": \"Add pow\",\n      \"change\": \"basic-arithmetic\",\n      \"task\": \"1.1\",\n      \"agent\": \"calc-swarm/coder-1\"\n    }\n  ],\n  \"files\": [\n    \"src/calc.js\"\n  ],\n  \"problems\": [],\n  \"warnings\": [],\n  \"executors\": [\n    \"calc-swarm\"\n  ]\n}",
       "note": "The returned branch checked: the commit trailers carry the change and the task, no forbidden path touched.",
       "name": "task check-result"
     },
@@ -814,9 +814,9 @@
       "id": "board-submit",
       "section": "build",
       "actor": "agent",
-      "command": "sdlc board submit --claim 3fe973ea07cf14789c3a12b715d378d0 --branch sdlc/basic-arithmetic/1.1 --json",
+      "command": "sdlc board submit --claim bd07ed24171241d5324f5c99c4416436 --branch sdlc/basic-arithmetic/1.1 --json",
       "exit": 0,
-      "output": "{\n  \"claim\": {\n    \"id\": \"3fe973ea07cf14789c3a12b715d378d0\",\n    \"item\": \"basic-arithmetic#1.1\",\n    \"executor\": \"calc-swarm\",\n    \"agent\": \"coder-1\",\n    \"claimedAt\": \"2026-10-17T01:41:54.102Z\",\n    \"expiresAt\": \"2026-10-17T01:56:55.226Z\",\n    \"leaseSeconds\": 900,\n    \"state\": \"submitted\"\n  },\n  \"result\": {\n    \"ok\": true,\n    \"base\": \"43feb2386d844d9e868adc1e4bc4c24cb989844d\",\n    \"commits\": [\n      {\n        \"sha\": \"14f91a689cfcf05f79b72549e11f632e66028792\",\n        \"subject\": \"Add pow\",\n        \"change\": \"basic-arithmetic\",\n        \"task\": \"1.1\",\n        \"agent\": \"calc-swarm/coder-1\"\n      }\n    ],\n    \"files\": [\n      \"src/calc.js\"\n    ],\n    \"problems\": [],\n    \"warnings\": [],\n    \"executors\": [\n      \"calc-swarm\"\n    ]\n  }\n}",
+      "output": "{\n  \"claim\": {\n    \"id\": \"bd07ed24171241d5324f5c99c4416436\",\n    \"item\": \"basic-arithmetic#1.1\",\n    \"executor\": \"calc-swarm\",\n    \"agent\": \"coder-1\",\n    \"claimedAt\": \"2026-10-17T07:50:09.152Z\",\n    \"expiresAt\": \"2026-10-17T08:05:10.276Z\",\n    \"leaseSeconds\": 900,\n    \"state\": \"submitted\"\n  },\n  \"result\": {\n    \"ok\": true,\n    \"base\": \"465b14cedfefeb8639ed2cf9d61f63b7acb2ccfd\",\n    \"commits\": [\n      {\n        \"sha\": \"6f8d6f5ae0023c33c871c974da2301cee44f3b8d\",\n        \"subject\": \"Add pow\",\n        \"change\": \"basic-arithmetic\",\n        \"task\": \"1.1\",\n        \"agent\": \"calc-swarm/coder-1\"\n      }\n    ],\n    \"files\": [\n      \"src/calc.js\"\n    ],\n    \"problems\": [],\n    \"warnings\": [],\n    \"executors\": [\n      \"calc-swarm\"\n    ]\n  }\n}",
       "note": "The agent returns the branch its claim named: the result check passes and the claim is submitted.",
       "name": "board submit"
     },
@@ -826,7 +826,7 @@
       "actor": "alice",
       "command": "sdlc board reopen --change basic-arithmetic --task 1.1 --reason The returned result does not cover the empty-input case. --json",
       "exit": 0,
-      "output": "{\n  \"claim\": {\n    \"id\": \"3fe973ea07cf14789c3a12b715d378d0\",\n    \"item\": \"basic-arithmetic#1.1\",\n    \"executor\": \"calc-swarm\",\n    \"agent\": \"coder-1\",\n    \"claimedAt\": \"2026-10-17T01:41:54.102Z\",\n    \"expiresAt\": \"2026-10-17T01:56:55.226Z\",\n    \"leaseSeconds\": 900,\n    \"state\": \"reopened\",\n    \"reason\": \"The returned result does not cover the empty-input case.\",\n    \"reopenedAt\": \"2026-10-17T01:42:10.952Z\",\n    \"escalate\": false\n  }\n}",
+      "output": "{\n  \"claim\": {\n    \"id\": \"bd07ed24171241d5324f5c99c4416436\",\n    \"item\": \"basic-arithmetic#1.1\",\n    \"executor\": \"calc-swarm\",\n    \"agent\": \"coder-1\",\n    \"claimedAt\": \"2026-10-17T07:50:09.152Z\",\n    \"expiresAt\": \"2026-10-17T08:05:10.276Z\",\n    \"leaseSeconds\": 900,\n    \"state\": \"reopened\",\n    \"reason\": \"The returned result does not cover the empty-input case.\",\n    \"reopenedAt\": \"2026-10-17T07:50:25.599Z\",\n    \"escalate\": false\n  }\n}",
       "note": "Alice rejects the submitted result with a reason; its claim is reopened without changing the task checkbox.",
       "name": "board reopen"
     },
@@ -896,7 +896,7 @@
       "actor": "carol",
       "command": "sdlc approve review --change basic-arithmetic",
       "exit": 0,
-      "output": "✓ review gate: Carol Hughes <carol@calc.example> approved as code-owner (deae0ff3a96f)\nSuggested commit message (its trailer ties the commit to this approval):\n  $ git commit -m \"chore(basic-arithmetic): approve the review gate\" -m \"SDLC-Approval: basic-arithmetic:review:deae0ff3a96f\"\nNext: agent — All gates are satisfied: archive the change to merge its delta specs into openspec/specs/. (/sdlc:archive)",
+      "output": "✓ review gate: Carol Hughes <carol@calc.example> approved as code-owner (3f51023be410)\nSuggested commit message (its trailer ties the commit to this approval):\n  $ git commit -m \"chore(basic-arithmetic): approve the review gate\" -m \"SDLC-Approval: basic-arithmetic:review:3f51023be410\"\nNext: agent — All gates are satisfied: archive the change to merge its delta specs into openspec/specs/. (/sdlc:archive)",
       "note": "Carol approves the review.",
       "name": "approve"
     },
@@ -926,7 +926,7 @@
       "actor": "alice",
       "command": "sdlc approve release --change basic-arithmetic",
       "exit": 0,
-      "output": "✓ release gate: Alice Walker <alice@calc.example> approved as release-manager (deae0ff3a96f)\nSuggested commit message (its trailer ties the commit to this approval):\n  $ git commit -m \"chore(basic-arithmetic): approve the release gate\" -m \"SDLC-Approval: basic-arithmetic:release:deae0ff3a96f\"\nNext: agent — All gates are satisfied: archive the change to merge its delta specs into openspec/specs/. (/sdlc:archive)",
+      "output": "✓ release gate: Alice Walker <alice@calc.example> approved as release-manager (3f51023be410)\nSuggested commit message (its trailer ties the commit to this approval):\n  $ git commit -m \"chore(basic-arithmetic): approve the release gate\" -m \"SDLC-Approval: basic-arithmetic:release:3f51023be410\"\nNext: agent — All gates are satisfied: archive the change to merge its delta specs into openspec/specs/. (/sdlc:archive)",
       "note": "Alice authorizes the release.",
       "name": "approve"
     },
@@ -936,7 +936,7 @@
       "actor": "bob",
       "command": "sdlc approvals verify",
       "exit": 0,
-      "output": "✓ basic-arithmetic/intent alice valid 50716b90 trailer: missing\n✓ basic-arithmetic/spec alice valid 02c182f4 trailer: missing\n✗ basic-arithmetic/plan bob wrong-signer 02c182f4 trailer: missing\n✓ basic-arithmetic/review carol valid 56b2bf8a trailer: missing\n✓ basic-arithmetic/release alice valid 9d6cbcbf trailer: missing\n✓ openspec/roles.yaml alice@calc.example bootstrap 46bb5cd9\n5 approvals checked, 1 invalid (warn: not blocking)\nSign commits: git config gpg.format ssh; git config user.signingkey <key>; git commit -S",
+      "output": "✓ basic-arithmetic/intent alice valid 2cb8d332 trailer: missing\n✓ basic-arithmetic/spec alice valid 2026497f trailer: missing\n✗ basic-arithmetic/plan bob wrong-signer 2026497f trailer: missing\n✓ basic-arithmetic/review carol valid 88b9c180 trailer: missing\n✓ basic-arithmetic/release alice valid 33fa2d0e trailer: missing\n✓ openspec/roles.yaml alice@calc.example bootstrap 05189252\n5 approvals checked, 1 invalid (warn: not blocking)\nSign commits: git config gpg.format ssh; git config user.signingkey <key>; git commit -S",
       "note": "Signed approvals check (warn mode): Alice and Carol sign; Bob's plan approval is unsigned, reported but not blocking.",
       "name": "approvals verify"
     },
@@ -946,7 +946,7 @@
       "actor": "alice",
       "command": "sdlc archive basic-arithmetic --yes",
       "exit": 0,
-      "output": "✓ archived basic-arithmetic → openspec\\changes\\archive\\2026-10-16-basic-arithmetic\n  specs: +1 added, ~0 modified, -0 removed, 0 renamed\nNext: agent — Start backlog item B3: Memory M+ / MR. (sdlc backlog start B3)",
+      "output": "✓ archived basic-arithmetic → openspec\\changes\\archive\\2026-10-17-basic-arithmetic\n  specs: +1 added, ~0 modified, -0 removed, 0 renamed\nNext: agent — Start backlog item B3: Memory M+ / MR. (sdlc backlog start B3)",
       "note": "The delta merges into the living spec; B1 closes.",
       "name": "archive"
     },
@@ -996,7 +996,7 @@
       "actor": "agent",
       "command": "sdlc new fix-rounding --kind bugfix --risk low",
       "exit": 0,
-      "output": "Created change fix-rounding (sdlc schema, bugfix, risk low, full track)\n  openspec\\changes\\fix-rounding\nNext: agent — Write intent (intent.md) for the intent gate. (/sdlc:intent)",
+      "output": "Created change fix-rounding (sdlc schema, bugfix, risk low, full track)\nSuggested track: lite (bugfix with low risk). A person can run: sdlc track set lite --change fix-rounding\n  openspec\\changes\\fix-rounding\nNext: agent — Write intent (intent.md) for the intent gate. (/sdlc:intent)",
       "note": "A bug fix: the CLI suggests lite; a person decides.",
       "name": "new"
     },
@@ -1116,7 +1116,7 @@
       "actor": "bob",
       "command": "sdlc status --markdown",
       "exit": 0,
-      "output": "### SDLC: `fix-rounding`\n\n**Stage:** Build (plan + implementation) · **Kind:** bugfix · **Risk:** low · **Track:** lite\n\n| Gate | Status | Approved by / reason |\n|---|---|---|\n| intent | blocked (optional) | missing artifacts: intent |\n| spec | blocked (optional) | missing artifacts: proposal, specs, design |\n| plan | blocked | missing artifacts: plan, tasks |\n| verify | blocked | waiting on the plan gate |\n| review | blocked | waiting on the plan gate |\n| release | waived (optional) | waived by Alice Walker <alice@calc.example>: Internal library, no release step |\n\n**Tasks:** 0/0 · **Verification:** never\n\n**Next:** Write plan (plan.md) for the plan gate. `sdlc instructions plan --change fix-rounding --json`\n\n---\n\n### SDLC: `voice-input`\n\n**Stage:** Plan (intent) · **Kind:** feature · **Risk:** medium · **Track:** full\n\n| Gate | Status | Approved by / reason |\n|---|---|---|\n| intent | rejected | rejected by Alice Walker <alice@calc.example>: Tills are in noisy shops |\n| spec | blocked | missing artifacts: proposal, specs, design |\n| plan | blocked | missing artifacts: plan, tasks |\n| verify | blocked | waiting on the intent gate |\n| review | blocked | waiting on the intent gate |\n| release | blocked (optional) | waiting on the intent gate |\n\n**Tasks:** 0/0 · **Verification:** never\n\n**Next:** The intent gate was rejected by Alice Walker <alice@calc.example>: Tills are in noisy shops. Revise the intent artifact(s), then ask for approval again.\n\n<sub>Generated by [sdlc](https://github.com/marin-ai-tech/sdlc) 0.22.3 · license: community (PolyForm-Noncommercial-1.0.0 + sdlc-Additional-Permissions-1.0)</sub>",
+      "output": "### SDLC: `fix-rounding`\n\n**Stage:** Build (plan + implementation) · **Kind:** bugfix · **Risk:** low · **Track:** lite\n\n| Gate | Status | Approved by / reason |\n|---|---|---|\n| intent | blocked (optional) | missing artifacts: intent |\n| spec | blocked (optional) | missing artifacts: proposal, specs, design |\n| plan | blocked | missing artifacts: plan, tasks |\n| verify | blocked | waiting on the plan gate |\n| review | blocked | waiting on the plan gate |\n| release | waived (optional) | waived by Alice Walker <alice@calc.example>: Internal library, no release step |\n\n**Tasks:** 0/0 · **Verification:** never\n\n**Next:** Write plan (plan.md) for the plan gate. `sdlc instructions plan --change fix-rounding --json`\n\n---\n\n### SDLC: `voice-input`\n\n**Stage:** Plan (intent) · **Kind:** feature · **Risk:** medium · **Track:** full\n\n| Gate | Status | Approved by / reason |\n|---|---|---|\n| intent | rejected | rejected by Alice Walker <alice@calc.example>: Tills are in noisy shops |\n| spec | blocked | missing artifacts: proposal, specs, design |\n| plan | blocked | missing artifacts: plan, tasks |\n| verify | blocked | waiting on the intent gate |\n| review | blocked | waiting on the intent gate |\n| release | blocked (optional) | waiting on the intent gate |\n\n**Tasks:** 0/0 · **Verification:** never\n\n**Next:** The intent gate was rejected by Alice Walker <alice@calc.example>: Tills are in noisy shops. Revise the intent artifact(s), then ask for approval again.\n\n<sub>Generated by [sdlc](https://github.com/marin-ai-tech/sdlc) 0.22.4 · license: community (PolyForm-Noncommercial-1.0.0 + sdlc-Additional-Permissions-1.0)</sub>",
       "note": "A report for the pull request.",
       "name": "status"
     },
@@ -1126,7 +1126,7 @@
       "actor": "alice",
       "command": "sdlc report --format md",
       "exit": 0,
-      "output": "# till-calculator SDLC progress (all time to 2026-10-17T01:43:12.541Z)\n\n2 active · 1 archived · 1 blocked · 0 awaiting a person\n\n## Stages\n\n| Stage | Active |\n| --- | ---: |\n| Plan (intent) | 1 |\n| Design (requirements + design spec) | 0 |\n| Build (plan + implementation) | 1 |\n| Test (verification evidence) | 0 |\n| Deploy (review + release) | 0 |\n| Maintain (close the loop) | 0 |\n\n## Changes\n\n| Change | Stage | Tasks | Verification | Next |\n| --- | --- | --- | --- | --- |\n| fix-rounding | Build (plan + implementation) | 0/0 | never | Write plan (plan.md) for the plan gate. |\n| voice-input | Plan (intent) | 0/0 | never | The intent gate was rejected by Alice Walker &lt;alice@calc.example&gt;: Tills are in noisy shops. Revise the intent artifact(s), then ask for approval again. |\n| basic-arithmetic | Archived | 2/2 | passed | Change is archived. |\n\n## Task board\n\n| Change | Task | Status | Executor | Agent | Lease end | Attempts | Last reason |\n| --- | --- | --- | --- | --- | --- | ---: | --- |\n\n### By executor\n\n| Executor | Claimed | Submitted |\n| --- | ---: | ---: |\n| calc-swarm | 0 | 0 |\n\n## Lifecycle diagrams\n\n```mermaid\nflowchart LR\n  subgraph chg_fix-rounding[\"fix-rounding\"]\n    direction LR",
+      "output": "# till-calculator SDLC progress (all time to 2026-10-17T07:51:25.728Z)\n\n2 active · 1 archived · 1 blocked · 0 awaiting a person\n\n## Stages\n\n| Stage | Active |\n| --- | ---: |\n| Plan (intent) | 1 |\n| Design (requirements + design spec) | 0 |\n| Build (plan + implementation) | 1 |\n| Test (verification evidence) | 0 |\n| Deploy (review + release) | 0 |\n| Maintain (close the loop) | 0 |\n\n## Changes\n\n| Change | Stage | Tasks | Verification | Next |\n| --- | --- | --- | --- | --- |\n| fix-rounding | Build (plan + implementation) | 0/0 | never | Write plan (plan.md) for the plan gate. |\n| voice-input | Plan (intent) | 0/0 | never | The intent gate was rejected by Alice Walker &lt;alice@calc.example&gt;: Tills are in noisy shops. Revise the intent artifact(s), then ask for approval again. |\n| basic-arithmetic | Archived | 2/2 | passed | Change is archived. |\n\n## Task board\n\n| Change | Task | Status | Executor | Agent | Lease end | Attempts | Last reason |\n| --- | --- | --- | --- | --- | --- | ---: | --- |\n\n### By executor\n\n| Executor | Claimed | Submitted |\n| --- | ---: | ---: |\n| calc-swarm | 0 | 0 |\n\n## Lifecycle diagrams\n\n```mermaid\nflowchart LR\n  subgraph chg_fix-rounding[\"fix-rounding\"]\n    direction LR",
       "note": "The progress report with Mermaid diagrams.",
       "name": "report"
     },
@@ -1146,7 +1146,7 @@
       "actor": "alice",
       "command": "sdlc audit",
       "exit": 0,
-      "output": "SDLC metrics across 3 change(s) (1 archived) · sdlc 0.22.3, license: community (PolyForm-Noncommercial-1.0.0 + sdlc-Additional-Permissions-1.0)\n  median hours: intent→spec 0 · spec→plan 0 · plan→verified 0 · verified→review 0 · total 0\n  verification first-pass rate: 1; rejections 1; waivers 1 (+0 by policy)\n  agent commits: 0 of 13 (SDLC-Agent trailer)\n  agent log events: 31 of 61\n  median wait for a person (seconds): intent 3 · spec 4 · plan 17 · review 3; rework reasons: missing-requirement 1\n  people's participation (3 changes), planned / actual: gate decisions 10; approvals 10 / 7; reworks 1, takeovers 1, waivers 1, answers 1; waits for a person 0 h\n    fix-rounding: gates plan, review; approvals 2 / 0; reworks 0, takeovers 0, waivers 1, answers 0; waits 0 h\n    voice-input: gates intent, spec, plan, review; approvals 4 / 0; reworks 0, takeovers 0, waivers 0, answers 0; waits 0 h\n    basic-arithmetic: gates intent, spec, plan, review; approvals 4 / 7; reworks 1, takeovers 1, waivers 0, answers 1; waits 0 h\n  recorded with sdlc 0.22.3; licenses: community (PolyForm-Noncommercial-1.0.0 + sdlc-Additional-Permissions-1.0)",
+      "output": "SDLC metrics across 3 change(s) (1 archived) · sdlc 0.22.4, license: community (PolyForm-Noncommercial-1.0.0 + sdlc-Additional-Permissions-1.0)\n  median hours: intent→spec 0 · spec→plan 0 · plan→verified 0 · verified→review 0 · total 0\n  verification first-pass rate: 1; rejections 1; waivers 1 (+0 by policy)\n  agent commits: 0 of 13 (SDLC-Agent trailer)\n  agent log events: 31 of 61\n  median wait for a person (seconds): intent 3 · spec 4 · plan 16 · review 3; rework reasons: missing-requirement 1\n  people's participation (3 changes), planned / actual: gate decisions 10; approvals 10 / 7; reworks 1, takeovers 1, waivers 1, answers 1; waits for a person 0 h\n    fix-rounding: gates plan, review; approvals 2 / 0; reworks 0, takeovers 0, waivers 1, answers 0; waits 0 h\n    voice-input: gates intent, spec, plan, review; approvals 4 / 0; reworks 0, takeovers 0, waivers 0, answers 0; waits 0 h\n    basic-arithmetic: gates intent, spec, plan, review; approvals 4 / 7; reworks 1, takeovers 1, waivers 0, answers 1; waits 0 h\n  recorded with sdlc 0.22.4; licenses: community (PolyForm-Noncommercial-1.0.0 + sdlc-Additional-Permissions-1.0)",
       "note": "Lead times and first-pass rate.",
       "name": "audit"
     },
@@ -1156,7 +1156,7 @@
       "actor": "alice",
       "command": "sdlc log --limit 15",
       "exit": 0,
-      "output": "(last 15 of 61 entries; --limit to see more)\n2026-10-17T01:42:20.093Z  gate.review.awaiting       basic-arithmetic  - sha256:deae0ff3a96f174c6b0ad43a6d4536bc08e797af8429c7f3d31eab554e3f8cd4 [sdlc 0.22.3 · community]\n2026-10-17T01:42:23.191Z  gate.review.approved       basic-arithmetic Carol Hughes <carol@calc.example> - role code-owner [sdlc 0.22.3 · community]\n2026-10-17T01:42:29.391Z  gate.release.approved      basic-arithmetic Alice Walker <alice@calc.example> - role release-manager [sdlc 0.22.3 · community]\n2026-10-17T01:42:37.207Z  change.archived            basic-arithmetic Alice Walker <alice@calc.example> - archived as 2026-10-16-basic-arithmetic [sdlc 0.22.3 · community]\n2026-10-17T01:42:37.215Z  backlog.done               basic-arithmetic Alice Walker <alice@calc.example> - B1 archived as 2026-10-16-basic-arithmetic [sdlc 0.22.3 · community]\n2026-10-17T01:42:47.025Z  change.created             fix-rounding Bob Turner <bob@calc.example> (agent claude-code) - schema sdlc, full track [sdlc 0.22.3 · community]\n2026-10-17T01:42:49.170Z  track.set                  fix-rounding Bob Turner <bob@calc.example> - full → lite: one-line fix [sdlc 0.22.3 · community]\n2026-10-17T01:42:51.164Z  tests.locked               fix-rounding Bob Turner <bob@calc.example> (agent claude-code) [sdlc 0.22.3 · community]\n2026-10-17T01:42:53.612Z  tests.unlocked             fix-rounding Bob Turner <bob@calc.example> [sdlc 0.22.3 · community]\n2026-10-17T01:42:55.765Z  change.created             voice-input Bob Turner <bob@calc.example> (agent claude-code) - schema sdlc, full track [sdlc 0.22.3 · community]\n2026-10-17T01:42:58.637Z  gate.intent.rejected       voice-input Alice Walker <alice@calc.example> - Tills are in noisy shops [sdlc 0.22.3 · community]\n2026-10-17T01:43:00.828Z  gate.release.waived        fix-rounding Alice Walker <alice@calc.example> - Internal library, no release step [sdlc 0.22.3 · community]\n2026-10-17T01:43:02.830Z  deferred.closed            basic-arithmetic  - D1 Division by zero shows an error [sdlc 0.22.3 · community]\n2026-10-17T01:43:04.164Z  backlog.done               Alice Walker <alice@calc.example> - B3 Memory M+ / MR [sdlc 0.22.3 · community]\n2026-10-17T01:43:05.425Z  backlog.imported           Alice Walker <alice@calc.example> (agent claude-code) - 1 epics, 2 items [sdlc 0.22.3 · community]",
+      "output": "(last 15 of 61 entries; --limit to see more)\n2026-10-17T07:50:34.581Z  gate.review.awaiting       basic-arithmetic  - sha256:3f51023be410c73488a732b3e04c954571701e4a1a7eced8a2873305cb36a9df [sdlc 0.22.4 · community]\n2026-10-17T07:50:37.614Z  gate.review.approved       basic-arithmetic Carol Hughes <carol@calc.example> - role code-owner [sdlc 0.22.4 · community]\n2026-10-17T07:50:43.926Z  gate.release.approved      basic-arithmetic Alice Walker <alice@calc.example> - role release-manager [sdlc 0.22.4 · community]\n2026-10-17T07:50:51.617Z  change.archived            basic-arithmetic Alice Walker <alice@calc.example> - archived as 2026-10-17-basic-arithmetic [sdlc 0.22.4 · community]\n2026-10-17T07:50:51.625Z  backlog.done               basic-arithmetic Alice Walker <alice@calc.example> - B1 archived as 2026-10-17-basic-arithmetic [sdlc 0.22.4 · community]\n2026-10-17T07:51:01.203Z  change.created             fix-rounding Bob Turner <bob@calc.example> (agent claude-code) - schema sdlc, full track [sdlc 0.22.4 · community]\n2026-10-17T07:51:03.233Z  track.set                  fix-rounding Bob Turner <bob@calc.example> - full → lite: one-line fix [sdlc 0.22.4 · community]\n2026-10-17T07:51:05.137Z  tests.locked               fix-rounding Bob Turner <bob@calc.example> (agent claude-code) [sdlc 0.22.4 · community]\n2026-10-17T07:51:07.458Z  tests.unlocked             fix-rounding Bob Turner <bob@calc.example> [sdlc 0.22.4 · community]\n2026-10-17T07:51:09.640Z  change.created             voice-input Bob Turner <bob@calc.example> (agent claude-code) - schema sdlc, full track [sdlc 0.22.4 · community]\n2026-10-17T07:51:12.371Z  gate.intent.rejected       voice-input Alice Walker <alice@calc.example> - Tills are in noisy shops [sdlc 0.22.4 · community]\n2026-10-17T07:51:14.481Z  gate.release.waived        fix-rounding Alice Walker <alice@calc.example> - Internal library, no release step [sdlc 0.22.4 · community]\n2026-10-17T07:51:16.412Z  deferred.closed            basic-arithmetic  - D1 Division by zero shows an error [sdlc 0.22.4 · community]\n2026-10-17T07:51:17.705Z  backlog.done               Alice Walker <alice@calc.example> - B3 Memory M+ / MR [sdlc 0.22.4 · community]\n2026-10-17T07:51:18.922Z  backlog.imported           Alice Walker <alice@calc.example> (agent claude-code) - 1 epics, 2 items [sdlc 0.22.4 · community]",
       "note": "Who did what, with the sdlc version and license.",
       "name": "log"
     },
@@ -1196,7 +1196,7 @@
       "actor": "agent",
       "command": "sdlc inbox list --json",
       "exit": 0,
-      "output": "{\n  \"items\": [\n    {\n      \"id\": \"20261017T014326118Z-ci-green-4729dc\",\n      \"change\": \"fix-rounding\",\n      \"check\": \"ci-green\",\n      \"server\": \"ci\",\n      \"tool\": \"pipeline_status\",\n      \"ok\": true,\n      \"result\": {\n        \"status\": \"success\",\n        \"ref\": \"a9f6de164e96ab0ec0a1cddd002ec9a9f7d7cdb8\",\n        \"token\": \"absent\"\n      },\n      \"at\": \"2026-10-17T01:43:26.118Z\",\n      \"done\": false\n    }\n  ]\n}",
+      "output": "{\n  \"items\": [\n    {\n      \"id\": \"20261017T075139262Z-ci-green-a1cde1\",\n      \"change\": \"fix-rounding\",\n      \"check\": \"ci-green\",\n      \"server\": \"ci\",\n      \"tool\": \"pipeline_status\",\n      \"ok\": true,\n      \"result\": {\n        \"status\": \"success\",\n        \"ref\": \"700eaf8edbe2437631b97746f0ad4bfe417c78ed\",\n        \"token\": \"absent\"\n      },\n      \"at\": \"2026-10-17T07:51:39.262Z\",\n      \"done\": false\n    }\n  ]\n}",
       "note": "The agent finds the result in its inbox.",
       "name": "inbox list"
     },
@@ -1216,7 +1216,7 @@
       "actor": "agent",
       "command": "sdlc hook session-start",
       "exit": 0,
-      "output": "{\"hookSpecificOutput\":{\"hookEventName\":\"SessionStart\",\"additionalContext\":\"SDLC harness (sdlc 0.22.3, license: community (PolyForm-Noncommercial-1.0.0 + sdlc-Additional-Permissions-1.0)): active changes in openspec/changes (run `sdlc status` for details).\\n- fix-rounding: stage build; next (agent): Write plan (plan.md) for the plan gate.\\n- voice-input: stage plan; next (agent): The intent gate was rejected by Alice Walker <alice@calc.example>: Tills are in noisy shops. Revise the intent artifact(s), then ask for approval again.\\n- inbox: fix-rounding, check ci-green: ok (once read: `sdlc inbox done 20261017T014326118Z-ci-green-4729dc`)\\nEnforcement mode is warn. Gate approvals are made by people with `sdlc approve`, never by the agent.\\nThe user can ask how sdlc works (stages, approvals, roles, why the hook said no): answer from `sdlc guide`.\"}}",
+      "output": "{\"hookSpecificOutput\":{\"hookEventName\":\"SessionStart\",\"additionalContext\":\"SDLC harness (sdlc 0.22.4, license: community (PolyForm-Noncommercial-1.0.0 + sdlc-Additional-Permissions-1.0)): active changes in openspec/changes (run `sdlc status` for details).\\n- fix-rounding: stage build; next (agent): Write plan (plan.md) for the plan gate.\\n- voice-input: stage plan; next (agent): The intent gate was rejected by Alice Walker <alice@calc.example>: Tills are in noisy shops. Revise the intent artifact(s), then ask for approval again.\\n- inbox: fix-rounding, check ci-green: ok (once read: `sdlc inbox done 20261017T075139262Z-ci-green-a1cde1`)\\nEnforcement mode is warn. Gate approvals are made by people with `sdlc approve`, never by the agent.\\nThe user can ask how sdlc works (stages, approvals, roles, why the hook said no): answer from `sdlc guide`.\"}}",
       "note": "What the agent learns when a session starts.",
       "name": "hook"
     },
@@ -1224,9 +1224,9 @@
       "id": "inbox-done",
       "section": "visibility",
       "actor": "agent",
-      "command": "sdlc inbox done 20261017T014326118Z-ci-green-4729dc",
+      "command": "sdlc inbox done 20261017T075139262Z-ci-green-a1cde1",
       "exit": 0,
-      "output": "Marked read: 20261017T014326118Z-ci-green-4729dc",
+      "output": "Marked read: 20261017T075139262Z-ci-green-a1cde1",
       "note": "Read: the agent marks the item done.",
       "name": "inbox done"
     },
@@ -1276,7 +1276,7 @@
       "actor": "agent",
       "command": "sdlc mcp serve",
       "exit": 0,
-      "output": "{\"result\":{\"protocolVersion\":\"2025-06-18\",\"capabilities\":{\"tools\":{},\"resources\":{}},\"serverInfo\":{\"name\":\"sdlc\",\"version\":\"0.22.3\"}},\"jsonrpc\":\"2.0\",\"id\":0}\n\n[sdlc mcp] serving till-calculator over stdio (version 0.22.3)",
+      "output": "{\"result\":{\"protocolVersion\":\"2025-06-18\",\"capabilities\":{\"tools\":{},\"resources\":{}},\"serverInfo\":{\"name\":\"sdlc\",\"version\":\"0.22.4\"}},\"jsonrpc\":\"2.0\",\"id\":0}\n\n[sdlc mcp] serving till-calculator over stdio (version 0.22.4)",
       "note": "Other AI systems read the process over MCP.",
       "name": "mcp serve"
     },
@@ -1336,7 +1336,7 @@
       "actor": "agent",
       "command": "sdlc team sync",
       "exit": 0,
-      "output": "Pack tillkit (60ec12384b1d00cdd22bedcd6713bc46112a8e43 60ec12384b1d): 0 roles, 0 skills\npack tillkit: 1 lenses, 0 workflows, 0 checks - not in effect until a person runs `sdlc team accept --pack tillkit`\nanalyst: a draft exists, left as it is\narchitect: a draft exists, left as it is\ndeveloper: a draft exists, left as it is\ntester: already accepted, left as it is\nreviewer: a draft exists, left as it is",
+      "output": "Pack tillkit (b74ad106cf74fac39f9f529444d80ccbf89519e4 b74ad106cf74): 0 roles, 0 skills\npack tillkit: 1 lenses, 0 workflows, 0 checks - not in effect until a person runs `sdlc team accept --pack tillkit`\nanalyst: a draft exists, left as it is\narchitect: a draft exists, left as it is\ndeveloper: a draft exists, left as it is\ntester: already accepted, left as it is\nreviewer: a draft exists, left as it is",
       "note": "The company pack tillkit brings a review lens about money; it is not in effect yet.",
       "name": "team sync"
     },
@@ -1346,7 +1346,7 @@
       "actor": "alice",
       "command": "sdlc team accept --pack tillkit",
       "exit": 0,
-      "output": "Pack tillkit (60ec12384b1d00cdd22bedcd6713bc46112a8e43 60ec12384b1d) accepted; recorded in openspec/.sdlc/team.json.\n  review lenses: tillkit-money\n  workflows: -",
+      "output": "Pack tillkit (b74ad106cf74fac39f9f529444d80ccbf89519e4 b74ad106cf74) accepted; recorded in openspec/.sdlc/team.json.\n  review lenses: tillkit-money\n  workflows: -",
       "note": "Alice, the maintainer, accepts the pack: from now on every review must cover the lens tillkit-money.",
       "name": "team accept"
     },
@@ -1376,7 +1376,7 @@
       "actor": "agent",
       "command": "sdlc backlog add Export prototype --outcome Export sums --accept Exported sums are readable --json",
       "exit": 0,
-      "output": "{\n  \"item\": {\n    \"id\": \"B9\",\n    \"status\": \"open\",\n    \"title\": \"Export prototype\",\n    \"acceptance\": [\n      \"Exported sums are readable\"\n    ],\n    \"dependsOn\": [],\n    \"line\": 69,\n    \"ready\": true,\n    \"blockedBy\": [],\n    \"missing\": [],\n    \"outcome\": \"Export sums\"\n  },\n  \"harness\": {\n    \"tool\": \"sdlc\",\n    \"version\": \"0.22.3\",\n    \"license\": \"community (PolyForm-Noncommercial-1.0.0 + sdlc-Additional-Permissions-1.0)\"\n  }\n}",
+      "output": "{\n  \"item\": {\n    \"id\": \"B9\",\n    \"status\": \"open\",\n    \"title\": \"Export prototype\",\n    \"acceptance\": [\n      \"Exported sums are readable\"\n    ],\n    \"dependsOn\": [],\n    \"line\": 69,\n    \"ready\": true,\n    \"blockedBy\": [],\n    \"missing\": [],\n    \"outcome\": \"Export sums\"\n  },\n  \"harness\": {\n    \"tool\": \"sdlc\",\n    \"version\": \"0.22.4\",\n    \"license\": \"community (PolyForm-Noncommercial-1.0.0 + sdlc-Additional-Permissions-1.0)\"\n  }\n}",
       "note": "The agent adds a ready item before trying an existing change.",
       "name": "backlog add"
     },

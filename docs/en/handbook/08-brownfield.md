@@ -133,6 +133,8 @@ Steven installs the harness without changing the code, and reads what `sdlc init
 ### You are done when
 
 - `openspec/sdlc.yaml` exists with `enforcement: mode: warn` and the three verify commands.
+- If `pretest` or `posttest` already runs a script such as lint, init keeps only the test command and reports which
+  hook runs the omitted script. With no such hook, each detected script remains a separate verify command.
 - `.claude/settings.json` has the `SessionStart`, `PreToolUse` and `Stop` hooks.
 - `sdlc doctor` shows `✓ verify commands  build, lint, test` and `✓ claude hooks`.
 

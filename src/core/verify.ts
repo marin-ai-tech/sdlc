@@ -254,9 +254,20 @@ export function detectVerifyCommands(root: string): DetectedCommand[] {
         : exists(path.join(root, 'yarn.lock')) ? 'yarn'
           : exists(path.join(root, 'bun.lockb')) || exists(path.join(root, 'bun.lock')) ? 'bun' : 'npm';
       const cmd = (script: string) => (runner === 'npm' ? (script === 'test' ? 'npm test' : `npm run ${script}`) : `${runner} run ${script}`);
+      const hooks = scripts.test ? ['pretest', 'posttest'].filter((hook) => typeof scripts[hook] === 'string') : [];
+      const runsInHook = (script: string): string | undefined => hooks.find((hook) => {
+        const pattern = new RegExp(
+          `(?:^|&&|[;|])\\s*(?:npm|pnpm|yarn|bun)\\s+(?:run\\s+)?${script}(?=\\s|[;&|]|$)`
+        );
+        return pattern.test(scripts[hook]);
+      });
       for (const script of ['build', 'typecheck', 'lint', 'test']) {
         if (scripts[script] && !/no test specified/.test(scripts[script])) {
-          found.push({ name: script, run: cmd(script), why: `package.json scripts.${script}` });
+          if (script !== 'test' && runsInHook(script)) continue;
+          const included = script === 'test' ? ['build', 'typecheck', 'lint'].filter(runsInHook) : [];
+          const note = included.map((item) => `${item} runs in ${runsInHook(item)} of test`).join('; ');
+          found.push({ name: script, run: cmd(script),
+            why: `package.json scripts.${script}${note ? `; ${note}` : ''}` });
         }
       }
     } catch {

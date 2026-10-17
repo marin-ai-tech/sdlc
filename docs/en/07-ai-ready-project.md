@@ -33,6 +33,10 @@ openspec/
 
 `sdlc layout check [--json]` reports each role as canonical, mapped, alias, or missing. A path is a candidate only when it matches the canonical path, a configured mapping, or an exact alias (case-insensitively). `ready` means every required role is present. `score` is the rounded percentage of all ten roles present, from 0 to 100; optional roles affect the score but not readiness. A configured mapping takes precedence, and a mapping to a missing path produces a warning and a missing role.
 
+`sdlc layout scaffold` fills the project name in generated documents from `package.json` (without its scope),
+`pyproject.toml` `[project]`, `Cargo.toml` `[package]`, or the final segment of a `go.mod` module. If no manifest
+supplies a name, it uses the folder name.
+
 ## 7.3. AGENTS.md and CLAUDE.md
 
 `AGENTS.md` is the main agent file, with links to the actual project documents. OpenCode reads it directly. `CLAUDE.md` is a thin Claude Code wrapper: its first line is `@AGENTS.md`, followed only by Claude-specific notes. Keep shared rules in the main guide so every agent follows the same project policy.

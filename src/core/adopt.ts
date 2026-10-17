@@ -15,6 +15,7 @@ interface AdoptPerson {
   name: string;
   email: string;
   commits: number;
+  lastCommit: string | null;
   /** `identity`: the person running the command (git user.email), added so the roles have a holder. */
   sources: ('git' | 'codeowners' | 'identity')[];
 }
@@ -101,17 +102,21 @@ function isBot(name: string, email: string): boolean {
 
 function gitPeople(root: string): Map<string, AdoptPerson> {
   const people = new Map<string, AdoptPerson>();
-  const result = git(root, ['log', '--format=%aN%x1f%aE']);
+  const result = git(root, ['log', '--format=%aN%x1f%aE%x1f%aI']);
   if (!result.ok) return people;
   for (const row of result.stdout.split('\n')) {
-    const [name, rawEmail] = row.split('\x1f');
+    const [name, rawEmail, timestamp] = row.split('\x1f');
     const email = rawEmail?.trim().toLowerCase();
     if (!email || !EMAIL.test(email) || isBot(name ?? '', email)) continue;
     const person = people.get(email);
     if (person) {
       person.commits++;
+      if (timestamp && timestamp.slice(0, 10) > (person.lastCommit ?? '')) {
+        person.lastCommit = timestamp.slice(0, 10);
+      }
     } else {
-      people.set(email, { id: '', name: name?.trim() || email, email, commits: 1, sources: ['git'] });
+      people.set(email, { id: '', name: name?.trim() || email, email, commits: 1,
+        lastCommit: timestamp?.slice(0, 10) ?? null, sources: ['git'] });
     }
   }
   return people;
@@ -149,7 +154,7 @@ function noteOwner(people: Map<string, AdoptPerson>, email: string): void {
   if (isBot('', email)) return;
   const person = people.get(email);
   if (!person) {
-    people.set(email, { id: '', name: email, email, commits: 0, sources: ['codeowners'] });
+    people.set(email, { id: '', name: email, email, commits: 0, lastCommit: null, sources: ['codeowners'] });
   } else if (!person.sources.includes('codeowners')) {
     person.sources.push('codeowners');
   }
@@ -188,7 +193,10 @@ function addRunner(root: string, people: Map<string, AdoptPerson>): string | und
   const email = identity.email?.trim().toLowerCase();
   if (!email || !EMAIL.test(email)) return undefined;
   if (!people.has(email)) {
-    people.set(email, { id: '', name: identity.name?.trim() || email, email, commits: 0, sources: ['identity'] });
+    people.set(email, { id: '', name: identity.name?.trim() || email, email, commits: 0,
+      lastCommit: null, sources: ['identity'] });
+  } else if (!people.get(email)!.sources.includes('identity')) {
+    people.get(email)!.sources.push('identity');
   }
   return email;
 }
@@ -286,6 +294,7 @@ export function analyzeAdoption(ctx: ProjectContext) {
     stack: stack(ctx.root),
     ci,
     people,
+    inactiveCount: people.filter((person) => !activePerson(person)).length,
     owners_unresolved: owners.unresolved,
     owners_scoped: owners.scoped,
     proposal,
@@ -295,7 +304,7 @@ export function analyzeAdoption(ctx: ProjectContext) {
 }
 
 function writeRoles(file: string, proposal: AdoptRoles): void {
-  const people = Object.fromEntries(proposal.people.map((person) => [
+  const people = Object.fromEntries(proposal.people.filter(activePerson).map((person) => [
     person.id, { name: person.name, emails: [person.email] },
   ]));
   const separation = {
@@ -304,6 +313,14 @@ function writeRoles(file: string, proposal: AdoptRoles): void {
     max_gates_per_person: DEFAULT_SEPARATION.maxGatesPerPerson,
   };
   writeYaml(file, { version: 1, signing: 'off', people, roles: proposal.roles, separation });
+}
+
+function activePerson(person: AdoptPerson): boolean {
+  if (person.sources.includes('identity') || person.sources.includes('codeowners')) return true;
+  if (!person.lastCommit) return false;
+  const cutoff = new Date();
+  cutoff.setFullYear(cutoff.getFullYear() - 1);
+  return person.lastCommit >= cutoff.toISOString().slice(0, 10);
 }
 
 export function applyAdoption(ctx: ProjectContext, proposal: AdoptProposal): boolean {

@@ -49,8 +49,10 @@ function showDraft(draft: Draft): void {
     line(t('adopt.tests', { value: file }));
   }
   for (const person of draft.people) {
-    line(t('adopt.person', { name: person.name, email: person.email }));
+    line(t('adopt.person', { name: person.name, email: person.email,
+      lastCommit: person.lastCommit ?? t('adopt.noCommit') }));
   }
+  line(t('adopt.inactive', { count: draft.inactiveCount }));
   showRoles(draft);
   showUnresolved(draft);
   line(t('adopt.apply', { command: draft.apply }));

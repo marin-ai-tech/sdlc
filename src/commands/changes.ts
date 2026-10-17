@@ -153,6 +153,12 @@ export async function newCommand(name: string, opts: NewOptions): Promise<void> 
       return;
     }
     line(c.bold(t('change.created', { name })) + c.dim(t('change.createdMeta', { schema, kind, risk, track })));
+    if (trackSuggestion) {
+      const reason = agentRequestedLite ? t('change.agentRequestedLite') : t('change.lowRiskKind', { kind });
+      line(t('change.trackSuggestion', { track: trackSuggestion.track,
+        reason,
+        command: `${config.cli} track set ${trackSuggestion.track} --change ${name}` }));
+    }
     if (agentRequestedLite) warn(t('warn.agentCannotLite', { cmd: `${config.cli} track set lite --change ${name}` }));
     line(`  ${path.relative(process.cwd(), changeDir) || changeDir}`);
     emitNextHint(ctx, name);

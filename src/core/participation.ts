@@ -52,11 +52,19 @@ function plannedGate(config: SdlcConfig, track: ChangeState['track'], gate: Appr
 }
 
 /** The gates the track requires and their approvals. */
-export function plannedParticipation(config: SdlcConfig, track: ChangeState['track']): PlannedParticipation {
+export function plannedParticipation(
+  config: SdlcConfig, track: ChangeState['track'], risk: ChangeState['risk'] = 'medium'
+): PlannedParticipation {
   const gates = APPROVAL_GATES.filter((gate) => plannedGate(config, track, gate));
   let approvals = 0;
   for (const gate of gates) {
     approvals += config.gates[gate].minApprovals ?? 1;
+    if (risk === 'high') {
+      const extras = config.gates[gate].highRiskApprovers.filter(
+        (role) => !config.gates[gate].approvers.includes(role)
+      );
+      approvals += new Set(extras).size;
+    }
   }
   return { gates: [...gates], approvals };
 }
@@ -104,7 +112,7 @@ export function participationOf(
   waits: Record<string, { seconds: number }>,
 ): Participation {
   return {
-    planned: plannedParticipation(config, state.track),
+    planned: plannedParticipation(config, state.track, state.risk),
     actual: actualParticipation(state, log, waits),
   };
 }
