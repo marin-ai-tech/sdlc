@@ -39,6 +39,7 @@ import { rolesCheck, rolesMigrate, rolesWho } from '../commands/roles.js';
 import { ciInitCommand } from '../commands/ci.js';
 import { teamAcceptCommand, teamCheckCommand, teamListCommand, teamSyncCommand } from '../commands/team.js';
 import { adoptCommand } from '../commands/adopt.js';
+import { proposeConfig, showConfig, applyConfig, dismissConfig } from '../commands/config-proposals.js';
 import { traceCommand } from '../commands/trace.js';
 import {
   taskCheckResultCommand, taskExecutorTokenCommand, taskExecutorsCommand, taskExportCommand,
@@ -104,6 +105,21 @@ export function buildProgram(): Command {
     .option('--apply', 'apply the adoption draft (human only)')
     .option('--json', 'output JSON')
     .action((opts) => adoptCommand(opts));
+  const config = program.command('config').description(cmdDesc('cmd.config'));
+  config.command('propose').description(cmdDesc('cmd.config.propose'))
+    .option('--set <key=value>', 'proposed setting', (value, values: string[]) => [...values, value], [])
+    .option('--file <path>', 'full proposed file')
+    .option('--target <target>', 'sdlc or roles', 'sdlc')
+    .requiredOption('--reason <text>', 'reason for the proposal')
+    .option('--json', 'output JSON').action((opts) => proposeConfig(opts));
+  config.command('show [id]').description(cmdDesc('cmd.config.show'))
+    .option('--json', 'output JSON').action((id, opts) => showConfig(id, opts));
+  config.command('apply <id>').description(cmdDesc('cmd.config.apply'))
+    .option('--yes', 'confirm a weakening').option('--json', 'output JSON')
+    .action((id, opts) => applyConfig(id, opts));
+  config.command('dismiss <id>').description(cmdDesc('cmd.config.dismiss'))
+    .requiredOption('--note <text>', 'reason for dismissal').option('--json', 'output JSON')
+    .action((id, opts) => dismissConfig(id, opts));
   const roles = program.command('roles').description(cmdDesc('cmd.roles'));
   roles.command('check').description(cmdDesc('cmd.roles.check'))
     .option('--change <id>', 'change id').option('--base <ref>', 'base ref').option('--json', 'output JSON')

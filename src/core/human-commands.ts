@@ -1,5 +1,6 @@
 export const HUMAN_COMMANDS = [
   'approve', 'reject', 'rework', 'waive', 'drop', 'tests unlock', 'track set',
+  'config apply', 'config dismiss',
   'backlog move', 'backlog drop', 'license set', 'roles migrate', 'takeover', 'release-control',
   // Removing the harness switches the guard off: a person's decision (B41).
   'uninstall',

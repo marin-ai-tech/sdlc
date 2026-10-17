@@ -1,5 +1,10 @@
 # 8. Roles, separation of duties and signed approvals
 
+For later changes to `roles.yaml`, an agent or person can run `sdlc config propose --target roles --set <key>=<yaml>
+--reason <text>` and `sdlc config show <id>`. A person holding `maintainer` reviews the diff and runs
+`sdlc config apply <id>` in their terminal. If `roles.yaml` changed meanwhile, the proposal is stale. Weaker
+signing or an emptied role raises a warning and requires `--yes`.
+
 A gate approval is only worth something if the right person gave it. Since 0.6.0, sdlc can tie approvals to people named in a file that lives in git, refuse approvals that break separation of duties, and check that each approval arrived in a commit signed by the person who gave it.
 
 Without `openspec/roles.yaml`, nothing changes: the `roles:` allow-lists in `openspec/sdlc.yaml` apply as before.

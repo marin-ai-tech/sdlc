@@ -16,6 +16,7 @@ Prepare an existing project for work with agents: the documents agents rely on, 
 - Fill documents from the code, not from guesses. Every statement carries a file reference (a file path, with a line when it helps). Mark anything you could not confirm with "to check" so the person reviews it.
 - Moving files is the person's decision: `sdlc layout convert` is only proposed (show the plan from `sdlc layout convert`; the person runs `--apply` in their own terminal if they want it).
 - Applying the settings is the person's step: `sdlc adopt --apply` writes `openspec/sdlc.yaml` and `openspec/roles.yaml`. Give the person the command; do not run it yourself.
+- For configuration changes outside the adoption draft, use `sdlc config propose` and show the proposal to the person.
 
 **Steps**
 

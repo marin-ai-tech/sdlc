@@ -6,6 +6,7 @@ import { harnessPackageDir } from '../core/openspec-schema.js';
 
 /** Workflow ids in the order they are presented to people. */
 export const WORKFLOW_IDS = [
+  'config',
   'help',
   'guide',
   'next',

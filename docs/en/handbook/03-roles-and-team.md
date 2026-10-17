@@ -1,5 +1,10 @@
 # 3. People and the agent team
 
+For a later roles change, an agent or person runs `sdlc config propose --target roles --set <key>=<yaml>
+--reason <text>` and `sdlc config show <id>`. A person holding `maintainer` reviews and runs
+`sdlc config apply <id>` in their terminal. A changed file makes the proposal stale; weaker signing or an
+empty role is warned and requires `--yes`.
+
 This chapter ties the gates to named people and sets up the agents that do the work. It is for **Steven** (platform
 engineer), who writes the configuration, for **Ethan** (tech lead), who accepts the agent roles, and for everyone who
 approves a gate. The outputs come from a trial run of `tasklet` with sdlc 0.14.4. The `github`, `knowledge` and

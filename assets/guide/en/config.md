@@ -4,6 +4,19 @@ summary: The main keys of openspec/sdlc.yaml and who may change them.
 ---
 # Configuration
 
+## Propose, review, apply
+
+An agent or person can run `sdlc config propose --set enforcement.mode=warn --reason "Trial week"`.
+Use `--target roles` for `openspec/roles.yaml`, or `--file` for a complete proposed file. The command validates and
+stores a proposal without changing the target. Run `sdlc config show` to list proposals and
+`sdlc config show C1` to inspect the exact diff, validation and warnings.
+
+Only a person runs `sdlc config apply C1` or `sdlc config dismiss C1 --note "Not now"` in their own terminal.
+When `roles.yaml` exists, applying requires its `maintainer` role. A change to the target since the proposal makes
+it stale; propose again. A lower enforcement mode, a removed required gate or verify command, reduced protected or
+test paths, lite `auto_waive`, lower approval count, weaker signing or an empty role raises a warning and requires
+`--yes` to apply. Review the warning before deciding.
+
 `openspec/sdlc.yaml` configures the process. **Only a person edits it**: the hook denies agent edits, because the file
 also controls the guard itself.
 

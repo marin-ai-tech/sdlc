@@ -1,5 +1,14 @@
 # 5. User guide
 
+## Configuration proposals
+
+An agent or person runs `sdlc config propose --set <key>=<yaml> --reason <text>` and then
+`sdlc config show <id>`. The show command presents the proposed diff, validation and weakening warnings.
+Use `--target roles` for `openspec/roles.yaml`. Only a person runs `sdlc config apply <id>` or
+`sdlc config dismiss <id> --note <text>` in their own terminal; applying requires the `maintainer` role when
+`roles.yaml` exists. A changed target makes the proposal stale. Weakening changes, such as lower enforcement,
+removed checks or lite `auto_waive`, require `--yes` after reviewing the warning.
+
 ## 5.1. Installation
 
 ```bash
@@ -703,4 +712,110 @@ sdlc update                             # regenerate files (manually edited ones
 sdlc update --tools claude              # change the set of agents
 sdlc update --dry-run                   # show what would change; write nothing
 sdlc uninstall                          # remove agent files and hooks; openspec/ remains
+```
+
+## 5.8. Reference
+
+### CLI
+
+| Command | Purpose |
+|---|---|
+| `sdlc init [path] [--statusline] [--mcp] [--layout <mode>] [--worktree <path>] [--git-init]` / `update` / `uninstall` | set up, regenerate, remove integrations (planning data is never touched); `--statusline` opts in the Claude Code status line; `--mcp` registers sdlc as an MCP server; `--layout` makes the project AI-ready (in place or in a new worktree); in an agent session they never weaken the guard, and `uninstall` is human-only |
+| `sdlc new <id> [--kind --risk --track --source-type --source-ref --skip-specs]` | start a change (an OpenSpec change folder + `.sdlc.yaml`) |
+| `sdlc explore <slug> \| list` | create or list optional research notes before intent |
+| `sdlc track set <full\|lite> --change <id> [--note <text>]` | human confirmation of the suggested track before plan approval |
+| `sdlc defer add \| list \| close` | manage the deferred-work registry |
+| `sdlc backlog add \| epic add \| epic edit \| list \| next \| edit \| start \| move \| drop \| done` | manage planned changes in `openspec/backlog.md` (order = priority; `move`/`drop` are human-only) |
+| `sdlc backlog import --issues [--json]` | add one backlog item per open GitHub issue that is not linked yet (`issues` in `sdlc.yaml`) |
+| `sdlc triage intake [--json]` | add one alert (JSON on stdin) as a backlog item; the same alert again adds nothing |
+| `sdlc import bmad <path> (--change <id> \| --to-backlog) [--dry-run]` | import BMAD planning into an unapproved change, or epics/tickets (or a PRD/SPEC) into the backlog |
+| `sdlc status [--change] [--markdown] [--json]` / `sdlc next` | stages, gates, approvals, evidence, who acts next (with `--change`, a stage stepper and task bar); with no active change, the next ready backlog item |
+| `sdlc guide [topic[#section]] [--json]` | how sdlc works: short articles (in several languages) the guide workflow answers from; `denials#<rule>` explains a hook denial |
+| `sdlc next --me [--json]` / `sdlc approve <gate> --change <id> --preview` | what waits for me, with the commands; what I am about to approve (writes nothing) |
+| `sdlc help [topic] [--json]` | catalog of workflows and CLI commands with who runs them (agent or person) |
+| `sdlc statusline` | one-line Claude Code status (change · stage · who acts); reads JSON on stdin |
+| `sdlc layout check [--json]` / `scaffold [--dry-run] [--json]` / `adapt [--dry-run] [--json]` / `convert [--apply] [--json]` | check layout readiness, create missing documents, map existing paths, or plan and apply conversion |
+| `sdlc rework <gate> --change <id> --reason <r> --note <t> [--reset]` | send a change back to a gate's stage with a reason; later approvals stop counting; `--reset` restores the planned files from the gate checkpoint (human-only) |
+| `sdlc takeover` / `release-control --change <id> --note <t>` | take a change from the agent and hand it back with a note (human-only) |
+| `sdlc team sync \| list \| check [--json]` / `team accept <role> \| --skill <id> \| --pack <name>` | the agent team: drafts from the registry, packs and built-ins; roles and their status; vetted skills; a person accepts a role, a skill with scripts, or the lenses, workflows and checks of a pack |
+| `sdlc events list \| flush \| summary [--json]` | process events waiting for delivery to the team's server; deliver them now; record and send the daily summary (once a day) |
+| `sdlc release check --change <id> [--json]` | run the release gate's MCP checks without approving |
+| `sdlc mcp serve [--http <host:port>] [--project <path>]` / `sdlc mcp check [--json] [--strict] [--args]` | sdlc as an MCP server over stdio (`init --mcp` registers it) or over HTTP with the token `SDLC_MCP_TOKEN`: the read tools, and the board tools for a client with an executor's token; connect to the registry servers and list their tools |
+| `sdlc context pull [--name <name>] [--json]` | write context packs from the team's knowledge server into `docs/context/` |
+| `sdlc task export --change <id> [--task <n.m>] --json` / `sdlc task check-result --change <id> --branch <ref> --json` | the task contract: the open tasks of an approved plan as work items; check a returned branch (both read-only) |
+| `sdlc judge --gate <gate> --change <id> [--json]` | run the gate's judge and record its verdict (anyone, an agent too) |
+| `sdlc ci init --provider github\|gitlab [--check <server>] [--force]` | write a CI configuration that runs `validate --all`, `approvals verify` and `events flush` (human-only) |
+| `sdlc inbox list [--json]` / `inbox done <id>` | MCP check results from runs outside an agent session, for the agent |
+| `sdlc review suggest --change <id> [--json]` | propose a reviewer: roles, CODEOWNERS owners first, fewer open reviews, never an author |
+| `sdlc trace <change> [--json]` | from intent to evidence: requirements, scenarios, tasks, commits (trailers `SDLC-Change`, `SDLC-Task`), verification and review findings, with the gaps |
+| `sdlc adopt [--apply] [--json]` | draft verify commands, protected paths and `roles.yaml` for an existing project; `--apply` writes them (human-only) |
+| `sdlc report [--format md\|json\|html] [--since] [--change] [--out]` / `sdlc dashboard [--since] [--change] [--out] [--watch [--serve <host:port>]]` | progress report and self-contained HTML dashboard (`--watch` rebuilds it when `openspec/` changes) |
+| `sdlc instructions <artifact> --change <id> --json` | artifact instructions (from OpenSpec for planning artifacts; from the harness for verification, review, release) |
+| `sdlc approve \| reject \| waive <gate> --change <id> [--as <role>] [--note]` | human gate decisions (with `openspec/roles.yaml`: the person, the role and separation of duties are checked) |
+| `sdlc roles check [--change] \| who <gate> --change <id> \| migrate` | who holds which role and who may approve a gate; `migrate` (human-only) moves `roles:` from `sdlc.yaml` into `roles.yaml` |
+| `sdlc approvals verify [--mode off\|warn\|required]` | check that every approval arrived in a commit signed by the approver, and `roles.yaml` changes by a maintainer |
+| `sdlc verify [--list] [--check] [--only]` | run checks, record evidence, check scenario coverage |
+| `sdlc review context \| check` | diff, policy and plan drift; open blocking findings |
+| `sdlc tests lock \| unlock` | bug-fix protocol (unlocking is human-only) |
+| `sdlc validate [--all]` | `openspec validate --strict`, delta target checks, overlaps |
+| `sdlc archive <id> --yes` | re-check gates, then `openspec archive` (delta merge) |
+| `sdlc audit [--change]` | audit trail and metrics |
+| `sdlc health [--since <date> \| --days <n>]` | project health findings with facts and recommendations |
+| `sdlc explain --change <id>` | why a change is where it is and what unblocks it |
+| `sdlc answer <n> --change <id> --text "…"` | a person answers an open question (human-only); `--list` shows them |
+| `sdlc guide tour [step]` | a walkthrough of the calculator demo for newcomers |
+| `sdlc audit --export <dir> [--since <date>]` | the evidence bundle for auditors |
+| `sdlc changelog [--change <id> \| --since <date>]` | release notes from the delta specs |
+| `sdlc log [--change] [--event] [--since] [--limit]` | project log, with the sdlc version and license of each entry |
+| `sdlc license` / `sdlc license set community \| commercial --agreement <id> [--licensee]` | show or record the license the project uses sdlc under (setting it is human-only) |
+| `sdlc doctor [--fix]` | installation health, including whether the declared license fits the project; `--fix` repairs only what sdlc owns |
+| `sdlc hook <event>` | policy dispatcher used by the hooks and the plugin |
+| `sdlc plugin build [dir] --marketplace` | render the Claude Code plugin |
+| `sdlc openspec <args>` | run the bundled OpenSpec CLI |
+
+Every command except `statusline`, `dashboard`, `mcp serve`, `hook` and the `openspec` pass-through supports `--json` and returns OpenSpec-style diagnostics (`{severity, code, message, fix}`) on failure.
+
+### What gets generated
+
+| | Claude Code | OpenCode |
+|---|---|---|
+| Workflows | `.claude/skills/sdlc-<id>/SKILL.md` + `.claude/commands/sdlc/<id>.md` | `.opencode/commands/sdlc-<id>.md` |
+| Skills | `.claude/skills/` | read from `.claude/skills/` (written to `.opencode/skills/` only for OpenCode-only projects, to avoid duplicate names) |
+| Subagents | `.claude/agents/sdlc-{verifier,reviewer,researcher,simplifier,health,advocate}.md` | `.opencode/agents/sdlc-*.md` (`mode: subagent`, `permission` map) |
+| Guardrails | hooks merged into `.claude/settings.json` | `.opencode/plugins/sdlc.js` |
+
+Cursor, Codex CLI, Qwen Code and GigaCode get the same workflows and subagents in their own folders, with their own
+hooks and rules: see [Cursor](docs/en/15-cursor.md), [Codex CLI](docs/en/16-codex.md) and
+[Qwen Code and GigaCode](docs/en/17-qwen-gigacode.md).
+
+The workflows are 18 short skills: `help`, `guide`, `next`, `status`, `health`, `adopt`, `team`, `backlog`, `explore`,
+`intent`, `spec`, `plan`, `build`, `verify`, `review`, `release`, `archive`, `triage`. They pull state, templates and
+instructions from the CLI at run time (`sdlc status|next|instructions --json`). Generated files are tracked in
+`openspec/.sdlc/manifest.json`, so `sdlc update` never overwrites a file you edited unless you pass `--force`.
+
+### Version and license records
+
+Everything sdlc writes records the sdlc version and the license the project uses sdlc under (`license` in `openspec/sdlc.yaml`):
+
+| Where | What |
+|---|---|
+| `openspec/.sdlc/log.jsonl` | append-only project log: setup, gate decisions, verification runs, archives, license changes and hook denials, one JSON line each with `sdlc` and `license` (commit it; `merge=union` keeps branches mergeable). Shell command text is never logged. `sdlc log` prints it. |
+| `.sdlc.yaml` of each change | `harness: {sdlc, license}` plus `sdlc`/`license` on every history event, approval, rejection, waiver and verification record |
+| change artifacts | one line `<!-- sdlc-provenance: sdlc <version> \| license: <license> \| <url> -->` at the end of the top-level markdown artifacts, written at approval, verification and archive. It is excluded from gate digests, so it never makes an approval stale. Delta specs are never stamped, because their text is merged into the living specs. |
+| `verification.md` | a `Harness` line in the evidence block |
+| generated agent files | a notice with the version, the license in use and the `Required Notice` (skills, commands, subagents, the OpenCode plugin, `schema.yaml`; not the artifact templates) |
+| `sdlc status --markdown`, `--json` outputs | a footer line or a `harness` object |
+
+### Language
+
+Help, `Next:` hints, `status`, the init wizard, hook reasons, the report and the dashboard follow the locale: `--locale <code>` on any command, then `SDLC_LOCALE`, then `locale:` in `openspec/sdlc.yaml`, then the system locale (`LC_ALL`, `LC_MESSAGES`, `LANG`, the OS). Without a translation the text is English. Translations ship with sdlc. JSON output, the project log and change records are always English, so agents and CI read the same thing everywhere.
+
+### Development
+
+```bash
+npm install            # uses --legacy-peer-deps via .npmrc
+npm run compile        # dist/ is build output (not in git); `npm install` and `npm install -g github:…` build it via the prepare script
+npm test               # compiles, then runs unit + end-to-end tests (real OpenSpec CLI)
+node bin/sdlc.js --help
+node bin/sdlc.js plugin build plugin --marketplace   # regenerate the committed plugin
 ```

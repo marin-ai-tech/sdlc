@@ -1,5 +1,9 @@
 # 1. Setting up a new project
 
+After initial setup, an agent or person can run `sdlc config propose --set <key>=<yaml> --reason <text>`
+and `sdlc config show <id>` to present a settings change. Only a person runs `sdlc config apply <id>` in
+their terminal. A changed target makes the proposal stale; weakening warnings require `--yes` after review.
+
 Steven, the platform engineer, sets up sdlc for `tasklet`, a new project that starts from an empty folder. Then the rest
 of the team joins. By the end of the chapter the repository has the sdlc files, the team's roles, working checks and a
 clean `sdlc doctor`.

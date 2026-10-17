@@ -2,6 +2,22 @@
 
 All notable changes to sdlc. Versions follow [Semantic Versioning](https://semver.org/); while the major version is 0, a minor version may change behavior.
 
+## 0.23.0 — 2026-10-17
+
+### Added
+- Settings changes by proposal. Agents cannot edit `openspec/sdlc.yaml` and `openspec/roles.yaml`; now an agent
+  (or a person) runs `sdlc config propose --set <key>=<value> --reason <text>` (or `--file`, `--target roles`):
+  the result is validated with the CLI's own parser and stored against the file as it is, and the file does not
+  change.
+- `sdlc config show [id]` lists the proposals or shows one: the diff, the validation and the warnings when it weakens
+  the process (a lower enforcement mode, a gate no longer required, removed verify commands, protected or test paths,
+  `auto_waive` on lite, fewer approvals; signing turned down or an emptied role in roles.yaml).
+- `sdlc config apply <id>` and `sdlc config dismiss <id> --note` are a person's decisions: refused to agents by the
+  CLI and the hooks, a maintainer with roles.yaml, a weakening needs `--yes`, and a proposal made before the file
+  changed is stale. Applying keeps the file's header and logs `config.applied`.
+- The `sdlc-config` workflow: the agent proposes the change, explains the warnings and gives the person the exact
+  apply command; the health and adoption workflows use it for settings outside the adoption draft.
+
 ## 0.22.4 — 2026-10-17
 
 ### Changed

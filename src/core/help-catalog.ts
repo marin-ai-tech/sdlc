@@ -9,6 +9,10 @@ import { TOOL_IDS } from '../integrations/types.js';
 export { HUMAN_COMMANDS } from './human-commands.js';
 
 const EXAMPLES: Record<string, string> = {
+  'config propose': 'sdlc config propose --set gates.plan.required=true --reason "Review the plan gate"',
+  'config show': 'sdlc config show C1',
+  'config apply': 'sdlc config apply C1',
+  'config dismiss': 'sdlc config dismiss C1 --note "Not now"',
   approve: 'sdlc approve plan --change add-export',
   reject: 'sdlc reject plan --change add-export --note "Revise scope"',
   rework: 'sdlc rework spec --change add-export --reason missing-requirement --note "No empty-name case"',

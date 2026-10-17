@@ -69,6 +69,7 @@ const POLICY_NAMES = [
 ];
 const GUARD_NAMES = [
   String.raw`openspec/sdlc\.yaml`,
+  String.raw`openspec/\.sdlc/config-proposals/[^/\s'"]+`,
   String.raw`openspec/\.sdlc/manifest\.json`,
   String.raw`\.claude/settings(?:\.[^/\s'"]+)?\.json`,
   String.raw`\.opencode/plugins/sdlc\.js`,
@@ -96,7 +97,7 @@ const TOOL_FOLDERS = [
   String.raw`\.agents(?:/skills)?`,
 ].join('|');
 /** Folders whose removal, move or replacement takes guard files with it. */
-const OPENSPEC_FOLDERS = String.raw`openspec(?:/\.sdlc|/schemas(?:/sdlc)?)?`;
+const OPENSPEC_FOLDERS = String.raw`openspec(?:/\.sdlc(?:/config-proposals)?|/schemas(?:/sdlc)?)?`;
 const GUARD_FOLDER = new RegExp(`^(?:${TOOL_FOLDERS}|${OPENSPEC_FOLDERS})$`, 'i');
 /** The same, while accepted roles are on disk: their folders too. */
 const GUARD_ROLE_FOLDER = new RegExp(`^(?:${TOOL_FOLDERS}|${OPENSPEC_FOLDERS}|docs(?:/agents)?)$`, 'i');

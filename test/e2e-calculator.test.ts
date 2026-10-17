@@ -158,6 +158,15 @@ describe('demo: a team builds a calculator with sdlc (every command)', { timeout
     step('layout-convert', 'setup', 'agent', ['layout', 'convert'], 'Nothing to convert (dry run).');
     step('adopt', 'setup', 'agent', ['adopt'], 'The agent drafts settings and roles from the repository: stack, CI, CODEOWNERS, git authors.');
     step('adopt-apply-agent', 'setup', 'agent', ['adopt', '--apply'], 'Applying the draft is a person\'s decision: refused for the agent.', { expect: 1 });
+    // Configuration proposals (0.23.0): the agent prepares and shows a precise change; Alice decides.
+    step('config-propose', 'setup', 'agent', ['config', 'propose', '--set', 'verify.output_lines=41',
+      '--reason', 'Keep one more output line'], 'The agent proposes a validated settings change.');
+    step('config-show', 'setup', 'agent', ['config', 'show', 'C1'], 'The agent shows the diff and warnings.');
+    step('config-apply', 'setup', 'alice', ['config', 'apply', 'C1'], 'Alice applies the reviewed proposal.');
+    step('config-propose-dismiss', 'setup', 'agent', ['config', 'propose', '--set', 'verify.output_lines=42',
+      '--reason', 'Consider more output'], 'The agent proposes a second change.');
+    step('config-dismiss', 'setup', 'alice', ['config', 'dismiss', 'C2', '--note', 'Not needed'],
+      'Alice dismisses the second proposal.');
     step('update', 'setup', 'alice', ['update', '--dry-run'], 'Generated files are up to date.');
     commit('alice', 'Install sdlc and the AI-ready layout');
   });
