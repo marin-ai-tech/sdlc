@@ -2,6 +2,27 @@
 
 All notable changes to sdlc. Versions follow [Semantic Versioning](https://semver.org/); while the major version is 0, a minor version may change behavior.
 
+## 0.23.4 — 2026-10-18
+
+### Changed
+- A settings proposal refuses an unknown key in an `mcp.servers` entry, an `events` receiver or a `context.sources`
+  entry, and a source without `server`, naming the path (for example `events[0].events` written instead of
+  `events[0].on`). A file already in place keeps working; `sdlc doctor` names its unknown keys.
+- `sdlc config show` warns about an empty value in `args`, `headers` or `env` (a shell may have expanded `${…}`); the
+  `sdlc-config` workflow says to single-quote such values.
+- Event texts and the event's `project` field name `project.name`, else the package.json (or pyproject.toml,
+  Cargo.toml, go.mod) name, else the folder. The stable event id still uses only `project.name`, so it stays the same
+  in every clone.
+- A secret in a person's free text (every `--note`, `answer --text`, `config propose --reason`, backlog titles) is
+  masked before it reaches the log, the change record, events or the output, and the command says so.
+
+### Fixed
+- `${VAR}` in a receiver's `args` is expanded from the environment when the event is sent; the outbox keeps the
+  reference. An unset variable keeps the event waiting and is named by `sdlc events list`, `flush` and `sdlc doctor`.
+- The hint about an artifact at the repository root matches the exact file name (the project's `REVIEW.md` is not a
+  misplaced `review.md`) and is translated.
+- Russian messages write MCP plainly.
+
 ## 0.23.3 — 2026-10-18
 
 ### Fixed
