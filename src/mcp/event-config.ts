@@ -36,6 +36,7 @@ export interface EventReceiver {
 export const DEFAULT_EVENT_PATTERNS = [
   'gate.*', 'verify.*', 'change.created', 'change.archived', 'backlog.*', 'health.degraded', 'health.recovered',
 ];
+export const RECEIVER_FIELDS = ['server', 'tool', 'on', 'args', 'message', 'include_note', 'chat'];
 
 const HOOK_PREFIX = 'hook.';
 const ARGUMENT_NAME = /^[A-Za-z_][A-Za-z0-9_]*$/;

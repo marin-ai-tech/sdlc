@@ -63,6 +63,8 @@ import { applyCommanderLocale, localizeDescriptions, peekLocaleFlag } from './co
 import { loadConfig } from '../core/config.js';
 import { projectPaths } from '../core/project.js';
 import { recordInvocation } from '../core/human-command.js';
+import { maskNoteArguments } from '../core/person-note.js';
+import { warn } from './output.js';
 
 function cmdDesc(key: string): string {
   return t(key);
@@ -765,8 +767,10 @@ async function deliverAfter(command: Command): Promise<void> {
 }
 
 export async function run(argv: string[]): Promise<void> {
+  const masked = maskNoteArguments(argv);
   recordInvocation(argv.slice(2));
   applyLocale(peekLocaleFlag(argv));
+  if (masked) warn(t('note.secretMasked'));
   const program = buildProgram();
   program.hook('postAction', (_program, actionCommand) => deliverAfter(actionCommand));
   await program.parseAsync(argv);

@@ -1,4 +1,6 @@
 {
+  "note.secretMasked": "A secret in the note was masked before recording.",
+  "hint.rootArtifact": "{file} belongs at {path}",
   "stage.plan": "Plan (intent)",
   "stage.design": "Design (requirements + design spec)",
   "stage.build": "Build (plan + implementation)",

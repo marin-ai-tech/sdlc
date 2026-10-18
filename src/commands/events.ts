@@ -1,11 +1,12 @@
 import { loadProject, type ProjectContext } from '../cli/context.js';
-import { c, line, printJson, reportFailure } from '../cli/output.js';
+import { c, line, printJson, reportFailure, warn } from '../cli/output.js';
 import { recordAwaiting } from '../core/awaiting.js';
 import { listActiveChanges } from '../core/changes.js';
 import { t } from '../core/i18n.js';
 import { appendLog } from '../core/log.js';
 import { evaluateChange, sharedFingerprint, type LifecycleView } from '../core/lifecycle.js';
 import { deliverPending, FLUSH_CALL_MS } from '../mcp/events.js';
+import { missingEventVariables } from '../mcp/event-args.js';
 import { readOutbox, type EventBody } from '../mcp/outbox.js';
 import {
   buildDailySummary,
@@ -18,17 +19,19 @@ interface ReceiverView {
   server: string;
   tool: string;
   on: string[];
+  missing: string[];
 }
 
 function receiverViews(ctx: ProjectContext): ReceiverView[] {
   return (ctx.config.events ?? []).map((receiver) => ({ server: receiver.server, tool: receiver.tool,
-    on: receiver.on }));
+    on: receiver.on, missing: missingEventVariables(receiver.args, process.env) }));
 }
 
 function printList(pending: EventBody[], receivers: ReceiverView[]): void {
   if (receivers.length === 0) line(t('events.noReceivers'));
   for (const receiver of receivers) {
     line(t('events.receiver', { server: receiver.server, tool: receiver.tool, on: receiver.on.join(', ') }));
+    if (receiver.missing.length) line(`  ${receiver.missing.join(', ')} is unset`);
   }
   if (pending.length === 0) {
     line(t('events.noPending'));
@@ -71,6 +74,9 @@ export async function eventsFlushCommand(opts: { json?: boolean }): Promise<void
     const ctx = loadProject();
     recordWaits(ctx);
     const result = await deliverPending(ctx.root, ctx.config, { callMs: FLUSH_CALL_MS });
+    for (const receiver of receiverViews(ctx)) {
+      if (receiver.missing.length) warn(`${receiver.missing.join(', ')} is unset`);
+    }
     if (opts.json) return printJson(result);
     line(t('events.flushed', { delivered: result.delivered, failed: result.failed }));
   } catch (error) {

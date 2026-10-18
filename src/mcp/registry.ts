@@ -47,6 +47,7 @@ const STAGE_IDS = ['plan', 'design', 'build', 'test', 'deploy', 'maintain'];
 /** A name that fits both tools' tool names (`mcp__<name>__<tool>`, `<name>_<tool>`); `sdlc` is the CLI's own. */
 const SERVER_NAME = /^[A-Za-z0-9][A-Za-z0-9-]*$/;
 export const RESERVED_SERVER = 'sdlc';
+export const SERVER_FIELDS = ['type', 'command', 'env', 'url', 'headers', 'stages', 'agents'];
 const REFERENCE = /\$\{([A-Za-z_][A-Za-z0-9_]*)\}/g;
 
 type Raw = Record<string, unknown>;

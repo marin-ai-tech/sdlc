@@ -1,6 +1,8 @@
 import * as path from 'node:path';
+import * as fs from 'node:fs';
 import type { ChangeRef } from './changes.js';
 import { isFile, isWithin, toPosix } from './fs-utils.js';
+import { t } from './i18n.js';
 
 const ARTIFACTS = [
   'intent.md', 'proposal.md', 'design.md', 'plan.md', 'tasks.md',
@@ -11,12 +13,13 @@ const ARTIFACTS = [
 export function rootArtifactHints(root: string, ref: ChangeRef): string[] {
   if (ref.archived || !isWithin(root, ref.dir)) return [];
   const hints: string[] = [];
+  const names = new Set(fs.readdirSync(root));
   for (const file of ARTIFACTS) {
     const source = path.join(root, file);
     const target = path.join(ref.dir, file);
     if (!isWithin(root, source) || !isWithin(ref.dir, target)) continue;
-    if (!isFile(source) || isFile(target)) continue;
-    hints.push(`${file} belongs at ${toPosix(path.relative(root, target))}`);
+    if (!names.has(file) || !isFile(source) || isFile(target)) continue;
+    hints.push(t('hint.rootArtifact', { file, path: toPosix(path.relative(root, target)) }));
   }
   return hints;
 }

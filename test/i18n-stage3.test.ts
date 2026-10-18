@@ -13,7 +13,7 @@ const CYRILLIC = /[а-яё]{3}/i;
  */
 const ALLOWED = new Set([
   'adr', 'ai-native', 'ai-ready', 'anthropic', 'bmad', 'cli', 'claude', 'code', 'opencode', 'openspec', 'qwen', 'json', 'yaml',
-  'html', 'id', 'osi', 'path', 'sdlc', 'yyyy-mm-dd', 'codegraph', 'git', 'npm', 'ssh', 'stdin', 'playbook', 'community',
+  'html', 'id', 'osi', 'path', 'sdlc', 'mcp', 'yyyy-mm-dd', 'codegraph', 'git', 'npm', 'ssh', 'stdin', 'playbook', 'community',
   'license', 'open', 'source', 'kebab-case', 'worktree', 'config',
   'intent', 'spec', 'specs', 'plan', 'build', 'verify', 'review', 'release', 'archive', 'triage', 'explore', 'help', 'next',
   'status', 'design', 'proposal', 'tasks', 'verification', 'apply', 'validate', 'delta', 'verified', 'diff', 'context',

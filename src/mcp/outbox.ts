@@ -2,6 +2,7 @@ import { createHash } from 'node:crypto';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import type { SdlcConfig } from '../core/config.js';
+import { projectNameFromManifest } from '../core/project-name.js';
 import { git } from '../core/git.js';
 import type { LogEntry } from '../core/log.js';
 import { personByEmail, readRolesFile } from '../core/roles.js';
@@ -174,10 +175,11 @@ function personId(root: string, by: string | undefined): string | undefined {
 export function eventBody(root: string, config: QueueConfig, entry: LogEntry): EventBody {
   const gate = GATE_EVENT.exec(entry.event)?.[1];
   const by = personId(root, entry.by);
-  const project = config.project?.name ?? path.basename(root);
+  const project = config.project?.name ?? projectNameFromManifest(root);
+  const idProject = config.project?.name;
   const id = entry.event === 'summary.daily'
-    ? summaryDailyEventId(config.project?.name, localDayOf(new Date(entry.ts)))
-    : entryEventId(config.project?.name, entry, gate);
+    ? summaryDailyEventId(idProject, localDayOf(new Date(entry.ts)))
+    : entryEventId(idProject, entry, gate);
   return {
     id,
     project,

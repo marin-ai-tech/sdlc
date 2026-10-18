@@ -18,6 +18,7 @@ import { conflictedRecords } from './record-conflicts.js';
 import { hooksDisabledFiles } from './user-guard.js';
 import { harnessVersion } from './version.js';
 import { readYamlObject } from './yaml-io.js';
+import { integrationUnknownKeys } from './config-integration-findings.js';
 import { readManifest, sha256 } from '../integrations/manifest.js';
 import { SETTINGS_PATH } from '../integrations/settings.js';
 import { CURSOR_HOOKS_PATH, cursorHooksInstalled } from '../integrations/cursor-hooks.js';
@@ -239,6 +240,12 @@ function mcpVariablesCheck(out: Checks, config: SdlcConfig, env: NodeJS.ProcessE
   const servers = config.mcp?.servers ?? [];
   const references = servers.flatMap((server) =>
     referencedVariables(server).map((variable) => ({ server: server.name, variable })));
+  for (const [index, receiver] of (config.events ?? []).entries()) {
+    const text = JSON.stringify(receiver.args);
+    for (const match of text.matchAll(/\$\{([A-Za-z_][A-Za-z0-9_]*)\}/g)) {
+      references.push({ server: `events[${index}].args`, variable: match[1] });
+    }
+  }
   if (references.length === 0) return;
   const missing = references.filter(({ variable }) => env[variable] === undefined);
   const message = missing.length === 0
@@ -267,6 +274,10 @@ function projectConfigChecks(
     : tt('doctor.logOff');
   out.add('project log', 'ok', logMessage);
   mcpVariablesCheck(out, config, env);
+  try {
+    const raw = readYamlObject(paths.sdlcConfig);
+    for (const key of integrationUnknownKeys(raw ?? {})) out.add(key, 'warn', `Unknown key: ${key}`);
+  } catch { /* The config check already reports invalid YAML. */ }
   integrationChecks(out, root, config);
   const names = config.verify.commands.map((v) => v.name).join(', ');
   const verify = config.verify.commands.length > 0 ? 'ok' : 'warn';

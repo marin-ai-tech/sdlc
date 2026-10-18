@@ -7,6 +7,7 @@ import { parseRolesFile } from './roles.js';
 import { SdlcError } from './errors.js';
 import { writeTextAtomic } from './fs-utils.js';
 import { editYamlText } from './yaml-text-edit.js';
+import { integrationUnknownKeys } from './config-integration-findings.js';
 export { unifiedDiff } from './line-diff.js';
 
 export type ConfigTarget = 'sdlc' | 'roles';
@@ -61,6 +62,12 @@ export function validateContent(text: string, target: ConfigTarget): void {
     }
   }
   validateKnownFields(value as Record<string, unknown>, target);
+  if (target === 'sdlc') {
+    const unknown = integrationUnknownKeys(value as Record<string, unknown>)[0];
+    if (unknown) {
+      throw new SdlcError('invalid_config', { key: 'config.error.unknownKey', params: { key: unknown } });
+    }
+  }
   try {
     if (target === 'roles') parseRolesFile(text);
     else parseConfig(value as Record<string, unknown>);

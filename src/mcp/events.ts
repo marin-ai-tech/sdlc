@@ -3,6 +3,7 @@ import { loadConfig, type SdlcConfig } from '../core/config.js';
 import { findProjectRoot, projectPaths } from '../core/project.js';
 import { withServer } from './client.js';
 import { chatParts, type ChatPart } from './event-chat.js';
+import { resolveEventArgs } from './event-args.js';
 import { receiverKey, type EventReceiver } from './event-config.js';
 import { eventMessage, peopleNames, withNote } from './event-message.js';
 import {
@@ -152,13 +153,13 @@ function eventFor(event: EventBody, note: string | undefined, chat: ChatPart | u
  * The tool's arguments: the static args and the event, or the static args and the text in the named argument;
  * the note is added only for a receiver with `include_note`, the chat handles only for a receiver with `chat`.
  */
-function toolArguments(delivery: Delivery): Record<string, unknown> {
+function toolArguments(delivery: Delivery, staticArgs: Record<string, unknown>): Record<string, unknown> {
   const { receiver, queued } = delivery;
   const note = noteOf(delivery);
   const chat = chatOf(delivery);
-  if (!receiver.message) return { ...receiver.args, event: eventFor(queued.item.event, note, chat) };
+  if (!receiver.message) return { ...staticArgs, event: eventFor(queued.item.event, note, chat) };
   const text = chat?.message ?? queued.item.message ?? '';
-  return { ...receiver.args, [receiver.message]: withNote(text, note) };
+  return { ...staticArgs, [receiver.message]: withNote(text, note) };
 }
 
 async function deliverCallOne(client: Client, work: CallWork, ms: number): Promise<void> {
@@ -177,7 +178,12 @@ async function deliverCallOne(client: Client, work: CallWork, ms: number): Promi
 }
 
 async function deliverOne(client: Client, delivery: Delivery, ms: number): Promise<void> {
-  const args = toolArguments(delivery);
+  const resolved = resolveEventArgs(delivery.receiver.args, process.env);
+  if (resolved.missing.length > 0) {
+    debug(`${receiverKey(delivery.receiver)} waits for ${resolved.missing.join(', ')}`);
+    return;
+  }
+  const args = toolArguments(delivery, resolved.args ?? {});
   const tool = delivery.receiver.tool;
   try {
     const answer = await client.callTool({ name: tool, arguments: args }, undefined, { timeout: ms });

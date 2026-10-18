@@ -15,6 +15,10 @@ Use `--target roles` for `openspec/roles.yaml`. Only a person runs `sdlc config 
 `sdlc config dismiss <id> --note <text>` in their own terminal; applying requires the `maintainer` role when
 `roles.yaml` exists. A changed target makes the proposal stale. Weakening changes, such as lower enforcement,
 removed checks or lite `auto_waive`, require `--yes` after reviewing the warning.
+Proposals reject unknown keys in MCP servers, event receivers and context sources, and a context source without
+`server`. `sdlc doctor` names unknown keys in an installed config without stopping other commands.
+`sdlc config show` warns when an `args`, `env` or `headers` value is empty, often because a shell expanded `${VAR}`.
+Put `${VAR}` values in single quotes when using `--set`; an empty-value warning does not require `--yes`.
 
 ## 5.1. Installation
 
@@ -28,7 +32,8 @@ sdlc init --tools claude,opencode      # any comma-separated set of: claude, ope
 sdlc doctor                            # check the installation
 ```
 
-`sdlc doctor` also checks "mcp variables": if a `${VAR}` in a registry server's `env` or `headers` is unset,
+`sdlc doctor` also checks "mcp variables": if a `${VAR}` in a registry server's `env` or `headers`,
+or an event receiver's `args`, is unset,
 it warns with the server and variable names, never the value.
 
 Since 0.16.1, `sdlc doctor --fix` applies only fixes sdlc owns: missing generated files, an outdated stamp, a missing

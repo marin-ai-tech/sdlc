@@ -41,6 +41,7 @@ export interface ContextSourcesConfig {
 
 /** A pack file name: letters, digits, `-` and `_` — no `/`, `\`, `..`, so it stays inside `docs/context/`. */
 const PACK_NAME = /^[A-Za-z0-9_-]+$/;
+export const SOURCE_FIELDS = ['name', 'server', 'resource', 'tool', 'args', 'stages', 'owner', 'fresh_days'];
 /** The lifecycle's six stages (lifecycle.ts `STAGES`); not imported, because config.ts loads this module. */
 const STAGE_IDS = ['plan', 'design', 'build', 'test', 'deploy', 'maintain'];
 

@@ -273,6 +273,8 @@ enforcement:
 ```
 
 The patterns are fixed prefixes, with no entropy guessing. That keeps false alarms rare, but a secret in an unusual format will not be caught.
+The same patterns mask secrets in recorded person notes, including gate decisions, rework, drop, answers,
+test unlock, config dismissal and control hand-off. A warning tells the person when masking happened.
 
 ## 10.7. Who should review this change
 
@@ -360,6 +362,10 @@ locale. The `event` object is then not sent. The text is built when queued, so a
 By default, it contains no email, note, command or output. Since 0.16.1, `include_note: true` opts a receiver into
 rejection and rework notes. The note is one line, at most 200 characters, with secrets masked. An event object gains
 `note`; a ready message appends ` — <note>` after its text. The default is off.
+The event project field and message use `project.name` when set, otherwise the name in package.json,
+pyproject.toml, Cargo.toml or go.mod, then the folder name. `${VAR}` in a receiver's static `args` is
+resolved only at delivery. The outbox retains the reference. An unset variable keeps that delivery queued;
+`sdlc events list`, `sdlc events flush` and `sdlc doctor` name the missing variable without its value.
 
 ```yaml
 events:

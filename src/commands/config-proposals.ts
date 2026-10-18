@@ -3,6 +3,7 @@ import { loadProject } from '../cli/context.js';
 import { line, printJson, reportFailure } from '../cli/output.js';
 import { agentEnvironment } from '../core/agent-env.js';
 import { parseConfig } from '../core/config.js';
+import { integrationEmptyWarnings } from '../core/config-integration-findings.js';
 import { type ConfigProposal, type ConfigTarget, digest, listProposals, nextProposalId, preserveHeader, proposedContent,
   readProposal, targetFile, unifiedDiff, validateContent, weakeningWarnings, writeProposal } from
   '../core/config-proposals.js';
@@ -102,7 +103,9 @@ function warnings(root: string, proposal: ConfigProposal): string[] {
     }
     return result;
   }
-  return weakeningWarnings(parseConfig(parse(current)), parseConfig(parse(proposal.content)));
+  const content = parse(proposal.content) as Record<string, unknown>;
+  return [...weakeningWarnings(parseConfig(parse(current)), parseConfig(content)),
+    ...integrationEmptyWarnings(content)];
 }
 
 function localizedWarning(warning: string): string {
@@ -131,6 +134,10 @@ function localizedWarning(warning: string): string {
     }
   }
   return warning;
+}
+
+function isWeakening(warning: string): boolean {
+  return !warning.includes('approvals are unsigned') && !warning.includes(' is empty;');
 }
 
 export function proposeConfig(opts: Options): void {
@@ -194,7 +201,7 @@ export function showConfig(id: string | undefined, opts: Options): void {
     const alerts = validation.validation === 'valid' ? warnings(ctx.root, proposal) : [];
     const result = { id, status: status(ctx.root, proposal), reason: proposal.reason,
       by: proposal.by, diff, ...validation, warnings: alerts,
-      weakens: alerts.some((warning) => !warning.includes('approvals are unsigned')),
+      weakens: alerts.some(isWeakening),
       ...(closed && !proposal.reviewedDiff ? { diffNote: t('config.legacyDiff') } : {}) };
     if (opts.json) printJson(result);
     else {
@@ -228,7 +235,7 @@ export function applyConfig(id: string, opts: Options): void {
     }
     validateContent(proposal.content, proposal.target);
     const alerts = warnings(ctx.root, proposal);
-    if (alerts.some((warning) => !warning.includes('approvals are unsigned')) && !opts.yes) {
+    if (alerts.some(isWeakening) && !opts.yes) {
       throw new SdlcError('weakening_requires_yes',
         { key: 'config.error.weakening', params: { id } },
         { key: 'config.fix.weakening' });
