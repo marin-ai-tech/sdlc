@@ -30,8 +30,9 @@ Research and design of the SDLC harness for Claude Code, OpenCode, Cursor, Codex
 26. [Example: signed approvals and an audit](26-signed-audit-example.md)
 27. [Example: sdlc in the ecosystem over MCP and events](27-mcp-integrations-example.md)
 28. [Example: an executor swarm, the board and the auction](28-executor-swarm-example.md)
-29. [The sdlc handbook](handbook/README.md) — the user guide for every role, to read: a new project and the conversion of an existing one
-30. [sdlc in practice: the video course](course/README.md) — the same material as scripts for short training videos
+29. [Example: one team, different agents](29-mixed-tools-example.md)
+30. [The sdlc handbook](handbook/README.md) — the user guide for every role, to read: a new project and the conversion of an existing one
+31. [sdlc in practice: the video course](course/README.md) — the same material as scripts for short training videos
 
 In short: **OpenSpec is the specification subsystem** (deltas, living specs, validation, archive), and **`sdlc` is
 the process layer** that follows the Anthropic playbook. It adds stages, gates with human approvals, verification
