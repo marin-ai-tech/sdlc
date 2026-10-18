@@ -244,7 +244,10 @@ The plan names the reproducing test and files to change. A person approves it wi
 3. Fix the code. Only a human can remove the lock: `sdlc tests unlock --change <id>`. The optional
    `--note "reason"` records why in the change record, log and audit.
 
-Artifact instructions return `resolvedOutputPath`; write each artifact there. If an artifact such as `plan.md` is
+Artifact instructions return `outputPath` relative to the project root with forward slashes and an absolute
+`resolvedOutputPath`; write each artifact at either destination from the project root. OpenSpec's original
+`outputPath` is relative to the change directory; sdlc replaces that field in its JSON response with the
+project-relative path. If an artifact such as `plan.md` is
 at the repository root while the change folder lacks it, `sdlc next` and `sdlc status` show its destination under
 `openspec/changes/<id>/`.
 
@@ -463,7 +466,13 @@ task contract says what an executor gets and what it must return.
   `missing_agent`, `unknown_executor` or `executor_not_allowed` otherwise; the result gains `executors` — the
   distinct executor ids the commits name — and each check is one `task.result_checked` log entry.
 
-Both commands only read: they merge nothing and approve nothing, and anyone, an agent too, may run them. Merging the
+If a valid result branch is absent locally, `check-result` fetches only `refs/heads/<branch>` from `origin` into
+a unique `refs/sdlc/fetched/` ref. It creates no local branch and never selects a caller-supplied remote or URL.
+Invalid branch names are refused before fetching. If origin is unavailable or the fetch fails, push the branch
+with `git push origin <branch>` and retry. The check still requires the same commit trailers and allowed executor;
+the branch suffix does not change which commits are accepted.
+
+Both commands merge nothing and approve nothing, and anyone, an agent too, may run them. Merging the
 branch, verification and review stay the usual steps of the change. The contract is published as JSON Schemas:
 `schemas/contracts/task.schema.json` and `schemas/contracts/result.schema.json`.
 
@@ -481,7 +490,8 @@ early or reassign with `sdlc board award --change <id> --task <n.m> --executor <
 Claim, heartbeat, release, submit, and bid accept `--request <key>` for peer retries. The key is 8–128
 letters, digits, `.`, `_`, `:`, or `-`. A repeated key and identical arguments return the stored answer for
 24 hours without a second state change or log entry; different arguments yield `request_conflict`.
-The same write tools take `request` over MCP, and executor tokens can call `board_bid`.
+The same write tools take `request` over MCP, and executor tokens can call `board_bid`. MCP accepts JSON numbers
+or numeric strings for `board_claim.lease`, `board_bid.minutes`, and `board_bid.cost`, with the same CLI ranges.
 MCP does not expose auction, award, or dispatch.
 
 Placement: `sdlc board dispatch --change <id> --task <n.m> --executor <id> [--lease <s>] [--json]`
@@ -521,10 +531,12 @@ they decide no gate and approve nothing:
 - `sdlc board reopen --change <id> --task <n.m> --reason <text> [--escalate] [--json]` reopens a submitted
   claim. A blank reason is refused (`reason_required`); an unknown task or one without a submitted claim is
   `unknown_task` or `task_not_submitted`. The board shows the number of earlier attempts and the last reason;
-  the next claim's work item includes `previousAttempts` in order. With `--escalate`, the rejected executor
-  joins `excluded` and cannot claim that task again (`executor_excluded`). The log records `task.reopened` with
-  the reason and, for escalation, `task.escalated`. Anyone, including an agent, may reopen a result. Verification
-  and review still decide the change's gates.
+  the next claim's work item includes `previousAttempts` in order, with each submitted branch and its head SHA
+  when recorded. The first claim uses `sdlc/<change>/<task>`; claim n uses `sdlc/<change>/<task>-<n>`, including
+  claims after release or expiry. Older board files without a head remain readable. With `--escalate`, the rejected
+  executor joins `excluded` and cannot claim that task again (`executor_excluded`). The log records
+  `task.reopened` with the reason and, for escalation, `task.escalated`. Anyone, including an agent, may reopen a
+  result. Verification and review still decide the change's gates.
 
 There is no expiry timer: board lease commands first drop held claims whose lease ran out and log one
 `task.lease_expired` per dropped claim — exactly once per claim. Writes are exclusive across processes:

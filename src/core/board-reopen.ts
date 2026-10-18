@@ -11,6 +11,7 @@ export interface PreviousAttempt {
   executor: string;
   agent: string;
   branch: string;
+  head?: string;
   reason: string;
   reopenedAt: string;
 }
@@ -25,6 +26,7 @@ export function previousAttempts(claims: BoardClaim[]): PreviousAttempt[] {
     executor: claim.executor,
     agent: claim.agent,
     branch: claim.branch!,
+    ...(claim.head ? { head: claim.head } : {}),
     reason: claim.reason!,
     reopenedAt: claim.reopenedAt!,
   }));

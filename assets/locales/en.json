@@ -682,6 +682,8 @@
   "error.the_board_file_x_is_broken_x": "The board file {file} is broken: {detail}.",
   "error.the_board_is_locked_by_another_process": "The board is locked by another process; try again in a moment.",
   "error.unknown_git_ref_x": "Unknown git ref: {ref}.",
+  "error.invalid_result_branch_x": "Invalid result branch name: {branch}.",
+  "error.result_branch_fetch_failed_x": "Board host could not fetch {branch} from origin. Push with git push origin {branch}.",
   "error.no_common_base_of_head_and_x": "HEAD and {ref} share no merge-base.",
   "error.several_active_changes_exist_x_name_one_with_cha": "Several active changes exist ({p1}); name one with --change <id>.",
   "error.there_are_no_active_changes": "There are no active changes.",

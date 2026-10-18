@@ -136,7 +136,8 @@ export function boardListCommand(opts: ListOptions): void {
     }
     line(t('board.list.heading'));
     for (const task of tasks) {
-      const who = task.executor === undefined ? '' : `  ${task.executor}/${task.agent ?? '?'}`;
+      const who = task.executor === undefined ? ''
+        : `  ${task.executor}${task.agent === undefined ? '' : `/${task.agent}`}`;
       const until = task.expiresAt === undefined ? '' : `  ${t('board.list.until', { at: task.expiresAt })}`;
       const attempts = task.attempts === undefined ? '' : `  ${t('board.list.attempts', {
         count: String(task.attempts), reason: task.lastReason ?? '',

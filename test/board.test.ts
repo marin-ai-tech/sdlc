@@ -222,6 +222,8 @@ describe('B118: leases', () => {
     expect(p.status('add-farewell#1.2')?.status).toBe('open');
     expect(p.log().filter((e) => e.event === 'task.released').map((e) => e.task)).toEqual(['1.2']);
     expect(code(p.board(['release', '--claim', claim.id]))).toBe('claim_unknown');
+    const next = p.claim('1.2').json<{ item: { result: { branch: string } } }>();
+    expect(next.item.result.branch).toBe('sdlc/add-farewell/1.2-2');
   }, 240000);
 });
 

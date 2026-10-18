@@ -63,7 +63,7 @@
     "forbidden": { "type": "array", "items": { "type": "string" } },
     "previousAttempts": {
       "type": "array",
-      "description": "Earlier submitted claims reopened with a reason, oldest first",
+      "description": "Earlier reopened submissions, oldest first; head is present when recorded",
       "items": {
         "type": "object",
         "required": ["executor", "agent", "branch", "reason", "reopenedAt"],
@@ -71,6 +71,7 @@
           "executor": { "type": "string", "minLength": 1 },
           "agent": { "type": "string", "minLength": 1 },
           "branch": { "type": "string", "minLength": 1 },
+          "head": { "type": "string", "pattern": "^[0-9a-f]{40}$" },
           "reason": { "type": "string", "minLength": 1 },
           "reopenedAt": { "type": "string", "format": "date-time" }
         },
@@ -81,7 +82,8 @@
       "type": "object",
       "required": ["branch", "trailers"],
       "properties": {
-        "branch": { "type": "string", "minLength": 1 },
+        "branch": { "type": "string", "minLength": 1,
+          "description": "First attempt: sdlc/<change>/<task>; attempt n > 1: sdlc/<change>/<task>-<n>" },
         "trailers": {
           "type": "object",
           "required": ["SDLC-Change", "SDLC-Task"],

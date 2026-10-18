@@ -682,6 +682,8 @@
   "error.the_board_file_x_is_broken_x": "Файл доски {file} повреждён: {detail}.",
   "error.the_board_is_locked_by_another_process": "Доска заблокирована другим процессом; повторите через мгновение.",
   "error.unknown_git_ref_x": "Неизвестная ревизия git: {ref}.",
+  "error.invalid_result_branch_x": "Недопустимое имя ветки результата: {branch}.",
+  "error.result_branch_fetch_failed_x": "Хост доски не смог получить {branch} из `origin`. Отправьте: `git push origin {branch}`.",
   "error.no_common_base_of_head_and_x": "У `HEAD` и {ref} нет общей базы слияния.",
   "error.several_active_changes_exist_x_name_one_with_cha": "Есть несколько активных изменений ({p1}); укажите одно через --change <id>.",
   "error.there_are_no_active_changes": "Нет активных изменений.",

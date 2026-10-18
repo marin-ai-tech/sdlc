@@ -7,6 +7,7 @@ import { SdlcError } from './errors.js';
 import { AGENT_TRAILER, executorRefusal, readExecutors, type Executor } from './executors.js';
 import { toPosix } from './fs-utils.js';
 import { git } from './git.js';
+import { resultBranch } from './result-branch.js';
 import { appendLog } from './log.js';
 import { matchesPlanFile, readPlanFiles } from './plan-files.js';
 import { changeTasks, forbiddenPaths } from './task-contract.js';
@@ -131,7 +132,7 @@ export function checkResult(
   root: string, ref: ChangeRef, config: SdlcConfig, branch: string, base?: string, expectExecutor?: string,
 ): TaskResult {
   const registry = readExecutors(root);
-  const branchSha = resolveRef(root, branch);
+  const branchSha = resolveRef(root, resultBranch(root, branch));
   const baseSha = base === undefined ? mergeBase(root, branchSha) : resolveRef(root, base);
   const commits = commitsOf(root, baseSha, branchSha);
   const files = changedFiles(root, baseSha, branchSha);

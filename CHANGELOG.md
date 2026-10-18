@@ -2,6 +2,22 @@
 
 All notable changes to sdlc. Versions follow [Semantic Versioning](https://semver.org/); while the major version is 0, a minor version may change behavior.
 
+## 0.23.5 — 2026-10-18
+
+### Changed
+- `outputPath` in the JSON of `sdlc instructions` is relative to the project root (`openspec/changes/<id>/plan.md`),
+  so an agent that writes it from the repository root puts the artifact into the change folder.
+- Each claim of a task gets its own result branch: the first is `sdlc/<change>/<task>`, later ones
+  `sdlc/<change>/<task>-<n>`. A retry no longer overwrites a rejected attempt, and `previousAttempts` keeps the head
+  commit (`head`) of each one.
+- The board tools over MCP accept numbers (`lease`, `minutes`, `cost`) as JSON numbers as well as strings.
+
+### Fixed
+- `sdlc board submit` and `sdlc task check-result` fetch a result branch the executor pushed to `origin` when the board
+  host does not have it yet; only from `origin`, only a valid branch name, into a private ref. A name that is not a
+  branch name is refused before any git call.
+- `sdlc board list` shows a dispatched task without an agent as its executor, not `executor/?`.
+
 ## 0.23.4 — 2026-10-18
 
 ### Changed

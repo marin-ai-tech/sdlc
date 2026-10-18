@@ -413,7 +413,7 @@ function recordInstructions(ctx: ProjectContext, ref: ChangeRef, artifact: strin
     changeName: ref.id,
     artifactId: artifact,
     changeDir: ref.dir,
-    outputPath: `${artifact}.md`,
+    outputPath: `openspec/changes/${ref.id}/${artifact}.md`,
     resolvedOutputPath: outputPath,
     exists: isFile(outputPath),
     instruction: RECORD_INSTRUCTIONS[artifact],
@@ -479,7 +479,14 @@ export async function instructionsCommand(artifact: string, opts: { change?: str
     );
     const view = freshView(ctx, ref);
     const pack = readContextPack(ctx.root, artifactStage(artifact, view.gates));
-    printJson({ ...result.data, sdlc: instructionsSdlcJson(view, artifact), ...contextPackJson(pack) });
+    const resolvedOutputPath = result.data.resolvedOutputPath;
+    const originalOutputPath = result.data.outputPath;
+    const destination = typeof resolvedOutputPath === 'string' ? resolvedOutputPath
+      : typeof originalOutputPath === 'string' ? path.resolve(ref.dir, originalOutputPath) : undefined;
+    const outputPath = destination === undefined ? originalOutputPath
+      : path.relative(ctx.root, destination).split(path.sep).join('/');
+    printJson({ ...result.data, outputPath, sdlc: instructionsSdlcJson(view, artifact),
+      ...contextPackJson(pack) });
     if (!result.ok) process.exitCode = 1;
   } catch (error) {
     reportFailure(error, opts.json);

@@ -4,10 +4,10 @@
  * backlog move or drop, adopt --apply, uninstall). Input schemas are plain JSON Schema.
  */
 
-/** A JSON Schema object with string properties only: every tool argument is a word passed to the CLI. */
+/** Tool arguments become CLI words after type checking. */
 export interface ToolInputSchema {
   type: 'object';
-  properties: Record<string, { type: 'string'; description: string }>;
+  properties: Record<string, { type: 'string' | ['string', 'number']; description: string }>;
   required?: string[];
   additionalProperties: false;
 }
@@ -24,6 +24,12 @@ function schema(properties: Record<string, string>, required: string[] = []): To
   const props: ToolInputSchema['properties'] = {};
   for (const [name, description] of Object.entries(properties)) props[name] = { type: 'string', description };
   return { type: 'object', properties: props, ...(required.length ? { required } : {}), additionalProperties: false };
+}
+
+function numericSchema(properties: Record<string, string>, numeric: string[], required: string[]): ToolInputSchema {
+  const input = schema(properties, required);
+  for (const name of numeric) input.properties[name].type = ['string', 'number'];
+  return input;
 }
 
 /** `--change <id>` when a change is given. */
@@ -129,8 +135,8 @@ export const WRITE_TOOLS: readonly ReadTool[] = [
   {
     name: 'board_claim',
     description: 'Claim a board task as the token executor.',
-    inputSchema: schema({ change: CHANGE, task: 'task number', agent: 'agent name',
-      lease: 'lease in seconds', request: 'idempotency key' }, ['change', 'task', 'agent']),
+    inputSchema: numericSchema({ change: CHANGE, task: 'task number', agent: 'agent name',
+      lease: 'lease in seconds', request: 'idempotency key' }, ['lease'], ['change', 'task', 'agent']),
     argv: (a) => ['board', 'claim', '--change', a.change ?? '', '--task', a.task ?? '',
       '--agent', a.agent ?? '', ...(a.lease ? ['--lease', a.lease] : []), ...requestOption(a.request)],
   },
@@ -158,9 +164,9 @@ export const WRITE_TOOLS: readonly ReadTool[] = [
   {
     name: 'board_bid',
     description: 'Bid for an open auction as the token executor.',
-    inputSchema: schema({ change: CHANGE, task: 'task number', agent: 'agent name',
+    inputSchema: numericSchema({ change: CHANGE, task: 'task number', agent: 'agent name',
       minutes: 'estimated minutes', cost: 'estimated cost', note: 'bid note',
-      request: 'idempotency key' }, ['change', 'task', 'agent', 'minutes']),
+      request: 'idempotency key' }, ['minutes', 'cost'], ['change', 'task', 'agent', 'minutes']),
     argv: (a) => ['board', 'bid', '--change', a.change ?? '', '--task', a.task ?? '',
       '--agent', a.agent ?? '', '--minutes', a.minutes ?? '',
       ...(a.cost === undefined ? [] : ['--cost', a.cost]),
@@ -177,7 +183,7 @@ export function findTool(name: string): ReadTool | undefined {
 }
 
 /**
- * The tool arguments as CLI words, or the reason they are refused: only the declared properties, strings, the
+ * The tool arguments as CLI words, or the reason they are refused: only the declared properties and types, the
  * required ones present, and no value that the CLI would read as an option (a leading `-`) or that is empty.
  */
 export function checkArguments(tool: ReadTool, input: unknown): Record<string, string | undefined> | string {
@@ -188,9 +194,13 @@ export function checkArguments(tool: ReadTool, input: unknown): Record<string, s
   for (const [key, value] of Object.entries(args as Record<string, unknown>)) {
     if (!(key in known)) return `unknown argument: ${key}`;
     if (value === undefined || value === null) continue;
-    if (typeof value !== 'string') return `${key} must be a string`;
-    if (value.trim() === '' || value.startsWith('-') || /[\0\r\n]/.test(value)) return `${key} is not a valid value`;
-    out[key] = value;
+    const numeric = Array.isArray(known[key].type);
+    if (typeof value !== 'string' && !(numeric && typeof value === 'number' && Number.isFinite(value))) {
+      return `${key} must be ${numeric ? 'a string or number' : 'a string'}`;
+    }
+    const word = String(value);
+    if (word.trim() === '' || word.startsWith('-') || /[\0\r\n]/.test(word)) return `${key} is not a valid value`;
+    out[key] = word;
   }
   const missing = (tool.inputSchema.required ?? []).filter((key) => out[key] === undefined);
   return missing.length ? `missing argument: ${missing.join(', ')}` : out;

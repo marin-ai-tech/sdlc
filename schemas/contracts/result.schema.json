@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://sdlc.dev/schemas/contracts/result.schema.json",
   "title": "sdlc task check-result verdict",
-  "description": "The JSON of `sdlc task check-result`: the commits and files of <base>..<branch>, the problems that fail the check and the warnings that do not. Read-only - nothing is merged or approved.",
+  "description": "Result verdict. Missing local branches are fetched from origin into a unique internal ref.",
   "type": "object",
   "required": ["ok", "base", "commits", "files", "problems", "warnings"],
   "properties": {

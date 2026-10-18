@@ -215,6 +215,8 @@ export function claimTask(
     assertClaimable(board, ref, opts.task, executor.id);
     const attempts = reopenedClaims(board, `${ref.id}#${opts.task}`);
     if (attempts.length > 0) item.previousAttempts = previousAttempts(attempts);
+    const claimNumber = board.claims.filter((claim) => claim.item === item.id).length + 1;
+    if (claimNumber > 1) item.result.branch += `-${claimNumber}`;
     const now = Date.now();
     const created: BoardClaim = {
       id: crypto.randomBytes(16).toString('hex'),
