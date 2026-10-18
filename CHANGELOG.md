@@ -2,6 +2,14 @@
 
 All notable changes to sdlc. Versions follow [Semantic Versioning](https://semver.org/); while the major version is 0, a minor version may change behavior.
 
+## 0.23.3 — 2026-10-18
+
+### Fixed
+- Records written before 0.23.2 stay readable. A closed settings proposal (applied or dismissed) whose roles.yaml
+  content has a `signing_key` that 0.23.2 no longer accepts no longer breaks `sdlc config show` and `sdlc config propose`;
+  an open one is listed, `config show` marks its validation as failed and `config apply` refuses it. Past roles.yaml
+  versions read by `sdlc approvals verify` treat such a key as no key; the current roles.yaml stays strict.
+
 ## 0.23.2 — 2026-10-18
 
 ### Added

@@ -142,7 +142,7 @@ function rolesBlob(root: string, rev: string): string | undefined {
 
 function rolesAt(root: string, rev: string): RolesFile | undefined {
   const blob = rolesBlob(root, rev);
-  return blob ? parseRolesFile(requiredGit(root, ['cat-file', 'blob', blob])) : undefined;
+  return blob ? parseRolesFile(requiredGit(root, ['cat-file', 'blob', blob]), ROLES_PATH, true) : undefined;
 }
 
 function previousRoles(root: string, sha: string): RolesFile | undefined {

@@ -64,6 +64,17 @@ function safeText(value: string): string {
     (char) => `\\u${char.charCodeAt(0).toString(16).padStart(4, '0')}`);
 }
 
+function proposalValidation(proposal: ConfigProposal): { validation: string; validationReason?: string } {
+  if (proposal.status !== 'open') return { validation: 'historical' };
+  try {
+    validateContent(proposal.content, proposal.target);
+    return { validation: 'valid' };
+  } catch (error) {
+    const reason = error instanceof SdlcError ? error.localizedMessage() : String(error);
+    return { validation: 'failed', validationReason: reason };
+  }
+}
+
 function warnings(root: string, proposal: ConfigProposal): string[] {
   const current = fs.readFileSync(targetFile(root, proposal.target), 'utf8');
   if (proposal.target === 'roles') {
@@ -176,12 +187,13 @@ export function showConfig(id: string | undefined, opts: Options): void {
     }
     const proposal = readProposal(ctx.root, id);
     const closed = proposal.status !== 'open';
+    const validation = proposalValidation(proposal);
     const current = closed && proposal.reviewedDiff ? undefined
       : fs.readFileSync(targetFile(ctx.root, proposal.target), 'utf8');
     const diff = current === undefined ? proposal.reviewedDiff! : unifiedDiff(current, proposal.content);
-    const alerts = closed ? [] : warnings(ctx.root, proposal);
+    const alerts = validation.validation === 'valid' ? warnings(ctx.root, proposal) : [];
     const result = { id, status: status(ctx.root, proposal), reason: proposal.reason,
-      by: proposal.by, diff, validation: 'valid', warnings: alerts,
+      by: proposal.by, diff, ...validation, warnings: alerts,
       weakens: alerts.some((warning) => !warning.includes('approvals are unsigned')),
       ...(closed && !proposal.reviewedDiff ? { diffNote: t('config.legacyDiff') } : {}) };
     if (opts.json) printJson(result);
@@ -190,7 +202,9 @@ export function showConfig(id: string | undefined, opts: Options): void {
         reason: safeText(proposal.reason), by: safeText(proposal.by) }));
       line(diff.replace('--- current\n+++ proposed', t('config.diffHeader')));
       if (closed && !proposal.reviewedDiff) line(t('config.legacyDiff'));
-      line(t('config.validation', { validation: { key: 'config.status.valid' } }));
+      const validationText = t(`config.status.${validation.validation}`);
+      const reason = validation.validationReason ? `: ${safeText(validation.validationReason)}` : '';
+      line(t('config.validation', { validation: `${validationText}${reason}` }));
       for (const warning of alerts) line(t('config.warning', { warning: safeText(localizedWarning(warning)) }));
     }
   } catch (error) { reportFailure(error, opts.json); }
@@ -212,6 +226,7 @@ export function applyConfig(id: string, opts: Options): void {
       throw new SdlcError('stale_proposal', { key: 'config.error.stale', params: { id } },
         { key: 'config.fix.stale' });
     }
+    validateContent(proposal.content, proposal.target);
     const alerts = warnings(ctx.root, proposal);
     if (alerts.some((warning) => !warning.includes('approvals are unsigned')) && !opts.yes) {
       throw new SdlcError('weakening_requires_yes',
@@ -226,7 +241,6 @@ export function applyConfig(id: string, opts: Options): void {
           { key: 'config.fix.maintainer' });
       }
     }
-    validateContent(proposal.content, proposal.target);
     proposal.reviewedDiff = unifiedDiff(current, proposal.content);
     writeTextAtomic(file, proposal.content);
     proposal.status = 'applied';

@@ -2,6 +2,7 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { parse } from 'yaml';
+import { digest, writeProposal } from '../src/core/config-proposals.js';
 import { git, humanEnv, initGitRepo, read, runCli, tempDir, write } from './helpers.js';
 
 /**
@@ -89,6 +90,31 @@ describe('1. propose', () => {
 });
 
 describe('2. show', () => {
+  it('shows why an old open proposal fails current validation without hiding it', () => {
+    const roles = [
+      'version: 1', 'signing: off', 'people:',
+      '  pat: { name: Pat, emails: [pat@example.com] }',
+      'roles:', '  maintainer: [pat]', '',
+    ].join('\n');
+    const p = project(roles);
+    const content = roles.replace('emails: [pat@example.com]',
+      'emails: [pat@example.com], signing_key: ../keys/pat.pub');
+    writeProposal(p.root, {
+      id: 'C1', target: 'roles', reason: 'Old key', by: 'Pat',
+      when: '2026-10-17T21:00:00.000Z', baseDigest: digest(roles), content, status: 'open',
+    }, true);
+    const list = p.cli(['config', 'show', '--json']);
+    expect(list.code).toBe(0);
+    expect(list.json<{ proposals: Array<{ id: string }> }>().proposals[0].id).toBe('C1');
+    const shown = p.cli(['config', 'show', 'C1', '--json']);
+    expect(shown.code, shown.stdout + shown.stderr).toBe(0);
+    expect(shown.json<{ validation: string; validationReason: string }>())
+      .toMatchObject({ validation: 'failed', validationReason: expect.stringMatching(/signing_key/) });
+    const applied = p.cli(['config', 'apply', 'C1', '--yes']);
+    expect(applied.code).not.toBe(0);
+    expect(applied.stdout + applied.stderr).toMatch(/signing_key/);
+  }, 240000);
+
   it('lists proposals and shows the diff, the validation and no warning for a harmless change', () => {
     const p = project();
     const id = propose(p, ['--set', 'gates.plan.auto_waive.kinds=[docs]', '--reason', 'Docs need no plan']);

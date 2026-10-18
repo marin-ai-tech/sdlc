@@ -153,7 +153,7 @@ function gates(value: unknown, file: string, field: string): ApprovalGateId[] {
 }
 
 /** Parses roles.yaml text at the boundary (`invalid_roles` with the field on error). */
-export function parseRolesFile(text: string, file = ROLES_PATH): RolesFile {
+export function parseRolesFile(text: string, file = ROLES_PATH, historical = false): RolesFile {
   let parsed: unknown;
   try {
     parsed = parse(text);
@@ -167,12 +167,12 @@ export function parseRolesFile(text: string, file = ROLES_PATH): RolesFile {
     && (typeof raw.signing_since !== 'string' || !raw.signing_since.trim())) {
     invalid(file, 'signing_since', 'must be a nonempty git commit reference');
   }
-  return { signing: raw.signing as SigningMode, people: parsePeople(raw.people, file),
+  return { signing: raw.signing as SigningMode, people: parsePeople(raw.people, file, historical),
     ...(raw.signing_since === undefined ? {} : { signingSince: raw.signing_since as string }),
     roles: parseRoles(raw.roles, raw.people, file), separation: parseSeparation(raw.separation, file) };
 }
 
-function parsePeople(value: unknown, file: string): Person[] {
+function parsePeople(value: unknown, file: string, historical: boolean): Person[] {
   const peopleRaw = mapping(value, file, 'people');
   const seen = new Set<string>();
   const people = Object.entries(peopleRaw).map(([id, value]) => {
@@ -186,11 +186,12 @@ function parsePeople(value: unknown, file: string): Person[] {
       if (seen.has(email)) invalid(file, `people.${id}.emails`, `duplicate email ${email}`);
       seen.add(email);
     }
-    if (item.signing_key !== undefined && !validSigningKey(item.signing_key)) {
+    const validKey = validSigningKey(item.signing_key);
+    if (item.signing_key !== undefined && !validKey && !historical) {
       invalid(file, `people.${id}.signing_key`, 'must be one OpenSSH public key line');
     }
     return { id, name: item.name as string, emails, handles,
-      ...(item.signing_key ? { signingKey: item.signing_key as string } : {}), ...(chat ? { chat } : {}) };
+      ...(validKey ? { signingKey: item.signing_key as string } : {}), ...(chat ? { chat } : {}) };
   });
   return people;
 }

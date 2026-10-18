@@ -165,12 +165,6 @@ export function readProposal(root: string, id: string): ConfigProposal {
     throw new SdlcError('invalid_proposal', { key: 'config.error.invalidProposal', params: { id } },
       { key: 'config.fix.invalidProposal' });
   }
-  try {
-    validateContent(p.content!, p.target!);
-  } catch {
-    throw new SdlcError('invalid_proposal', { key: 'config.error.invalidProposalContent', params: { id } },
-      { key: 'config.fix.invalidProposal' });
-  }
   return p as ConfigProposal;
 }
 

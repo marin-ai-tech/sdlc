@@ -1802,6 +1802,8 @@
   "config.status.applied": "applied",
   "config.status.dismissed": "dismissed",
   "config.status.valid": "valid",
+  "config.status.failed": "failed",
+  "config.status.historical": "historical record (not revalidated)",
   "config.proposed": "Proposed {id}. Review with sdlc config show {id}",
   "config.listItem": "{id} {target} {status} {reason} ({by})",
   "config.showItem": "{id}: {status} — {reason} ({by})",
