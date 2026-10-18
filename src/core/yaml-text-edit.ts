@@ -68,7 +68,9 @@ function editOne(text: string, setting: string): string {
   const existing = map.items.find((item) => item.key?.toString() === key);
   if (isNode(existing?.value) && existing.value.range) {
     const [start, end] = existing.value.range;
-    return `${text.slice(0, start)}${value}${text.slice(end)}`;
+    const old = text.slice(start, end);
+    const eol = old.endsWith('\r\n') ? '\r\n' : old.endsWith('\n') ? '\n' : '';
+    return `${text.slice(0, start)}${value}${eol}${text.slice(end)}`;
   }
   return appendToMap(text, map, depth, key, value);
 }
@@ -76,4 +78,35 @@ function editOne(text: string, setting: string): string {
 /** Edit only the lines named by --set, retaining the original line endings and untouched text. */
 export function editYamlText(text: string, settings: string[]): string {
   return settings.reduce(editOne, text);
+}
+
+/** Remove one map entry without serializing its neighbors. */
+export function removeYamlKey(text: string, path: string[]): string {
+  const doc = parseDocument(text, { uniqueKeys: true });
+  const parent = doc.getIn(path.slice(0, -1), true);
+  if (!isMap(parent)) return text;
+  const index = parent.items.findIndex((item) => item.key?.toString() === path.at(-1));
+  if (index < 0) return text;
+  const pair = parent.items[index];
+  if (!isNode(pair?.key) || !pair.key.range) return text;
+  if (parent.flow) {
+    if (!parent.range) return text;
+    if (parent.items.length === 1) {
+      return text.slice(0, parent.range[0] + 1) + text.slice(parent.range[1] - 1);
+    }
+    const nextKey = parent.items[index + 1]?.key;
+    if (isNode(nextKey) && nextKey.range) {
+      return text.slice(0, pair.key.range[0]) + text.slice(nextKey.range[0]);
+    }
+    const previousValue = parent.items[index - 1]?.value;
+    if (!isNode(previousValue) || !previousValue.range || !isNode(pair.value) || !pair.value.range) {
+      return text;
+    }
+    return text.slice(0, previousValue.range[1]) + text.slice(pair.value.range[1]);
+  }
+  const start = lineStart(text, pair.key.range[0]);
+  const valueEnd = isNode(pair.value) && pair.value.range ? pair.value.range[1] : pair.key.range[1];
+  const next = text.indexOf('\n', valueEnd);
+  const end = next < 0 ? text.length : next + 1;
+  return text.slice(0, start) + text.slice(end);
 }

@@ -8,6 +8,7 @@ import { isFile, isWithin, toPosix } from './core/fs-utils.js';
 import { resolveLocale, setLocale, systemLocale, t } from './core/i18n.js';
 import { appendHookLog } from './core/log.js';
 import { evaluateToolCall, normalizeToolCall, sessionSummary, stopCheck, type Decision, type ToolCall } from './core/policy.js';
+import { shellWriteDestinations } from './core/policy-shell-writes.js';
 import { findProjectRoot, projectPaths } from './core/project.js';
 import { sessionHealthLine } from './core/health/signal.js';
 import { cursorAllow, cursorDefault, cursorDeny, fromCursor, type CursorInput } from './hook-cursor.js';
@@ -134,8 +135,11 @@ function respondPreTool(agent: Agent, decision: Decision, sessionId: string | un
  * targeted. Shell command text is never logged; it can carry secrets.
  */
 function decisionDetail(root: string, call: ToolCall, decision: Decision): string {
-  const files = call.files
-    .map((f) => (path.isAbsolute(f) ? f : path.resolve(call.cwd, f)))
+  const targets = call.kind === 'bash' && call.command
+    ? shellWriteDestinations(call.command, root, call.cwd) : call.files;
+  const base = call.kind === 'bash' ? root : call.cwd;
+  const files = targets
+    .map((f) => (path.isAbsolute(f) ? f : path.resolve(base, f)))
     .filter((f) => isWithin(root, f))
     .map((f) => toPosix(path.relative(root, f)));
   return `${decision.rule ?? 'policy'}: ${call.tool}${files.length > 0 ? ` ${files.slice(0, 5).join(', ')}` : ''}`;
@@ -212,7 +216,7 @@ function preTool(agent: Agent, input: HookInput, project: HookProject): void {
   if (respondPreTool(agent, decision, input.session_id, root) && config.log.hookDecisions && logged) {
     appendHookLog(root, config, {
       event: decision.decision === 'deny' ? 'hook.denied' : 'hook.warned',
-      agent,
+      agent: agent === 'claude' ? 'claude-code' : agent,
       detail: decisionDetail(root, call, decision),
     });
   }

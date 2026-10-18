@@ -29,6 +29,9 @@ only sdlc's are replaced or removed.
 until you trust it: open `/hooks` in Codex and trust sdlc's hooks after `sdlc init` and after an `sdlc update` that
 changed them. `sdlc doctor` reminds you.
 
+Headless `codex exec` may skip project hooks even after that trust. sdlc's command rules still apply. To run sdlc's
+hooks headless, use `--dangerously-bypass-hook-trust` only for hooks you have vetted.
+
 ## 16.2. What Codex enforces
 
 | Rule | In Codex |

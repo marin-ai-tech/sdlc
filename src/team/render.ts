@@ -4,6 +4,7 @@ import { artifactsBlock } from './artifacts.js';
 import { projectBlock } from './facts.js';
 import type { RoleFile } from './role-file.js';
 import { teamLocale } from './sources.js';
+import { readAsset, splitFrontmatter } from '../integrations/assets.js';
 
 /**
  * Generation of the team's subagents (B70): each accepted role becomes `sdlc-<role>` for each tool, its body with
@@ -45,5 +46,7 @@ export function roleBody(role: RoleFile, ctx: RenderContext): string {
   const withArtifacts = applyCliPrefix(fill(role.body, '{{artifacts}}', artifacts), ctx.cli);
   const project = ctx.root ? projectBlock({ root: ctx.root, config: ctx.config, stages: role.stages, locale }) : '';
   const out = project ? fill(withArtifacts, '{{project}}', project) : withArtifacts.split('{{project}}').join('');
-  return `${out.replace(/\n{3,}/g, '\n\n').trimEnd()}\n`;
+  const builtIn = REPLACES[role.id];
+  const instructions = builtIn ? splitFrontmatter(readAsset('agents', `${builtIn}.md`)).body : '';
+  return `${out.replace(/\n{3,}/g, '\n\n').trimEnd()}\n${instructions ? `\n${instructions.trim()}\n` : ''}`;
 }

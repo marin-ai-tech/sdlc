@@ -36,6 +36,9 @@ sdlc doctor                            # check the installation
 or an event receiver's `args`, is unset,
 it warns with the server and variable names, never the value.
 
+On Windows with Claude Code selected, `sdlc doctor` also checks whether Claude Code can find Git Bash. If it cannot,
+the `claude hooks` check explains the blocked tool calls and how to set `CLAUDE_CODE_GIT_BASH_PATH`.
+
 Since 0.16.1, `sdlc doctor --fix` applies only fixes sdlc owns: missing generated files, an outdated stamp, a missing
 or older sdlc git hook, and a missing starter `REVIEW.md`. It keeps edited generated files. Other findings are left to
 you. JSON output separates `fixed` from `manual`.
@@ -63,6 +66,8 @@ the CLI returns `agent_cannot_edit_roles` in an agent session, and the hook deni
 `sdlc init`:
 - creates `openspec/` by running `openspec init` if it does not exist, and makes `sdlc` the default schema. In an existing OpenSpec project, the default schema does not change;
 - copies the schema to `openspec/schemas/sdlc/` and creates `openspec/sdlc.yaml`. Verification commands are detected automatically from `package.json`, `Makefile`, `pyproject`, `go.mod` or `Cargo.toml`;
+- on a later `init` or `update`, edits only changed settings in `openspec/sdlc.yaml`; other lines keep their spacing,
+  comments, flow collections and line endings;
 - generates, for each chosen tool, the workflows (skills, commands), the subagents and what holds the gates: hooks for
   Claude Code, a plugin for OpenCode, the tool's own hooks and rules for Cursor, Codex CLI, Qwen Code and GigaCode
   ([Supported tools](#supported-tools)); plus `REVIEW.md` if it does not exist.

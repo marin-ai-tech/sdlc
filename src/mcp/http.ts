@@ -274,6 +274,9 @@ export async function serveHttp(
   const httpServer = http.createServer((req, res) => {
     onRequest(req, res, token, listen.host, listeningPort(httpServer), projects);
   });
+  // Clients (executors between board calls) pause longer than Node's 5 s default and then meet a closed socket.
+  httpServer.keepAliveTimeout = 65_000;
+  httpServer.headersTimeout = 66_000;
   await listenHttp(httpServer, listen);
   process.stderr.write(`${mcpUrl(listen.host, listeningPort(httpServer))}\n`);
   process.stderr.write(`[sdlc mcp] serving over http (version ${harnessVersion()})\n`);

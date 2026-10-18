@@ -19,6 +19,7 @@ import { hooksDisabledFiles } from './user-guard.js';
 import { harnessVersion } from './version.js';
 import { readYamlObject } from './yaml-io.js';
 import { integrationUnknownKeys } from './config-integration-findings.js';
+import { claudeGitBash, gitBashOnPath } from './claude-git-bash.js';
 import { readManifest, sha256 } from '../integrations/manifest.js';
 import { SETTINGS_PATH } from '../integrations/settings.js';
 import { CURSOR_HOOKS_PATH, cursorHooksInstalled } from '../integrations/cursor-hooks.js';
@@ -178,7 +179,13 @@ function integrationChecks(out: Checks, root: string, config: SdlcConfig): void 
     const message = hasHooks
       ? tt('doctor.hooksInstalled', { path: SETTINGS_PATH })
       : tt('doctor.hooksMissing', { path: SETTINGS_PATH });
-    out.add('claude hooks', hasHooks ? 'ok' : 'warn', message, tt('doctor.fix.update'));
+    const bashMissing = process.platform === 'win32' && !claudeGitBash();
+    const bashMessage = bashMissing ? `; ${tt('doctor.claudeGitBashMissing')}` : '';
+    const bash = bashMissing ? gitBashOnPath() : undefined;
+    const fix = bashMissing
+      ? bash ? tt('doctor.fix.claudeGitBashPath', { path: bash }) : tt('doctor.fix.claudeGitBashInstall')
+      : tt('doctor.fix.update');
+    out.add('claude hooks', hasHooks && !bashMissing ? 'ok' : 'warn', message + bashMessage, fix);
   }
   if (config.tools.includes('opencode')) {
     const plugin = isFile(path.join(root, '.opencode', 'plugins', 'sdlc.js')) ? 'ok' : 'warn';
@@ -216,7 +223,7 @@ function codexCheck(out: Checks, root: string): void {
   const installed = codexHooksInstalled(root) && isFile(path.join(root, CODEX_RULES_PATH));
   const key = installed ? 'doctor.codexHooksInstalled' : 'doctor.codexHooksMissing';
   const hooks = tt(key, { hooks: CODEX_HOOKS_PATH, rules: CODEX_RULES_PATH });
-  const parts = [hooks, tt('doctor.codexTrust'), tt('doctor.codexOff')];
+  const parts = [hooks, tt('doctor.codexTrust'), tt('doctor.codexHeadless'), tt('doctor.codexOff')];
   const fix = installed ? tt('doctor.fix.codexTrust') : tt('doctor.fix.update');
   out.add('codex', 'warn', parts.join('; '), fix);
 }

@@ -2,6 +2,26 @@
 
 All notable changes to sdlc. Versions follow [Semantic Versioning](https://semver.org/); while the major version is 0, a minor version may change behavior.
 
+## 0.23.6 — 2026-10-18
+
+### Changed
+- `sdlc init` and `sdlc update` change only the lines of the keys they set in `openspec/sdlc.yaml` (for example
+  `tools`); every other line stays byte for byte.
+- One name per tool: hook decisions record Claude Code as `claude-code`, like commit trailers and log events; the
+  audit groups older `claude` entries with it.
+- A team role that takes the place of a built-in subagent keeps what sdlc parses: the reviewer role keeps the exact
+  finding format and the coverage line of `review.md`.
+- `sdlc doctor` and the Codex guide say that a headless `codex exec` may run no project hooks after trusting them in
+  `/hooks`; sdlc's command rules still apply.
+
+### Fixed
+- On Windows, `sdlc doctor` warns when Claude Code will not find Git Bash (no `CLAUDE_CODE_GIT_BASH_PATH`, no Git under
+  Program Files): sdlc's hooks would not run and every tool call would be blocked. The fix names the variable and the
+  bash.exe next to the git on PATH.
+- A denied shell command records the files it writes in the hook decision, like an edit.
+- `sdlc mcp serve --http` keeps idle connections for 65 seconds: a client that paused about five seconds between
+  calls (an executor between board calls) no longer got `fetch failed` / `ECONNRESET`.
+
 ## 0.23.5 — 2026-10-18
 
 ### Changed

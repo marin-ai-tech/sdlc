@@ -177,7 +177,9 @@ Take only what the team needs, from sources it trusts. A skill is instructions a
 
   Otherwise an agent could make the tester pass anything.
 - **A person may edit a role.** `sdlc team list` then shows it as `changed`. Like an approval bound to content, a changed role is not generated until it is accepted again. Meanwhile verify and review fall back to the built-in subagents.
-- **Two roles replace built-ins.** The accepted tester and reviewer take the place of `sdlc-verifier` and `sdlc-reviewer` in the verify and review workflows. The old names stay for one version.
+- **Two roles replace built-ins.** The accepted tester and reviewer take the place of `sdlc-verifier` and
+  `sdlc-reviewer` in the verify and review workflows. The old names stay for one version. Generated subagents append
+  the built-in verification and review instructions after the team's role text, including the review.md finding format.
 
 ## 12.8. Commands
 

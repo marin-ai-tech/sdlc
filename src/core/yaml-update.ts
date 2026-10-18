@@ -1,7 +1,8 @@
 import { isDeepStrictEqual } from 'node:util';
-import { isMap, isNode, parseDocument, type Document } from 'yaml';
+import { isMap, isNode, parseDocument, stringify, type Document } from 'yaml';
 import { readText, writeTextAtomic } from './fs-utils.js';
 import { writeYaml } from './yaml-io.js';
+import { editYamlText, removeYamlKey } from './yaml-text-edit.js';
 
 /**
  * Writes settings into a YAML file that people also edit by hand. Only the keys whose value changed are written;
@@ -62,7 +63,45 @@ export function updateYamlFile(file: string, previous: Plain, next: Plain, heade
     writeYaml(file, next, header);
     return;
   }
-  if (applyMap(doc, [], previous, next)) {
-    writeTextAtomic(file, doc.toString({ lineWidth: 0 }));
+  const changes: Array<{ path: Path; value?: unknown; remove?: true }> = [];
+  collectChanges(doc, [], previous, next, changes);
+  if (changes.length === 0) return;
+  let edited = text;
+  for (const change of changes) {
+    if (change.remove) {
+      edited = removeYamlKey(edited, change.path);
+      continue;
+    }
+    const value = stringify(change.value, { collectionStyle: 'flow', lineWidth: 0 }).trimEnd();
+    edited = editYamlText(edited, [`${change.path.join('.')}=${value}`]);
+  }
+  writeTextAtomic(file, edited);
+}
+
+function collectChanges(
+  doc: Document,
+  path: Path,
+  previous: Plain,
+  next: Plain,
+  changes: Array<{ path: Path; value?: unknown; remove?: true }>,
+): void {
+  for (const [key, value] of Object.entries(next)) {
+    const at = [...path, key];
+    if (value === undefined) {
+      if (doc.hasIn(at)) {
+        changes.push({ path: at, remove: true });
+      }
+      continue;
+    }
+    if (previous[key] !== undefined && !doc.hasIn(at) && isDeepStrictEqual(previous[key], value)) continue;
+    if (isPlain(value) && isMap(doc.getIn(at, true))) {
+      collectChanges(doc, at, isPlain(previous[key]) ? previous[key] as Plain : {}, value, changes);
+    } else if (!isDeepStrictEqual(currentValue(doc, at), value)) {
+      changes.push({ path: at, value });
+    }
+  }
+  for (const key of Object.keys(previous)) {
+    const at = [...path, key];
+    if (!(key in next) && doc.hasIn(at)) changes.push({ path: at, remove: true });
   }
 }

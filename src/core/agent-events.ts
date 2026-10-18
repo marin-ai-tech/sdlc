@@ -6,7 +6,10 @@ export function agentEvents(root: string, since?: string, change?: string) {
     && (!change || entry.change === change));
   const byAgent: Record<string, number> = {};
   for (const entry of entries) {
-    if (entry.agent) byAgent[entry.agent] = (byAgent[entry.agent] ?? 0) + 1;
+    if (entry.agent) {
+      const agent = entry.agent === 'claude' ? 'claude-code' : entry.agent;
+      byAgent[agent] = (byAgent[agent] ?? 0) + 1;
+    }
   }
   return { agent: Object.values(byAgent).reduce((total, count) => total + count, 0),
     total: entries.length, byAgent };

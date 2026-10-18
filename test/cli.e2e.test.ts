@@ -133,7 +133,7 @@ describe('sdlc CLI end to end (with the bundled OpenSpec)', () => {
   it('logs hook denials with the rule and tool, never the command text', () => {
     cli(['hook', 'pre-tool'], {}, JSON.stringify({ cwd: root, tool_name: 'Bash', tool_input: { command: 'sdlc approve plan --token s3cr3t' } }));
     const denial = logEntries().filter((e) => e.event === 'hook.denied').at(-1)!;
-    expect(denial).toMatchObject({ agent: 'claude', detail: 'separation-of-duties: Bash', sdlc: VERSION, license: COMMUNITY });
+    expect(denial).toMatchObject({ agent: 'claude-code', detail: 'separation-of-duties: Bash', sdlc: VERSION, license: COMMUNITY });
     expect(read(path.join(root, 'openspec/.sdlc/log.jsonl'))).not.toContain('s3cr3t');
   });
 
