@@ -104,7 +104,8 @@ the gates and the main limit of each are in the [supported tools](docs/en/05-gui
   [a bug fix from an alert](docs/en/24-bugfix-incident-example.md),
   [CI, release protection and upgrading](docs/en/25-ci-release-upgrade-example.md),
   [signed approvals and an audit](docs/en/26-signed-audit-example.md),
-  [sdlc over MCP and events](docs/en/27-mcp-integrations-example.md)
+  [sdlc over MCP and events](docs/en/27-mcp-integrations-example.md),
+  [an executor swarm and the auction](docs/en/28-executor-swarm-example.md)
 - [The AI-ready project layout](docs/en/07-ai-ready-project.md),
   [roles and signed approvals](docs/en/08-roles-and-signing.md),
   [integrations and MCP](docs/en/10-integrations.md), [the agent team](docs/en/12-agent-team.md),
