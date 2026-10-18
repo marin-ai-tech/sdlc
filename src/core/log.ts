@@ -70,11 +70,20 @@ function logEntry(config: Pick<SdlcConfig, 'license'>, input: LogInput, stamp: H
 /** Hook processes only append; the next ordinary log write drains the local queue. */
 export function appendHookLog(root: string, config: SdlcConfig & QueueConfig, input: LogInput): void {
   if (!config.log.enabled || !config.log.hookDecisions) return;
+  appendLocalLog(root, config, input);
+}
+
+/** Reading commands queue observations without changing the tracked project log. */
+export function appendLocalLog(
+  root: string, config: Pick<SdlcConfig, 'license' | 'log'> & QueueConfig,
+  input: LogInput, stamp: HarnessStamp = harnessStamp(config),
+): void {
+  if (!config.log.enabled) return;
   try {
     const file = path.join(root, HOOK_LOG_PATH);
     ensureDir(path.dirname(file));
     ensureHookIgnore(root);
-    const entry = logEntry(config, input, harnessStamp(config));
+    const entry = logEntry(config, input, stamp);
     fs.appendFileSync(file, `${JSON.stringify(entry)}\n`, 'utf-8');
     queueEvent(root, config, entry);
   } catch {

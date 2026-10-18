@@ -1,7 +1,7 @@
 import type { AwaitedGate } from './awaiting.js';
 import type { ApprovalGateId, SdlcConfig } from './config.js';
 import type { HarnessStamp } from './license.js';
-import { appendLog, type LogEntry } from './log.js';
+import { appendLocalLog, type LogEntry } from './log.js';
 import type { QueueConfig } from '../mcp/outbox.js';
 
 /**
@@ -46,6 +46,6 @@ export function recordOverdue(
   if (entries.some((entry) => sameWait(entry, event, waiting))) return;
   const waitingFor = waiting.people ?? firstAwaiting(entries, waiting)?.waitingFor;
   const input = { event, change: waiting.change, detail: waiting.digest, ...(waitingFor ? { waitingFor } : {}) };
-  appendLog(root, config, input, stamp);
+  appendLocalLog(root, config, input, stamp);
   entries.push({ ts: new Date().toISOString(), sdlc: '', license: '', ...input });
 }

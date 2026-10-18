@@ -186,13 +186,27 @@ function parsePeople(value: unknown, file: string): Person[] {
       if (seen.has(email)) invalid(file, `people.${id}.emails`, `duplicate email ${email}`);
       seen.add(email);
     }
-    if (item.signing_key !== undefined && typeof item.signing_key !== 'string') {
-      invalid(file, `people.${id}.signing_key`, 'must be a string');
+    if (item.signing_key !== undefined && !validSigningKey(item.signing_key)) {
+      invalid(file, `people.${id}.signing_key`, 'must be one OpenSSH public key line');
     }
     return { id, name: item.name as string, emails, handles,
       ...(item.signing_key ? { signingKey: item.signing_key as string } : {}), ...(chat ? { chat } : {}) };
   });
   return people;
+}
+
+function validSigningKey(value: unknown): value is string {
+  if (typeof value !== 'string' || /[\r\n]/.test(value)) return false;
+  const type = '(?:ssh-ed25519|ssh-rsa|ecdsa-sha2-nistp(?:256|384|521)'
+    + '|sk-ssh-ed25519@openssh\\.com|sk-ecdsa-sha2-nistp256@openssh\\.com)';
+  const match = new RegExp(`^${type} ([A-Za-z0-9+/]+={0,2})(?: [^\\r\\n]+)?$`).exec(value);
+  if (!match || match[1].length % 4 !== 0) return false;
+  const blob = Buffer.from(match[1], 'base64');
+  if (blob.toString('base64') !== match[1] || blob.length < 8) return false;
+  const nameLength = blob.readUInt32BE(0);
+  const algorithm = value.split(' ', 1)[0];
+  return nameLength > 0 && 4 + nameLength < blob.length
+    && blob.subarray(4, 4 + nameLength).toString('ascii') === algorithm;
 }
 
 function parseRoles(value: unknown, people: unknown, file: string): Record<string, string[]> {

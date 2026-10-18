@@ -363,7 +363,7 @@ export async function waiveCommand(gateArg: string, opts: DecisionOptions): Prom
  * agent may do it; unlocking is a human decision.
  */
 export async function testsCommand(
-  action: string, opts: { change?: string; json?: boolean; by?: string },
+  action: string, opts: { change?: string; json?: boolean; by?: string; note?: string },
 ): Promise<void> {
   try {
     if (action !== 'lock' && action !== 'unlock') {
@@ -375,7 +375,7 @@ export async function testsCommand(
     const state = readChangeState(ref.dir);
     const identity = opts.by ?? formatIdentity(gitIdentity(ctx.root)) ?? agentEnvironment() ?? 'unknown';
     state.tests_locked = action === 'lock';
-    recordChangeEvent(ctx, ref, state, `tests.${action}ed`, identity);
+    recordChangeEvent(ctx, ref, state, `tests.${action}ed`, identity, action === 'unlock' ? opts.note : undefined);
     if (opts.json) return printJson({ change: ref.id, testsLocked: state.tests_locked });
     line(action === 'lock'
       ? c.green(t('tests.locked', { change: ref.id }))

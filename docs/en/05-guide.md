@@ -4,6 +4,11 @@
 
 An agent or person runs `sdlc config propose --set <key>=<yaml> --reason <text>` and then
 `sdlc config show <id>`. The show command presents the proposed diff, validation and weakening warnings.
+Use one proposal per change: pass several `--set` options for related settings, then apply one id.
+The diff shows only changed lines and keeps the file's line endings and untouched formatting. An open proposal
+for the same file is named when another is proposed; applying one makes the other stale. For roles, use one
+OpenSSH public key line in each `signing_key`. When turning signing on, include `signing_since` to keep earlier
+approvals pre-signing; without it, the proposal warns how many unsigned approvals will fail verification.
 Applied and dismissed proposals retain the diff at the decision; older records without a saved diff
 compare with the current file and say so. Config log events identify the proposer and decision maker by name and email.
 Use `--target roles` for `openspec/roles.yaml`. Only a person runs `sdlc config apply <id>` or
@@ -231,7 +236,12 @@ The plan names the reproducing test and files to change. A person approves it wi
 `sdlc approve plan --change <id>` before the agent writes any test.
 1. The first task is a test that reproduces the bug. Make sure it fails for the right reason, and commit it.
 2. `sdlc tests lock --change <id>` — from then on, hooks do not let the agent change the tests.
-3. Fix the code. Only a human can remove the lock: `sdlc tests unlock`.
+3. Fix the code. Only a human can remove the lock: `sdlc tests unlock --change <id>`. The optional
+   `--note "reason"` records why in the change record, log and audit.
+
+Artifact instructions return `resolvedOutputPath`; write each artifact there. If an artifact such as `plan.md` is
+at the repository root while the change folder lacks it, `sdlc next` and `sdlc status` show its destination under
+`openspec/changes/<id>/`.
 
 ### Review with lenses and coverage
 

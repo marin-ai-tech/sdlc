@@ -13,7 +13,10 @@ Help the person review a precise change to `openspec/sdlc.yaml` or `openspec/rol
 **Input**: {{input}}
 
 1. Ask what the person wants changed and why. Check the current settings and roles.
-2. Run `sdlc config propose --set <key>=<yaml value> --reason <reason>`; use `--target roles` for roles.
+2. Make one proposal per change. Put related keys, such as all signing keys or `signing` with
+   `signing_since`, in one `sdlc config propose` command with several `--set` options; use `--target roles`
+   for roles. `sdlc config apply` takes one proposal id. An open proposal for the same file is a warning:
+   applying either proposal makes the other stale.
 3. Run `sdlc config show <id>`. Show the diff and explain each weakening warning in plain words.
 4. Give the person the exact `sdlc config apply <id>` command to run in their own terminal. If the proposal
    weakens the process, explain `--yes`. A changed target makes the proposal stale; propose again.

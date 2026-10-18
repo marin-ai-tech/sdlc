@@ -21,7 +21,7 @@ function printTasks(trace: Trace): void {
   for (const task of trace.tasks) {
     const commits = task.commits.map((hash) => hash.slice(0, 7)).join(', ');
     const link = commits ? t('trace.commits', { commits }) : t('trace.noCommit');
-    line(`  ${task.id} [${task.done ? 'x' : ' '}] ${task.text} — ${link}`);
+    line(`  ${task.id ?? '-'} [${task.done ? 'x' : ' '}] ${task.text} — ${link}`);
   }
 }
 

@@ -1,8 +1,8 @@
-import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { loadConfig } from '../src/core/config.js';
 import { recordHealthSignals } from '../src/core/health/signal.js';
+import { readLog } from '../src/core/log.js';
 import { git, humanEnv, initGitRepo, runCli, tempDir } from './helpers.js';
 
 /**
@@ -16,8 +16,7 @@ function project() {
   git(root, ['commit', '-q', '--allow-empty', '-m', 'init']);
   expect(runCli(['init', '--tools', 'none', '--json'], root, humanEnv(tempDir('sdlc-home-'))).code).toBe(0);
   const config = loadConfig(path.join(root, 'openspec/sdlc.yaml'));
-  const events = (name: string) => fs.readFileSync(path.join(root, 'openspec/.sdlc/log.jsonl'), 'utf-8').trim()
-    .split('\n').map((line) => JSON.parse(line)).filter((entry: { event: string }) => entry.event === name);
+  const events = (name: string) => readLog(root).filter((entry) => entry.event === name);
   return { root, config, events };
 }
 

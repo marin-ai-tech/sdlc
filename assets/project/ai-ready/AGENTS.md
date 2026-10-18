@@ -50,6 +50,8 @@ Run the project verify commands before claiming a change is done:
 4. During a bug fix, locked / pinned tests are not edited; only product code (and new failing tests when the plan says so).
 5. Keep the diff inside the approved plan. If you must deviate, record the deviation in the change notes and stop for a human.
 6. Prefer small, reversible steps; do not invent scope.
+7. Change `openspec/sdlc.yaml` and `openspec/roles.yaml` only through a settings proposal:
+   `sdlc config propose` and the `sdlc-config` workflow. A person applies the proposal.
 
 ## Definition of done
 

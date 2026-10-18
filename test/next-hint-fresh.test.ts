@@ -100,7 +100,7 @@ describe('B88: the Next: line and the status line are as fresh as sdlc next', ()
     expect(nextLine(verified.stdout)).not.toMatch(/archive/i);
     expect(statusLine()).toContain(stageTitle());
     expect(statusLine()).toMatch(/person/);
-    const log = read(path.join(root, 'openspec/.sdlc/log.jsonl')).trim().split('\n').map((line) => JSON.parse(line));
+    const log = cli(['log', '--json']).json<{ entries: Array<{ event: string }> }>().entries;
     expect(log.filter((entry) => entry.event === 'gate.review.awaiting').length).toBeGreaterThanOrEqual(1);
   }, 120000);
 

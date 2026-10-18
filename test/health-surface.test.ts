@@ -28,8 +28,8 @@ function project(verify: boolean) {
     write(file, stringify(config));
   };
   setVerify(verify);
-  const events = (name: string) => read(path.join(root, 'openspec/.sdlc/log.jsonl')).trim().split('\n')
-    .map((l) => JSON.parse(l)).filter((e: { event: string }) => e.event === name);
+  const events = (name: string) => cli(['log', '--json'])
+    .json<{ entries: Array<{ event: string; detail?: string }> }>().entries.filter((entry) => entry.event === name);
   const session = () => {
     const r = cli(['hook', 'session-start'], JSON.stringify({ cwd: root, source: 'startup' }));
     return r.stdout.trim() ? String(JSON.parse(r.stdout).hookSpecificOutput.additionalContext) : '';

@@ -1,7 +1,7 @@
 import { recordAutoWaived } from './auto-waive.js';
 import type { HarnessStamp } from './license.js';
 import type { LifecycleView } from './lifecycle.js';
-import { appendLog, readLog, type LogEntry } from './log.js';
+import { appendLocalLog, readLog, type LogEntry } from './log.js';
 import { recordOverdue, type WaitConfig } from './overdue.js';
 
 /**
@@ -50,7 +50,7 @@ function logAwaiting(
 ): void {
   const people = waiting.people ? { waitingFor: waiting.people } : {};
   const input = { event: `gate.${waiting.gate}.awaiting`, change: waiting.change, detail: waiting.digest, ...people };
-  appendLog(root, config, input, stamp);
+  appendLocalLog(root, config, input, stamp);
   entries.push({ ts: new Date().toISOString(), sdlc: '', license: '', ...input });
 }
 

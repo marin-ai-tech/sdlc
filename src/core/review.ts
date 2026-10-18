@@ -140,14 +140,19 @@ export interface CoverageResult {
 export function parseCoverage(content: string): CoverageEntry[] {
   const entries: CoverageEntry[] = [];
   let inCoverage = false;
+  let heading: string | undefined;
   for (const [index, line] of content.split(/\r?\n/).entries()) {
-    if (/^##\s+/.test(line)) { inCoverage = /^##\s+Coverage\s*$/i.test(line); continue; }
+    if (/^##\s+/.test(line)) { inCoverage = /^##\s+Coverage\s*$/i.test(line); heading = undefined; continue; }
     if (/^#\s+/.test(line)) { inCoverage = false; continue; }
     if (!inCoverage) continue;
+    const pass = /^###\s+([a-z]+(?:-[a-z]+)*)\s*$/i.exec(line);
+    if (pass) { heading = pass[1].toLowerCase(); continue; }
+    if (!line.trim()) continue;
     const match = /^\s*[-*]\s+([a-z]+(?:-[a-z]+)*)\s*[:\-—]\s*(.*)$/i.exec(line);
-    if (!match) continue;
-    const name = match[1].toLowerCase();
-    const value = match[2].trim();
+    const name = heading ?? match?.[1].toLowerCase();
+    const value = heading ? line.trim() : match?.[2].trim();
+    heading = undefined;
+    if (!name || !value) continue;
     const count = /^(\d+)\s+findings?\b/i.exec(value);
     if (count) entries.push({ name, findings: Number(count[1]), line: index + 1 });
     else if (/^none found\b/i.test(value)) {

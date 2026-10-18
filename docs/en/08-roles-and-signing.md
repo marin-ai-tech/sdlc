@@ -124,6 +124,10 @@ git config commit.gpgsign true
 ```
 
 Then put the public key into `signing_key` in `roles.yaml` (a maintainer commits that change).
+`signing_key` must be a single OpenSSH public key line. A path to a key file is invalid, and the roles parser
+rejects it for proposals, applies, verification and doctor. When enabling signing on an existing project, include
+`signing_since` in the same proposal if earlier approvals should remain pre-signing. Otherwise `config show` warns
+how many unsigned approvals will fail `sdlc approvals verify`.
 
 Since 0.16.3, a commit before any key exists passes as `pre-signing` if it adds no key. The first key-adding
 commit is checked against its own version. It passes as `bootstrap` when signed by a maintainer listed there.

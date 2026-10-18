@@ -25,6 +25,15 @@ for newcomers.
 | A newcomer learns sdlc in an hour | `sdlc guide tour`: seven steps through the calculator demo | 0.11.4 |
 | Repeated gate rejections surface | `quality.rejections` warns at two; `health.rejections` tunes it | 0.22.2 |
 | Other branches appear as hints | `next --me`, health, report and dashboard name them | 0.22.2 |
+| Missing gate decision log entries surface | `discipline.log-gaps` compares active and archived change records with the shared log and local queue | 0.23.2 |
+
+`discipline.log-gaps` counts approved, rejected and waived gate decisions recorded in each change's history and
+compares them with the project log, including its local queue. Each fact names the change, gate and missing count.
+A missing or malformed log remains a separate log integrity concern; health reports gaps without failing the command.
+Wait observations from `status`, `next` and other reading commands go to the ignored local queue first, preserving
+their first-seen time for audit. The next project log write drains that queue into the shared log. Policy auto-waives
+also update the change record, so reading a change can still record that decision there.
+Health state signals from `sdlc health` and session start use the same queue; `sdlc log` includes queued entries.
 | A gate's artifacts are checked by the team's rubric before a person looks | `gates.<gate>.judge` and `sdlc judge`: a person cannot approve until a verdict passes | 0.20.0 |
 
 ## 13.2. Use cases

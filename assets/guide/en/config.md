@@ -6,10 +6,14 @@ summary: The main keys of openspec/sdlc.yaml and who may change them.
 
 ## Propose, review, apply
 
-An agent or person can run `sdlc config propose --set enforcement.mode=warn --reason "Trial week"`.
-Use `--target roles` for `openspec/roles.yaml`, or `--file` for a complete proposed file. The command validates and
-stores a proposal without changing the target. Run `sdlc config show` to list proposals and
-`sdlc config show C1` to inspect the exact diff, validation and warnings.
+Run `sdlc config propose --set enforcement.mode=warn --reason "Trial week"`. Use `--target roles` for
+`openspec/roles.yaml`, or `--file` for a complete proposed file. Propose validates without applying.
+Use `sdlc config show` to list proposals and `sdlc config show C1` for the diff and warnings.
+Use one proposal per change, with several `--set` options for related keys; `config apply` takes one id.
+Another open proposal for the file is named because applying either makes the other stale. The diff keeps
+untouched lines and line endings. `signing_key` must be one OpenSSH public key line, not a path. Include
+`signing_since` when enabling signing to keep earlier approvals pre-signing; otherwise `config show` warns
+how many unsigned approvals will fail verification. This warning does not require `--yes`.
 
 Only a person runs `sdlc config apply C1` or `sdlc config dismiss C1 --note "Not now"` in their own terminal.
 When `roles.yaml` exists, applying requires its `maintainer` role. A change to the target since the proposal makes

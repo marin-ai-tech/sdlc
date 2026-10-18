@@ -48,7 +48,7 @@ export function evaluateReviewGate(
     }
     const coverage = checkCoverage(findings, parseCoverage(content), [...config.review.passes, ...config.review.lenses]);
     if (!reviewBlocked && config.review.requireLensCoverage && (coverage.missing.length || coverage.unchecked.length)) {
-      reviewBlocked = lr('gate.reviewCoverage', {
+      reviewBlocked = lr(coverage.unchecked.length ? 'gate.reviewCoverageUnchecked' : 'gate.reviewCoverage', {
         missing: coverage.missing.join(', '),
         unchecked: coverage.unchecked.join(', '),
       });

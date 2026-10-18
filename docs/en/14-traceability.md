@@ -118,3 +118,9 @@ one summary per project and day, so run it once a day from a scheduler or a CI j
 
 When a change has tasks but no commit names any of them with an `SDLC-Task` trailer, `sdlc trace` reports one
 `tasks-without-trailers` gap with the task count. Once a commit names a task, unnamed tasks are listed individually.
+Every checkbox task appears in the trace. A task without an `n.m` number has no id or linked commits and gets a
+`task-without-number` gap because an `SDLC-Task` trailer cannot name it. If a review coverage count disagrees with
+the findings under that pass, `review-coverage-mismatch` names the declared and actual counts.
+
+The evidence bundle records `signing.mode` and the resolved full `signing.since` commit in `index.json`.
+`index.md` explains that approvals recorded in or before `signing_since` are `pre-signing` and need no signature.

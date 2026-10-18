@@ -2,6 +2,35 @@
 
 All notable changes to sdlc. Versions follow [Semantic Versioning](https://semver.org/); while the major version is 0, a minor version may change behavior.
 
+## 0.23.2 — 2026-10-18
+
+### Added
+- `sdlc health` reports `discipline.log-gaps` when a gate decision in a change record (approved, rejected, waived)
+  has no entry in the log, for example after a line was deleted from `openspec/.sdlc/log.jsonl` by hand.
+- `sdlc tests unlock --note <text>` records why the tests were unlocked; the log and `sdlc audit` show it.
+- The evidence bundle of `sdlc audit --export` names the signing mode and the `signing_since` cutoff, and its legend
+  explains `pre-signing`.
+- `sdlc trace` lists every task, numbered or not, and reports the gaps `task-without-number` and
+  `review-coverage-mismatch` (a coverage count in review.md that the findings do not match).
+
+### Changed
+- Commands that only read (status, next, list, show, log, health, audit, the dashboard) record waits in the
+  git-ignored local queue, like hook decisions: running them, or an agent that runs them, leaves the working copy
+  clean. The next command that writes the log moves the waits into the shared log.
+- `sdlc config propose --set` changes only the lines of the keys it sets and keeps everything else byte for byte:
+  alignment, flow mappings, comments and CRLF line ends. `sdlc config show` prints a minimal line diff.
+- A proposal names the other open proposals for the same file; the `sdlc-config` workflow asks for one proposal per
+  change.
+- A roles.yaml proposal that turns signing on without `signing_since` says how many approvals are unsigned and will
+  fail `sdlc approvals verify`.
+- `sdlc next` says where an artifact found at the repository root belongs (`openspec/changes/<id>/plan.md`); the
+  plan, build, verify, review and release workflows name `resolvedOutputPath`. The agent guide (AGENTS.md) says that
+  the process settings change only through `sdlc config propose`.
+- Review coverage may use one `### <pass>` heading per pass; the refusal shows the line a pass needs.
+
+### Fixed
+- `signing_key` in roles.yaml must be an OpenSSH public key line; a path or other text is refused naming the person.
+
 ## 0.23.1 — 2026-10-17
 
 ### Added

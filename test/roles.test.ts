@@ -11,7 +11,8 @@ const ROLES = [
   'version: 1',
   'signing: off',
   'people:',
-  '  alice: { name: Alice Ivanova, emails: [Alice@Corp.example], signing_key: "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIalice alice@corp" }',
+  '  alice: { name: Alice Ivanova, emails: [Alice@Corp.example], signing_key: "ssh-ed25519 '
+    + 'AAAAC3NzaC1lZDI1NTE5AAAAILeSy3Bx57azZITi0juE+3UqUrIWVyNznE+XogQim4Ul alice@corp" }',
   '  bob: { name: Bob Petrov, emails: [bob@corp.example] }',
   '  carol: { name: Carol Smirnova, emails: [carol@corp.example] }',
   'roles:',
@@ -64,7 +65,9 @@ describe('roles.yaml (core)', () => {
 
   it('allowed_signers lists people with an ssh key, one principal per email', () => {
     const lines = allowedSigners(parseRolesFile(ROLES)).trim().split('\n');
-    expect(lines).toEqual(['alice@corp.example ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIalice alice@corp']);
+    expect(lines).toEqual([
+      'alice@corp.example ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAILeSy3Bx57azZITi0juE+3UqUrIWVyNznE+XogQim4Ul alice@corp',
+    ]);
   });
 
   it('changeAuthors reads commit authors and Co-authored-by trailers outside openspec/', () => {

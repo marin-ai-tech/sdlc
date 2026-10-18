@@ -43,8 +43,9 @@ function project() {
   }
   const next = () => cli(['next', '--change', CHANGE, '--json']).json().next;
   const mine = () => JSON.stringify(cli(['next', '--me', '--json']).json());
-  const awaiting = (gate: string) => read(path.join(root, 'openspec/.sdlc/log.jsonl')).trim().split('\n')
-    .map((line) => JSON.parse(line)).filter((e) => e.event === `gate.${gate}.awaiting`).length;
+  const awaiting = (gate: string) => cli(['log', '--json'])
+    .json<{ entries: Array<{ event: string }> }>().entries
+    .filter((entry) => entry.event === `gate.${gate}.awaiting`).length;
   const edit = (file: string) => fs.appendFileSync(path.join(dir, file), '\n- Empty names get "Goodbye, friend".\n');
   return { cli, next, mine, awaiting, edit };
 }

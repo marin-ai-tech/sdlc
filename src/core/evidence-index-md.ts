@@ -38,7 +38,11 @@ function headLines(index: EvidenceIndex): string[] {
     `Generated: ${index.generatedAt} with sdlc ${index.harness.version} (${index.harness.license}).`,
     `Log period: ${period} (log.jsonl).`,
     `Changes: ${index.changes.length}. Approvals: ${index.approvals.length}.`,
+    `Signing mode: ${index.signing.mode}.`,
+    ...(index.signing.since
+      ? [`signing_since ${index.signing.since}: approvals in it or before it are pre-signing.`] : []),
     'Signature: the status `sdlc approvals verify` computes; not-checked when roles.yaml has no signing mode.',
+    'pre-signing: approval recorded in or before signing_since; its signature is not required.',
     'Trailer: whether the approval commit trailer (SDLC-Approval) is reachable from HEAD.',
   ];
 }

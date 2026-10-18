@@ -9,16 +9,17 @@ import * as path from 'node:path';
 import type { ChangeRef } from './changes.js';
 import { readText } from './fs-utils.js';
 import { git } from './git.js';
-import { parseFindings } from './review.js';
+import { checkCoverage, parseCoverage, parseFindings } from './review.js';
 import { parseTasks } from './tasks.js';
 
 export interface TraceEvidence { row: string; run: string; seen: string; result: string }
 export interface TraceScenario { name: string; evidence: TraceEvidence[] }
 export interface TraceRequirement { name: string; file: string; scenarios: TraceScenario[] }
-export interface TraceTask { id: string; text: string; done: boolean; commits: string[] }
+export interface TraceTask { id?: string; text: string; done: boolean; commits: string[] }
 export interface TraceFinding { id: string; title: string; status?: string; deferredTo?: string }
 export type GapKind = 'requirement-without-scenario' | 'scenario-without-evidence' | 'task-without-commit'
-  | 'tasks-without-trailers' | 'finding-without-status';
+  | 'tasks-without-trailers' | 'finding-without-status' | 'task-without-number'
+  | 'review-coverage-mismatch';
 export interface TraceGap { kind: GapKind; ref: string }
 
 export interface Trace {
@@ -97,10 +98,10 @@ function commitsByTask(root: string, change: string): Map<string, string[]> {
 function parseTraceTasks(root: string, ref: ChangeRef): TraceTask[] {
   const commits = commitsByTask(root, ref.id);
   const progress = parseTasks(readText(path.join(ref.dir, 'tasks.md')) ?? '');
-  return progress.tasks.flatMap((task) => {
+  return progress.tasks.map((task) => {
     const match = TASK_ID.exec(task.description);
-    if (!match) return [];
-    return [{ id: match[1], text: match[2], done: task.done, commits: commits.get(match[1]) ?? [] }];
+    if (!match) return { text: task.description, done: task.done, commits: [] };
+    return { id: match[1], text: match[2], done: task.done, commits: commits.get(match[1]) ?? [] };
   });
 }
 
@@ -125,7 +126,7 @@ function parseTraceFindings(dir: string): TraceFinding[] {
   }));
 }
 
-function findGaps(trace: Omit<Trace, 'gaps'>): TraceGap[] {
+function findGaps(trace: Omit<Trace, 'gaps'>, dir: string): TraceGap[] {
   const gaps: TraceGap[] = [];
   for (const requirement of trace.requirements) {
     if (requirement.scenarios.length === 0) gaps.push({ kind: 'requirement-without-scenario', ref: requirement.name });
@@ -133,15 +134,26 @@ function findGaps(trace: Omit<Trace, 'gaps'>): TraceGap[] {
       if (scenario.evidence.length === 0) gaps.push({ kind: 'scenario-without-evidence', ref: scenario.name });
     }
   }
-  if (trace.tasks.length > 0 && trace.tasks.every((task) => task.commits.length === 0)) {
-    gaps.push({ kind: 'tasks-without-trailers', ref: String(trace.tasks.length) });
+  for (const task of trace.tasks.filter((entry) => !entry.id)) {
+    gaps.push({ kind: 'task-without-number', ref: task.text });
+  }
+  const numbered = trace.tasks.filter((entry) => entry.id);
+  if (numbered.length > 0 && numbered.every((task) => task.commits.length === 0)) {
+    gaps.push({ kind: 'tasks-without-trailers', ref: String(numbered.length) });
   } else {
-    for (const task of trace.tasks.filter((entry) => entry.commits.length === 0)) {
-      gaps.push({ kind: 'task-without-commit', ref: task.id });
+    for (const task of numbered.filter((entry) => entry.commits.length === 0)) {
+      gaps.push({ kind: 'task-without-commit', ref: task.id! });
     }
   }
   for (const finding of trace.findings.filter((entry) => entry.status === undefined)) {
     gaps.push({ kind: 'finding-without-status', ref: finding.id });
+  }
+  const review = readText(path.join(dir, 'review.md')) ?? '';
+  const coverage = parseCoverage(review);
+  const mismatched = checkCoverage(parseFindings(review), coverage, coverage.map((entry) => entry.name)).mismatched;
+  for (const item of mismatched) {
+    gaps.push({ kind: 'review-coverage-mismatch',
+      ref: `${item.name}: ${item.declared} declared, ${item.actual} found` });
   }
   return gaps;
 }
@@ -164,5 +176,5 @@ export function buildTrace(root: string, ref: ChangeRef): Trace {
     tasks: parseTraceTasks(root, ref),
     findings: parseTraceFindings(ref.dir),
   };
-  return { ...partial, gaps: findGaps(partial) };
+  return { ...partial, gaps: findGaps(partial, ref.dir) };
 }

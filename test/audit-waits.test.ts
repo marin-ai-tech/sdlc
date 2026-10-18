@@ -25,7 +25,7 @@ function project() {
   write(file, stringify(config));
   expect(cli(['new', 'demo', '--json']).code).toBe(0);
   write(path.join(root, 'openspec/changes/demo/intent.md'), INTENT);
-  const events = () => read(path.join(root, 'openspec/.sdlc/log.jsonl')).trim().split('\n').map((l) => JSON.parse(l));
+  const events = () => cli(['log', '--json']).json<{ entries: Array<{ event: string; detail?: string }> }>().entries;
   return { root, cli, events };
 }
 

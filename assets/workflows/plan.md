@@ -18,10 +18,11 @@ Produce the implementation plan - Stage 3 (Build). Nothing is implemented withou
 3. **Draft `plan.md`**: `sdlc instructions plan --change <id> --json`, then fill every section - files that change,
    order of work (mark independent steps `[parallel]`), risks, alternatives considered, proof (tests per spec scenario,
    the `sdlc verify` checks, visual evidence), rollback. Under "Files that change", write paths in backticks, one per
-   list item.
+   list item. Write the artifact to `resolvedOutputPath` from that JSON response.
 4. **Interrogate the plan with the engineer.** Ask: what could this change break? Which step is riskiest? Which options were rejected and why? Iterate until an engineer who never saw this conversation could implement the change from plan.md alone.
 5. **Write `tasks.md`**: `sdlc instructions tasks --change <id> --json`. For a bug fix, name the reproducing
-   test in the plan; the first build task writes and runs it after a person approves the plan.
+   test in the plan; the first build task writes and runs it after a person approves the plan. Write tasks to that
+   response's `resolvedOutputPath`.
 6. **Stop at the gate.** Present the plan and give the engineer the approval command: `sdlc approve plan --change <id>` (`risk: high` also needs `--as tech-lead`). Implementation starts with {{cmd:build}} only after approval.
 
 **Guardrails**

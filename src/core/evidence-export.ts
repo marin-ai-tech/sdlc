@@ -48,6 +48,7 @@ export interface EvidenceIndex {
   changes: string[];
   approvals: ExportApproval[];
   rolesCommits: ReturnType<typeof rolesSignatures>;
+  signing: { mode: RolesFile['signing']; since?: string };
 }
 
 export interface ExportSummary {
@@ -193,7 +194,8 @@ export function periodLog(root: string, since: string | undefined, change: Chang
 }
 
 function buildIndex(project: ExportProject, refs: ChangeRef[], since: string | undefined): EvidenceIndex {
-  const roles = signingRoles(project.root);
+  const configured = readRolesFile(project.root);
+  const roles = configured?.signing === 'off' ? undefined : configured;
   const rolesCommits = roles
     ? withAllowedSigners(roles, (signers) => rolesSignatures(project.root, signers))
     : [];
@@ -205,6 +207,11 @@ function buildIndex(project: ExportProject, refs: ChangeRef[], since: string | u
     changes: refs.map(bundleId),
     approvals: exportApprovals(project.root, refs, roles),
     rolesCommits,
+    signing: {
+      mode: configured?.signing ?? 'off',
+      ...(configured?.signingSince
+        ? { since: resolveSigningSince(project.root, configured.signingSince) } : {}),
+    },
   };
 }
 

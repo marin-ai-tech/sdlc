@@ -5,6 +5,7 @@ import {
   contextStaleFinding, doctorFinding, enforcementFinding, noVerifyFinding, signingFinding, singlePersonFinding,
 } from './config-findings.js';
 import { loadHealthContext, type HealthContext, type HealthOptions } from './context.js';
+import { logGapsFinding } from './log-gaps.js';
 import {
   denialsFinding, forcedArchiveFinding, liteBehaviourFinding, restaleFinding, testLockFinding, waiversFinding,
 } from './discipline.js';
@@ -54,6 +55,7 @@ const COLLECTORS: CollectorEntry[] = [
   { id: 'discipline.restale', run: restaleFinding, cost: 'normal' },
   { id: 'discipline.denials', run: denialsFinding, cost: 'normal' },
   { id: 'discipline.test_lock', run: testLockFinding, cost: 'normal' },
+  { id: 'discipline.log-gaps', run: logGapsFinding, cost: 'normal' },
   { id: 'config.no_verify', run: noVerifyFinding, cost: 'bad' },
   { id: 'config.enforcement', run: enforcementFinding, cost: 'bad' },
   { id: 'config.single_person', run: singlePersonFinding, cost: 'normal' },

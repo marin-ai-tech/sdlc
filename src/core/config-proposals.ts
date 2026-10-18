@@ -6,6 +6,8 @@ import { CONFIG_HEADER, parseConfig, type SdlcConfig } from './config.js';
 import { parseRolesFile } from './roles.js';
 import { SdlcError } from './errors.js';
 import { writeTextAtomic } from './fs-utils.js';
+import { editYamlText } from './yaml-text-edit.js';
+export { unifiedDiff } from './line-diff.js';
 
 export type ConfigTarget = 'sdlc' | 'roles';
 export type ProposalStatus = 'open' | 'applied' | 'dismissed';
@@ -114,22 +116,9 @@ function validateKnownFields(raw: Record<string, unknown>, target: ConfigTarget)
 }
 
 export function proposedContent(current: string, sets: string[], file: string | undefined): string {
-  const base = file ? fs.readFileSync(file, 'utf8') : current;
-  if (!sets.length) return base;
-  const document = parseDocument(base, { uniqueKeys: true });
-  for (const setting of sets) {
-    const separator = setting.indexOf('=');
-    if (separator < 1) {
-      throw new SdlcError('invalid_config', { key: 'config.error.invalidSet', params: { setting } });
-    }
-    const key = setting.slice(0, separator);
-    const value = parseDocument(setting.slice(separator + 1), { uniqueKeys: true });
-    if (value.errors.length || !key.split('.').every((part) => /^[\w-]+$/.test(part))) {
-      throw new SdlcError('invalid_config', { key: 'config.error.invalidSet', params: { setting } });
-    }
-    document.setIn(key.split('.'), value.toJS());
-  }
-  return document.toString({ lineWidth: 0 });
+  const base = file ? fs.readFileSync(file, 'utf8').replace(/\r?\n/g, current.includes('\r\n') ? '\r\n' : '\n')
+    : current;
+  return editYamlText(base, sets);
 }
 
 export function preserveHeader(current: string, proposed: string, target: ConfigTarget): string {
@@ -233,25 +222,4 @@ export function weakeningWarnings(before: SdlcConfig, after: SdlcConfig): string
     }
   }
   return warnings;
-}
-
-export function unifiedDiff(before: string, after: string): string {
-  const oldLines = before.split('\n');
-  const newLines = after.split('\n');
-  let prefix = 0;
-  while (prefix < oldLines.length && oldLines[prefix] === newLines[prefix]) prefix++;
-  let suffix = 0;
-  while (suffix < oldLines.length - prefix && suffix < newLines.length - prefix
-    && oldLines[oldLines.length - 1 - suffix] === newLines[newLines.length - 1 - suffix]) suffix++;
-  return [
-    '--- current', '+++ proposed',
-    `@@ -${prefix + 1},${oldLines.length - prefix - suffix} +${prefix + 1},${newLines.length - prefix - suffix} @@`,
-    ...oldLines.slice(prefix, oldLines.length - suffix).map((line) => `-${escapeLine(line)}`),
-    ...newLines.slice(prefix, newLines.length - suffix).map((line) => `+${escapeLine(line)}`),
-  ].join('\n');
-}
-
-function escapeLine(line: string): string {
-  return line.replace(/[\x00-\x1f\x7f-\x9f\u200e\u200f\u202a-\u202e\u2066-\u2069]/g,
-    (char) => `\\u${char.charCodeAt(0).toString(16).padStart(4, '0')}`);
 }

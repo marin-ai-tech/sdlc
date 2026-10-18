@@ -23,6 +23,7 @@ sdlc tests lock --change fix-rounding
    (`enforcement.test_paths`), also in warn mode.
 7. `sdlc verify --change <id>` records the evidence: the test that failed now passes.
 8. A person unlocks when the work is done: `sdlc tests unlock --change <id>` (a person's command).
+   If a locked test is wrong, they can add `--note "reason"`; the reason appears in the change record, log and audit.
 
 ## Why lock the tests
 

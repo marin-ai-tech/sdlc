@@ -23,6 +23,7 @@ Review the change - Stage 5 (Deploy). Every change gets the same passes with sev
    - **edge-cases**: boundaries, empty, huge, concurrent and Unicode inputs, failure paths
    - **verification-gaps**: behaviour that tests and evidence do not prove
 4. **Write `review.md`** from `sdlc instructions review --change <id> --json`. Each finding: `### F<n> [important|nit|pre-existing][pass-or-lens] <title>` with Where, Detail, Fix and `Status: open`. Rank by severity; respect the nit cap. Fill `## Coverage` with one line per pass and lens: a finding count or `none found — checked: <specific work checked>`.
+   Write it to the response's `resolvedOutputPath`.
 5. **Fix loop.** For each finding with a genuine choice, use {{tool:ask}} to offer fix, defer, or accept with a recommendation and consequences. Fix important findings with the build discipline, re-run `sdlc verify --change <id>`, and set `fixed (<commit or note>)`. Nits: fix cheaply or mark `accepted (<reason>)`. For deferred work, run `sdlc defer add "<title>" --why "<why>" --change <id> --finding <F-id>` and set `Status: deferred (D<n>)` using the returned id.
 6. **Check**: `sdlc review check --change <id>` must report zero open blocking findings.
 7. **Learn.** When a finding repeats a mistake seen before, propose the correction as a CLAUDE.md / AGENTS.md rule (or a skill update) so the next change avoids it.

@@ -4,6 +4,7 @@ import { c, gateBadge, line, printJson, reportFailure, warn } from '../cli/outpu
 import { bar, stepper } from '../cli/progress.js';
 import { emitNextHint, resolveNext } from '../cli/next-hint.js';
 import { t } from '../core/i18n.js';
+import { rootArtifactHints } from '../core/root-artifact-hint.js';
 import { ADAPTERS, renderContext } from '../integrations/install.js';
 import type { SdlcConfig } from '../core/config.js';
 import type { ToolId } from '../integrations/types.js';
@@ -295,7 +296,7 @@ export async function statusCommand(opts: StatusOptions): Promise<void> {
       const ref = resolveChange(ctx.paths, opts.change, { allowArchived: true });
       const view = evaluateChange(ctx.root, ref, ctx.config);
       recordAwaiting(ctx.root, ctx.config, view, ctx.stamp);
-      const warnings = changeWarnings(ctx, view, overlaps);
+      const warnings = [...changeWarnings(ctx, view, overlaps), ...rootArtifactHints(ctx.root, ref)];
       if (opts.json) return printJson({ change: { ...view, warnings }, root: { path: ctx.root }, harness: ctx.stamp });
       if (opts.markdown) return line(`${markdownReport(view, warnings)}\n\n${reportFooter(ctx)}`);
       return printDetailed(view, warnings, invocation);
@@ -305,7 +306,7 @@ export async function statusCommand(opts: StatusOptions): Promise<void> {
     const views = refs.map((ref) => {
       try {
         const view = evaluateChange(ctx.root, ref, ctx.config, { fingerprint });
-        return { ...view, warnings: changeWarnings(ctx, view, overlaps) };
+        return { ...view, warnings: [...changeWarnings(ctx, view, overlaps), ...rootArtifactHints(ctx.root, ref)] };
       } catch (error) {
         return { change: ref.id, error: error instanceof Error ? error.message : String(error) } as unknown as LifecycleView & { error: string };
       }
@@ -330,7 +331,10 @@ export async function statusCommand(opts: StatusOptions): Promise<void> {
       const next = v.next.actor === 'human' && v.next.cli
         ? `${actorLabel(v)}: ${v.next.cli}`
         : `${actorLabel(v)}: ${v.next.workflow ? `${invocation(v.next.workflow)} - ` : ''}${nextText(v)}`;
-      line(`${v.change.padEnd(width)}  ${v.stage.padEnd(9)} ${next}`);
+      const ref = refs.find((item) => item.id === v.change);
+      const misplaced = ref ? rootArtifactHints(ctx.root, ref) : [];
+      const suffix = misplaced.length ? `; ${misplaced.join('; ')}` : '';
+      line(`${v.change.padEnd(width)}  ${v.stage.padEnd(9)} ${next}${suffix}`);
     }
     for (const o of overlaps) {
       warn(t('warn.requirementChanged', { requirement: o.requirement, capability: o.capability, changes: o.changes.map((x) => `${x.change}:${x.op}`).join(', ') }));
@@ -355,7 +359,8 @@ export async function nextCommand(opts: { change?: string; json?: boolean }): Pr
     }
     const ref = resolveChange(ctx.paths, opts.change);
     const view = evaluateChange(ctx.root, ref, ctx.config);
-    const warnings = [...view.warnings, ...approvalAvailabilityWarnings(ctx.root, ctx.config, view)];
+    const warnings = [...view.warnings, ...approvalAvailabilityWarnings(ctx.root, ctx.config, view),
+      ...rootArtifactHints(ctx.root, ref)];
     recordAwaiting(ctx.root, ctx.config, view, ctx.stamp);
     if (opts.json) {
       printJson({ change: view.change, stage: view.stage, stageTitle: view.stageTitle,

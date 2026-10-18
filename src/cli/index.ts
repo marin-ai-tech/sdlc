@@ -491,6 +491,7 @@ export function buildProgram(): Command {
     .command('tests <action>')
     .description(cmdDesc('cmd.tests'))
     .option('--change <id>', 'change id')
+    .option('--note <text>', 'reason for unlocking the tests')
     .option('--json', 'output JSON')
     .action((action, opts) => testsCommand(action, opts));
 

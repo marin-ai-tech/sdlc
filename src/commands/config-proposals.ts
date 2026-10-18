@@ -14,6 +14,9 @@ import { appendLog } from '../core/log.js';
 import { parseRolesFile, personByEmail, readRolesFile } from '../core/roles.js';
 import { resolveSigningSince, isPreSigningCommit } from '../core/signing-since.js';
 import { parse } from 'yaml';
+import { allChanges } from '../core/approval-signatures.js';
+import { exportApprovals } from '../core/evidence-export.js';
+import { projectPaths } from '../core/project.js';
 
 interface Options { json?: boolean; target?: string; set?: string[]; file?: string; reason?: string; yes?: boolean;
   note?: string }
@@ -77,6 +80,12 @@ function warnings(root: string, proposal: ConfigProposal): string[] {
     if (after.signingSince && (!before.signingSince || movesCutoff)) {
       result.push('signing_since is later or newly added');
     }
+    if (before.signing === 'off' && after.signing !== 'off' && !after.signingSince) {
+      const unsigned = exportApprovals(root, allChanges(projectPaths(root)), after)
+        .filter((approval) => approval.signature === 'unsigned').length;
+      if (unsigned) result.push(`${unsigned} approvals are unsigned and will fail sdlc approvals verify; `
+        + 'set signing_since to keep them as pre-signing');
+    }
     for (const [role, people] of Object.entries(before.roles)) {
       if (people.length && !(after.roles[role]?.length)) result.push(`${role} role is empty`);
     }
@@ -89,6 +98,8 @@ function localizedWarning(warning: string): string {
   if (warning === 'enforcement mode is lower') return t('config.warning.enforcement');
   if (warning === 'signing is lower') return t('config.warning.signing');
   if (warning === 'signing_since is later or newly added') return t('config.warning.signingSince');
+  const unsigned = /^(\d+) approvals are unsigned and will fail /.exec(warning);
+  if (unsigned) return t('config.warning.unsignedHistory', { count: Number(unsigned[1]) });
   const patterns: Array<[RegExp, string, string]> = [
     [/^(.+) gate is no longer required$/, 'config.warning.gate', 'gate'],
     [/^(.+) gate auto_waive includes lite$/, 'config.warning.autoWaive', 'gate'],
@@ -134,8 +145,16 @@ export function proposeConfig(opts: Options): void {
     writeProposal(ctx.root, proposal, true);
     appendLog(ctx.root, ctx.config, { event: 'config.proposed', by: namedIdentity(ctx.root),
       detail: proposal.id }, ctx.stamp);
-    if (opts.json) printJson({ id: proposal.id });
-    else line(t('config.proposed', { id: proposal.id }));
+    const others = listProposals(ctx.root).filter((item) => item.id !== proposal.id
+      && item.target === chosen && item.status === 'open');
+    const otherWarnings = others.map((other) => t('config.warning.openProposal', {
+        id: other.id, file: chosen === 'roles' ? 'openspec/roles.yaml' : 'openspec/sdlc.yaml',
+      }));
+    if (opts.json) printJson({ id: proposal.id, warnings: otherWarnings });
+    else {
+      line(t('config.proposed', { id: proposal.id }));
+      for (const warning of otherWarnings) line(t('config.warning', { warning }));
+    }
   } catch (error) { reportFailure(error, opts.json); }
 }
 
@@ -162,7 +181,8 @@ export function showConfig(id: string | undefined, opts: Options): void {
     const diff = current === undefined ? proposal.reviewedDiff! : unifiedDiff(current, proposal.content);
     const alerts = closed ? [] : warnings(ctx.root, proposal);
     const result = { id, status: status(ctx.root, proposal), reason: proposal.reason,
-      by: proposal.by, diff, validation: 'valid', warnings: alerts, weakens: alerts.length > 0,
+      by: proposal.by, diff, validation: 'valid', warnings: alerts,
+      weakens: alerts.some((warning) => !warning.includes('approvals are unsigned')),
       ...(closed && !proposal.reviewedDiff ? { diffNote: t('config.legacyDiff') } : {}) };
     if (opts.json) printJson(result);
     else {
@@ -193,7 +213,7 @@ export function applyConfig(id: string, opts: Options): void {
         { key: 'config.fix.stale' });
     }
     const alerts = warnings(ctx.root, proposal);
-    if (alerts.length && !opts.yes) {
+    if (alerts.some((warning) => !warning.includes('approvals are unsigned')) && !opts.yes) {
       throw new SdlcError('weakening_requires_yes',
         { key: 'config.error.weakening', params: { id } },
         { key: 'config.fix.weakening' });

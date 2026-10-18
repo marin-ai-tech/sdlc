@@ -1,7 +1,7 @@
 import type { SdlcConfig } from '../config.js';
 import { t } from '../i18n.js';
 import type { HarnessStamp } from '../license.js';
-import { appendLog, readLog, type LogEntry } from '../log.js';
+import { appendLocalLog, readLog, type LogEntry } from '../log.js';
 import type { ProjectPaths } from '../project.js';
 import { runHealth, type HealthRun } from './index.js';
 
@@ -34,11 +34,11 @@ export function recordHealthSignals(
     const bad = new Set(run.drafts.filter((draft) => draft.level === 'bad').map((draft) => draft.id));
     const before = degradedIds(log ?? readLog(root));
     for (const id of [...bad].filter((item) => !before.has(item)).sort()) {
-      appendLog(root, config, { event: DEGRADED, detail: id }, stamp);
+      appendLocalLog(root, config, { event: DEGRADED, detail: id }, stamp);
     }
     const evaluated = new Set(run.evaluated);
     for (const id of [...before].filter((item) => !bad.has(item) && evaluated.has(item)).sort()) {
-      appendLog(root, config, { event: RECOVERED, detail: id }, stamp);
+      appendLocalLog(root, config, { event: RECOVERED, detail: id }, stamp);
     }
   } catch {
     // A missing signal only makes the record less complete.

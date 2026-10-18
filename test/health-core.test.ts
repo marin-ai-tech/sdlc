@@ -121,7 +121,7 @@ describe('health findings', () => {
       '', '## Out of scope', 'None', '', '## Open questions', 'None', '',
     ].join('\n'));
     expect(p.cli(['next', '--change', 'late', '--json']).code).toBe(0);
-    const logFile = path.join(p.root, 'openspec/.sdlc/log.jsonl');
+    const logFile = path.join(p.root, 'openspec/.sdlc/hook-log.jsonl');
     const entries = read(logFile).trim().split('\n').map((l) => JSON.parse(l));
     const awaiting = entries.find((e: { event: string }) => e.event === 'gate.intent.awaiting');
     expect(awaiting, read(logFile)).toBeDefined();
