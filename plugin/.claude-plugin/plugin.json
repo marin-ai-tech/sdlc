@@ -1,7 +1,7 @@
 {
   "name": "sdlc",
   "version": "0.23.7",
-  "description": "AI-native SDLC workflows (adopt, backlog, explore, intent, spec, plan, build, verify, review, release, archive, triage) with gates, built on OpenSpec. Requires the `sdlc` CLI (npm package sdlc).",
+  "description": "Human-gated SDLC for AI coding agents: workflows from intent to release, approvals only by people, verification evidence and review, built on OpenSpec. Requires the sdlc CLI from the GitHub release (https://github.com/marin-ai-tech/sdlc/releases/latest), not the unrelated npm package of that name.",
   "author": {
     "name": "marin-ai technologies",
     "url": "https://github.com/marin-ai-tech"
