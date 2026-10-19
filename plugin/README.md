@@ -20,6 +20,21 @@ sdlc init --tools opencode    # ...or also set up OpenCode in the same project
 
 Workflows: `/sdlc:config`, `/sdlc:help`, `/sdlc:guide`, `/sdlc:next`, `/sdlc:status`, `/sdlc:health`, `/sdlc:adopt`, `/sdlc:team`, `/sdlc:backlog`, `/sdlc:explore`, `/sdlc:intent`, `/sdlc:spec`, `/sdlc:plan`, `/sdlc:build`, `/sdlc:verify`, `/sdlc:review`, `/sdlc:release`, `/sdlc:archive`, `/sdlc:triage`.
 
+## Data and privacy
+
+- sdlc runs on your machine. It has no telemetry and no account; its authors receive no data.
+- Approval records store the git name and email of the person who approves, in the project's own files
+  (openspec/), next to the decisions, check output and the event log. They follow your repository's retention.
+- Network access happens only to what the project configures in openspec/sdlc.yaml:
+  - event receivers (MCP servers such as a chat or GitHub): after a CLI command, queued events with the project,
+    the change id, the gate, the decision and the people's ids from roles.yaml; chat handles only to a receiver
+    with chat, the note of a rejection only to a receiver with include_note: true;
+  - MCP servers read by `sdlc context pull`;
+  - extension pack sources (git or npm) fetched by `sdlc team sync`.
+- `sdlc mcp serve --http` listens only when a person starts it.
+
+Privacy: [PRIVACY.md](https://github.com/marin-ai-tech/sdlc/blob/master/PRIVACY.md)
+
 ## License
 
 sdlc, including this plugin, is dual-licensed: free under the Community License (PolyForm Noncommercial 1.0.0 with

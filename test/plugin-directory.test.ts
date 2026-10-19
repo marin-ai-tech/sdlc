@@ -113,6 +113,23 @@ describe('the plugin passes the Claude plugin directory checks', () => {
     expect(fs.existsSync(path.join(out, 'hooks', 'pre-tool.sh'))).toBe(true);
   });
 
+  it('the README lists what data the plugin stores and where it can send it, with a Privacy link', () => {
+    const readme = String(file('README.md')!.content);
+    expect(readme).toContain('## Data and privacy');
+    for (const sink of ['openspec/sdlc.yaml', 'include_note', 'sdlc context pull', 'sdlc team sync', 'mcp serve']) {
+      expect(readme, sink).toContain(sink);
+    }
+    expect(readme).toContain('Privacy: [PRIVACY.md](https://github.com/marin-ai-tech/sdlc/blob/master/PRIVACY.md)');
+    expect(fs.existsSync(path.join(REPO_ROOT, 'PRIVACY.md'))).toBe(true);
+  });
+
+  it('negative: the README promises nothing the event delivery contradicts', () => {
+    const readme = String(file('README.md')!.content).toLowerCase();
+    for (const claim of ['no network', 'never sends', 'nothing leaves', 'offline only']) {
+      expect(readme, claim).not.toContain(claim);
+    }
+  });
+
   it('negative: a tracked hook script in plugin/ is not committed without its executable bit', () => {
     const listed = spawnSync('git', ['ls-files', '-s', '--', 'plugin'], { cwd: REPO_ROOT, encoding: 'utf-8' });
     expect(listed.status).toBe(0);

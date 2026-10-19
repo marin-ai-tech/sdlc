@@ -35,6 +35,24 @@ export interface PluginFile {
 
 export const PLUGIN_NAME = 'sdlc';
 
+/** What the plugin stores and where it can send data, for the plugin directory's data-handling answers. */
+const PRIVACY_SECTION = [
+  '## Data and privacy',
+  '',
+  '- sdlc runs on your machine. It has no telemetry and no account; its authors receive no data.',
+  '- Approval records store the git name and email of the person who approves, in the project\'s own files',
+  '  (openspec/), next to the decisions, check output and the event log. They follow your repository\'s retention.',
+  '- Network access happens only to what the project configures in openspec/sdlc.yaml:',
+  '  - event receivers (MCP servers such as a chat or GitHub): after a CLI command, queued events with the project,',
+  '    the change id, the gate, the decision and the people\'s ids from roles.yaml; chat handles only to a receiver',
+  '    with chat, the note of a rejection only to a receiver with include_note: true;',
+  '  - MCP servers read by `sdlc context pull`;',
+  '  - extension pack sources (git or npm) fetched by `sdlc team sync`.',
+  '- `sdlc mcp serve --http` listens only when a person starts it.',
+  '',
+  `Privacy: [PRIVACY.md](${PROJECT_URL}/blob/master/PRIVACY.md)`,
+];
+
 export function renderClaudePlugin(cli = 'sdlc'): PluginFile[] {
   const version = harnessVersion();
   // The plugin is distributed by the licensor itself, so its notices name the
@@ -124,6 +142,8 @@ export function renderClaudePlugin(cli = 'sdlc'): PluginFile[] {
       '```',
       '',
       'Workflows: ' + WORKFLOW_IDS.map((id) => `\`/sdlc:${id}\``).join(', ') + '.',
+      '',
+      ...PRIVACY_SECTION,
       '',
       '## License',
       '',
