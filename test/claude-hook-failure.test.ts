@@ -35,17 +35,34 @@ function bashPath(): string {
   return fs.existsSync(bash) ? bash : 'bash';
 }
 
-function run(mode: string, withCli = true) {
+/** The plugin's PreToolUse command and its script, laid out as Claude Code installs the plugin. */
+function pluginCommand(): { command: string; root: string } {
+  const files = renderClaudePlugin('sdlc');
+  const hooks = JSON.parse(String(files.find((f) => f.path === 'hooks/hooks.json')!.content)).hooks;
+  const command = hooks.PreToolUse[0].hooks[0].command as string;
+  const root = tempDir('sdlc-plugin-root-');
+  for (const f of files.filter((entry) => entry.path.startsWith('hooks/') && entry.path.endsWith('.sh'))) {
+    write(path.join(root, f.path), String(f.content));
+    fs.chmodSync(path.join(root, f.path), 0o755);
+  }
+  return { command, root };
+}
+
+function run(mode: string, withCli = true, surface: 'project' | 'plugin' = 'project', extraEnv: NodeJS.ProcessEnv = {}) {
   const dir = tempDir('sdlc-fake-cli-');
   if (withCli) {
     write(path.join(dir, 'sdlc'), FAKE);
     fs.chmodSync(path.join(dir, 'sdlc'), 0o755);
   }
   const shellPath = `${dir.replace(/\\/g, '/').replace(/^([A-Za-z]):/, (_m, d: string) => `/${d.toLowerCase()}`)}:/usr/bin:/bin`;
-  const result = spawnSync(bashPath(), ['-c', `export PATH="${shellPath}"; ${hookCommand('sdlc', 'pre-tool')}`], {
+  const plugin = surface === 'plugin' ? pluginCommand() : undefined;
+  const command = plugin ? plugin.command : hookCommand('sdlc', 'pre-tool');
+  // Claude Code gives the plugin's own path, in the platform's form.
+  const pluginEnv = plugin ? { CLAUDE_PLUGIN_ROOT: plugin.root } : {};
+  const result = spawnSync(bashPath(), ['-c', `export PATH="${shellPath}"; ${command}`], {
     input: JSON.stringify({ tool_name: 'Bash', tool_input: { command: 'ls' } }),
     encoding: 'utf-8',
-    env: { ...process.env, MODE: mode },
+    env: { ...process.env, MODE: mode, ...pluginEnv, ...extraEnv },
   });
   const callsFile = path.join(dir, 'calls');
   const calls = fs.existsSync(callsFile) ? fs.readFileSync(callsFile, 'utf-8').length : 0;
@@ -80,11 +97,47 @@ describe('the Claude Code PreToolUse command when the check itself fails', () =>
     expect(r.status).toBe(0);
     expect(r.stdout).toBe('');
   });
+});
 
-  it('the Claude Code plugin uses the same guarded command', () => {
-    const files = renderClaudePlugin('sdlc');
-    const hooks = files.find((file) => file.path.endsWith('hooks/hooks.json'));
-    expect(hooks, 'plugin hooks.json').toBeDefined();
-    expect(hooks!.content).toContain(JSON.stringify(hookCommand('sdlc', 'pre-tool')).slice(1, -1));
+/** The plugin runs the same check through hooks/pre-tool.sh, so the Claude plugin directory can follow it. */
+describe('the Claude Code plugin PreToolUse script when the check itself fails', () => {
+  it('passes the decision through when sdlc hook answers', () => {
+    const r = run('deny', true, 'plugin');
+    expect(r.status, r.stderr).toBe(0);
+    expect(r.stdout).toContain('"permissionDecision":"deny"');
+    expect(r.calls).toBe(1);
+  });
+
+  it('a check that fails once is run again with the same input', () => {
+    const r = run('flaky', true, 'plugin');
+    expect(r.status, r.stderr).toBe(0);
+    expect(r.stdout).toBe('{"decision":"after-retry"}');
+    expect(r.calls).toBe(2);
+  });
+
+  it('a check that keeps failing blocks the call (exit 2) and says why', () => {
+    const r = run('crash', true, 'plugin');
+    expect(r.status).toBe(2);
+    expect(r.stderr).toMatch(/\[sdlc\][^\n]*could not run/i);
+    expect(r.stderr).toMatch(/sdlc doctor/);
+    expect(r.stdout).toBe('');
+    expect(r.calls).toBe(2);
+  });
+
+  it('negative: without the CLI on the machine the call goes through quietly', () => {
+    const r = run('deny', false, 'plugin');
+    expect(r.status).toBe(0);
+    expect(r.stdout).toBe('');
+  });
+
+  it('negative: the script leaves no temporary files behind', () => {
+    const tmp = tempDir('sdlc-hook-tmp-');
+    const tmpEnv = { TMPDIR: tmp, TMP: tmp, TEMP: tmp };
+    const r = run('crash', true, 'plugin', tmpEnv);
+    expect(r.status).toBe(2);
+    expect(fs.readdirSync(tmp)).toEqual([]);
+    const ok = run('deny', true, 'plugin', tmpEnv);
+    expect(ok.status, ok.stderr).toBe(0);
+    expect(fs.readdirSync(tmp)).toEqual([]);
   });
 });

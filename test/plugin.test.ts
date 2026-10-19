@@ -10,14 +10,16 @@ describe('Claude Code plugin', () => {
 
   it('the committed plugin/ and marketplace match the generator (run `sdlc plugin build plugin --marketplace`)', () => {
     for (const f of files) {
-      const committed = fs.readFileSync(path.join(REPO_ROOT, 'plugin', f.path), 'utf-8');
-      expect(committed, f.path).toBe(f.content);
+      const committed = path.join(REPO_ROOT, 'plugin', f.path);
+      // The listing icon is binary; every other file is text.
+      if (Buffer.isBuffer(f.content)) expect(fs.readFileSync(committed).equals(f.content), f.path).toBe(true);
+      else expect(fs.readFileSync(committed, 'utf-8'), f.path).toBe(f.content);
     }
     expect(fs.readFileSync(path.join(REPO_ROOT, '.claude-plugin', 'marketplace.json'), 'utf-8')).toBe(renderMarketplace());
   });
 
-  it('renders every file with LF line endings, whatever the checkout (core.autocrlf)', () => {
-    for (const f of files) {
+  it('renders every text file with LF line endings, whatever the checkout (core.autocrlf)', () => {
+    for (const f of files.filter((entry) => typeof entry.content === 'string')) {
       expect(f.content.includes('\r'), f.path).toBe(false);
     }
     expect(renderMarketplace().includes('\r')).toBe(false);

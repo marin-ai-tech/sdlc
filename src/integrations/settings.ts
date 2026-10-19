@@ -32,12 +32,12 @@ function isOurs(handler: HookHandler): boolean {
 }
 
 /** Single-quotes a word for sh. */
-function shQuote(text: string): string {
+export function shQuote(text: string): string {
   return `'${text.replace(/'/g, `'\\''`)}'`;
 }
 
 /** The reason Claude Code shows (stderr of exit 2) when the PreToolUse check could not run twice in a row. */
-function blockedNotice(cli: string): string {
+export function blockedNotice(cli: string): string {
   return [
     `[sdlc] The SDLC harness check could not run (${cli} hook pre-tool failed twice), so this call is blocked.`,
     `Retry the call; if it keeps failing, run \`${cli} doctor\`.`,

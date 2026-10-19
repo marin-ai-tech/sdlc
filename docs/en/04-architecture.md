@@ -112,6 +112,8 @@ One engine (`src/core/policy.ts`) and one dispatcher (`sdlc hook pre-tool | sess
 
 **Claude Code:** `SessionStart`, `PreToolUse` (`Edit|Write|MultiEdit|NotebookEdit|Bash|PowerShell|mcp__.*`; PowerShell since 0.8.2, MCP tools since 0.9.0) and `Stop` are merged into `.claude/settings.json`. The response uses the `hookSpecificOutput.permissionDecision/additionalContext` format. Other hooks are left untouched. The harness recognizes its own handlers by the `sdlc hook` command.
 
+The Claude Code plugin runs the same PreToolUse check through `hooks/pre-tool.sh` so the plugin directory can follow it. The script retries a failed check once and then blocks the call with the reason; without the CLI, it exits quietly.
+
 **OpenCode:** `.opencode/plugins/sdlc.js` is loaded automatically:
 - `tool.execute.before` calls `sdlc hook pre-tool --agent opencode`; a denial is thrown as an exception;
 - `tool.execute.after` appends the reminder to the tool output (this is how "warn" is implemented in OpenCode);

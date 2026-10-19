@@ -1,3 +1,4 @@
+import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { normalizeNewlines, readText } from '../core/fs-utils.js';
 import {
@@ -15,8 +16,8 @@ import {
 import { harnessPackageDir } from '../core/openspec-schema.js';
 import { harnessVersion } from '../core/version.js';
 import { AGENT_IDS, loadAgent, loadWorkflow, WORKFLOW_IDS } from './assets.js';
+import { renderPluginHooks } from './plugin-hooks.js';
 import { appendNotice, renderBody, yamlString } from './render.js';
-import { harnessHooks } from './settings.js';
 import { allowedToolsFor } from './skills.js';
 
 /**
@@ -28,7 +29,8 @@ import { allowedToolsFor } from './skills.js';
  */
 export interface PluginFile {
   path: string;
-  content: string;
+  content: string | Buffer;
+  executable?: true;
 }
 
 export const PLUGIN_NAME = 'sdlc';
@@ -53,6 +55,10 @@ export function renderClaudePlugin(cli = 'sdlc'): PluginFile[] {
       license: LICENSE_REFERENCE,
       keywords: ['sdlc', 'openspec', 'spec-driven', 'gates', 'governance'],
     }, null, 2)}\n`,
+  });
+  files.push({
+    path: '.claude-plugin/icon.png',
+    content: fs.readFileSync(path.join(harnessPackageDir(), 'assets/plugin/icon.png')),
   });
   for (const id of WORKFLOW_IDS) {
     const wf = loadWorkflow(id);
@@ -93,7 +99,7 @@ export function renderClaudePlugin(cli = 'sdlc'): PluginFile[] {
       ].join('\n'), notice),
     });
   }
-  files.push({ path: 'hooks/hooks.json', content: `${JSON.stringify({ hooks: harnessHooks(cli) }, null, 2)}\n` });
+  files.push(...renderPluginHooks(cli));
   files.push({
     path: 'README.md',
     content: [

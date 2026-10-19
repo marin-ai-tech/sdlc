@@ -30,7 +30,16 @@ export async function pluginBuildCommand(target: string | undefined, opts: { cli
         if (!wanted.has(rel)) fs.rmSync(path.join(dir, rel), { force: true });
       }
     }
-    for (const f of files) writeTextAtomic(path.join(dir, f.path), f.content);
+    for (const f of files) {
+      const target = path.join(dir, f.path);
+      if (Buffer.isBuffer(f.content)) {
+        fs.mkdirSync(path.dirname(target), { recursive: true });
+        fs.writeFileSync(target, f.content);
+      } else {
+        writeTextAtomic(target, f.content);
+      }
+      if (f.executable) fs.chmodSync(target, 0o755);
+    }
     let marketplace: string | undefined;
     if (opts.marketplace) {
       marketplace = path.join(path.dirname(dir), '.claude-plugin', 'marketplace.json');

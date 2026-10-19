@@ -35,7 +35,8 @@ describe('files copied from the harness package are emitted with LF', () => {
   });
 
   it('plugin files, including the copied legal files', () => {
-    for (const f of renderClaudePlugin()) {
+    // The listing icon is binary; every text file must be LF.
+    for (const f of renderClaudePlugin().filter((entry) => typeof entry.content === 'string')) {
       expect(f.content.includes('\r'), f.path).toBe(false);
     }
   });
