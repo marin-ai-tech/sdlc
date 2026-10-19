@@ -63,6 +63,8 @@ export interface EventBody {
 
 export interface QueuedEvent {
   event: EventBody;
+  /** Digest of an awaiting or overdue gate; older queue files recover it from the log. */
+  waitDigest?: string;
   /** The receivers (`server/tool`) that have not taken the event yet. */
   receivers: string[];
   /** The ready one-line text for receivers with `message`; built when queued, from the event's fields only. */
@@ -237,6 +239,7 @@ export function queueEvent(root: string, config: QueueConfig, entry: LogEntry): 
     const event = eventBody(root, config, entry);
     const item: QueuedEvent = {
       event,
+      ...(WAIT_EVENT.test(entry.event) && entry.detail ? { waitDigest: entry.detail } : {}),
       receivers: receivers.map(receiverKey),
       ...messageFor(root, receivers, event),
       ...noteFor(config, entry),

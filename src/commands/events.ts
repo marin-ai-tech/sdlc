@@ -8,6 +8,7 @@ import { evaluateChange, sharedFingerprint, type LifecycleView } from '../core/l
 import { deliverPending, FLUSH_CALL_MS } from '../mcp/events.js';
 import { missingEventVariables } from '../mcp/event-args.js';
 import { readOutbox, type EventBody } from '../mcp/outbox.js';
+import { dropStaleWaits } from '../mcp/stale-waits.js';
 import {
   buildDailySummary,
   reportForSummary,
@@ -45,7 +46,8 @@ function printList(pending: EventBody[], receivers: ReceiverView[]): void {
 export async function eventsListCommand(opts: { json?: boolean }): Promise<void> {
   try {
     const ctx = loadProject();
-    const pending = readOutbox(ctx.root).map((queued) => queued.item.event);
+    const pending = dropStaleWaits(ctx.root, ctx.config, readOutbox(ctx.root))
+      .map((queued) => queued.item.event);
     const receivers = receiverViews(ctx);
     if (opts.json) return printJson({ pending, receivers });
     printList(pending, receivers);

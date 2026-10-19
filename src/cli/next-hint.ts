@@ -5,6 +5,7 @@ import { listActiveChanges, resolveChange, type ChangeRef } from '../core/change
 import { nextBacklogItem, readBacklog } from '../core/backlog.js';
 import { t } from '../core/i18n.js';
 import { evaluateChange, type NextAction } from '../core/lifecycle.js';
+import { mergedTaskHint } from '../core/merged-task-hint.js';
 
 /** Next action shown after a state-changing CLI command (change or project-level). */
 export type NextHint = NextAction & { item?: string };
@@ -40,7 +41,7 @@ function changeNext(ctx: ProjectContext, ref: ChangeRef): NextHint | undefined {
   const view = evaluateChange(ctx.root, ref, ctx.config);
   recordAwaiting(ctx.root, ctx.config, view, ctx.stamp);
   if (view.next.actor === 'none') return undefined;
-  return view.next;
+  return mergedTaskHint(ctx.root, ref, view.next);
 }
 
 /**

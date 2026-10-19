@@ -2,6 +2,20 @@
 
 All notable changes to sdlc. Versions follow [Semantic Versioning](https://semver.org/); while the major version is 0, a minor version may change behavior.
 
+## 0.23.7 — 2026-10-18
+
+### Changed
+- `sdlc next` names the unticked tasks whose commits (trailers `SDLC-Change` and `SDLC-Task`) are already in HEAD and
+  says to mark them done in tasks.md, for example after board results were merged.
+- `sdlc board list` says when `openspec/.sdlc/log.jsonl` has uncommitted changes: the board host writes the board trail
+  there and has to commit it.
+
+### Fixed
+- A queued wait event whose gate no longer waits on that digest (approved, rejected, waived, archived or changed) is
+  dropped when the queue is sent, instead of reaching the chat out of date.
+- Reading commands never create or rewrite a tracked file: when `openspec/.sdlc/.gitignore` lacks the queue's rule,
+  it goes into `.git/info/exclude`; an existing file that has the rule is not rewritten (CRLF or LF).
+
 ## 0.23.6 — 2026-10-18
 
 ### Changed

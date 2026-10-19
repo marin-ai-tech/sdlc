@@ -42,6 +42,7 @@ import { formatIdentity, gitIdentity } from '../core/git.js';
 import { evaluateChange, sharedFingerprint, type LifecycleView } from '../core/lifecycle.js';
 import { approvalAvailabilityWarnings } from '../core/approval-availability.js';
 import { recordAwaiting } from '../core/awaiting.js';
+import { mergedTaskHint } from '../core/merged-task-hint.js';
 import { openspecFailure, runOpenSpec, runOpenSpecJson } from '../core/openspec.js';
 import { loadSchemaInfo } from '../core/openspec-schema.js';
 import { PROJECT_URL } from '../core/license.js';
@@ -359,6 +360,7 @@ export async function nextCommand(opts: { change?: string; json?: boolean }): Pr
     }
     const ref = resolveChange(ctx.paths, opts.change);
     const view = evaluateChange(ctx.root, ref, ctx.config);
+    view.next = mergedTaskHint(ctx.root, ref, view.next);
     const warnings = [...view.warnings, ...approvalAvailabilityWarnings(ctx.root, ctx.config, view),
       ...rootArtifactHints(ctx.root, ref)];
     recordAwaiting(ctx.root, ctx.config, view, ctx.stamp);

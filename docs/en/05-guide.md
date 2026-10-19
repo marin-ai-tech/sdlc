@@ -549,6 +549,14 @@ There is no expiry timer: board lease commands first drop held claims whose leas
 broken `board.json` is `board_invalid`, never silently reset. Who splits the work, retries or races executors
 stays outside sdlc.
 
+When unticked tasks already have commits in HEAD with matching `SDLC-Change` and `SDLC-Task` trailers,
+`sdlc next` names them and asks you to mark them done in `tasks.md`. `sdlc board list` also warns when
+`openspec/.sdlc/log.jsonl` has uncommitted entries; commit the board trail before pulling.
+
+Queued `gate.<g>.awaiting` and `gate.<g>.overdue` notifications are discarded when the change no longer waits
+for that gate and artifact digest. `sdlc events list` hides these ended waits. Reading commands keep missing
+local queue and board ignore rules in Git's local `info/exclude`, leaving tracked `.gitignore` files untouched.
+
 ### Roles and separation of duties
 
 With `openspec/roles.yaml`, approvals are tied to people in git: the approver's email must belong to a person holding a role the gate accepts, the authors of the code do not approve its review or release, listed gate pairs need different people, and a per-person limit applies. `sdlc roles who <gate> --change <id>` shows the roles needed for that change's risk and who may approve; people refused only for lacking the role are omitted from text. Without `--change`, it lists every role. The `Next:` hint and the workflows name eligible people. `gates.<g>.min_approvals: N` makes a gate wait for approvals from N different people; one person approving again replaces only their own approval. With `signing: warn | required`, `sdlc approvals verify` checks that each approval arrived in a commit signed by the approver. See [Roles, separation of duties and signed approvals](08-roles-and-signing.md).

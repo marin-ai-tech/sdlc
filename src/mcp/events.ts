@@ -10,6 +10,7 @@ import {
   readOutbox, settleCalls, settleQueued, type EventBody, type QueuedCall, type QueuedFile,
 } from './outbox.js';
 import type { McpServer } from './registry.js';
+import { dropStaleWaits } from './stale-waits.js';
 
 /**
  * Delivery of queued events (B45) with the MCP client: each receiver's tool is called with `{ ...args, event }`,
@@ -241,7 +242,7 @@ export async function deliverPending(root: string, config: EventsConfig, limits:
   Promise<DeliveryResult> {
   const receivers = config.events ?? [];
   const sinks = receivers.length > 0 || config.issues !== undefined;
-  const queued = sinks ? readOutbox(root) : [];
+  const queued = sinks ? dropStaleWaits(root, config as SdlcConfig, readOutbox(root)) : [];
   if (queued.length === 0) return { delivered: 0, failed: 0 };
   dropRemoved(queued, receivers);
   dropRemovedCalls(queued, config);

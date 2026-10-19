@@ -8,6 +8,7 @@ import { reopenTask } from '../core/board-reopen.js';
 import { dispatchTask } from '../core/board-dispatch.js';
 import { openAuction, bidTask, awardTask, type BidOptions } from '../core/board-market.js';
 import { t } from '../core/i18n.js';
+import { git } from '../core/git.js';
 import type { ResultProblem } from '../core/task-result.js';
 
 /**
@@ -126,12 +127,15 @@ export function boardListCommand(opts: ListOptions): void {
   try {
     const ctx = loadProject();
     const tasks = boardTasks(ctx.root, ctx.paths, ctx.config, opts.change);
+    const status = git(ctx.root, ['status', '--porcelain', '--', 'openspec/.sdlc/log.jsonl']);
+    const uncommittedLog = status.ok && status.stdout.length > 0;
     if (opts.json) {
-      printJson({ tasks });
+      printJson({ tasks, uncommittedLog });
       return;
     }
     if (tasks.length === 0) {
       line(t('board.list.empty'));
+      if (uncommittedLog) line(t('board.list.commitLog'));
       return;
     }
     line(t('board.list.heading'));
@@ -147,6 +151,7 @@ export function boardListCommand(opts: ListOptions): void {
       })}`;
       line(`  ${task.id}  ${task.status}${who}${until}${attempts}${excluded}`);
     }
+    if (uncommittedLog) line(t('board.list.commitLog'));
   } catch (error) {
     reportFailure(error, opts.json);
   }

@@ -4,6 +4,7 @@ import { SdlcError } from './errors.js';
 import { ensureDir, readText, writeTextAtomic } from './fs-utils.js';
 import { parseAuctions, type BoardAuction } from './board-market-state.js';
 import { parseRequests, pruneRequests, RequestReplay, type BoardRequest } from './board-requests.js';
+import { ensureLocalIgnore } from './local-ignore.js';
 
 /**
  * The board file and its lock (B118a, epic E16): `openspec/.sdlc/board.json` holds the claims the agents of the
@@ -157,22 +158,6 @@ export function readBoard(root: string): Board {
     auctions: parseAuctions(raw.auctions), requests: pruneRequests(parseRequests(raw.requests), Date.now()) };
 }
 
-/** `openspec/.sdlc/.gitignore` keeps board.json and board.lock out of every commit; extended, never replaced. */
-function ensureGitignore(root: string): void {
-  const file = path.join(root, BOARD_IGNORE);
-  const entries = ['board.json', 'board.lock'];
-  const text = readText(file);
-  if (text === undefined) {
-    writeTextAtomic(file, `${entries.join('\n')}\n`);
-    return;
-  }
-  const present = new Set(text.split('\n').map((line) => line.trim()).filter(Boolean));
-  const missing = entries.filter((entry) => !present.has(entry));
-  if (missing.length === 0) return;
-  const join = text.endsWith('\n') || text === '' ? '' : '\n';
-  writeTextAtomic(file, `${text}${join}${missing.join('\n')}\n`);
-}
-
 function sleepSync(ms: number): void {
   Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
 }
@@ -228,7 +213,7 @@ export function updateBoard<T>(root: string, fn: (board: Board) => T, writeOnErr
       throw error;
     } finally {
       if (!replayed && (completed || writeOnError)) {
-        ensureGitignore(root);
+        ensureLocalIgnore(root, ['board.json', 'board.lock']);
         writeTextAtomic(file, `${JSON.stringify(board)}\n`);
       }
     }

@@ -5,6 +5,7 @@ import { ensureDir, isFile, readText } from './fs-utils.js';
 import { harnessStamp, type HarnessStamp } from './license.js';
 import { queueEvent, type EventSummary, type QueueConfig } from '../mcp/outbox.js';
 import { agentEnvironment } from './agent-env.js';
+import { ensureLocalIgnore } from './local-ignore.js';
 
 /**
  * Append-only project log: one JSON object per line in
@@ -82,7 +83,7 @@ export function appendLocalLog(
   try {
     const file = path.join(root, HOOK_LOG_PATH);
     ensureDir(path.dirname(file));
-    ensureHookIgnore(root);
+    ensureLocalIgnore(root, ['hook-log.jsonl']);
     const entry = logEntry(config, input, stamp);
     fs.appendFileSync(file, `${JSON.stringify(entry)}\n`, 'utf-8');
     queueEvent(root, config, entry);
