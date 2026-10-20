@@ -12,7 +12,7 @@ import { REPO_ROOT, tempDir } from './helpers.js';
  */
 
 const BINARY = /\.(png|jpe?g|gif|ico|pptx|tgz|zip|pdf|mp4|woff2?)$/i;
-const SECOND_SCRIPT = /[Ѐ-ӿ]/;
+const SECOND_SCRIPT = new RegExp(`[${String.fromCharCode(0x400)}-${String.fromCharCode(0x4ff)}]`);
 const CODE = String.fromCharCode(114, 117);
 const LANGUAGE_NAME = new RegExp(String.fromCharCode(114, 117, 115, 115, 105, 97, 110), 'i');
 const CODE_IN_TEXT = new RegExp(
