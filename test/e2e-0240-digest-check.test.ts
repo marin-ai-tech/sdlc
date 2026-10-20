@@ -16,6 +16,9 @@ import { REPO_ROOT, git, humanEnv, initGitRepo, read, runCli, tempDir, write } f
  * - project-log: `gate.<g>.approved` and `gate.<g>.rejected` entries carry the digest as a field.
  * Oracles: `status --json` (the full gate evaluation), byte comparison of the record, the log and the local queue,
  * the checkpoint refs, sdlc's own catalog `t()` from the build, and the 0.23.7 shapes written out below.
+ * Review round 1: only the full digest is accepted (the 12-character form can be collided), a gate without a digest
+ * gives approve's own error, the preview names the version and suggests the guarded command, archived gates have no
+ * digest.
  */
 
 type Json = Record<string, any>;
@@ -34,6 +37,12 @@ const INTENT = [...INTENT_LINES, 'None', ''].join('\n');
 const INTENT_WITH_QUESTION = [...INTENT_LINES, '- Which users count?', ''].join('\n');
 const ROLES = ['version: 1', 'signing: off', 'people:', '  alice: { name: Alice Ivanova, emails: [pat@example.com] }',
   'roles:', '  product-owner: [alice]', '  engineer: [alice]', '  code-owner: [alice]', '  maintainer: [alice]',
+  ''].join('\n');
+/** Bob may not approve the intent: he holds no product-owner role. */
+const ROLES_WITH_BOB = ['version: 1', 'signing: off', 'people:',
+  '  alice: { name: Alice Ivanova, emails: [pat@example.com] }',
+  '  bob: { name: Bob Petrov, emails: [bob@example.com] }',
+  'roles:', '  product-owner: [alice]', '  engineer: [bob]', '  code-owner: [bob]', '  maintainer: [alice]',
   ''].join('\n');
 
 function short(digest: string): string {
@@ -102,6 +111,20 @@ function preview(p: P, expected: string): Json {
   const r = p.cli(['approve', 'intent', '--change', p.change, '--preview', '--expect-digest', expected, '--json']);
   expect(r.code, r.stdout + r.stderr).toBe(0);
   return r.json<Json>();
+}
+
+/** The preview without `--expect-digest`, in JSON or as text. */
+function plainPreview(p: P, json = true) {
+  const r = p.cli(['approve', 'intent', '--change', p.change, '--preview', ...(json ? ['--json'] : [])]);
+  expect(r.code, r.stdout + r.stderr).toBe(0);
+  return r;
+}
+
+/** The roles file with Bob, and Bob's git identity: a person who may not approve the intent. */
+function asBob(p: P): void {
+  write(p.file('openspec/roles.yaml'), ROLES_WITH_BOB);
+  git(p.root, ['config', 'user.name', 'Bob Petrov']);
+  git(p.root, ['config', 'user.email', 'bob@example.com']);
 }
 
 function logEntries(p: P, event: string): Json[] {
@@ -229,6 +252,8 @@ describe('gate-reads: the report gives each gate its version and its approvals',
     expect(gate.approvals).toHaveLength(1);
     expect(gate.approvals[0].digest).toMatch(DIGEST);
     expect(gate.staleApprovals).toEqual([]);
+    const withDigest = (archived!.gates as Json[]).filter((item) => 'digest' in item).map((item) => item.id);
+    expect(withDigest).toEqual([]);
   }, 240000);
 
   it('A gate bound to the code: the review digest is the one status uses', () => {
@@ -307,14 +332,16 @@ describe('gate-approval: approve only the expected version', () => {
     expect(checkpointRefs(p.root)).toContain(`refs/sdlc/${p.change}/intent`);
   }, 240000);
 
-  it('The short form: the 12 characters approve prints approve like the full digest', () => {
-    const p = project();
-    write(p.intent, INTENT);
-    const digest = reportGate(p, 'intent').digest;
-    const r = approve(p, ['--expect-digest', short(digest), '--json']);
+  it('A gate bound to the code: approve review with the report\'s digest', () => {
+    const p = atReview();
+    const digest = reportGate(p, 'review').digest as string;
+    const stale = `sha256:${'0'.repeat(64)}`;
+    const refused = p.cli(['approve', 'review', '--change', p.change, '--expect-digest', stale, '--json']);
+    expect(refused.json<Json>().status[0].code).toBe('digest_changed');
+    const r = p.cli(['approve', 'review', '--change', p.change, '--expect-digest', digest, '--json']);
     expect(r.code, r.stdout + r.stderr).toBe(0);
-    expect(reportGate(p, 'intent').approvals[0].digest).toBe(digest);
-  }, 240000);
+    expect(statusGate(p, 'review').approvals[0].digest).toBe(digest);
+  }, 480000);
 
   it('Already approved in that version: reported as already approved, as without the option', () => {
     const p = project();
@@ -334,6 +361,7 @@ describe('gate-approval: approve only the expected version', () => {
     expect(r.code).toBe(1);
     expect(r.stderr).toContain(short(before));
     expect(r.stderr).toContain(short(after));
+    expect(r.stderr).toContain('--preview');
     const left = snapshot(p);
     expect(left).toEqual(untouched);
     expect(left.refs).not.toContain(`refs/sdlc/${p.change}/intent`);
@@ -357,13 +385,28 @@ describe('gate-approval: approve only the expected version', () => {
     expect(r.stderr).toContain(text.ru);
   }, 240000);
 
-  it('Nothing to approve: gate_not_ready, and nothing written', () => {
+  it('A blocked gate: gate_blocked, the same code and message as without the option, nothing written', () => {
     const p = project();
     const untouched = snapshot(p);
     const r = approve(p, ['--expect-digest', `sha256:${'a'.repeat(64)}`, '--json']);
     expect(r.code).toBe(1);
-    expect(r.json<Json>().status[0].code).toBe('gate_not_ready');
+    const guarded = r.json<Json>().status[0];
     expect(snapshot(p)).toEqual(untouched);
+    const plain = approve(p, ['--json']).json<Json>().status[0];
+    expect(plain.code).toBe('gate_blocked');
+    expect({ code: guarded.code, message: guarded.message }).toEqual({ code: plain.code, message: plain.message });
+  }, 240000);
+
+  it('A person without the role: refused for the missing role with the same code as without the option', () => {
+    const p = project();
+    write(p.intent, INTENT);
+    asBob(p);
+    const digest = reportGate(p, 'intent').digest;
+    const guarded = approve(p, ['--expect-digest', digest, '--json']);
+    expect(guarded.code).toBe(1);
+    const plain = approve(p, ['--json']);
+    expect(guarded.json<Json>().status[0].code).toBe(plain.json<Json>().status[0].code);
+    expect(statusGate(p, 'intent').approvals).toEqual([]);
   }, 240000);
 
   it('An agent session: refused as a person\'s command even with the matching digest, nothing written', () => {
@@ -386,6 +429,49 @@ describe('gate-approval: the expected digest\'s form', () => {
     const r = approve(p, ['--expect-digest', 'abc', '--json']);
     expect(r.code).toBe(1);
     expect(r.json<Json>().status[0].code).toBe('invalid_option');
+    expect(snapshot(p)).toEqual(untouched);
+  }, 240000);
+
+  it('The 12 characters approve prints: invalid_option, nothing written', () => {
+    const p = project();
+    write(p.intent, INTENT);
+    const digest = reportGate(p, 'intent').digest as string;
+    const untouched = snapshot(p);
+    const r = approve(p, ['--expect-digest', short(digest), '--json']);
+    expect(r.code).toBe(1);
+    expect(r.json<Json>().status[0].code).toBe('invalid_option');
+    expect(snapshot(p)).toEqual(untouched);
+  }, 240000);
+
+  it('A value with control characters: invalid_option, the value shown escaped', () => {
+    const p = project();
+    write(p.intent, INTENT);
+    const digest = reportGate(p, 'intent').digest as string;
+    const r = approve(p, ['--expect-digest', `${digest}\r`, '--json']);
+    expect(r.code).toBe(1);
+    const [diagnostic] = r.json<Json>().status;
+    expect(diagnostic.code).toBe('invalid_option');
+    expect(diagnostic.message).toContain('\\r');
+    expect(diagnostic.message).not.toContain('\r');
+  }, 240000);
+
+  it('A long value is cut in the message', () => {
+    const p = project();
+    write(p.intent, INTENT);
+    const r = approve(p, ['--expect-digest', 'x'.repeat(5000), '--json']);
+    const [diagnostic] = r.json<Json>().status;
+    expect(diagnostic.code).toBe('invalid_option');
+    expect(diagnostic.message).not.toContain('x'.repeat(81));
+  }, 240000);
+
+  it('Two values: invalid_option, nothing written', () => {
+    const p = project();
+    write(p.intent, INTENT);
+    const digest = reportGate(p, 'intent').digest as string;
+    const untouched = snapshot(p);
+    const r = approve(p, ['--expect-digest', `sha256:${'0'.repeat(64)}`, '--expect-digest', digest, '--json']);
+    expect(r.code).toBe(1);
+    expect(r.stdout + r.stderr).toMatch(/invalid_option|expect-digest/);
     expect(snapshot(p)).toEqual(untouched);
   }, 240000);
 
@@ -434,6 +520,59 @@ describe('gate-approval: the preview with an expected digest', () => {
     expect(first).toBe('digest_changed');
     expect(r.json<Json>().status[0].code).toBe(first);
   }, 240000);
+
+  it('The comparison before the roles: a person without the role sees digest_changed first, like approve', () => {
+    const { p, before } = changedAfterReading();
+    asBob(p);
+    const rules = preview(p, before).refusals.map((refusal: Json) => refusal.rule);
+    expect(rules[0]).toBe('digest_changed');
+    expect(rules.length).toBeGreaterThan(1);
+    expect(approve(p, ['--expect-digest', before, '--json']).json<Json>().status[0].code).toBe('digest_changed');
+  }, 240000);
+
+  it('A malformed value in the preview: the preview succeeds and lists invalid_option', () => {
+    const p = project();
+    write(p.intent, INTENT);
+    const out = preview(p, 'abc');
+    expect(out.allowed).toBe(false);
+    expect(out.refusals.map((refusal: Json) => refusal.rule)).toContain('invalid_option');
+  }, 240000);
+
+  it('The preview writes nothing, with the option set', () => {
+    const { p, before } = changedAfterReading();
+    const untouched = snapshot(p);
+    preview(p, before);
+    expect(snapshot(p)).toEqual(untouched);
+  }, 240000);
+});
+
+describe('gate-approval: the preview names the version', () => {
+  it('The preview without the option: the digest status uses, and a guarded command', () => {
+    const p = project();
+    write(p.intent, INTENT);
+    const out = plainPreview(p).json<Json>();
+    const truth = statusGate(p, 'intent').digest as string;
+    expect(truth).toMatch(DIGEST);
+    expect(out.digest).toBe(truth);
+    expect(out.allowed).toBe(true);
+    expect(out.cli.endsWith(`--expect-digest ${truth}`)).toBe(true);
+  }, 240000);
+
+  it('The text preview: the full digest and the guarded command', () => {
+    const p = project();
+    write(p.intent, INTENT);
+    const digest = reportGate(p, 'intent').digest as string;
+    const text = plainPreview(p, false).stdout;
+    expect(text).toContain(digest);
+    expect(text).toContain(`--expect-digest ${digest}`);
+  }, 240000);
+
+  it('Nothing to approve in the preview: no digest and no command', () => {
+    const p = project();
+    const out = plainPreview(p).json<Json>();
+    expect(Object.keys(out)).not.toContain('digest');
+    expect(Object.keys(out)).not.toContain('cli');
+  }, 240000);
 });
 
 describe('project-log: decisions name their version', () => {
@@ -470,6 +609,14 @@ describe('project-log: decisions name their version', () => {
     expect(entry.detail).toBe('needs work');
   }, 240000);
 
+  it('A rejection of a gate without a version: no digest field', () => {
+    const p = project();
+    p.must(['reject', 'intent', '--change', p.change, '--note', 'write it first', '--json']);
+    const entry = logEntries(p, 'gate.intent.rejected').at(-1)!;
+    expect(entry).toBeDefined();
+    expect(Object.keys(entry)).not.toContain('digest');
+  }, 240000);
+
   it('Older entries without a digest are listed unchanged by log and report', () => {
     const p = project();
     const old = { ts: '2026-10-01T00:00:00.000Z', event: 'gate.intent.approved', change: p.change,
@@ -495,5 +642,8 @@ describe('project-log: decisions name their version', () => {
     expect(approved).toBeDefined();
     expect(Object.keys(approved!.event)).not.toContain('digest');
     for (const key of Object.keys(approved!.event)) expect(OLD_EVENT_KEYS).toContain(key);
+    for (const key of ['id', 'project', 'event', 'change', 'gate', 'at', 'sdlc']) {
+      expect(Object.keys(approved!.event)).toContain(key);
+    }
   }, 240000);
 });

@@ -1,3 +1,5 @@
+import { spawnSync } from 'node:child_process';
+import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { git, humanEnv, initGitRepo, read, runCli, tempDir, write } from './helpers.js';
@@ -36,8 +38,11 @@ function project() {
   write(path.join(root, 'openspec/roles.yaml'), ROLES);
   expect(cli(['new', 'a', '--json']).code).toBe(0);
   write(path.join(root, 'openspec/changes/a/intent.md'), INTENT);
+  const queue = path.join(root, 'openspec/.sdlc/hook-log.jsonl');
+  // The record, the log, the local queue (wait records go there) and the checkpoint refs (digest-check review F9).
   const files = () => [read(path.join(root, 'openspec/changes/a/.sdlc.yaml')),
-    read(path.join(root, 'openspec/.sdlc/log.jsonl'))];
+    read(path.join(root, 'openspec/.sdlc/log.jsonl')), fs.existsSync(queue) ? read(queue) : null,
+    spawnSync('git', ['for-each-ref', 'refs/sdlc'], { cwd: root, encoding: 'utf-8' }).stdout];
   return { cli, as, files };
 }
 

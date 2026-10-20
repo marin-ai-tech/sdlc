@@ -1,16 +1,25 @@
 import { describe, expect, it } from 'vitest';
 import { SdlcError } from '../src/core/errors.js';
-import { assertExpectedDigest, parseExpectedDigest, shortDigest } from '../src/core/expected-digest.js';
+import { assertExpectedDigest, parseExpectedDigest } from '../src/core/expected-digest.js';
+import type { GateEvaluation } from '../src/core/lifecycle.js';
 
 /**
- * The expected digest of `sdlc approve --expect-digest` (change digest-check): the two accepted forms, case, and the
- * comparison with the gate's current digest. The command-level behaviour is in test/e2e-0240-digest-check.test.ts.
+ * The expected digest of `sdlc approve --expect-digest` (change digest-check): only the full form is accepted (the
+ * 12-character form can be collided by an agent that writes both versions), the refused value is shown escaped and
+ * cut, and a gate without a digest gives the error approve gives without the option. The command-level behaviour is
+ * in test/e2e-0240-digest-check.test.ts.
  */
 
 const HEX = '5686b708f959805888bc3743b17b92b15fa7cb771bdda161a4f1fafa4e692c2f';
 const CURRENT = `sha256:${HEX}`;
 const OTHER = `sha256:${'0'.repeat(64)}`;
-const TARGET = { gate: 'intent', change: 'a' };
+
+function gate(fields: Partial<GateEvaluation>): GateEvaluation {
+  return {
+    id: 'intent', stage: 'plan', required: true, status: 'pending', satisfied: false, artifacts: [],
+    approvals: [], staleApprovals: [], missingRoles: [], ...fields,
+  } as GateEvaluation;
+}
 
 function failure(run: () => unknown): SdlcError {
   try {
@@ -23,52 +32,52 @@ function failure(run: () => unknown): SdlcError {
 }
 
 describe('parseExpectedDigest', () => {
-  it('accepts the full digest and the 12 characters approve prints, in any case', () => {
-    expect(parseExpectedDigest(CURRENT)).toEqual({ kind: 'full', value: CURRENT });
-    expect(parseExpectedDigest(CURRENT.toUpperCase())).toEqual({ kind: 'full', value: CURRENT });
-    expect(parseExpectedDigest(HEX.slice(0, 12))).toEqual({ kind: 'short', value: HEX.slice(0, 12) });
-    expect(parseExpectedDigest(HEX.slice(0, 12).toUpperCase())).toEqual({ kind: 'short', value: HEX.slice(0, 12) });
+  it('accepts the full digest in any case and returns it in lower case', () => {
+    expect(parseExpectedDigest(CURRENT)).toBe(CURRENT);
+    expect(parseExpectedDigest(CURRENT.toUpperCase())).toBe(CURRENT);
   });
 
-  it('negative: refuses every other form with invalid_option', () => {
-    const values = ['', 'abc', HEX, HEX.slice(0, 11), HEX.slice(0, 13), `sha256:${HEX.slice(0, 12)}`,
-      `sha256:${HEX}0`, ` ${CURRENT}`, `${CURRENT} `, `sha1:${HEX}`, `sha256:${'g'.repeat(64)}`];
+  it('negative: refuses every other form with invalid_option, the 12 characters included', () => {
+    const values = ['', 'abc', HEX, HEX.slice(0, 12), HEX.slice(0, 12).toUpperCase(), `sha256:${HEX.slice(0, 12)}`,
+      `sha256:${HEX}0`, ` ${CURRENT}`, `${CURRENT} `, `${CURRENT}\r`, `sha1:${HEX}`, `sha256:${'g'.repeat(64)}`];
     for (const value of values) {
       const error = failure(() => parseExpectedDigest(value));
-      expect(error.code, value).toBe('invalid_option');
+      expect(error.code, JSON.stringify(value)).toBe('invalid_option');
     }
   });
-});
 
-describe('shortDigest', () => {
-  it('is the 12 characters after the prefix', () => {
-    expect(shortDigest(CURRENT)).toBe(HEX.slice(0, 12));
+  it('shows the refused value escaped and cut to 80 characters', () => {
+    expect(failure(() => parseExpectedDigest(`${CURRENT}\r`)).message).toContain('\\r');
+    const long = failure(() => parseExpectedDigest('x'.repeat(500))).message;
+    expect(long).toContain('x'.repeat(80));
+    expect(long).not.toContain('x'.repeat(81));
   });
 });
 
 describe('assertExpectedDigest', () => {
-  it('passes without an expected digest, and when the full or the short form matches', () => {
-    expect(() => assertExpectedDigest(undefined, TARGET, CURRENT)).not.toThrow();
-    expect(() => assertExpectedDigest(undefined, TARGET, undefined)).not.toThrow();
-    expect(() => assertExpectedDigest(parseExpectedDigest(CURRENT), TARGET, CURRENT)).not.toThrow();
-    expect(() => assertExpectedDigest(parseExpectedDigest(HEX.slice(0, 12)), TARGET, CURRENT)).not.toThrow();
+  it('passes without an expected digest, and when the digest matches', () => {
+    expect(() => assertExpectedDigest(undefined, 'a', gate({ digest: CURRENT }))).not.toThrow();
+    expect(() => assertExpectedDigest(undefined, 'a', gate({ status: 'blocked' }))).not.toThrow();
+    expect(() => assertExpectedDigest(CURRENT, 'a', gate({ digest: CURRENT }))).not.toThrow();
   });
 
-  it('negative: a different version is digest_changed naming both short forms', () => {
-    const error = failure(() => assertExpectedDigest(parseExpectedDigest(OTHER), TARGET, CURRENT));
+  it('negative: a different version is digest_changed naming both and pointing to the preview', () => {
+    const error = failure(() => assertExpectedDigest(OTHER, 'a', gate({ digest: CURRENT })));
     expect(error.code).toBe('digest_changed');
     expect(error.message).toContain('0'.repeat(12));
     expect(error.message).toContain(HEX.slice(0, 12));
     expect(error.fix).toContain('--preview');
   });
 
-  it('negative: a short form that is not the start of the current digest is digest_changed', () => {
-    const error = failure(() => assertExpectedDigest(parseExpectedDigest(HEX.slice(1, 13)), TARGET, CURRENT));
-    expect(error.code).toBe('digest_changed');
+  it('negative: a blocked gate without a digest is gate_blocked with its reason', () => {
+    const blocked = gate({ status: 'blocked', reason: 'missing artifacts: intent' });
+    const error = failure(() => assertExpectedDigest(CURRENT, 'a', blocked));
+    expect(error.code).toBe('gate_blocked');
+    expect(error.message).toContain('missing artifacts: intent');
   });
 
-  it('negative: a gate with no version is gate_not_ready', () => {
-    const error = failure(() => assertExpectedDigest(parseExpectedDigest(CURRENT), TARGET, undefined));
+  it('negative: a gate that is not blocked and has no digest is gate_not_ready', () => {
+    const error = failure(() => assertExpectedDigest(CURRENT, 'a', gate({ status: 'pending' })));
     expect(error.code).toBe('gate_not_ready');
   });
 });
