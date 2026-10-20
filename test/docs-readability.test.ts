@@ -16,6 +16,14 @@ const CONVERTED = [
   'docs/en/README.md',
   'docs/en/glossary.md',
   'docs/en/13-process-health.md',
+  'docs/en/05-guide.md',
+  'docs/en/04-architecture.md',
+  'docs/en/07-ai-ready-project.md',
+  'docs/en/08-roles-and-signing.md',
+  'docs/en/14-traceability.md',
+  'docs/en/10-integrations.md',
+  'docs/en/11-mcp-use-cases.md',
+  'docs/en/12-agent-team.md',
 ];
 
 const LONG_PAGE_WORDS = 800;
