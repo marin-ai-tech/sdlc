@@ -1030,12 +1030,10 @@ addresses his note, and Paul approves.
 
    ```text
    ✗ review gate rejected by Paul <paul@northwind.example>: README has no word about due dates. Document dueDate and the overdue filter.
-   Next: person — Paul (code-owner) must read review.md and the diff, then approve the review gate: sdlc approve review --change add-due-dates
    ```
 
-   The `Next:` line still names Paul: a rejection keeps the review gate waiting for him. Tell the agent to read the
-   note and fix what `review.md` and the note ask; then Paul reviews again. To hand the change back with a reason
-   that `sdlc next` shows, use `sdlc rework` (see Pitfalls).
+   After the rejection, `sdlc next` hands the change to the agent: it revises `review.md`, fixes what the note asks,
+   and then asks Paul for approval again. The review gate waits for Paul once the agent is done.
 
    `sdlc status` shows the note on the review line:
 
@@ -1089,8 +1087,8 @@ addresses his note, and Paul approves.
 
 ### Pitfalls
 
-- After `sdlc reject`, `sdlc next` still points at Paul, not at the agent. Tell the agent to read the note, as in
-  step 8. When the agent must clearly do more work, `sdlc rework review --reason … --note "…"` hands the change back
+- A rejection hands the change to the agent through `sdlc next`, with the reviewer's note. When the agent must
+  clearly do more work for a recorded reason, `sdlc rework review --reason … --note "…"` hands the change back
   with the reason in `sdlc next`.
 - A finding marked `deferred (D<n>)` must link to an open item in `openspec/deferred-work.md`, or the review check
   fails.

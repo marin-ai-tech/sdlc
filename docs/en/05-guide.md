@@ -41,7 +41,8 @@ Put `${VAR}` values in single quotes when using `--set`; an empty-value warning 
 
 ## 5.1. Installation
 
-Install the CLI in a git repository, then check the setup with `sdlc doctor`.
+Install the CLI, then check the setup with `sdlc doctor`. Without a git repository, the setup wizard offers
+`git init`.
 
 ```bash
 # CLI, the latest release (the required OpenSpec version is installed with it)
@@ -431,7 +432,7 @@ each under `## Coverage`, including work checked when no finding was made:
 
 `sdlc review check --change <id>` checks missing entries, mismatched finding counts, empty `checked:` evidence, and
 deferred links. The review gate uses that result. `review.require_lens_coverage: true` requires lens coverage;
-without it, missing coverage warns. An accepted extension pack adds its lenses as `<pack>-<id>`, and their
+`sdlc init` writes it for new projects. In a config without the key, missing coverage only warns. An accepted extension pack adds its lenses as `<pack>-<id>`, and their
 coverage is required in the same way ([Extension packs](#extension-packs)).
 
 ### Defer a finding
@@ -449,7 +450,7 @@ The registry is `openspec/deferred-work.md`; each `### D<n> [open] Title` entry 
 to the intent, spec, plan, qa, or review stage. The gate counts as rejected until approved again.
 Approvals before the rework stop counting, including later gates' approvals.
 
-`rework.reasons` in `sdlc.yaml` supplies the categories that audit counts:
+`rework.reasons` in `sdlc.yaml` sets the categories that audit counts. By default they are:
 
 - `missing-requirement` and `wrong-assumption`;
 - `design-flaw` and `implementation-bug`;

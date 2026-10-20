@@ -43,7 +43,8 @@ where you can learn how it works in a change.
   See the [user guide](05-guide.md).
 - **Judge:** An optional check of a gate's artifacts against the team's rubric before a person approves.
   See [process health](13-process-health.md).
-- **Lens:** A named viewpoint that the review must cover and record.
+- **Lens:** A named viewpoint the review covers and records; with `review.require_lens_coverage: true` (the
+  default for new projects) missing coverage blocks the review gate.
   See the [agent team](12-agent-team.md).
 - **Living spec:** The current requirement kept after a change's delta is archived.
   See [OpenSpec analysis](01-openspec-analysis.md).
