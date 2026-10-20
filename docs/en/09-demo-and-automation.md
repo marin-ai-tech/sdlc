@@ -1,37 +1,87 @@
-# 9. The calculator demo and keeping the dashboard current
+# The calculator demo and dashboard automation
 
-## 9.1. The demo: a calculator built with every command
+Use the calculator demo to follow a complete sdlc change with real commands and output. Then choose how to keep a
+local dashboard current as the project changes.
 
-`test/e2e-calculator.test.ts` is both an acceptance test and the script of the demo. A team of three builds a till calculator with AI agents:
+## On this page
 
-- **Alice**: product owner, release manager, maintainer of `roles.yaml`;
-- **Bob**: engineer and tech lead, who writes the code;
-- **Carol**: engineer and code owner, who reviews it.
+- [Follow the calculator demo](#-follow-the-calculator-demo)
+- [Build the demo deck](#-build-the-demo-deck)
+- [Keep the dashboard current](#-keep-the-dashboard-current)
+- [Terms](#-terms)
+- [See also](#-see-also)
 
-The scenario covers every step of the product:
+## 💡 Follow the calculator demo
 
-- **Setup**: `init` for Claude Code and OpenCode (the demo's two tools), `doctor`, `health`, `license`, `help`, the `layout` commands, `update`.
-- **Roles**: `roles.yaml` with signing in `warn` mode.
-- **Planning**: exploration; a backlog with an epic, dependencies and priorities.
-- **OpenSpec underneath**: the change is a plain OpenSpec change (`openspec list`, `status`, `show`); a delta requirement without a scenario is refused by strict validation, then fixed; the `sdlc` schema validates as an OpenSpec schema; after the archive the requirement lives in the spec (`openspec list --specs`, `openspec show calculator`).
-- **The change**: a change started from a backlog item, then the gates with the right people: Alice answers the intent's open question herself (`answer`), and `explain` says why the change is back at the spec after a rework; before the release the agent builds the changelog from the delta specs (`changelog`). Bob is refused as product owner and as the author of the code he would review. Next come verification with evidence, a review with lenses and a deferred finding, the release, `approvals verify` and the archive.
-- **Other flows**: a bug fix with locked tests, a rejected idea, a waiver, closing deferred work and a backlog item, and a BMAD import.
-- **Visibility**: `status`, `report`, `dashboard`, `audit`, `log`, `statusline`, the session hook, the plugin and `uninstall`.
+`test/e2e-calculator.test.ts` is both an acceptance test and the demo script. Three people build a till calculator with
+AI agents:
+
+- **Alice:** product owner, release manager and maintainer of `roles.yaml`.
+- **Bob:** engineer and tech lead who writes the code.
+- **Carol:** engineer and code owner who reviews it.
+
+The story follows a change from setup to archive. This diagram shows its main path:
+
+```mermaid
+flowchart LR
+    A[Setup] -->|plans| B[Backlog and gates]
+    B -->|guides| C[Build and verify]
+    C -->|checks| D[Review and release]
+    D -->|records| E[Archive]
+```
+
+The scenario includes these parts:
+
+- **Setup:** `init` for Claude Code and OpenCode, the demo's two tools. It also runs `doctor`, `health`, `license`,
+  `help`, the `layout` commands and `update`.
+- **Roles:** `roles.yaml` uses signing in `warn` mode.
+- **Planning:** exploration and a backlog with an epic, dependencies and priorities.
+- **OpenSpec:** the change is a plain OpenSpec change. The demo runs `openspec list`, `status` and `show`.
+  Strict validation refuses a delta requirement without a scenario until it is fixed. The `sdlc` schema validates
+  as an OpenSpec schema. After archive, `openspec list --specs` and `openspec show calculator` show the requirement.
+- **The change:** a backlog item starts it. Alice answers the intent's open question with `answer`.
+  After rework, `explain` shows why it returns to spec. The agent builds the changelog from delta specs with
+  `changelog` before release. Bob cannot act as product owner or review his own code.
+- **Later gates:** verification records evidence. Review uses lenses and defers a finding. Release is followed by
+  `approvals verify` and archive.
+- **Other flows:** a bug fix with locked tests, a rejected idea, a waiver, deferred work and backlog closure,
+  and a BMAD import.
+- **Visibility:** `status`, `report`, `dashboard`, `audit`, `log`, `statusline`, the session hook, the plugin
+  and `uninstall`.
 
 The test fails if any CLI command is missing from the story.
 
-Each step is recorded with who ran it, the command, the exit code, an excerpt of the output and a note. The deck is built from that transcript. The team's surnames follow the deck's language (`SDLC_DEMO_PEOPLE` selects them), so `npm run demo:deck` runs the scenario once per language and every output on the slides stays real:
+## 🛠️ Build the demo deck
+
+Each step records who ran it, the command, the exit code, an output excerpt and a note. The deck uses that transcript,
+so its slide output comes from the scenario itself.
 
 ```bash
 npm run demo:deck                  # per language: runs the scenario, then builds the deck
 node scripts/demo/build-deck.mjs --transcript docs/demo/calculator-transcript.en.json --lang en --out deck.pptx
 ```
 
-The story (which steps each slide shows, the words in every shipped language) is in `scripts/demo/deck-content.mjs`; `scripts/demo/build-deck.mjs` renders it with pptxgenjs. The English deck is `docs/demo/sdlc-calculator-demo.en.pptx` (20 slides), built from `docs/demo/calculator-transcript.en.json`.
+`SDLC_DEMO_PEOPLE` selects the team's surnames for the deck. `npm run demo:deck` runs the scenario once per language.
+The slide steps and words are in `scripts/demo/deck-content.mjs`. `scripts/demo/build-deck.mjs` renders them with
+pptxgenjs. The 20-slide English deck is `docs/demo/sdlc-calculator-demo.en.pptx`, built from
+`docs/demo/calculator-transcript.en.json`.
 
-## 9.2. A background process that keeps the dashboard current
+## 🔁 Keep the dashboard current
 
-`sdlc dashboard --out reports/dashboard.html` writes one self-contained page. `scripts/examples/dashboard-watch.mjs` keeps it current: it watches `openspec/` and rebuilds the page after changes. Rebuilds are debounced, never run two at a time and are spaced by a minimum interval. The script can also serve the page on localhost with an auto-refresh.
+`sdlc dashboard --out reports/dashboard.html` writes a self-contained page. You can refresh it with the CLI or with
+`scripts/examples/dashboard-watch.mjs`. Both watch `openspec/` and rebuild after changes. With `--serve`, the page is
+available on localhost with auto-refresh.
+
+### Use the CLI
+
+`sdlc dashboard --watch [--serve <host:port>]` builds the page and rebuilds it when `openspec/` changes. Use
+`--serve` when you want the local auto-refresh view.
+See [keeping the dashboard current](05-guide.md#56-keeping-the-dashboard-current).
+
+### Use the watcher script
+
+The script debounces rebuilds, runs one at a time and spaces them by a minimum interval. These commands let you
+build once, watch continuously or serve the page:
 
 ```bash
 node scripts/examples/dashboard-watch.mjs --once                     # build once
@@ -40,16 +90,22 @@ node scripts/examples/dashboard-watch.mjs --serve 127.0.0.1:8123     # and serve
 node scripts/examples/dashboard-watch.mjs --cli "npx --no-install sdlc" --debounce 2000 --min-interval 10000
 ```
 
-[`scripts/examples/README.md`](../../scripts/examples/README.md) shows how to run it in the background:
+[`scripts/examples/README.md`](../../scripts/examples/README.md) explains background runs with:
 
-- as a Windows Task Scheduler task (`register-dashboard-task.ps1`);
-- as a `systemd --user` service;
-- as a `launchd` agent;
-- as a CI step that keeps the page as a build artifact.
+- Windows Task Scheduler through `register-dashboard-task.ps1`;
+- a `systemd --user` service;
+- a `launchd` agent;
+- a CI step that keeps the page as a build artifact.
 
-Everything stays local; nothing is published.
+> [!NOTE]
+> The dashboard and watcher stay local. Neither publishes the page.
 
-Since 0.16.1 the CLI does the same without the script: `sdlc dashboard --watch [--serve <host:port>]` builds the
-page, rebuilds it when `openspec/` changes and, with `--serve`, serves it with an auto-refresh
-([5.6](05-guide.md#56-keeping-the-dashboard-current)). The script stays for schedulers such as the Windows Task
-Scheduler.
+## 📚 Terms
+
+The [glossary](glossary.md) explains [gates](glossary.md) and other sdlc terms used in the demo.
+
+## 📚 See also
+
+- [User guide](05-guide.md) — follow a change through its gates.
+- [Process health](13-process-health.md) — understand the health command used in the demo.
+- [Dashboard example](21-dashboard-health-example.md) — read a dashboard in a team run.
