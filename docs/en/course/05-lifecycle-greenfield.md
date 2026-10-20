@@ -1079,8 +1079,9 @@ addresses his note, and Paul approves.
    Next: person — Paul (code-owner) must read review.md and the diff, then approve the review gate: sdlc approve review --change add-due-dates
    ```
 
-   The recorded `Next:` line names Paul. After a rejection, the change goes to the agent. It fixes what `review.md`
-   and the note ask. The review gate then waits for Paul again.
+   The `Next:` line still names Paul: a rejection keeps the review gate waiting for him. Tell the agent to read the
+   note and fix what `review.md` and the note ask; then Paul reviews again. To hand the change back with a reason
+   that `sdlc next` shows, use `sdlc rework` (see Pitfalls).
 
    `sdlc status` shows the note on the review line:
 
