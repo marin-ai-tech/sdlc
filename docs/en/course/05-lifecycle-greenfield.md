@@ -939,8 +939,8 @@ behavioural verification, and let Grace confirm that every scenario was exercise
 
 - The verify gate passes on the automated checks alone. The behavioural table is checked only by
   `sdlc verify --check`, which is not part of the gate. Grace (or CI) runs it with `--strict`.
-- `${HEAD}` is the head commit. A check that uses `${HEAD}` is not called while code outside
-  `openspec/` is uncommitted: it fails and asks you to commit (and push) first. Commit, push, let CI finish, then run
+- `${HEAD}` is the head commit. While code outside `openspec/` is uncommitted, sdlc does not call the server
+  for a check that uses `${HEAD}`: the check fails with a reason to commit (and push) first. Commit, push, let CI finish, then run
   `sdlc verify`.
 - `sdlc verify --list` shows the `verify.mcp` checks (name, server, tool, required) next to the commands.
 - `sdlc verify --only <names>` runs some checks for a quick look but never passes the gate.
