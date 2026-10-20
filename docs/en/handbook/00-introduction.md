@@ -1,14 +1,16 @@
 # 0. Introduction
 
 This chapter explains what sdlc is, who does what, and how the handbook is built. It has no setup steps. Start here,
-whatever your role is. The examples use sdlc 0.14 and the `tasklet` project of Northwind Labs ([lesson 0.4](#s0-4)).
+whatever your role is. The examples use the `tasklet` project of Northwind Labs ([lesson 0.4](#s0-4)).
 
-## Contents
+## On this page
 
 - [0.1 What sdlc is: stages and gates on top of OpenSpec](#s0-1)
 - [0.2 People decide, agents work](#s0-2)
 - [0.3 The artifacts of a change, and the two tracks](#s0-3)
 - [0.4 Northwind Labs, the toolchain and how to read this handbook](#s0-4)
+- [Terms](#terms)
+- [See also](#see-also)
 
 
 <a id="s0-1"></a>
@@ -18,6 +20,19 @@ whatever your role is. The examples use sdlc 0.14 and the `tasklet` project of N
 
 You can say in two sentences what sdlc adds to a coding agent. You can name the six stages and the six
 gates, and you know where sdlc keeps its state.
+
+This diagram shows how work moves from an idea to the living specs:
+
+```mermaid
+flowchart LR
+    A[Explore] -->|frames| B[Intent]
+    B -->|defines| C[Spec and plan]
+    C -->|authorizes| D[Build and verify]
+    D -->|reviews| E[Release and archive]
+```
+
+> [!NOTE]
+> The release gate is optional by default. A team turns it on in `openspec/sdlc.yaml`.
 
 ### Procedure
 
@@ -377,7 +392,7 @@ lessons to read for your role.
    - Commands a person must run are always run by that named person in their own terminal. The lesson says so
      each time, and shows what happens when the agent tries.
    - Prompts to Claude Code are written as `> /sdlc:intent "…"` or as plain text in a block quote.
-   - Output in a `text` block is real output from sdlc 0.14. When a lesson only describes the screen, it says so.
+   - Output in a `text` block is real output from sdlc. When a lesson only describes the screen, it says so.
 
 6. Where to start, by role:
 
@@ -399,3 +414,12 @@ lessons to read for your role.
 
 - A role in `roles.yaml` is a gate role, not a job title. Grace and Laura hold no gate role, and that is correct.
 - GigaCode support is experimental: it was not checked against a live installation.
+
+## Terms
+
+See the [sdlc glossary](../glossary.md) for the process terms used in this module.
+
+## See also
+
+- [Set up a new project](01-setup-greenfield.md) — continue through the handbook.
+- [Integrations](../10-integrations.md) — see how sdlc connects to team systems.

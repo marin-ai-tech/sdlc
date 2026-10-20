@@ -1,25 +1,39 @@
 # Module 0. Introduction
 
 This module explains what sdlc is, who does what, and how the course is built. It has no setup steps. Watch it
-first, whatever your role is.
+first, whatever your role is. The examples use the `tasklet` project of Northwind Labs (lesson 0.4).
 
-In this module:
+## On this page
 
-- Lesson 0.1 — What sdlc is: stages and gates on top of OpenSpec
-- Lesson 0.2 — People decide, agents work
-- Lesson 0.3 — The artifacts of a change, and the two tracks
-- Lesson 0.4 — Northwind Labs, the toolchain and how to read this course
-
-The examples use sdlc 0.14 and the `tasklet` project of Northwind Labs (lesson 0.4).
+- [Lesson 0.1 — What sdlc is: stages and gates on top of OpenSpec](#s0-1)
+- [Lesson 0.2 — People decide, agents work](#s0-2)
+- [Lesson 0.3 — The artifacts of a change, and the two tracks](#s0-3)
+- [Lesson 0.4 — Northwind Labs, the toolchain and how to read this course](#s0-4)
+- [Terms](#terms)
+- [See also](#see-also)
 
 ---
 
+<a id="s0-1"></a>
 ## Lesson 0.1 — What sdlc is: stages and gates on top of OpenSpec            (video: ~6 min)
 
 **Role:** everyone   **Project:** tasklet   **You need:** nothing; a terminal with sdlc if you want to follow along
 
 **Goal.** You can say in two sentences what sdlc adds to a coding agent. You can name the six stages and the six
 gates, and you know where sdlc keeps its state.
+
+This diagram shows how work moves from an idea to the living specs:
+
+```mermaid
+flowchart LR
+    A[Explore] -->|frames| B[Intent]
+    B -->|defines| C[Spec and plan]
+    C -->|authorizes| D[Build and verify]
+    D -->|reviews| E[Release and archive]
+```
+
+> [!NOTE]
+> The release gate is optional by default. A team turns it on in `openspec/sdlc.yaml`.
 
 ### Steps
 
@@ -120,6 +134,7 @@ gates, and you know where sdlc keeps its state.
 
 ---
 
+<a id="s0-2"></a>
 ## Lesson 0.2 — People decide, agents work            (video: ~7 min)
 
 **Role:** everyone; Oliver (developer) and Megan (product owner) on screen   **Project:** tasklet
@@ -250,6 +265,7 @@ agent tries to take a person's decision, and where a person runs their commands.
 
 ---
 
+<a id="s0-3"></a>
 ## Lesson 0.3 — The artifacts of a change, and the two tracks            (video: ~6 min)
 
 **Role:** everyone   **Project:** tasklet   **You need:** lessons 0.1 and 0.2
@@ -337,6 +353,7 @@ know when a change may take the short `lite` track and who decides that.
 
 ---
 
+<a id="s0-4"></a>
 ## Lesson 0.4 — Northwind Labs, the toolchain and how to read this course            (video: ~7 min)
 
 **Role:** everyone   **Project:** both   **You need:** lessons 0.1 to 0.3
@@ -398,7 +415,7 @@ lessons to watch for your role.
    - Commands a person must run are always run by that named person in their own terminal. The lesson says so
      each time, and shows what happens when the agent tries.
    - Prompts to Claude Code are written as `> /sdlc:intent "…"` or as plain text in a block quote.
-   - Output in a `text` block is real output from sdlc 0.14. When a lesson only describes the screen, it says so.
+   - Output in a `text` block is real output from sdlc. When a lesson only describes the screen, it says so.
 
 6. Where to start, by role:
 
@@ -427,3 +444,12 @@ lessons to watch for your role.
 - The four MCP servers as boxes around Claude Code, with arrows: the agent calls `github` and `knowledge`; the CLI
   sends events to `telegram`; other AI systems read `sdlc`.
 - The tools table; highlight the "Call a workflow" column.
+
+## Terms
+
+See the [sdlc glossary](../glossary.md) for the process terms used in this module.
+
+## See also
+
+- [Set up a new project](01-setup-greenfield.md) — continue through the course.
+- [Integrations](../10-integrations.md) — see how sdlc connects to team systems.

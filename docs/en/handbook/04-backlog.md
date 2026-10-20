@@ -1,14 +1,11 @@
 # 4. Backlog and planning
 
-An existing active change can be attached to an open item with `sdlc backlog link B1 --change add-export`.
-The same actor who may start a backlog item may link it. Archiving completes the item; dropping the
-change with `sdlc drop add-export --note "Created by mistake"` returns it to open. Archived ids cannot be reused.
+This chapter shows how planned work becomes a change. Megan, the product owner, plans the `tasklet` backlog with
+Claude Code and decides the order. Oliver and Ethan can use the first two lessons to see where their changes come from.
 
-This chapter is about planned work before it becomes a change. It is for **Megan**, the product owner, who plans the
-`tasklet` backlog with Claude Code and decides the order. Oliver and Ethan read the first two lessons to see where their
-changes come from. The outputs come from a trial run of `tasklet` with sdlc 0.14.4.
+The outputs come from a trial run of `tasklet`.
 
-## Contents
+## On this page
 
 - [4.1 The backlog: epics, items and when an item is ready](#s4-1)
 - [4.2 Planning with Claude Code: `/sdlc:backlog`](#s4-2)
@@ -16,10 +13,24 @@ changes come from. The outputs come from a trial run of `tasklet` with sdlc 0.14
 - [4.4 Order, drop and start: the product owner's commands](#s4-4)
 - [4.5 Explore an idea before intent, and defer work for later](#s4-5)
 - [4.6 Import planning documents from BMAD](#s4-6)
+- [Terms](#terms)
+- [See also](#see-also)
 
+This diagram shows how a backlog item becomes an active change and returns to open if that change is dropped:
+
+```mermaid
+flowchart LR
+    A[Open item] -->|start or link| B[Active change]
+    B -->|archive| C[Done item]
+    B -->|drop| A
+```
 
 <a id="s4-1"></a>
 ## 4.1 The backlog: epics, items and when an item is ready
+
+An active change can be attached to a ready open item with `sdlc backlog link B1 --change add-export`.
+The same actor who may start a backlog item may link it. Archiving completes the item. Dropping the change with
+`sdlc drop add-export --note "Created by mistake"` returns the item to open. Archived ids cannot be reused.
 
 *Megan  ·  tasklet  · needs: sdlc initialized (Chapter 1); a terminal in `tasklet`*
 
@@ -61,7 +72,7 @@ is not ready.
 
    `--accept` can be repeated: one criterion each time. `--depends B<n>` names an item that must be done first.
 
-4. She adds three more items quickly, with only a title, and one that depends on B1:
+4. She adds three more items quickly, with only a title, and one that depends on the due-dates item:
 
    ```bash
    sdlc backlog add "Reminders for overdue tasks" --epic E1 --kind feature --depends B1 \
@@ -117,9 +128,9 @@ is not ready.
 
 ### You are done when
 
-- `sdlc backlog list --ready` shows only B1.
+- `sdlc backlog list --ready` shows only the due-dates item.
 - `sdlc backlog next` prints `B1 Add due dates to tasks`.
-- You can say why B2 is not ready (no acceptance criterion, and B1 is not done).
+- You can say why the reminders item is not ready (no acceptance criterion, and the due-dates item is not done).
 
 ### Pitfalls
 
@@ -144,8 +155,9 @@ Let the agent break an epic into ready items and refine an item, while every wri
 
    > /sdlc:backlog
 
-   The agent runs `sdlc backlog list` and `sdlc backlog next`. It names the next ready item (B1) and says what blocks
-   the others: B2 has no acceptance criterion and waits for B1; B3 and B4 have no outcome and no criterion.
+   The agent runs `sdlc backlog list` and `sdlc backlog next`. It names the due-dates item as next.
+   The reminders item has no acceptance criterion and waits for the due-dates item.
+   The export and dark-mode items have no outcome or criterion.
 
 2. She asks the agent to decompose an idea:
 
@@ -162,7 +174,9 @@ Let the agent break an epic into ready items and refine an item, while every wri
 
 3. She asks the agent to bring an item to ready:
 
+   ```text
    > /sdlc:backlog B3
+   ```
 
    The agent asks what is missing, then writes her answers with `sdlc backlog edit`:
 
@@ -188,12 +202,13 @@ Let the agent break an epic into ready items and refine an item, while every wri
 
    The agent fixes the title with `sdlc backlog edit B3 --title "…"` instead.
 
-5. Megan asks the agent to put B3 before B2. The agent does not run the command. It gives her the command for her
+5. Megan asks the agent to put the export item before the reminders item. The agent does not run the command.
+   It gives her the command for her
    own terminal ([lesson 4.4](#s4-4)).
 
 ### You are done when
 
-- `sdlc backlog list` shows B3 as ready.
+- `sdlc backlog list` shows the export item as ready.
 - `git diff openspec/backlog.md` shows only changes the commands made.
 - The agent never ran `sdlc backlog move` or `sdlc backlog drop`.
 
@@ -217,7 +232,7 @@ close that link when the change is archived.
 
 ### Procedure
 
-1. Understand it plainly first. Since 0.19.0, sdlc can import open GitHub issues into the backlog through the team's
+1. Understand it plainly first. sdlc can import open GitHub issues into the backlog through the team's
    GitHub MCP server. Steven names the server and the repository once; Megan (or anyone) runs the import. The agent
    still helps with the outcome and acceptance of each item. A person orders the backlog.
 
@@ -273,7 +288,7 @@ close that link when the change is archived.
    no change is in design, or ask Steven to add `design` to the server's stages.
 
 6. Close the loop on archive. When the change started from that item is archived, sdlc marks the backlog item
-   `done` and, since 0.19.0, comments on the linked GitHub issue and closes it (through the event outbox). A failing
+   `done`, comments on the linked GitHub issue and closes it (through the event outbox). A failing
    server does not fail the archive; `sdlc events flush` delivers the comment and the close later. An item without
    `Issue: GH-<n>` calls nothing.
 
@@ -300,9 +315,13 @@ close that link when the change is archived.
 
 Megan sets the order and removes work in her own terminal. The agent starts the next ready item as a change.
 
+> [!IMPORTANT]
+> Megan chooses the order in her terminal. The agent may start a ready item after she decides.
+
 ### Procedure
 
-1. In the chat, Megan asks the agent to move B3 before B2. The agent may not decide the order. If it tries, the hook
+1. In the chat, Megan asks the agent to move the export item before the reminders item.
+   The agent may not decide the order. If it tries, the hook
    denies the call; the CLI refuses as well:
 
    ```text
@@ -373,9 +392,10 @@ Megan sets the order and removes work in her own terminal. The agent starts the 
    ```
 
    This creates the change folder with a draft `intent.md` built from the item (outcome and acceptance criteria) and
-   sets B1 to `in-progress`. The agent continues with `/sdlc:intent add-due-dates` to complete the intent (Chapter 5).
+   sets the due-dates item to `in-progress`. The agent continues with `/sdlc:intent add-due-dates`.
+   That completes the intent (Chapter 5).
 
-7. See the end of the loop. When the change is archived, B1 becomes `done` and the epic bar moves:
+7. See the end of the loop. When the change is archived, the due-dates item becomes `done` and the epic bar moves:
 
    ```text
    E1 Task planning  ███░░░░░░░  1/3
@@ -383,18 +403,19 @@ Megan sets the order and removes work in her own terminal. The agent starts the 
    B1  done     -      Add due dates to tasks        add-due-dates
    ```
 
-   An item that depended on B1 can now become ready.
+   An item that depended on the due-dates item can now become ready.
 
 ### You are done when
 
-- B3 is above B2 in `openspec/backlog.md`, and B4 shows `[dropped]` with Megan's note.
-- After `backlog start`, `openspec/changes/add-due-dates/intent.md` exists and B1 is `in-progress`.
+- The export item is above the reminders item in `openspec/backlog.md`.
+  The dark-mode item shows `[dropped]` with Megan's note.
+- After `backlog start`, `openspec/changes/add-due-dates/intent.md` exists and the due-dates item is `in-progress`.
 - `git log` shows the move and the drop committed by Megan, not by the agent.
 
 ### Pitfalls
 
 - After `backlog start`, the draft intent goes to the agent. Megan approves it after `/sdlc:intent` completes it.
-- Since 0.18.0, with `roles.yaml`, `sdlc backlog move` and `drop` need the `product-owner` role. Without the file any
+- With `roles.yaml`, `sdlc backlog move` and `drop` need the `product-owner` role. Without the file any
   person may run them, as before; an agent never may. At Northwind only Megan holds `product-owner`; anyone else is
   refused with `missing_role`, and the message names who may.
 - `sdlc backlog done B<n> --note "…"` marks an item done without a change. Use it for work that was finished another
@@ -415,7 +436,7 @@ that it is not lost.
 1. Understand when to explore. Exploration is optional and decides nothing. Use it when an idea is not clear enough to
    write acceptance criteria. Skip it when the idea is clear: add the item instead.
 
-2. Megan is not sure what "reminders" should mean (B2). She asks the agent:
+2. Megan is not sure what "reminders" should mean (the reminders item). She asks the agent:
 
    > /sdlc:explore Reminders for overdue tasks: email, chat, or both? How often?
 
@@ -435,7 +456,7 @@ that it is not lost.
    code.
 
 3. The agent recommends **proceed**, **reshape** or **stop**, and asks Megan to choose. She chooses "reshape: email
-   only, one reminder per task". The agent brings B2 to ready:
+   only, one reminder per task". The agent brings the reminders item to ready:
 
    ```bash
    sdlc backlog edit B2 --outcome "Owners get one reminder per overdue task, by email" \
@@ -459,7 +480,8 @@ that it is not lost.
    due-date-reminders  openspec/explorations/due-date-reminders.md
    ```
 
-5. Now the second half: **deferred work**. While planning B1, Megan decides that time zones are out of scope for the
+5. Now the second half: **deferred work**. While planning the due-dates item, Megan decides that time zones are
+   out of scope for the
    first version. She does not want the decision to be lost. She (or the agent) records it:
 
    ```bash
@@ -491,7 +513,7 @@ that it is not lost.
 ### You are done when
 
 - `openspec/explorations/due-date-reminders.md` has a Recommendation section and Megan's choice.
-- `sdlc backlog list` shows B2 as ready once B1 is done.
+- `sdlc backlog list` shows the reminders item as ready once the due-dates item is done.
 - `sdlc defer list` shows D1 with its reason.
 
 ### Pitfalls
@@ -515,10 +537,11 @@ approving anything.
 
 1. Understand the two modes. Give exactly one of them:
 
-   | Mode | What it writes |
-   |---|---|
-   | `--to-backlog` | BMAD epics and tickets (or a PRD/SPEC without tickets) become backlog epics and items |
-   | `--change <id>` | a PRD, SPEC and architecture spine become `intent.md`, `proposal.md`, `specs/`, `design.md`, and deferred bullets go to `openspec/deferred-work.md` |
+   - `--to-backlog` turns BMAD epics and tickets into backlog epics and items.
+     It can also use a PRD or SPEC without tickets.
+   - `--change <id>` turns a PRD, SPEC and architecture spine into change artifacts:
+     `intent.md`, `proposal.md`, `specs/` and `design.md`.
+     Deferred bullets go to `openspec/deferred-work.md`.
 
 2. The team planned "Shared task lists" in BMAD. The output is in `_bmad-output/epic-sharing/` inside the repository:
    `epic-sharing.md` and `tickets.toml`. Megan previews the import first:
@@ -527,7 +550,7 @@ approving anything.
    sdlc import bmad _bmad-output/epic-sharing --to-backlog --dry-run --json
    ```
 
-   This JSON preview is from the trial with sdlc 0.14.4. Since 0.15.2, use `--json` to request it:
+   Use `--json` to request this JSON preview:
 
    ```json
    {
@@ -577,7 +600,7 @@ approving anything.
    B7  open    -      Shared list shows the owner's private tasks        -
    ```
 
-   B7 is not ready because it depends on B5.
+   The private-tasks item is not ready because it depends on the sharing item.
 
 5. For one change built from a PRD, Ethan uses the other mode, then validates:
 
@@ -593,15 +616,26 @@ approving anything.
 ### You are done when
 
 - `sdlc backlog list --epic E2` shows three items with BMAD sources.
-- `openspec/backlog.md` shows `- **Source**: bmad _bmad-output/epic-sharing/tickets.toml#1.1` under B5.
+- `openspec/backlog.md` shows `- **Source**: bmad _bmad-output/epic-sharing/tickets.toml#1.1` under the sharing item.
 - No gate of any change changed state because of the import.
 
 ### Pitfalls
 
-- The path must be inside the project. This output is from the trial with sdlc 0.14.4. Since 0.15.4, an outside path
+- The path must be inside the project. An outside path
   or a link to one is refused with `path_outside_project` (`Path outside project: …`), also with `--change`.
-- Since 0.15.2, `--dry-run` prints a text summary unless `--json` is given. Read it before importing.
+- `--dry-run` prints a text summary unless `--json` is given. Read it before importing.
 - Repeating the import skips matching BMAD epics and items and reports `Already imported: …`.
 - In `--change` mode, sdlc recognises the documents by their content: a PRD starts with `# PRD:`, an architecture
   spine with `# Architecture Spine —`, a SPEC has `id: SPEC-…` in its front matter.
 - Imported items keep the BMAD order. Megan reorders them with `sdlc backlog move` afterwards.
+
+## Terms
+
+- [Change](../glossary.md): the working record for one proposed piece of work.
+- [Intent](../glossary.md): the first artifact for a change.
+- [Gate](../glossary.md): a decision point before a change advances.
+
+## See also
+
+- [The user guide](../05-guide.md) follows a change through its gates.
+- [Process health](../13-process-health.md) helps you inspect work that gets stuck.

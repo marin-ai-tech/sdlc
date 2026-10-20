@@ -4,7 +4,7 @@ Steven connects `tasklet` to the team's systems: GitHub (the task manager and th
 server and a Telegram bot. He also lets other AI systems read the process. Every step here is configuration in
 `openspec/sdlc.yaml`, so only a person makes it. The same steps work for `billing-api`.
 
-## Contents
+## On this page
 
 - [2.1 The MCP registry: github, knowledge, telegram](#s2-1)
 - [2.2 Check the servers with `sdlc mcp check`](#s2-2)
@@ -14,12 +14,18 @@ server and a Telegram bot. He also lets other AI systems read the process. Every
 - [2.6 Events to Telegram: waits, approvals, overdue gates](#s2-6)
 - [2.7 Other AI systems read the process: `sdlc mcp serve`](#s2-7)
 - [Known limitations](#known-limitations)
+- [Terms](#terms)
+- [See also](#see-also)
 
 ### Context
 
-At the end of the chapter: **Known limitations** — what the scenario wanted and sdlc does not do (yet). One rule holds
-for the whole chapter: **nothing over MCP makes a decision.** No server, tool, inbox item or event can approve, reject,
-waive, rework, take over, unlock tests, set the license or uninstall. Those stay with a person at their own terminal.
+The known limitations at the end of this chapter describe the scenario's boundaries.
+
+One rule holds for the whole chapter: **nothing over MCP makes a decision.** A person uses their own terminal to:
+
+- approve, reject or waive a gate;
+- rework or take over a change;
+- unlock tests, set the license or uninstall.
 
 
 <a id="s2-1"></a>
@@ -30,6 +36,18 @@ server installed on the machine*
 
 The team's MCP servers are described once in `openspec/sdlc.yaml`, with secrets as references, and sdlc
 writes them into the agent tool's own configuration.
+
+This diagram shows how the shared registry reaches an agent tool:
+
+```mermaid
+flowchart LR
+    A[Person] -->|configures| B[Shared registry]
+    B -->|sdlc update writes| C[Agent tool configuration]
+    C -->|connects| D[Team MCP servers]
+```
+
+> [!IMPORTANT]
+> Only a person changes `openspec/sdlc.yaml`.
 
 ### Procedure
 
@@ -78,7 +96,7 @@ writes them into the agent tool's own configuration.
    - `knowledge` is the team's own server with docs, ADRs, the glossary, and the registry of agent roles and skills.
    - `telegram` is the team's bot server. The CLI sends events to it ([lesson 2.6](#s2-6)). The agent does not need it.
 
-   Since 0.19.0, Steven can also pull context packs from the knowledge server into `docs/context/` for review.
+   Steven can also pull context packs from the knowledge server into `docs/context/` for review.
    He lists them under `context.sources` in `openspec/sdlc.yaml`:
 
    ```yaml
@@ -208,7 +226,7 @@ behind the guard's back.
 - Use `sdlc mcp check --strict` in CI: an unreachable registry server makes it exit 1. Without `--strict`, it exits 0.
 - The file-write warning is a guess from tool names. A server that writes files under another name is not flagged.
   Read a server's documentation before you add it.
-- Since 0.16.0, `sdlc mcp check --args` shows input arguments; JSON includes each tool's `args` schema.
+- `sdlc mcp check --args` shows input arguments; JSON includes each tool's `args` schema.
   The tool and argument names still come from your server.
 
 
@@ -280,7 +298,7 @@ those stages.
 ### Pitfalls
 
 - When two changes are active at different stages, a server is allowed if any of those stages is in its list.
-- `stages: []` or no `stages` means "not checked", not "never". Since 0.16.2, set
+- `stages: []` or no `stages` means "not checked", not "never". Set
   `agents: false` on `telegram` to keep it out of the agent configuration.
 - An open change is never at the `maintain` stage: its stage is plan, design, build, test or deploy. A server listed
   only for `maintain` is therefore outside its stages whenever a change is active.
@@ -317,7 +335,7 @@ reach the agent through the inbox.
          - run: npm test
    ```
 
-2. Since 0.17.0, sdlc writes its own workflow and the gate check. CI configuration is a person's decision, so Steven
+2. sdlc writes its own workflow and the gate check. CI configuration is a person's decision, so Steven
    runs the command in his own terminal. In an agent session it is refused, and the hook denies it too:
 
    ```bash
@@ -412,13 +430,13 @@ reach the agent through the inbox.
 
 ### Pitfalls
 
-- Commit and push before you verify. `${HEAD}` is the last commit; uncommitted code is not what CI tested. Since
-  0.17.0, a check that uses `${HEAD}` is not called while code outside `openspec/` is uncommitted: it fails with a
-  reason to commit (and push) first.
+- Commit and push before you verify. `${HEAD}` is the last commit; uncommitted code is not what CI tested.
+  A check that uses `${HEAD}` does not run while code outside `openspec/` is uncommitted.
+  It fails with a reason to commit and push first.
 - `$any` passes when one run of the commit is green, the `sdlc` workflow or `ci`. To wait for one workflow only, add
   its id to `args` if your server's tool takes one (see `sdlc mcp check --args`).
 - With `wait_while`, a queued or in-progress CI run is polled until it finishes or the wait limit expires.
-- Plain lists match item by item and by exact length. Since 0.16.0, use
+- Plain lists match item by item and by exact length. Use
   `expect: { workflow_runs: { $any: { conclusion: success } } }` to match a run in a list.
 - `sdlc verify --only ci-green` runs only that check. It records evidence but never passes the gate.
 - `sdlc verify --list` shows the MCP checks (name, server, tool, required) next to the commands.
@@ -546,7 +564,7 @@ when a wait is overdue, without anyone asking `sdlc next`.
 2. Understand what the bot receives. After each sdlc command, sdlc calls `send_message` with the static `args` plus
    `text`: one line that names the project, the change, the gate and the people by their names from `roles.yaml`, in
    the locale of the command. sdlc builds the line when the event is queued, so an event that waits in the outbox
-   reads the same later. The trial ran sdlc 0.14.4, without `message`; this real event is from
+   reads the same later. This real event is from
    `sdlc events list --json`:
 
    ```json
@@ -566,7 +584,7 @@ when a wait is overdue, without anyone asking `sdlc next`.
    text ever carries an email, a command, its output or a note. Without `message`, sdlc sends this `event` object
    instead of the text, and the bot's tool must accept it.
 
-   Since 0.19.0, people may list chat handles in `openspec/roles.yaml`, and a receiver may ask for them:
+   People may list chat handles in `openspec/roles.yaml`, and a receiver may ask for them:
 
    ```yaml
    # in openspec/roles.yaml, under people.megan:
@@ -624,7 +642,7 @@ when a wait is overdue, without anyone asking `sdlc next`.
 
    `--autostash` keeps the clone's own log entries across the pull; the log merges line by line (`merge=union`).
 
-6. **The daily summary.** Since 0.19.0, `sdlc events summary` records the event `summary.daily` (counts of done,
+6. **The daily summary.** `sdlc events summary` records the event `summary.daily` (counts of done,
    active, waiting for people, blocked; the waiting changes) and sends it to receivers whose `on` matches
    `summary.*` or `summary.daily` (opt-in: not in the default patterns). One summary per project and day. Add the
    pattern to the Telegram receiver:
@@ -661,7 +679,7 @@ when a wait is overdue, without anyone asking `sdlc next`.
   shell, needs `${TELEGRAM_BOT_TOKEN}`. Without it, the events wait in that clone's outbox.
 - A fresh CI checkout starts from the committed log each time. A scheduled flush there can announce the same wait
   again and miss an overdue gate. Use a clone that keeps its log, as in step 5.
-- Since 0.19.0, awaiting and overdue event ids match across clones; a receiver can drop repeats by `id`.
+- Awaiting and overdue event ids match across clones; a receiver can drop repeats by `id`.
 - A generic Telegram server with only `send_message(chat_id, text)` takes events through `message: text`. Without
   `message`, sdlc sends the `event` object, and the tool must accept it.
 - `events` must name a server of `mcp.servers`; an unknown name is a configuration error.
@@ -679,7 +697,7 @@ data. The assistant can read, but it cannot decide anything.
 ### Procedure
 
 1. Understand the server. `sdlc mcp serve` speaks MCP over stdio by default. `sdlc init --mcp` registered it for the
-   project's tools in [lesson 1.2](01-setup-greenfield.md#s1-2). Since 0.19.0, `sdlc mcp serve --http <host:port>`
+   project's tools in [lesson 1.2](01-setup-greenfield.md#s1-2). `sdlc mcp serve --http <host:port>`
    serves the same read-only tools over MCP Streamable HTTP at `/mcp` for a remote client. A bearer token is always
    required, also on localhost: set `SDLC_MCP_TOKEN` in the environment (at least 16 characters; never a flag).
    Without it the server does not start (`token_required`); a bad or missing token gets 401. Port `0` picks a free
@@ -776,13 +794,21 @@ data. The assistant can read, but it cannot decide anything.
 <a id="known-limitations"></a>
 ## Known limitations
 
-Limitations observed in the sdlc 0.14.4 trial. Some were fixed later; see the changelog. Items closed in 0.19.0 are
-gone from this list; see the sections above for what replaced them.
+These limits affect the scenario. Check them when you configure servers and events.
 
 - `stages: []` means "not checked"; use `agents: false` to keep an agent away.
 - An open change is never at `maintain`, so a `maintain`-only server is out of stage during `/sdlc:triage`.
-- Events are sent only from the clone where the command ran; every person needs the receiver's secret. Since 0.19.0
-  a wait has the same event id in every clone and in CI, so a receiver keeps one.
+- Events are sent only from the clone where the command ran; every person needs the receiver's secret.
+  A wait has the same event id in every clone and in CI, so a receiver keeps one.
 - A scheduled `events flush` for overdue gates needs a clone that keeps its log; a fresh checkout alone is not
-  enough for that schedule. Since 0.19.0, `sdlc ci init` already runs `sdlc events flush` at the end of the CI
+  enough for that schedule. `sdlc ci init` already runs `sdlc events flush` at the end of the CI
   workflow.
+
+## Terms
+
+See the [sdlc glossary](../glossary.md) for the process terms used in this module.
+
+## See also
+
+- [Review the introduction](00-introduction.md) — continue through the handbook.
+- [Integrations](../10-integrations.md) — see how sdlc connects to team systems.

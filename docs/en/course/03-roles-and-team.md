@@ -4,21 +4,33 @@ This module ties the gates to named people and sets up the agents that do the wo
 engineer), who writes the configuration, for **Ethan** (tech lead), who accepts the agent roles, and for everyone who
 approves a gate.
 
-In this module:
+The outputs come from a trial run of `tasklet`. The `github`, `knowledge` and `telegram` servers
+were small local stand-ins with the same tool names, so their answers are simple.
 
-- Lesson 3.1 — `roles.yaml`: people, roles and the gates they approve
-- Lesson 3.2 — Who may approve: `roles check`, `roles who`, `next --me` and `--preview`
-- Lesson 3.3 — Signed approvals and `sdlc approvals verify`
-- Lesson 3.4 — The agent team: sync, drafts and a person's acceptance
-- Lesson 3.5 — Roles and skills from the `knowledge` registry and from packs
-- Lesson 3.6 — The built-in subagents
-- Lesson 3.7 — Team extensions from a pack
+## On this page
 
-The outputs come from a trial run of `tasklet` with sdlc 0.14.4. The `github`, `knowledge` and `telegram` servers
-in that run were small local stand-ins with the same tool names, so the answers they gave are simple.
+- [Lesson 3.1: people and gates](#s3-1)
+- [Lesson 3.2: approval eligibility](#s3-2)
+- [Lesson 3.3: signed approvals](#s3-3)
+- [Lesson 3.4: sync and acceptance](#s3-4)
+- [Lesson 3.5: roles and skills from packs](#s3-5)
+- [Lesson 3.6: built-in subagents](#s3-6)
+- [Lesson 3.7: team extensions](#s3-7)
+- [Terms](#terms)
+- [See also](#see-also)
+
+The approval path connects a person's git identity to the role required by a gate:
+
+```mermaid
+flowchart LR
+    A[Person's git email] -->|identifies| B[Role in roles.yaml]
+    B -->|qualifies for| C[Gate]
+    C -->|records| D[Approval]
+```
 
 ---
 
+<a id="s3-1"></a>
 ## Lesson 3.1 — `roles.yaml`: people, roles and the gates they approve            (video: ~7 min)
 
 **Role:** Steven (writes the files), the whole team (reads them)   **Project:** tasklet
@@ -28,8 +40,16 @@ For a high-risk change, `roles who <gate> --change <id>` names the extra require
 `approve --preview` shows which roles are still missing. If separation rules leave no eligible person,
 `status` and `next` warn and point back to `roles who`.
 
+For a later roles change, an agent or person runs `sdlc config propose --target roles --set <key>=<yaml>
+--reason <text>` and `sdlc config show <id>`. A person holding `maintainer` reviews the proposal and runs
+`sdlc config apply <id>` in their terminal. A changed file makes the proposal stale. Weaker signing or an empty
+role requires `--yes` after a warning.
+
 **Goal.** Write `openspec/roles.yaml` for the Northwind team, connect its roles to the gates in
 `openspec/sdlc.yaml`, and check the result with `sdlc roles check`.
+
+> [!TIP]
+> Run `sdlc roles check` after changing the role file so you can inspect the result before an approval.
 
 ### Steps
 
@@ -160,6 +180,7 @@ For a high-risk change, `roles who <gate> --change <id>` names the extra require
 
 ---
 
+<a id="s3-2"></a>
 ## Lesson 3.2 — Who may approve: `roles check`, `roles who`, `next --me` and `--preview`            (video: ~7 min)
 
 **Role:** Megan, Ethan, Paul, Emily (approvers); Oliver (author)   **Project:** tasklet
@@ -272,7 +293,7 @@ they are about to approve before they approve it.
 
 ### Pitfalls
 
-- Since 0.15.2, `sdlc next --me` lists gates waiting for Megan's answers and gives `sdlc answer`.
+- `sdlc next --me` lists gates waiting for Megan's answers and gives `sdlc answer`.
 - `roles who spec --change <id>` lists the roles needed at that change's risk. The tech lead counts only at high risk.
 - With `min_approvals: 2`, `sdlc approve review` accepts any two holders of the listed roles. sdlc cannot require
   "one approval from each role" except through `high_risk_approvers` on a high-risk change.
@@ -285,6 +306,7 @@ they are about to approve before they approve it.
 
 ---
 
+<a id="s3-3"></a>
 ## Lesson 3.3 — Signed approvals and `sdlc approvals verify`            (video: ~8 min)
 
 **Role:** Steven (setup), every approver (signs), CI   **Project:** tasklet
@@ -372,7 +394,7 @@ every change to `roles.yaml` is signed by a maintainer. Check it locally and in 
    sdlc approvals verify --mode required
    ```
 
-   Since 0.16.3, CI needs the full history. For GitHub Actions use
+   CI needs the full history. For GitHub Actions use
    `actions/checkout` with `fetch-depth: 0`.
 
    It exits 1 when any approval is invalid. Steven adds it as a required check on the default branch, together with
@@ -388,11 +410,11 @@ every change to `roles.yaml` is signed by a maintainer. Check it locally and in 
 
 ### Pitfalls
 
-- Since 0.16.3, keyless commits before signing pass as `pre-signing`. Add all maintainer and approver
+- keyless commits before signing pass as `pre-signing`. Add all maintainer and approver
   keys in one commit signed by a maintainer listed there; it passes as `bootstrap`. Switch to
   `signing: warn`, then `signing: required`, in signed commits. A second bootstrap fails as
   `bootstrap-conflict`. Protect the main branch from force pushes and keep `roles.yaml` under CODEOWNERS.
-- Commit the change folder after `sdlc archive`. Since 0.15.4, approvals committed while the change was active keep
+- Commit the change folder after `sdlc archive`. Approvals committed while the change was active keep
   their status before the archive move is committed.
 - With `signing: off`, `sdlc approvals verify` checks no signatures. Set `signing: warn` or `signing: required`
   in `openspec/roles.yaml` to turn it on. For an existing project, set `signing_since` to a commit: approvals
@@ -408,13 +430,19 @@ every change to `roles.yaml` is signed by a maintainer. Check it locally and in 
 
 ---
 
+<a id="s3-4"></a>
 ## Lesson 3.4 — The agent team: sync, drafts and a person's acceptance            (video: ~7 min)
 
 **Role:** Ethan (accepts), Oliver (asks the agent), Claude Code   **Project:** tasklet
 **You need:** lesson 3.1
 
-**Goal.** Give the project five role agents (analyst, architect, developer, tester, reviewer) that know the project's
-rules, and accept them as a person.
+**Goal.** Give the project five role agents that know its rules. Accept them as a person:
+
+- analyst;
+- architect;
+- developer;
+- tester;
+- reviewer.
 
 ### Steps
 
@@ -495,7 +523,7 @@ rules, and accept them as a person.
 
    Accepting also says whether the draft differs from its source, so Ethan sees what the agent added.
 
-   Since 0.18.0, with `openspec/roles.yaml` only a person who holds `maintainer` may accept a role. Without the file
+   With `openspec/roles.yaml`, only a person who holds `maintainer` may accept a role. Without the file
    any person may, as before; an agent never may. Ethan holds `tech-lead` and `engineer`, so before this step Steven
    adds `ethan` to `maintainer` in `roles.yaml` and commits it signed (lesson 3.3). Without that, Ethan is refused
    with `missing_role`, and the message names who may (Steven and Laura).
@@ -529,7 +557,7 @@ rules, and accept them as a person.
 - The project facts in a role follow the project only through `sdlc update`. After Steven changes a verify command,
   he runs `sdlc update`.
 - A `Project rules` section is only as good as what the agent found. Read it before you accept.
-- Since 0.18.0, `sdlc team accept` needs the `maintainer` role when `roles.yaml` exists (step 5). Agree in the team
+- `sdlc team accept` needs the `maintainer` role when `roles.yaml` exists (step 5). Agree in the team
   who accepts roles (at Northwind: Ethan, as a maintainer).
 - Denials in this lesson: `sdlc guide denials#guard-config` and `denials#separation-of-duties`.
 
@@ -541,6 +569,7 @@ rules, and accept them as a person.
 
 ---
 
+<a id="s3-5"></a>
 ## Lesson 3.5 — Roles and skills from the `knowledge` registry and from packs            (video: ~8 min)
 
 **Role:** Steven (configures), Ethan (accepts)   **Project:** tasklet (the same applies to billing-api)
@@ -589,7 +618,7 @@ that carries a script.
      - { name: northwind-npm, npm: "@northwind/sdlc-pack@1.2.0" }
    ```
 
-   - Pin the version: a tag or a commit for git, an exact version for npm. Since 0.20.0, a pack with workflows or
+   - Pin the version: a tag or a commit for git, an exact version for npm. A pack with workflows or
      checks needs the commit (lesson 3.7).
    - An `npm:` pack is a registry package or a `.tgz` file (a path or an `https://` URL). A folder or a repository is
      refused for `npm:`, because npm runs a package's `prepare` script for those even with `--ignore-scripts`. Put a
@@ -673,7 +702,7 @@ that carries a script.
 
 - A checksum proves that the content did not change on the way, not that it is good. Take roles and skills only from
   sources the team trusts, and read the scripts.
-- Since 0.18.0, `sdlc team list` shows "a newer draft waits" (JSON `newerDraft: true`) when a draft in
+- `sdlc team list` shows "a newer draft waits" (JSON `newerDraft: true`) when a draft in
   `docs/agents/drafts/` differs from the accepted role. Read the draft and accept it when it is right.
 - `team.registry` must name a server of `mcp.servers`; otherwise `sdlc.yaml` does not load (`invalid_config`).
 - Never put a literal token in `env` or `headers`; use `${KNOWLEDGE_TOKEN}`. sdlc refuses a literal
@@ -687,6 +716,7 @@ that carries a script.
 
 ---
 
+<a id="s3-6"></a>
 ## Lesson 3.6 — The built-in subagents            (video: ~5 min)
 
 **Role:** Oliver, Ethan, Steven   **Project:** tasklet   **You need:** lesson 3.4
@@ -699,14 +729,19 @@ the place of two of them.
 1. Open `.claude/agents/`. `sdlc init` writes six subagents there. They run in a fresh context, so their verdict is
    not shaped by the conversation that produced the code.
 
-   | Subagent | What it does | Called by | Can edit |
-   |---|---|---|---|
-   | `sdlc-verifier` | runs the app and the tests, exercises every spec scenario and the nearest flows, reports evidence and mismatches; fixes nothing | `/sdlc:verify` | no |
-   | `sdlc-reviewer` | reviews one pass or lens at a time and records findings with severity, evidence and a fix | `/sdlc:review` | no |
-   | `sdlc-researcher` | answers a focused question about the code, specs and history, concisely | `/sdlc:explore`, `/sdlc:spec`, `/sdlc:plan`, `/sdlc:team` | no |
-   | `sdlc-simplifier` | removes needless complexity from green code without changing behaviour | since 0.17.0 `/sdlc:build` runs it after the last task, before `sdlc verify` (`stages.build.simplify: false` turns this off); or ask for it by name | yes |
-   | `sdlc-advocate` | argues one side of a key design decision for the debate lens | `/sdlc:spec` with `design: { debate: true }` | no |
-   | `sdlc-health` | digs into one finding of `sdlc health` and reports the evidence | `/sdlc:health` | no |
+   - `sdlc-verifier` runs the app and tests. It exercises every spec scenario and the nearest flows.
+     It reports evidence and mismatches, but fixes nothing. `/sdlc:verify` calls it. It cannot edit.
+   - `sdlc-reviewer` reviews one pass or lens at a time. It records findings with severity, evidence and a fix.
+     `/sdlc:review` calls it. It cannot edit.
+   - `sdlc-researcher` answers a focused question about code, specs and history.
+     `/sdlc:explore`, `/sdlc:spec`, `/sdlc:plan` and `/sdlc:team` call it. It cannot edit.
+   - `sdlc-simplifier` removes needless complexity from green code without changing behaviour.
+     `/sdlc:build` runs it after the last task and before `sdlc verify`, or you can ask for it by name.
+     `stages.build.simplify: false` turns this off. It can edit.
+   - `sdlc-advocate` argues one side of a key design decision for the debate lens.
+     `/sdlc:spec` calls it with `design: { debate: true }`. It cannot edit.
+   - `sdlc-health` digs into one finding of `sdlc health` and reports the evidence.
+     `/sdlc:health` calls it. It cannot edit.
 
 2. Show the replacement. When the team accepts its own **tester** and **reviewer** (lessons 3.4 and 3.5), the verify
    and review workflows call `sdlc-tester` and the accepted `sdlc-reviewer` instead of the built-ins. The generated
@@ -768,6 +803,7 @@ the place of two of them.
 
 ---
 
+<a id="s3-7"></a>
 ## Lesson 3.7 — Team extensions from a pack            (video: ~8 min)
 
 **Role:** Steven (configures), Ethan (accepts, as a maintainer)   **Project:** tasklet
@@ -776,18 +812,19 @@ the place of two of them.
 **Goal.** Bring Northwind's review lens, workflow and verify check from the company pack, and see that none of them is
 in effect before a person accepts the pack.
 
-The outputs of this lesson come from a trial with sdlc 0.20.0. The pack was a local copy of a git repository, and its
+The outputs of this lesson come from a trial. The pack was a local copy of a git repository, and its
 check was a stand-in that always passes.
 
 ### Steps
 
-1. Explain what a pack may bring since 0.20.0, next to roles and skills:
+1. Explain what a pack may bring next to roles and skills:
 
-   | File in the pack | What it becomes in the project | Who uses it |
-   |---|---|---|
-   | `lenses/<id>.md` | a review lens named `<pack>-<id>` | `sdlc review context` gives its text; `sdlc review check` needs its coverage line in review.md |
-   | `workflows/<id>.md` | a workflow, generated as the skill `sdlc-<pack>-<id>` for the project's tools | the agent; it never replaces a built-in workflow |
-   | `checks.yaml` | `verify:` checks, named `<pack>/<name>` | `sdlc verify` runs them as an agent |
+   - `lenses/<id>.md` becomes a review lens named `<pack>-<id>`.
+     `sdlc review context` gives its text. `sdlc review check` needs its coverage line in review.md.
+   - `workflows/<id>.md` becomes the skill `sdlc-<pack>-<id>` for the project's tools.
+     The agent uses it. It never replaces a built-in workflow.
+   - `checks.yaml` adds `verify:` checks named `<pack>/<name>`.
+     `sdlc verify` runs them as an agent.
 
 2. Northwind's pack holds one of each:
 
@@ -906,3 +943,14 @@ check was a stand-in that always passes.
 - The pack folder with its three files.
 - `sdlc team sync` before and after pinning the commit.
 - The refusal in Claude Code, Ethan's acceptance, and `sdlc verify --list` after it.
+
+## Terms
+
+- [Gate](../glossary.md): a decision point before a change advances.
+- [Pack](../glossary.md): a source of team roles, skills and accepted extensions.
+- [Separation of duties](../glossary.md): rules that keep certain decisions with different people.
+
+## See also
+
+- [Roles and signing](../08-roles-and-signing.md) explains approval rules in more detail.
+- [Agent team](../12-agent-team.md) describes team roles and skills.

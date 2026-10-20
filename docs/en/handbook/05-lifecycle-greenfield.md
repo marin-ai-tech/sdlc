@@ -1,18 +1,10 @@
 # 5. One change from idea to archive (tasklet)
 
-After `sdlc rework`, the agent revises the named gate's artifacts before a person approves again. Repeating an
-approval for the same digest as the same person and role records nothing. When plan is waived and tasks.md is absent,
-fresh passing verification satisfies verify; open tasks still block it. A person can drop a mistaken change with
-`sdlc drop <change> --note "why"`, preserving its reason in the archive without merging delta specs.
+Follow "Add due dates to tasks" (`add-due-dates`) through every stage in the `tasklet` API. Oliver guides the agent.
+Megan, Ethan, Grace, Paul and Emily handle their own decisions. Use this chapter to see the commands and evidence
+at each gate, from the first intent to the archived record.
 
-This chapter follows one change through every stage: **"Add due dates to tasks"** (`add-due-dates`) in the `tasklet`
-API. Every person of the team appears at their gate. Oliver drives the agent; the others decide in their own terminals.
-All outputs come from a trial run of `tasklet` with sdlc 0.14.4 and the configuration of Chapters 1 to 3.
-
-For a high-risk change, `approve --preview` names every required role, including high-risk extras,
-and the roles still missing. `status` and `next` flag a remaining gate when no one may approve it.
-
-## Contents
+## On this page
 
 - [5.1 The map: stages, gates, people and Telegram](#s5-1)
 - [5.2 Intent: Megan answers a question and approves](#s5-2)
@@ -26,23 +18,42 @@ and the roles still missing. `status` and `next` flag a remaining gate when no o
 - [5.10 Archive: living specs, the backlog and the record](#s5-10)
 - [5.11 A judge before the person](#s5-11)
 - [Known limitations](#known-limitations)
-
-### Context
-
-Each person ran their commands with their own git identity, outside the agent session. The `github` and `telegram` MCP
-servers in that run were small local stand-ins with the tool names used in chapter 2 (`list_workflow_runs`,
-`report_event`); your servers' answers will be richer. "Known limitations" at the end of this file lists what sdlc does
-not do yet.
-
+- [Terms](#-terms)
+- [See also](#-see-also)
 
 <a id="s5-1"></a>
 ## 5.1 The map: stages, gates, people and Telegram
 
-*everyone; Steven for the Telegram setup  ·  tasklet  · needs: Chapters 3 and 4 (roles, the team, B1 ready in the
+*everyone; Steven for the Telegram setup  ·  tasklet  · needs: Chapters 3 and 4 (roles, the team, a ready item in the
 backlog); the `telegram` server in `mcp.servers`*
+
+Each person runs commands with their own git identity, outside the agent session. The outputs come from a trial
+run of `tasklet` with the configuration of Chapters 1 to 3. The `github` and `telegram` MCP servers are small local
+stand-ins using the Chapter 2 tool names `list_workflow_runs` and `report_event`. Your servers may give fuller answers.
+
+After `sdlc rework`, the agent revises the named gate's artifacts before a person approves again. Repeating an
+approval for the same digest as the same person and role records nothing. When plan is waived and `tasks.md` is absent,
+fresh passing verification satisfies verify; open tasks still block it. A person can drop a mistaken change with
+`sdlc drop <change> --note "why"`, preserving its reason in the archive without merging delta specs.
+
+For a high-risk change, `approve --preview` names every required role, including high-risk extras and roles still
+missing. `status` and `next` flag a remaining gate when no one may approve it.
 
 Know the whole path of the change before it starts: who acts at each step, which command they run, and
 what the team's Telegram chat receives.
+
+This map shows the order of stages and where a person or the checks decide:
+
+```mermaid
+flowchart LR
+    I[Intent: Megan] -->|approves| S[Spec: Megan]
+    S -->|approves| P[Plan: Ethan or Oliver]
+    P -->|authorizes| B[Build: Oliver]
+    B -->|runs checks| V[Verify: checks and Grace]
+    V -->|passes| R[Review: Paul]
+    R -->|approves| L[Release: Emily]
+    L -->|authorizes| A[Archive]
+```
 
 ### Procedure
 
@@ -51,8 +62,8 @@ what the team's Telegram chat receives.
 
    | Step | Workflow (agent) | Gate | Who decides | Person's command |
    |---|---|---|---|---|
-   | 1 | `/sdlc:intent` | intent | Megan (product-owner) | `sdlc answer …`, then `sdlc approve intent --change add-due-dates` |
-   | 2 | `/sdlc:spec` | spec | Megan; also Ethan (tech-lead) when the risk is high | `sdlc approve spec --change add-due-dates` |
+   | 1 | `/sdlc:intent` | intent | Megan (product-owner) | `sdlc approve intent --change add-due-dates` |
+   | 2 | `/sdlc:spec` | spec | Megan; Ethan for high risk | `sdlc approve spec --change add-due-dates` |
    | 3 | `/sdlc:plan` | plan | Ethan or Oliver (engineer) | `sdlc approve plan --change add-due-dates` |
    | 4 | `/sdlc:build` | — | — | — |
    | 5 | `/sdlc:verify` | verify | nobody: the checks; Grace reads the evidence | — |
@@ -60,7 +71,8 @@ what the team's Telegram chat receives.
    | 7 | `/sdlc:release` | release | Emily (release-manager) | `sdlc approve release --change add-due-dates` |
    | 8 | `/sdlc:archive` | — | — | — |
 
-   At any moment, `sdlc next` names the next step and the person; `/sdlc:next` in Claude Code runs the next agent
+   Megan first answers the intent question with `sdlc answer …`. At any moment, `sdlc next` names the next step and
+   person; `/sdlc:next` in Claude Code runs the next agent
    step or stops and names the person.
 
 2. See how the team is told. Steven added the receiver in Chapter 2 ([lesson 2.6](02-toolchain-mcp.md#s2-6)):
@@ -78,9 +90,8 @@ what the team's Telegram chat receives.
    ```
 
    After a command, sdlc calls `send_message` with the static `args` plus `text`: one line that names the project,
-   the change, the gate and the people by their names from `roles.yaml`. The trial ran sdlc 0.14.4, before
-   `message`, so the first call the Telegram server received, when the intent started to wait for Megan, still
-   carried the `event` object:
+   the change, the gate and the people by their names from `roles.yaml`. The recorded event below shows the
+   structured payload. With the configuration above, the server receives one line of text instead:
 
    ```json
    {"chat":"tasklet-team","event":{"id":"7db8a1d5f45a4b0d3220a23d","project":"tasklet",
@@ -106,8 +117,8 @@ what the team's Telegram chat receives.
    ```
 
    Read the left column first, then the right one. Passing verifications are not sent: the `on` list names only
-   `verify.failed`. The trial ran sdlc 0.14.4. Since 0.15.0 the chat also gets `gate.spec.awaiting` (`["megan"]`)
-   once the agent has revised the spec that Ethan sent back.
+   `verify.failed`. The chat also gets `gate.spec.awaiting` (`["megan"]`) once the agent revises the spec that Ethan
+   sent back.
 
 4. Understand delivery. It takes at most 5 seconds and never fails a command. An event that could not be sent waits in
    `.git/sdlc/outbox/` and goes with the next command:
@@ -146,25 +157,25 @@ what the team's Telegram chat receives.
 
 - With `message: text`, sdlc sends one line of text, which a Telegram MCP server's `send_message` takes as it is.
   Without `message`, sdlc sends a structured `event`, and the server needs a tool that accepts it.
-- Events omit emails and command output. Since 0.16.1, a receiver can opt into a masked, one-line rework or
+- Events omit emails and command output. A receiver can opt into a masked, one-line rework or
   rejection note with `include_note: true` (default off). The note is at most 200 characters; it appears as
   `note` in an event or after the ready message text.
-- Events are sent by the CLI. Since 0.16.2, `agents: false` lets the CLI use `telegram`
+- Events are sent by the CLI. `agents: false` lets the CLI use `telegram`
   without adding it to agent MCP settings. Without `stages`, the stage rule does not apply.
 
 <a id="s5-2"></a>
 ## 5.2 Intent: Megan answers a question and approves
 
-*Oliver with Claude Code (writes), Megan (decides)  ·  tasklet  · needs: [lesson 5.1](#s5-1); B1 ready in the backlog
-(Chapter 4)*
+*Oliver writes with Claude Code; Megan decides. Project: tasklet. Needs [lesson 5.1](#s5-1) and a ready backlog item
+from Chapter 4.*
 
-Turn B1 into an approved `intent.md`. Megan answers the open question and approves in her own terminal.
+Turn the ready backlog item into an approved `intent.md`. Megan answers the open question in her own terminal.
 
 ### Procedure
 
 1. Oliver starts the item and asks the agent to complete the intent:
 
-   > Start B1 as add-due-dates, then run /sdlc:intent add-due-dates.
+   > Start the due dates item as add-due-dates, then run /sdlc:intent add-due-dates.
 
    The agent runs `sdlc backlog start B1 --change add-due-dates` ([lesson 4.4](04-backlog.md#s4-4)), then
    `/sdlc:intent`. It reads the
@@ -267,7 +278,10 @@ Turn B1 into an approved `intent.md`. Megan answers the open question and approv
 
    | Gate | Who | Command | Telegram | `sdlc next` after |
    |---|---|---|---|---|
-   | intent | Megan | `sdlc answer 1 …`, `sdlc approve intent --change add-due-dates` | `gate.intent.awaiting` → `gate.intent.approved` | agent: write proposal (`/sdlc:spec`) |
+   | intent | Megan | `sdlc approve intent --change add-due-dates` | agent: write proposal (`/sdlc:spec`) |
+
+   Megan uses `sdlc answer 1 …` before approval. Telegram moves from `gate.intent.awaiting` to
+   `gate.intent.approved`.
 
 ### You are done when
 
@@ -277,7 +291,7 @@ Turn B1 into an approved `intent.md`. Megan answers the open question and approv
 
 ### Pitfalls
 
-- Since 0.15.2, `sdlc next --me` lists the gate awaiting Megan's answer, and `sdlc next` asks her to answer first.
+- `sdlc next --me` lists the gate awaiting Megan's answer, and `sdlc next` asks her to answer first.
   Run `sdlc answer --change <id> --list` to see the questions.
 - An answer typed into `intent.md` by hand, or by the agent, does not count. Only `sdlc answer` records it.
 - Editing `intent.md` after the approval makes it stale; Megan approves again. Every change to `intent.md` before the
@@ -306,8 +320,11 @@ spec gate.
 
    | File | Content in this change |
    |---|---|
-   | `proposal.md` | why; what changes (an optional `dueDate`, the overdue filter); the capability `tasks`; how intent question 1 was answered |
-   | `specs/tasks/spec.md` | `## ADDED Requirements`: "Due date on a task" (two scenarios), "Overdue tasks" (one scenario) |
+   | `proposal.md` | Why the change matters and how intent question 1 was answered. |
+   | `specs/tasks/spec.md` | `## ADDED Requirements` for due dates and overdue tasks. |
+
+   The proposal covers an optional `dueDate`, the overdue filter and the `tasks` capability. The spec has "Due date
+   on a task" with two scenarios and "Overdue tasks" with one scenario.
    | `design.md` | decisions (store `YYYY-MM-DD`; "today" is the UTC date), areas of concern, risks, rollback |
 
    A scenario looks like this:
@@ -382,7 +399,9 @@ spec gate.
 
    | Gate | Who | Command | Telegram | `sdlc next` after |
    |---|---|---|---|---|
-   | spec | Megan (+ Ethan if high risk) | `sdlc approve spec --change add-due-dates` | `gate.spec.awaiting` → `gate.spec.approved` | agent: write plan (`/sdlc:plan`) |
+   | spec | Megan; Ethan for high risk | `sdlc approve spec --change add-due-dates` | agent: plan (`/sdlc:plan`) |
+
+   Telegram moves from `gate.spec.awaiting` to `gate.spec.approved`.
 
 ### You are done when
 
@@ -473,7 +492,10 @@ edit, including shell writes.
 
    | Gate | Who | Command | Telegram | `sdlc next` after |
    |---|---|---|---|---|
-   | plan | Ethan (or Oliver) as engineer; + Ethan as tech-lead if high risk | `sdlc approve plan --change add-due-dates` | `gate.plan.awaiting` (`["ethan","oliver"]`) → `gate.plan.approved` | agent: implement (`/sdlc:build`) |
+   | plan | Ethan or Oliver; Ethan for high risk | `sdlc approve plan --change add-due-dates` | `/sdlc:build` |
+
+   Telegram moves from `gate.plan.awaiting` (`["ethan","oliver"]`) to `gate.plan.approved`. Ethan or Oliver
+   approves as engineer. For high risk, Ethan also approves as tech lead.
 
 ### You are done when
 
@@ -669,8 +691,7 @@ the agent inside the rules.
    test       npm test
    ```
 
-   This output is from the trial with sdlc 0.14.4. Since 0.15.0 the list also shows the `verify.mcp` checks (here
-   `ci-green`) with their server, tool and whether they are required.
+   The list also shows the `verify.mcp` checks (here `ci-green`) with their server, tool and required status.
 
 3. It works the tasks in order: writes the four failing tests first, runs them, implements `src/tasks.js` until they
    pass, and ticks `- [x]` only when a task's check passed. The write to `src/tasks.js` is now allowed: the hook
@@ -865,7 +886,9 @@ behavioural verification, and let Grace confirm that every scenario was exercise
 
    | Gate | Who | Command | Telegram | `sdlc next` after |
    |---|---|---|---|---|
-   | verify | nobody: the required checks; Grace reviews the evidence | `sdlc verify` (agent or person) | nothing when it passes; `verify.failed` when it fails | agent: run the review (`/sdlc:review`) |
+   | verify | Required checks; Grace reads evidence | `sdlc verify` | agent: review (`/sdlc:review`) |
+
+   An agent or a person can run the checks. Telegram sends nothing when they pass and `verify.failed` when they fail.
 
 ### You are done when
 
@@ -877,7 +900,7 @@ behavioural verification, and let Grace confirm that every scenario was exercise
 
 - The verify gate passes on the automated checks alone. The behavioural table is checked only by
   `sdlc verify --check`, which is not part of the gate. Grace (or CI) runs it with `--strict`.
-- `${HEAD}` is the head commit. Since 0.17.0, a check that uses `${HEAD}` is not called while code outside
+- `${HEAD}` is the head commit. A check that uses `${HEAD}` is not called while code outside
   `openspec/` is uncommitted: it fails and asks you to commit (and push) first. Commit, push, let CI finish, then run
   `sdlc verify`.
 - `sdlc verify --list` shows the `verify.mcp` checks (name, server, tool, required) next to the commands.
@@ -1010,8 +1033,8 @@ addresses his note, and Paul approves.
    Next: person — Paul (code-owner) must read review.md and the diff, then approve the review gate: sdlc approve review --change add-due-dates
    ```
 
-   This output is from the trial with sdlc 0.14.4. Since 0.15.0 the `Next:` line hands the change to the agent
-   instead: it fixes what review.md and the note ask, and after its fix the review gate waits for Paul again.
+   The recorded `Next:` line names Paul. After a rejection, the change goes to the agent. It fixes what `review.md`
+   and the note ask. The review gate then waits for Paul again.
 
    `sdlc status` shows the note on the review line:
 
@@ -1052,7 +1075,10 @@ addresses his note, and Paul approves.
 
     | Gate | Who | Command | Telegram | `sdlc next` after |
     |---|---|---|---|---|
-    | review | Paul | `sdlc reject review … --note "…"`, later `sdlc approve review --change add-due-dates` | `gate.review.awaiting` → `gate.review.rejected` → `gate.review.awaiting` → `gate.review.approved` | agent: prepare `release.md` (`/sdlc:release`) |
+    | review | Paul | `sdlc approve review --change add-due-dates` | agent: prepare `release.md` |
+
+    Paul first uses `sdlc reject review … --note "…"`. Telegram moves through `gate.review.awaiting`,
+    `gate.review.rejected`, `gate.review.awaiting` and `gate.review.approved`. The agent then runs `/sdlc:release`.
 
 ### You are done when
 
@@ -1189,7 +1215,10 @@ approval waits for the release checks in GitHub.
 
    | Gate | Who | Command | Telegram | `sdlc next` after |
    |---|---|---|---|---|
-   | release | Emily | `sdlc approve release --change add-due-dates` | `gate.release.awaiting` → `gate.release.approved` | agent: archive (`sdlc archive add-due-dates --yes`) |
+   | release | Emily | `sdlc approve release --change add-due-dates` | agent: archive |
+
+   Telegram moves from `gate.release.awaiting` to `gate.release.approved`. The agent runs
+   `sdlc archive add-due-dates --yes`.
 
 ### You are done when
 
@@ -1244,9 +1273,8 @@ record the change leaves behind.
    `change.archived`.
 
 3. The agent closes the loop, as proposals for Oliver: a CLAUDE.md rule for a mistake that happened twice, and
-   follow-up intents for deferred work (D2). Since 0.19.0, when the backlog item carried `Issue: GH-<n>`, archive
-   already comments on the GitHub issue and closes it ([lesson 4.3](04-backlog.md#s4-3)); the agent does not need to
-   do that by hand.
+   follow-up intents for deferred work (D2). When the backlog item carries `Issue: GH-<n>`, archive comments on
+   the GitHub issue and closes it ([lesson 4.3](04-backlog.md#s4-3)). The agent need not do that by hand.
 
 4. The backlog item is done, and the next one is proposed:
 
@@ -1292,8 +1320,8 @@ record the change leaves behind.
    The gap is honest: the tests of task 1.1 went into the same commit as task 1.2. A gap is a question for the
    reviewer, not a failure.
 
-6. Check the approvals. This output is from the trial with sdlc 0.14.4. Since 0.15.4, approvals committed while the
-   change was active retain their status before the archive move is committed:
+6. Check the approvals. Approvals committed while the change was active retain their status before the archive move
+   is committed:
 
    ```bash
    sdlc approvals verify --mode warn
@@ -1317,15 +1345,15 @@ record the change leaves behind.
 
 - `openspec/specs/tasks/spec.md` exists with three requirements.
 - `sdlc status` no longer lists `add-due-dates`; `sdlc status --archived` does.
-- `sdlc next` proposes B3.
+- `sdlc next` proposes the next ready backlog item.
 
 ### Pitfalls
 
 - `sdlc archive` refuses while a required gate is not satisfied. `--force` is a person's command and needs `--note`;
   `sdlc health` counts forced archives.
 - `--skip-specs` archives without touching the living specs; use it only for tooling or docs changes.
-- Since 0.15.2, the trace shows a deferred finding as `deferred (D2)`.
-- Commit the archive move for a complete history; since 0.15.4, `sdlc approvals verify` also works before that commit.
+- The trace shows a deferred finding as `deferred (D2)`.
+- Commit the archive move for a complete history; `sdlc approvals verify` also works before that commit.
 
 
 <a id="s5-11"></a>
@@ -1337,7 +1365,7 @@ record the change leaves behind.
 An independent model checks the spec by the team's rubric before Megan reads it. The agent fixes what the
 judge finds. Megan still approves.
 
-The outputs of this lesson come from a trial with sdlc 0.20.0 on a small change of `tasklet`, `fix-empty-title`. The
+The outputs of this lesson come from a trial on a small change of `tasklet`, `fix-empty-title`. The
 judge in that trial was a small local script with one rule of the rubric: every requirement has a scenario. Your
 judge will be a model with a real rubric.
 
@@ -1491,14 +1519,24 @@ judge will be a model with a real rubric.
 <a id="known-limitations"></a>
 ## Known limitations
 
-Limitations observed in the sdlc 0.14.4 trial. Some were fixed later; see the changelog. Items closed in 0.19.0
-(GitHub Issues import and closing the issue on archive) are gone from this list; see [lesson 4.3](04-backlog.md#s4-3).
+These limits may affect how you configure gates and review status. See [lesson 4.3](04-backlog.md#s4-3) for issue
+import and closing issues on archive.
 
 - `sdlc backlog add` has no `--source-url` (only `sdlc new` has one), so an issue link kept by hand is a ref string.
-  Since 0.19.0, `sdlc backlog import --issues` uses the `Issue: GH-<n>` field instead.
+  `sdlc backlog import --issues` uses the `Issue: GH-<n>` field.
 - `min_approvals` cannot require one approval per role (for example code owner and tech lead) outside
-  `high_risk_approvers`. For QA, the optional qa gate of 0.18.0 (`gates.qa`) is an approval of its own.
+  `high_risk_approvers`. For QA, the optional `gates.qa` gate is an approval of its own.
 - The `missing_role` hint ("ask Paul, Ethan, …") can name people whom `distinct_approvers` excludes (seen in the
   first trial).
-- Since 0.16.2, set `agents: false` for an event-only `telegram` server: the CLI sends events,
+- Set `agents: false` for an event-only `telegram` server: the CLI sends events,
   while agent MCP settings omit it. A server without `stages` is not checked by the stage rule.
+
+## 📚 Terms
+
+Start with the [glossary](../glossary.md) for change, gate, intent, evidence, living spec and judge.
+
+## 📚 See also
+
+- [Course module 5](../course/05-lifecycle-greenfield.md) — follow the same change as video lessons.
+- [Backlog chapter](04-backlog.md) — prepare the item that starts this change.
+- [Roles chapter](03-roles-and-team.md) — see who can decide at each gate.

@@ -1,17 +1,10 @@
 # 1. Setting up a new project
 
-After initial setup, an agent or person can run `sdlc config propose --set <key>=<yaml> --reason <text>`
-and `sdlc config show <id>` to present a settings change. Only a person runs `sdlc config apply <id>` in
-their terminal. A changed target makes the proposal stale; weakening warnings require `--yes` after review.
-
 Steven, the platform engineer, sets up sdlc for `tasklet`, a new project that starts from an empty folder. Then the rest
 of the team joins. By the end of the chapter the repository has the sdlc files, the team's roles, working checks and a
 clean `sdlc doctor`.
 
-After init, review any `.gitignore` warning: Git must include `openspec/` and generated agent files for the
-team to share the process. `sdlc doctor` lists ignored paths and the exception lines to add.
-
-## Contents
+## On this page
 
 - [1.1 Install the CLI](#s1-1)
 - [1.2 `sdlc init`: the wizard and the flags](#s1-2)
@@ -19,6 +12,8 @@ team to share the process. `sdlc doctor` lists ignored paths and the exception l
 - [1.4 What init wrote, the verify commands and `sdlc doctor`](#s1-4)
 - [1.5 Enforcement modes and the license line](#s1-5)
 - [1.6 Commit the setup, bring in the team, and update after an upgrade](#s1-6)
+- [Terms](#terms)
+- [See also](#see-also)
 
 
 <a id="s1-1"></a>
@@ -85,6 +80,18 @@ developers.
 
 You can set up sdlc in an empty folder, either with the interactive wizard or with flags in one command,
 and you know what each choice means.
+
+This diagram shows the setup path for a new project:
+
+```mermaid
+flowchart LR
+    A[Install CLI] -->|run| B[sdlc init]
+    B -->|writes| C[Project files]
+    C -->|check| D[sdlc doctor]
+```
+
+> [!TIP]
+> Review the wizard summary before confirming. The wizard writes nothing until you confirm it.
 
 ### Procedure
 
@@ -294,6 +301,9 @@ shows a healthy installation.
 
 ### Procedure
 
+Review any `.gitignore` warning after init. Git must include `openspec/` and generated agent files so the team can
+share the process. `sdlc doctor` lists ignored paths and the exception lines to add.
+
 1. Review what init wrote:
 
    | Path | Why it exists |
@@ -426,6 +436,10 @@ shows a healthy installation.
 
 You can choose `off`, `warn` or `block` for a project and change it later. You know which license the
 project uses sdlc under and how to record a commercial one.
+
+After setup, an agent or person can run `sdlc config propose --set <key>=<yaml> --reason <text>` and
+`sdlc config show <id>` to present a settings change. Only a person runs `sdlc config apply <id>` in their terminal.
+A changed target makes the proposal stale; weakening warnings require `--yes` after review.
 
 ### Procedure
 
@@ -598,3 +612,12 @@ and regenerate the files without losing local edits.
 
 Clone the project, run `npm install`, `sdlc doctor`, and `sdlc doctor --fix` to restore the git hook that is not
 cloned. Ask the tech lead for an entry in `openspec/roles.yaml`, then run `sdlc next --me`.
+
+## Terms
+
+See the [sdlc glossary](../glossary.md) for the process terms used in this module.
+
+## See also
+
+- [Connect the toolchain](02-toolchain-mcp.md) — continue through the handbook.
+- [Integrations](../10-integrations.md) — see how sdlc connects to team systems.

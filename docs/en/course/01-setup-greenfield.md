@@ -4,20 +4,20 @@ Steven, the platform engineer, sets up sdlc for `tasklet`, a new project that st
 rest of the team joins. By the end of the module the repository has the sdlc files, the team's roles, working
 checks and a clean `sdlc doctor`.
 
-After init, review any `.gitignore` warning: Git must include `openspec/` and generated agent files for the
-team to share the process. `sdlc doctor` lists ignored paths and the exception lines to add.
+## On this page
 
-In this module:
-
-- Lesson 1.1 — Install the CLI
-- Lesson 1.2 — `sdlc init`: the wizard and the flags
-- Lesson 1.3 — People and roles: `openspec/roles.yaml`
-- Lesson 1.4 — What init wrote, the verify commands and `sdlc doctor`
-- Lesson 1.5 — Enforcement modes and the license line
-- Lesson 1.6 — Commit the setup, bring in the team, and update after an upgrade
+- [Lesson 1.1 — Install the CLI](#s1-1)
+- [Lesson 1.2 — `sdlc init`: the wizard and the flags](#s1-2)
+- [Lesson 1.3 — People and roles: `openspec/roles.yaml`](#s1-3)
+- [Lesson 1.4 — What init wrote, the verify commands and `sdlc doctor`](#s1-4)
+- [Lesson 1.5 — Enforcement modes and the license line](#s1-5)
+- [Lesson 1.6 — Commit the setup, bring in the team, and update after an upgrade](#s1-6)
+- [Terms](#terms)
+- [See also](#see-also)
 
 ---
 
+<a id="s1-1"></a>
 ## Lesson 1.1 — Install the CLI            (video: ~5 min)
 
 **Role:** Steven (platform engineer); later every team member   **Project:** tasklet
@@ -81,12 +81,25 @@ developers.
 
 ---
 
+<a id="s1-2"></a>
 ## Lesson 1.2 — `sdlc init`: the wizard and the flags            (video: ~8 min)
 
 **Role:** Steven   **Project:** tasklet   **You need:** lesson 1.1
 
 **Goal.** You can set up sdlc in an empty folder, either with the interactive wizard or with flags in one command,
 and you know what each choice means.
+
+This diagram shows the setup path for a new project:
+
+```mermaid
+flowchart LR
+    A[Install CLI] -->|run| B[sdlc init]
+    B -->|writes| C[Project files]
+    C -->|check| D[sdlc doctor]
+```
+
+> [!TIP]
+> Review the wizard summary before confirming. The wizard writes nothing until you confirm it.
 
 ### Steps
 
@@ -181,6 +194,7 @@ and you know what each choice means.
 
 ---
 
+<a id="s1-3"></a>
 ## Lesson 1.3 — People and roles: `openspec/roles.yaml`            (video: ~7 min)
 
 **Role:** Steven (maintainer); the team reviews   **Project:** tasklet   **You need:** lesson 1.2
@@ -299,12 +313,16 @@ sdlc refuses an approval from the wrong person.
 
 ---
 
+<a id="s1-4"></a>
 ## Lesson 1.4 — What init wrote, the verify commands and `sdlc doctor`            (video: ~7 min)
 
 **Role:** Steven; Ethan chooses the stack   **Project:** tasklet   **You need:** lessons 1.2 and 1.3
 
 **Goal.** You know what each generated file is for, the verify gate has real commands to run, and `sdlc doctor`
 shows a healthy installation.
+
+Review any `.gitignore` warning after init. Git must include `openspec/` and generated agent files so the team can
+share the process. `sdlc doctor` lists ignored paths and the exception lines to add.
 
 ### Steps
 
@@ -439,6 +457,7 @@ shows a healthy installation.
 
 ---
 
+<a id="s1-5"></a>
 ## Lesson 1.5 — Enforcement modes and the license line            (video: ~6 min)
 
 **Role:** Steven; Laura for the license decision   **Project:** tasklet (billing-api for contrast)
@@ -446,6 +465,10 @@ shows a healthy installation.
 
 **Goal.** You can choose `off`, `warn` or `block` for a project and change it later. You know which license the
 project uses sdlc under and how to record a commercial one.
+
+After setup, an agent or person can run `sdlc config propose --set <key>=<yaml> --reason <text>` and
+`sdlc config show <id>` to present a settings change. Only a person runs `sdlc config apply <id>` in their terminal.
+A changed target makes the proposal stale; weakening warnings require `--yes` after review.
 
 ### Steps
 
@@ -532,6 +555,7 @@ project uses sdlc under and how to record a commercial one.
 
 ---
 
+<a id="s1-6"></a>
 ## Lesson 1.6 — Commit the setup, bring in the team, and update after an upgrade            (video: ~7 min)
 
 **Role:** Steven; then Oliver and the approvers   **Project:** tasklet   **You need:** lessons 1.1 to 1.5
@@ -629,3 +653,12 @@ and regenerate the files without losing local edits.
 
 Clone the project, run `npm install`, `sdlc doctor`, and `sdlc doctor --fix` to restore the git hook that is not
 cloned. Ask the tech lead for an entry in `openspec/roles.yaml`, then run `sdlc next --me`.
+
+## Terms
+
+See the [sdlc glossary](../glossary.md) for the process terms used in this module.
+
+## See also
+
+- [Connect the toolchain](02-toolchain-mcp.md) — continue through the course.
+- [Integrations](../10-integrations.md) — see how sdlc connects to team systems.
