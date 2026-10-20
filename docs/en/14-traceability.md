@@ -1,11 +1,27 @@
 # 14. Traceability and audit: use cases
 
-A team that works with agents gets asked three questions sooner or later: "Show me who approved this and that it was
-really them", "What changed for users in this release?" and "How much of this did the agent write?". sdlc 0.12.0
-answers them from what the process already records, and adds two practices around them: a debate before a key design
-decision, and a daily summary.
+Use this page to find the evidence behind a change, prepare release notes and inspect agent contributions. It also
+shows how a team can record both sides of a design decision and send a daily summary.
+
+## On this page
+
+- [What the team gets](#141-what-the-team-gets)
+- [Use cases](#142-use-cases)
+- [Limits](#143-limits-we-accept)
+- [Trace gaps](#144-trace-gaps-without-task-trailers)
+- [Terms](#-terms)
+- [See also](#-see-also)
 
 ## 14.1. What the team gets
+
+These commands connect process records with the questions people ask about a change.
+
+```mermaid
+flowchart LR
+    A[Change artifacts] -->|export| B[Audit evidence]
+    C[Delta specs] -->|derive| D[Changelog]
+    E[Agent commits] -->|trailer| F[Agent share]
+```
 
 | Need | What sdlc does |
 |---|---|
@@ -13,9 +29,11 @@ decision, and a daily summary.
 | Release notes that match the specs | `sdlc changelog`: requirements added, changed and removed by the delta specs |
 | Know which commits agents made | a git hook marks them `SDLC-Agent: <agent>`; the audit shows the share |
 | Both sides of a key design decision on record | the debate lens: two advocates argue it before the spec gate |
-| A short morning digest | `sdlc events summary` sends the daily summary to the team's receivers (0.19.0); an example script writes done, next, blocked and waiting on people to a file |
+| A short morning digest | `sdlc events summary` sends the daily summary to the team's receivers; an example script writes done, next, blocked and waiting on people to a file |
 
 ## 14.2. Use cases
+
+Each example starts with a question and follows the evidence that answers it.
 
 ### The quarterly audit
 
@@ -25,11 +43,18 @@ The compliance officer asks for the evidence of the third quarter. The team lead
 sdlc audit --export evidence-q3 --since 2026-07-01
 ```
 
-`evidence-q3/` holds `index.md` (a readable table per change), `index.json` (the same for tools), the folders of every
-change (intent, specs, design, plan, verification evidence, review, the change record) and `log.jsonl` with the
-decisions of the period. Each approval shows who gave it, in which role, the digest of what was signed, the signature
-status (`valid`, `unsigned`, `wrong-signer`, … with `roles.yaml` and signing on; `not-checked` otherwise) and whether
-the commit with its `SDLC-Approval` trailer exists. With `signing_since` in `roles.yaml`, approvals recorded through
+`evidence-q3/` holds:
+
+> [!NOTE]
+> The export contains process evidence from `openspec/`. It does not include source code or secrets.
+
+- `index.md`, a readable table per change, and `index.json`, the same data for tools;
+- each change's intent, specs, design, plan, verification evidence, review and change record;
+- `log.jsonl` with the decisions of the period.
+
+Each approval shows the person and role, the digest of the signed content, and whether its commit has an
+`SDLC-Approval` trailer. With `roles.yaml` and signing on, it shows `valid`, `unsigned`, `wrong-signer` or another
+signature status; otherwise it shows `not-checked`. With `signing_since` in `roles.yaml`, approvals recorded through
 a chosen commit are `pre-signing`; later approvals use the configured mode. With `signing: off`, no signatures are
 checked. Nothing from outside openspec/ goes in — no source code, no
 secrets — and an existing folder with files in it is refused, so the export never mixes into something else.
@@ -55,8 +80,10 @@ date. A change without delta specs adds nothing.
 ### How much did the agents write?
 
 After `sdlc init` (or `sdlc update`), the project's git has a `prepare-commit-msg` hook. A commit made in an agent's
-terminal (Claude Code, OpenCode, Cursor, Codex CLI, Qwen Code, GigaCode, or anything that sets `SDLC_AGENT`) gets a
+terminal (Claude Code, OpenCode, Cursor, Codex CLI, Qwen Code or GigaCode) gets a
 trailer:
+
+Any other tool that sets `SDLC_AGENT` is marked too.
 
 ```text
 Add CSV export
@@ -104,17 +131,21 @@ what waits on people (with the commands). It never sends anything; mail it, post
 schtasks /Create /SC DAILY /ST 08:00 /TN sdlc-daily /TR "cmd /c cd /d C:\work\shop && node daily-summary.mjs --out reports"
 ```
 
-Since 0.19.0, `sdlc events summary` sends the summary as the event `summary.daily` to the receivers whose `on` names
+`sdlc events summary` sends the summary as the event `summary.daily` to the receivers whose `on` names
 it, for example a Telegram bot ([Events and the daily summary](05-guide.md#events-and-the-daily-summary)). There is
 one summary per project and day, so run it once a day from a scheduler or a CI job.
 
 ## 14.3. Limits we accept
+
+Read these limits when interpreting the agent marker and the debate record.
 
 - The agent marker comes from the environment of the agent's terminal; a commit made outside it (for example, a person
   committing what an agent wrote) is a person's commit.
 - The debate is recorded text: sdlc checks that both positions and the decision are there, not how good they are.
 
 ## 14.4. Trace gaps without task trailers
+
+`sdlc trace` reports missing task links and mismatched review coverage.
 
 When a change has tasks but no commit names any of them with an `SDLC-Task` trailer, `sdlc trace` reports one
 `tasks-without-trailers` gap with the task count. Once a commit names a task, unnamed tasks are listed individually.
@@ -124,3 +155,13 @@ the findings under that pass, `review-coverage-mismatch` names the declared and 
 
 The evidence bundle records `signing.mode` and the resolved full `signing.since` commit in `index.json`.
 `index.md` explains that approvals recorded in or before `signing_since` are `pre-signing` and need no signature.
+
+## 📚 Terms
+
+The [glossary](glossary.md) explains audit, approval, evidence and digest.
+
+## 📚 See also
+
+- [Roles and signed approvals](08-roles-and-signing.md) — check who may decide and how signatures are verified.
+- [Process health](13-process-health.md) — inspect waits, rework and approval evidence.
+- [User guide](05-guide.md) — follow the change lifecycle.

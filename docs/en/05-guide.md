@@ -1,6 +1,25 @@
 # 5. User guide
 
+Use this guide to set up sdlc, move a change through its gates, and find the commands you need.
+Start with installation and the change lifecycle. Return to the configuration and CLI tables as your project grows.
+
+## On this page
+
+- [Configuration proposals](#configuration-proposals) — review a settings change before applying it.
+- [Installation](#51-installation) — install the CLI and choose tools.
+- [Start with a backlog](#52-working-with-sdlc-from-init-to-an-empty-backlog) — prepare and order work.
+- [Lifecycle of a change](#53-lifecycle-of-a-change) — follow gates, evidence, and decisions.
+- [Configuration](#54-configuring-openspecsdlcyaml) — set project policy.
+- [CI and headless mode](#55-ci-and-headless-mode) — run checks without prompts.
+- [Dashboard](#56-keeping-the-dashboard-current) — watch progress.
+- [Updating and uninstalling](#57-updating-and-uninstalling) — manage generated files.
+- [Reference](#58-reference) — look up commands and generated files.
+- [Terms](#-terms) — check the process vocabulary.
+- [See also](#-see-also) — continue with related guides.
+
 ## Configuration proposals
+
+Use a proposal to inspect a configuration change before a person applies it.
 
 An agent or person runs `sdlc config propose --set <key>=<yaml> --reason <text>` and then
 `sdlc config show <id>`. The show command presents the proposed diff, validation and weakening warnings.
@@ -22,6 +41,8 @@ Put `${VAR}` values in single quotes when using `--set`; an empty-value warning 
 
 ## 5.1. Installation
 
+Install the CLI in a git repository, then check the setup with `sdlc doctor`.
+
 ```bash
 # CLI, the latest release (the required OpenSpec version is installed with it)
 npm install -g https://github.com/marin-ai-tech/sdlc/releases/latest/download/sdlc.tgz
@@ -39,40 +60,91 @@ it warns with the server and variable names, never the value.
 On Windows with Claude Code selected, `sdlc doctor` also checks whether Claude Code can find Git Bash. If it cannot,
 the `claude hooks` check explains the blocked tool calls and how to set `CLAUDE_CODE_GIT_BASH_PATH`.
 
-Since 0.16.1, `sdlc doctor --fix` applies only fixes sdlc owns: missing generated files, an outdated stamp, a missing
-or older sdlc git hook, and a missing starter `REVIEW.md`. It keeps edited generated files. Other findings are left to
-you. JSON output separates `fixed` from `manual`.
+`sdlc doctor --fix` repairs only what sdlc owns:
 
-Examples: `--tools cursor`, `--tools claude,codex`, `--tools qwen`, `--tools gigacode`. Without `--tools`, `sdlc init`
+- missing generated files;
+- an outdated stamp;
+- a missing or older sdlc git hook;
+- a missing starter `REVIEW.md`.
+
+It keeps edited generated files and leaves other findings to you. JSON output separates `fixed` from `manual`.
+
+### Choose tools
+
+Choose the agents that will use the project. Examples: `--tools cursor`, `--tools claude,codex`, `--tools qwen`,
+`--tools gigacode`. Without `--tools`, `sdlc init`
 uses the tools it finds in the project (for example a `.claude/`, `.cursor/`, `.codex/` or `.qwen/` folder), else
 Claude Code and OpenCode. The tools are compared in [Supported tools](#supported-tools) at the end of this section.
 
 For Cursor, see [15. Cursor IDE](15-cursor.md): `sdlc init --tools cursor --mcp` sets up skills, commands, subagents,
 a rule, the MCP server and Cursor's own hooks. For Codex CLI, see [16. Codex CLI](16-codex.md):
 `sdlc init --tools codex --mcp`, then trust sdlc's hooks once in Codex's `/hooks`. For Qwen Code and GigaCode, see
-[17. Qwen Code and GigaCode](17-qwen-gigacode.md): `sdlc init --tools qwen --mcp` (or `gigacode`, experimental); if you turned Qwen
-Code's folder trust on, trust the project folder.
+[17. Qwen Code and GigaCode](17-qwen-gigacode.md): `sdlc init --tools qwen --mcp` (or `gigacode`, experimental); if you
+turned Qwen Code's folder trust on, trust the project folder.
 
-From git, install the `release` branch, which carries the built code: `npm install -g github:marin-ai-tech/sdlc#release`. Never `npm install -g sdlc`: the registry package of that name is unrelated.
+From git, install the `release` branch, which carries the built code:
+`npm install -g github:marin-ai-tech/sdlc#release`.
+Never `npm install -g sdlc`: the registry package of that name is unrelated.
 
-With no flags in a terminal, `sdlc init` guides you through the setup (tools, enforcement mode, status line, /opsx, language, roles) and shows a summary before writing. The wizard also offers to install the OpenSpec CLI and codegraph when they are missing. Scripts, `--json`, non-terminals and agent sessions never prompt.
+### Use the setup wizard
 
-Since 0.16.1, `sdlc init --roles` also creates the starter `openspec/roles.yaml` using the current git identity for
+With no flags in a terminal, `sdlc init` guides you through setup and shows a summary before writing.
+You choose:
+
+- tools and enforcement mode;
+- the status line and /opsx workflows;
+- language and roles.
+
+The wizard also offers to install the OpenSpec CLI and codegraph when they are missing.
+Scripts, `--json`, non-terminals and agent sessions never prompt.
+
+`sdlc init --roles` creates the starter `openspec/roles.yaml` using the current git identity for
 every role. It keeps an existing file and reports created or kept in text and JSON. Only a person may run this option:
 the CLI returns `agent_cannot_edit_roles` in an agent session, and the hook denies it as it does `roles migrate`.
 
-**AI-ready from the start.** In an empty folder (nothing but `.git`, `.gitignore`, `LICENSE`, `README`) the wizard creates the agent documents right away and offers `git init` when there is no repository. In an existing project it first shows how the project differs from the AI-ready layout — missing documents and documents under other names — and offers three choices: build the AI-ready project in a new git worktree in a folder you name (the whole setup happens there, in one commit on the `sdlc/ai-ready` branch; your working copy is not touched), adapt in place (`layout adapt`), or skip. Without the wizard: `--layout scaffold|adapt|worktree|none` with `--worktree <path>`, and `--git-init`; without `--layout` init only reports the differences. Only a person may create the worktree, because it commits on their behalf.
+**AI-ready from the start.** In an empty folder (nothing but `.git`, `.gitignore`, `LICENSE`, `README`),
+the wizard creates agent documents and offers `git init` when there is no repository.
+In an existing project, it shows missing documents and documents under other names. You can:
 
-`sdlc init`:
-- creates `openspec/` by running `openspec init` if it does not exist, and makes `sdlc` the default schema. In an existing OpenSpec project, the default schema does not change;
-- copies the schema to `openspec/schemas/sdlc/` and creates `openspec/sdlc.yaml`. Verification commands are detected automatically from `package.json`, `Makefile`, `pyproject`, `go.mod` or `Cargo.toml`;
+- build the AI-ready project in a named new git worktree. Setup happens there in one commit on the
+  `sdlc/ai-ready` branch, leaving your working copy untouched;
+- adapt in place with `layout adapt`;
+- skip layout changes.
+
+Without the wizard, use `--layout scaffold|adapt|worktree|none` with `--worktree <path>` and `--git-init`.
+Without `--layout`, init only reports differences. Only a person may create the worktree because it commits for them.
+
+### Generated project files
+
+`sdlc init` prepares the project:
+- creates `openspec/` by running `openspec init` if it does not exist, and makes `sdlc` the default schema. In an
+  existing OpenSpec project, the default schema does not change;
+- copies the schema to `openspec/schemas/sdlc/` and creates `openspec/sdlc.yaml`. Verification commands are detected
+  automatically from `package.json`, `Makefile`, `pyproject`, `go.mod` or `Cargo.toml`;
 - on a later `init` or `update`, edits only changed settings in `openspec/sdlc.yaml`; other lines keep their spacing,
   comments, flow collections and line endings;
 - generates, for each chosen tool, the workflows (skills, commands), the subagents and what holds the gates: hooks for
   Claude Code, a plugin for OpenCode, the tool's own hooks and rules for Cursor, Codex CLI, Qwen Code and GigaCode
   ([Supported tools](#supported-tools)); plus `REVIEW.md` if it does not exist.
 
-Useful flags: `--mode block` — strict enforcement; `--cli "npx --no-install sdlc"` — if the CLI is installed locally in the project (`npm i -D https://github.com/marin-ai-tech/sdlc/releases/latest/download/sdlc.tgz`; `--no-install` keeps npx from fetching the unrelated registry package); `--opsx` — also install OpenSpec's own `/opsx:*` workflows alongside; `--delivery skills|commands|both`; `--no-hooks`; `--statusline` — install the Claude Code status line; `--mcp` — register the sdlc MCP server for the chosen tools ([10.1](10-integrations.md#101-another-ai-system-reads-the-process)); `--tools all` or `--tools none` — every supported tool, or none of them.
+### Setup flags
+
+Use these flags to choose how init integrates with your tools:
+
+| Flag | Use |
+|---|---|
+| `--mode block` | Strict enforcement. |
+| `--cli "npx --no-install sdlc"` | Use the CLI installed locally in the project. |
+| `--opsx` | Install OpenSpec's `/opsx:*` workflows too. |
+| `--delivery skills|commands|both` | Choose workflow delivery. |
+| `--no-hooks` | Skip hooks. |
+| `--statusline` | Install the Claude Code status line. |
+| `--mcp` | Register the sdlc MCP server for the chosen tools. See [integrations](10-integrations.md#101-another-ai-system-reads-the-process). |
+| `--tools all` or `--tools none` | Choose every supported tool or none. |
+
+For a local CLI, install with
+`npm i -D https://github.com/marin-ai-tech/sdlc/releases/latest/download/sdlc.tgz`.
+The `--no-install` flag keeps npx from fetching the unrelated registry package.
 
 **Claude Code plugin (organization-wide):**
 ```text
@@ -85,7 +157,10 @@ mandatory, use `extraKnownMarketplaces` and `enabledPlugins` in `.claude/setting
 
 After `init`, commit the generated files: they are shared by the team.
 
-**License.** By default, a project uses sdlc under the free Community License. It covers noncommercial use, open source projects and a 30-day evaluation. `sdlc init` and `sdlc doctor` warn you if the project has no OSI-approved license. Commercial use requires a commercial license. After the agreement is signed, record the license with `sdlc license set commercial --agreement <id> --licensee "<company>"`.
+**License.** By default, a project uses sdlc under the free Community License. It covers noncommercial use, open source
+projects and a 30-day evaluation. `sdlc init` and `sdlc doctor` warn you if the project has no OSI-approved license.
+Commercial use requires a commercial license. After signing, record it:
+`sdlc license set commercial --agreement <id> --licensee "<company>"`.
 
 ### Supported tools
 
@@ -107,6 +182,8 @@ In every tool, the CLI itself refuses a person's decision in the agent's shell, 
 configuration, and commits made in the agent's shell carry `SDLC-Agent: <agent>`.
 
 ## 5.2. Working with sdlc: from init to an empty backlog
+
+Use this path to prepare an existing project, order its work, and complete the first change.
 
 An existing active change can be attached to an open backlog item with
 `sdlc backlog link B1 --change add-export`. The item becomes in progress and archiving the change marks it done.
@@ -131,20 +208,28 @@ Qwen Code and GigaCode call them (`/sdlc-adopt`); in Codex CLI they are `$sdlc-a
 | 5 | Take the next ready item: `sdlc backlog start B<n>` creates the change with a draft intent; then the lifecycle of a change (5.3). | `/sdlc:intent`, then `/sdlc:next` | you approve each gate in your terminal |
 | 6 | Close: `sdlc archive` merges the deltas into the living specs and marks the item `done`. With no active change, `/sdlc:next` proposes the next ready item. | `/sdlc:archive` / `/sdlc-archive` | — |
 
-Repeat steps 3–6 until the backlog is empty. A new idea goes through step 3 at any time; an alert or an incident through `/sdlc:triage` (`/sdlc-triage`). Since 0.19.0, `sdlc triage intake` turns an alert into a backlog item, and `sdlc backlog import --issues` brings in GitHub issues ([Backlog and epics](#backlog-and-epics)).
+Repeat steps 3–6 until the backlog is empty. A new idea goes through step 3 at any time; an alert or an incident through
+`/sdlc:triage` (`/sdlc-triage`). `sdlc triage intake` turns an alert into a backlog item.
+`sdlc backlog import --issues` brings in GitHub issues ([Backlog and epics](#backlog-and-epics)).
 
-- In an empty folder step 1 already creates the agent documents (and offers `git init`), so step 2 mostly drafts the settings and roles.
-- Step 3 is not a study of the whole project (that is step 2) and not a gate: skip it when the idea is clear and add the item in step 4.
+- In an empty folder step 1 already creates the agent documents (and offers `git init`), so step 2 mostly drafts the
+  settings and roles.
+- Step 3 is not a study of the whole project (that is step 2) and not a gate: skip it when the idea is clear and add the
+  item in step 4.
 - Commit after steps 1 and 2: the generated files and documents are shared by the team.
-- With several approvers, check `openspec/roles.yaml` after `sdlc adopt --apply`: roles without a better holder go to you, marked to check.
+- With several approvers, check `openspec/roles.yaml` after `sdlc adopt --apply`: roles without a better holder go to
+  you, marked to check.
 - Approve gates in your own terminal: a `!` command in the agent chat runs in the agent's shell and is refused.
 
 ## 5.3. Lifecycle of a change
 
+A change moves through planning, implementation, verification, and a person's decisions.
+The table shows the usual path and the corresponding workflows.
+
 | Step | Who | Claude Code | OpenCode, Cursor, Qwen Code, GigaCode | CLI |
 |---|---|---|---|---|
 | Idea → intent.md | agent + idea author | `/sdlc:intent "customers call to check the status of their request"` | `/sdlc-intent …` | `sdlc new <id>` |
-| Before a person approves: the judge checks the gate's artifacts (if `gates.<gate>.judge`, 0.20.0) | agent | | | `sdlc judge --gate <gate> --change <id>` |
+| Before a person approves: the judge checks the gate's artifacts (if `gates.<gate>.judge`) | agent | | | `sdlc judge --gate <gate> --change <id>` |
 | Approve the intent | product owner | | | `sdlc approve intent --change <id>` |
 | proposal, deltas, design | agent | `/sdlc:spec` | `/sdlc-spec` | `sdlc validate` |
 | Approve the spec | product owner (+ tech lead if high risk) | | | `sdlc approve spec --change <id> [--as tech-lead]` |
@@ -161,34 +246,61 @@ Repeat steps 3–6 until the backlog is empty. A new idea goes through step 3 at
 
 In Codex CLI, call the same workflows as `$sdlc-intent`, `$sdlc-spec` and so on.
 
-At any point, `/sdlc:next` (`/sdlc-next`, `$sdlc-next` in Codex) runs the next step or tells you who must do it and with which command. `sdlc status` shows all changes, and `sdlc status --markdown` produces a report for a PR or a wiki.
+At any point, `/sdlc:next` (`/sdlc-next`, `$sdlc-next` in Codex) runs the next step or tells you who must do it and with
+which command. `sdlc status` shows all changes, and `sdlc status --markdown` produces a report for a PR or a wiki.
 
-**A human runs approvals in their own terminal.** Inside an agent session, `sdlc approve` refuses to run. This is by design.
+**A human runs approvals in their own terminal.** Inside an agent session, `sdlc approve` refuses to run. This is by
+design.
 
 
 
 ### Getting around
 
-- Language: help, hints, `status`, the init wizard, hook reasons and reports follow `--locale`, `SDLC_LOCALE`, `locale:` in `sdlc.yaml` or the system locale, in that order; English when there is no translation (other languages ship). JSON never changes with the locale.
-- `sdlc help [topic] [--json]` and `/sdlc:help` (`/sdlc-help`, `$sdlc-help`) list workflows and CLI commands and say who runs each one (agent or person).
-- **Ask the agent how sdlc works.** "How do I send this back?", "why did the hook say no?", "who approves the plan?": the agent answers for your project with the guide workflow (`/sdlc:guide`, `/sdlc-guide`, `$sdlc-guide` in Codex, or just ask). The material ships with sdlc in English and other languages, so it matches the installed version: `sdlc guide` lists the topics (start, lifecycle, gates, roles, team, tracks, bugfix, backlog, rework, verify, review, health, mcp, config, denials, faq), and `sdlc guide <topic>` prints one. Every hook denial ends with the section that explains it, for example `sdlc guide denials#plan-gate`. The sdlc MCP server offers the same as its `guide` tool.
-- **What is waiting for me:** `sdlc next --me` lists every gate, across the active changes, that you (your git identity, matched in `roles.yaml`) may take now, with the command. Without `roles.yaml` it lists every gate waiting for a person.
-- **What am I approving:** `sdlc approve <gate> --change <id> --preview` shows the gate's artifacts, what changed since the last approval, the approvals so far and needed, open findings and verification for review and release, and whether you may approve. It writes nothing.
-- **Approve the version you read:** `sdlc approve <gate> --change <id> --expect-digest <digest>` approves only while the gate still has that digest. If the artifacts changed after you read them, the approval is refused and nothing is recorded. Take the digest from `sdlc approve <gate> --change <id> --preview --json` or `sdlc next --me --json`: the full `sha256:…` value, or the 12 characters that `approve` prints. Programs should pass the full digest.
-- **Versions in the JSON reads:** in `sdlc report --json` each gate has its `digest`, its `approvals` and its `staleApprovals`, each approval with the digest it binds. In `sdlc next --me --json` an approval carries the gate's `digest`. The `gate.<g>.approved` and `gate.<g>.rejected` entries of `sdlc log --json` carry the digest of the version decided. These reads write nothing.
-- After a state-changing command, the CLI prints a `Next:` hint (who acts next and how; the exact command when a person must act) and adds `next` to JSON. With no active change, session-start context names the next ready backlog item.
-- `sdlc status --change <id>` draws a stage stepper and a task bar; `sdlc backlog list` draws a bar per epic. Markdown reports include Mermaid diagrams with sanitized labels.
+- Language: help, hints, `status`, the init wizard, hook reasons and reports follow `--locale`, `SDLC_LOCALE`, `locale:`
+  in `sdlc.yaml` or the system locale, in that order; English when there is no translation (other languages ship). JSON
+  never changes with the locale.
+- `sdlc help [topic] [--json]` and `/sdlc:help` (`/sdlc-help`, `$sdlc-help`) list workflows and CLI commands and say who
+  runs each one (agent or person).
+- **Ask the agent how sdlc works.** "How do I send this back?", "why did the hook say no?", "who approves the plan?":
+  the agent answers for your project with the guide workflow (`/sdlc:guide`, `/sdlc-guide`, `$sdlc-guide` in Codex, or
+  just ask). The material ships with sdlc in English and other languages, so it matches the installed version.
+  `sdlc guide` lists the topics (start, lifecycle, gates, roles, team, tracks, bugfix, backlog, rework, verify, review,
+  health, mcp, config, denials, faq), and `sdlc guide <topic>` prints one. Every hook denial ends with the section that
+  explains it, for example `sdlc guide denials#plan-gate`. The sdlc MCP server offers the same as its `guide` tool.
+- **What is waiting for me:** `sdlc next --me` lists every gate, across the active changes, that you (your git identity,
+  matched in `roles.yaml`) may take now, with the command. Without `roles.yaml` it lists every gate waiting for a
+  person.
+- **What am I approving:** `sdlc approve <gate> --change <id> --preview` shows the gate's artifacts, what changed since
+  the last approval, the approvals so far and needed, open findings and verification for review and release, and whether
+  you may approve. It writes nothing.
+- **Approve the version you read:** `sdlc approve <gate> --change <id> --expect-digest <digest>` approves only while the
+  gate still has that digest. If the artifacts changed after you read them, the approval is refused and nothing is
+  recorded. Take the digest from `sdlc approve <gate> --change <id> --preview --json` or `sdlc next --me --json`: the
+  full `sha256:…` value, or the 12 characters that `approve` prints. Programs should pass the full digest.
+- **Versions in the JSON reads:** in `sdlc report --json` each gate has its `digest`, its `approvals` and its
+  `staleApprovals`, each approval with the digest it binds. In `sdlc next --me --json` an approval carries the gate's
+  `digest`. The `gate.<g>.approved` and `gate.<g>.rejected` entries of `sdlc log --json` carry the digest of the version
+  decided. These reads write nothing.
+- After a state-changing command, the CLI prints a `Next:` hint (who acts next and how; the exact command when a person
+  must act) and adds `next` to JSON. With no active change, session-start context names the next ready backlog item.
+- `sdlc status --change <id>` draws a stage stepper and a task bar; `sdlc backlog list` draws a bar per epic. Markdown
+  reports include Mermaid diagrams with sanitized labels.
 
 ```text
 intent ● ─ spec ○ ─ plan ○ ─ build ○ ─ verify ○ ─ review ○ ─ archive ○
 tasks      █████░░░░░  2/4
 ```
 
-- Claude Code status line: `sdlc statusline` prints one line (`change · stage · who acts`). Opt in with `sdlc init --statusline`. A user-defined status line is never replaced; `sdlc uninstall` removes only the sdlc one.
+- Claude Code status line: `sdlc statusline` prints one line (`change · stage · who acts`).
+  Opt in with `sdlc init --statusline`. A user-defined status line is never replaced;
+  `sdlc uninstall` removes only the sdlc one.
 
 ### Backlog and epics
 
-Planned work lives in `openspec/backlog.md` before an OpenSpec change exists. Epics group items under a goal; each item is one future change. File order is priority. Status is in the heading (`open`, `in-progress`, `done`, `dropped`). Readiness is computed: an open item is ready when it has an Outcome, at least one Acceptance criterion, and every `Depends on` item is `done`. Ids (`B<n>`, `E<n>`) are never reused.
+Planned work lives in `openspec/backlog.md` before an OpenSpec change exists. Epics group items under a goal; each item
+is one future change. File order is priority. Status is in the heading (`open`, `in-progress`, `done`, `dropped`).
+Readiness is computed: an open item is ready when it has an Outcome, at least one Acceptance criterion, and every
+`Depends on` item is `done`. Ids (`B<n>`, `E<n>`) are never reused.
 
 ```markdown
 # Backlog
@@ -206,14 +318,48 @@ Goal: policyholders see claim status without calling support.
 - **Depends on**: B4
 ```
 
-Commands: `sdlc backlog epic add <title> [--goal]`, `sdlc backlog epic edit <E-id> [--title --goal --clear-goal]` (changes an epic's title or goal, never the order), `sdlc backlog add <title> [--epic --kind --risk --outcome --accept --depends --source-type --source-ref --allow-duplicate]`, `sdlc backlog list [--epic --status --ready]`, `sdlc backlog next` (the next ready item), `sdlc backlog edit <B-id> [--title --outcome --accept --add-accept --depends --clear-depends --kind --risk]` (changes an open or in-progress item's text, never its place or status; `--accept` and `--depends` replace the list; a done or dropped item is refused), `sdlc backlog start <B-id> [--change <id>]` (creates the change and a draft `intent.md`, sets the item to `in-progress`), `sdlc backlog move <B-id> (--top | --before <B-id> | --after <B-id> | --epic <E-id>)` and `sdlc backlog drop <B-id> --note <text>` (human-only), `sdlc backlog done <B-id> --note <text>` (marks an item done by hand; the note is required), `sdlc backlog import --issues` (GitHub issues, below). Flow: ready item → `backlog start` → change lifecycle → `sdlc archive` marks the item `done`. With no active change, `sdlc next` proposes the next ready item.
+Use these commands to manage the backlog:
 
-People edit `openspec/backlog.md` by hand as well — notes under items and epics, extra fields and sections stay when a command writes the file — and agents change it only through these commands — the hook denies an agent's direct edit, so order and removal stay a person's decision. In every supported tool, the backlog workflow (`/sdlc:backlog`, `/sdlc-backlog`, `$sdlc-backlog` in Codex) works with the backlog: without input it shows the list, the next ready item and what blocks the others; with an epic or an idea it proposes items with an outcome and acceptance criteria and adds only those you confirm; with `B<n>` it brings the item to ready and offers to start it. For a reorder or a drop it gives you the command to run.
+| Command | What it does |
+|---|---|
+| `sdlc backlog epic add <title> [--goal]` | Add an epic. |
+| `sdlc backlog epic edit <E-id> [--title --goal --clear-goal]` | Change its title or goal, never its order. |
+| `sdlc backlog add <title> [--epic --kind --risk --outcome --accept --depends --source-type --source-ref --allow-duplicate]` | Add an item. |
+| `sdlc backlog list [--epic --status --ready]` | List items. |
+| `sdlc backlog next` | Show the next ready item. |
+| `sdlc backlog edit <B-id> [--title --outcome --accept --add-accept --depends --clear-depends --kind --risk]` | Edit an open or in-progress item's text. |
+| `sdlc backlog start <B-id> [--change <id>]` | Create a change and draft `intent.md`; mark the item `in-progress`. |
+| `sdlc backlog move <B-id> (--top | --before <B-id> | --after <B-id> | --epic <E-id>)` | Move an item; person only. |
+| `sdlc backlog drop <B-id> --note <text>` | Drop an item; person only. |
+| `sdlc backlog done <B-id> --note <text>` | Mark an item done by hand; note required. |
+| `sdlc backlog import --issues` | Import GitHub issues as described below. |
+
+Editing an item never changes its place or status. `--accept` and `--depends` replace their lists.
+A done or dropped item cannot be edited. A ready item goes through `backlog start` and the change lifecycle.
+`sdlc archive` then marks it `done`. With no active change, `sdlc next` proposes the next ready item.
+
+This diagram shows how a ready item becomes a completed change:
+
+```mermaid
+flowchart LR
+    A[Ready backlog item] -->|start| B[Change lifecycle]
+    B -->|archive| C[Done item]
+```
+
+People may edit `openspec/backlog.md` by hand. Commands preserve notes, extra fields, and sections.
+Agents change it through backlog commands only; the hook denies direct edits. Order and removal remain your decisions.
+
+The backlog workflow is `/sdlc:backlog`, `/sdlc-backlog`, or `$sdlc-backlog` in Codex. It can:
+
+- show the list, the next ready item, and what blocks others when called without input;
+- propose items for an epic or idea, then add only those you confirm;
+- prepare an item named by `B<n>` and offer to start it;
+- give you the command for a reorder or drop.
 
 `sdlc backlog add` refuses a second open item with the same `--source-type` and `--source-ref`.
 The `duplicate_item` error names the existing item. Use `--allow-duplicate` when one source needs several items.
 
-Since 0.19.0, the backlog can also take work from two outside sources. Neither sets the order: a person still orders
+The backlog can also take work from two outside sources. Neither sets the order: a person still orders
 the backlog (`sdlc backlog move`).
 
 - **GitHub Issues.** With `issues: { server: github, repo: owner/name }` in `openspec/sdlc.yaml` (5.4),
@@ -223,25 +369,33 @@ the backlog (`sdlc backlog move`).
   issue is archived, sdlc comments on the issue (the comment names the change) and closes it. The calls go through
   the event outbox: if the server fails, the archive still succeeds, and `sdlc events flush` delivers them later. An
   item without an issue never causes a GitHub call. See
-  [10.11](10-integrations.md#1011-since-0190-github-issues-and-the-team-chat).
+  [10.11](10-integrations.md#1011-github-issues-and-the-team-chat).
 - **Alerts.** `sdlc triage intake [--json]` reads one alert as JSON on stdin (`{ id, title, severity?, url? }`) and
   adds a backlog item with the source `alert:<id>`. The same alert again adds nothing and answers `duplicate: true`.
   Input that is not JSON, or an alert without an id or a title, is refused with `invalid_alert`, and nothing is added.
-  Anyone may run it, so a monitoring job can pipe its alerts in. `/sdlc:triage` still turns an alert into a new intent.
+  Anyone may run it, so a monitoring job can pipe its alerts in. `/sdlc:triage` turns an alert into a new intent.
 
 ### Explore before intent
 
-Step 3 of the path in 5.2. Use `/sdlc:explore` (`/sdlc-explore`) to research and pressure-test an idea. `sdlc explore <slug>` creates `openspec/explorations/<slug>.md`; `sdlc explore list` lists notes. Start a linked change with `sdlc new <id> --source-type exploration --source-ref openspec/explorations/<slug>.md`. Exploration is optional and does not approve intent.
+Step 3 of the path in the previous section. Use `/sdlc:explore` (`/sdlc-explore`) to research and pressure-test an idea.
+`sdlc explore <slug>` creates `openspec/explorations/<slug>.md`; `sdlc explore list` lists notes. Start a linked change
+with `sdlc new <id> --source-type exploration --source-ref openspec/explorations/<slug>.md`. Exploration is optional and
+does not approve intent.
 
 ### Track suggestion and confirmation
 
-`sdlc new` suggests `lite` for eligible small changes from their kind and risk and records `track_suggestion` in `.sdlc.yaml`. Read the reason, then run `sdlc track set <full|lite> --change <id>` yourself. The CLI refuses agent sessions and changes after the plan is approved; the hook also denies agents.
+`sdlc new` suggests `lite` for eligible small changes from their kind and risk and records `track_suggestion` in
+`.sdlc.yaml`. Read the reason, then run `sdlc track set <full|lite> --change <id>` yourself. The CLI refuses agent
+sessions and changes after the plan is approved; the hook also denies agents.
 
 ### Lite track (small edits)
 ```bash
 sdlc new fix-null-name --kind bugfix --risk low --track lite [--skip-specs]
 ```
-The intent and the spec are optional: the change starts with plan.md and tasks.md, followed by the same verify and review steps. Run by a person, `--track lite` applies the track; from an agent session it is only recorded as a suggestion until a person runs `sdlc track set lite`. `--skip-specs` sets `skip_specs: true` for a change that does not alter external behavior.
+The intent and the spec are optional: the change starts with plan.md and tasks.md, followed by the same verify and
+review steps. Run by a person, `--track lite` applies the track; from an agent session it is only recorded as a
+suggestion until a person runs `sdlc track set lite`. `--skip-specs` sets `skip_specs: true` for a change that does not
+alter external behavior.
 
 ### Bug-fix protocol
 The plan names the reproducing test and files to change. A person approves it with
@@ -260,7 +414,8 @@ at the repository root while the change folder lacks it, `sdlc next` and `sdlc s
 
 ### Review with lenses and coverage
 
-`review.passes` and `review.lenses` in `openspec/sdlc.yaml` define the perspectives to check. In `review.md`, record each under `## Coverage`, including work checked when no finding was made:
+`review.passes` and `review.lenses` in `openspec/sdlc.yaml` define the perspectives to check. In `review.md`, record
+each under `## Coverage`, including work checked when no finding was made:
 
 ```md
 ## Findings
@@ -274,15 +429,38 @@ at the repository root while the change folder lacks it, `sdlc next` and `sdlc s
 - adversarial: 1 finding
 ```
 
-`sdlc review check --change <id>` checks missing entries, mismatched finding counts, empty `checked:` evidence, and deferred links. The review gate uses that result. New projects require lens coverage; older projects warn until `review.require_lens_coverage: true` opts in. An accepted extension pack adds its lenses as `<pack>-<id>`, and their coverage is required in the same way ([Extension packs](#extension-packs-0200)).
+`sdlc review check --change <id>` checks missing entries, mismatched finding counts, empty `checked:` evidence, and
+deferred links. The review gate uses that result. `review.require_lens_coverage: true` requires lens coverage;
+without it, missing coverage warns. An accepted extension pack adds its lenses as `<pack>-<id>`, and their
+coverage is required in the same way ([Extension packs](#extension-packs)).
 
 ### Defer a finding
 
-Record postponed work with `sdlc defer add <title> --why <text> [--change <id>] [--finding <F-id>] [--revisit <text>]`, inspect it with `sdlc defer list [--open] [--change <id>]`, and close it with `sdlc defer close <D-id> --status done|dropped --note <text>`. The registry is `openspec/deferred-work.md`; each `### D<n> [open] Title` entry has `**Change**`, optional `**Finding**`, `**Why**`, `**Revisit when**`, and `**Created**` fields. Mark the review finding `deferred (D<n>)`; the review check requires a link to an open item. Reports and dashboards show the registry.
+Record postponed work with `sdlc defer add <title> --why <text> [--change <id>] [--finding <F-id>] [--revisit <text>]`,
+inspect it with `sdlc defer list [--open] [--change <id>]`.
+Close it with `sdlc defer close <D-id> --status done|dropped --note <text>`.
+The registry is `openspec/deferred-work.md`; each `### D<n> [open] Title` entry has
+`**Change**`, optional `**Finding**`, `**Why**`, `**Revisit when**`, and `**Created**` fields. Mark the review finding
+`deferred (D<n>)`; the review check requires a link to an open item. Reports and dashboards show the registry.
 
 ### Send a change back, take it over
 
-`sdlc rework <gate> --change <id> --reason <category> --note "<what has to change>"` sends a change back to the stage of a gate (intent, spec, plan, qa, review). The gate counts as rejected until it is approved again, and approvals made before the rework stop counting, the later gates' too. Reasons come from `rework.reasons` in `sdlc.yaml` (default: missing-requirement, wrong-assumption, design-flaw, implementation-bug, test-gap, scope-change, other); the audit counts them. Approving a gate records a checkpoint (`refs/sdlc/<change>/<gate>`; branches and HEAD stay); `--reset` restores from it only the files listed under "Files that change" in plan.md and the change folder, and refuses when they have uncommitted edits. External actions are not undone. Approving the gate again with nothing changed since the approval before the rework needs `--note` (why nothing had to change; `--preview` shows `unchangedSinceRework`). After `rework.max_cycles` reworks of one gate (default 3), `sdlc next` asks a person to take the change over or review its scope instead of another agent round.
+`sdlc rework <gate> --change <id> --reason <category> --note "<what has to change>"` sends work back
+to the intent, spec, plan, qa, or review stage. The gate counts as rejected until approved again.
+Approvals before the rework stop counting, including later gates' approvals.
+
+`rework.reasons` in `sdlc.yaml` supplies the categories that audit counts:
+
+- `missing-requirement` and `wrong-assumption`;
+- `design-flaw` and `implementation-bug`;
+- `test-gap`, `scope-change`, and `other`.
+
+Approving a gate records a checkpoint at `refs/sdlc/<change>/<gate>`; branches and HEAD stay.
+`--reset` restores only the plan's "Files that change" and the change folder from that checkpoint.
+It refuses files with uncommitted edits and does not undo external actions.
+If nothing changed since the earlier approval, approving again needs `--note` to explain why.
+`--preview` shows `unchangedSinceRework`. After `rework.max_cycles` reworks of one gate (default 3),
+`sdlc next` asks a person to take over or review the scope.
 
 After a rework, `sdlc next` first asks the agent to revise. Once the agent has changed the gate's artifacts,
 the gate waits for a person again: `sdlc next` names them, `sdlc next --me` lists it, and the
@@ -290,23 +468,57 @@ the gate waits for a person again: `sdlc next` names them, `sdlc next --me` list
 then the reviewer decides again. An open rejection remains on its row in `sdlc status` even while an earlier
 gate blocks it; `sdlc next` carries the person's note until that gate is approved.
 
-`sdlc takeover --change <id> --note "<why>"` takes a change from the agent: until `sdlc release-control --change <id> --note "<for the agent>"`, the hook denies agent edits in the change folder and in the plan's files, and `next` says to wait for you. The agent sees the hand-back note. Both commands, like rework, are a person's.
+`sdlc takeover --change <id> --note "<why>"` takes a change from the agent.
+Until `sdlc release-control --change <id> --note "<for the agent>"`, the hook denies agent edits.
+It protects the change folder and the plan's files, and `next` says to
+wait for you. The agent sees the hand-back note. Both commands, like rework, are a person's.
 
-The plan's files are every path listed under "Files that change" in plan.md: paths in backticks, plain list items (`- src/greet.js (modified)`) and globs (`src/legacy/**`). Without plan.md, or when that list names no path, the takeover holds the whole project. The takeover, `rework --reset` and the warning about planned files the change did not touch read this list in the same way; plan drift (`sdlc review context`) reads the whole plan.
+The plan's files are every path listed under "Files that change" in plan.md.
+This includes paths in backticks, plain list items (`- src/greet.js (modified)`), and globs (`src/legacy/**`).
+Without plan.md, or when that list names no path, the takeover
+holds the whole project. The takeover, `rework --reset` and the warning about planned files the change did not touch
+read this list in the same way; plan drift (`sdlc review context`) reads the whole plan.
 
-The plan gate holds code edits until a plan is approved. With one active change, its approved plan opens code edits. With several active changes, the agent may edit code, or write it through the shell, only in files that an approved plan lists; any other file meets the plan gate (denied in `block` mode, a reminder in `warn` mode). An approved plan that lists no file opens nothing while another change is active. Editing plan.md after its approval voids the approval.
+The plan gate holds code edits until a plan is approved. With one active change, its approved plan opens code edits.
+With several active changes, the agent may edit code, or write it through the shell, only in files that an approved plan
+lists; any other file meets the plan gate (denied in `block` mode, a reminder in `warn` mode). An approved plan that
+lists no file opens nothing while another change is active. Editing plan.md after its approval voids the approval.
 
 ### Evidence, changelog and agent commits
 
-`sdlc audit --export <dir> [--since <date>] [--change <id>]` writes the evidence bundle for auditors: `index.json` and `index.md` with every approval, its signature status (as `sdlc approvals verify` checks it, `not-checked` without signing) and its trailer, the change folders and the log of the period; only files inside openspec/. Since 0.16.2, `sdlc audit --since <date>` without `--export` gives the plain audit for that period: changes with history from that date, agent commits from that date, and JSON `since`. `sdlc audit --change <id>` includes commits made while an archived change was active and the agents' share of commits bearing its `SDLC-Change: <id>` trailer (JSON `agentCommits: { agent, total }`); `--since` limits it. `sdlc changelog [--change <id> | --since <date>]` lists the requirements the delta specs add, change and remove; `/sdlc:release` puts it into release.md. `sdlc init` and `sdlc update` install a `prepare-commit-msg` git hook that marks commits made in an agent session with `SDLC-Agent: <agent>`; the audit and the dashboard show the agents' share. A project's own hook is kept (`sdlc doctor` shows the line to chain sdlc's), and a `core.hooksPath` outside the project is left alone. With `design: { debate: true }`, the spec workflow has two `sdlc-advocate` subagents argue the key decision and records `## Debate` in design.md; the spec gate waits for it. An example script (`assets/examples/daily-summary.mjs` in the package) writes a daily summary file for a scheduler. Since 0.19.0, `sdlc events summary` sends the summary as an event ([Events and the daily summary](#events-and-the-daily-summary)). Use cases: [14. Traceability and audit](14-traceability.md).
+`sdlc audit --export <dir> [--since <date>] [--change <id>]` writes the evidence bundle for auditors: `index.json` and
+`index.md` with every approval, its signature status (as `sdlc approvals verify` checks it, `not-checked` without
+signing) and its trailer, the change folders and the log of the period; only files inside openspec/.
+`sdlc audit --since <date>` without `--export` gives the plain audit for that period: changes with history from that date,
+agent commits
+from that date, and JSON `since`. `sdlc audit --change <id>` includes commits made while an archived change was active
+and the agents' share of commits bearing its `SDLC-Change: <id>` trailer (JSON `agentCommits: { agent, total }`);
+`--since` limits it. `sdlc changelog [--change <id> | --since <date>]` lists the requirements the delta specs add,
+change and remove; `/sdlc:release` puts it into release.md. `sdlc init` and `sdlc update` install a `prepare-commit-msg`
+git hook that marks commits made in an agent session with `SDLC-Agent: <agent>`; the audit and the dashboard show the
+agents' share. A project's own hook is kept (`sdlc doctor` shows the line to chain sdlc's), and a `core.hooksPath`
+outside the project is left alone. With `design: { debate: true }`, the spec workflow has two `sdlc-advocate` subagents
+argue the key decision and records `## Debate` in design.md; the spec gate waits for it. An example script
+(`assets/examples/daily-summary.mjs` in the package) writes a daily summary file for a scheduler. `sdlc events summary`
+sends the summary as an event ([Events and the daily summary](#events-and-the-daily-summary)). Use cases: [14.
+Traceability and audit](14-traceability.md).
 
-Export the bundle outside the project, or to a folder listed in `.gitignore`: a folder inside the project that git does not ignore changes the working tree, so `sdlc audit --export` warns that it makes the verification of the active changes stale, and `sdlc verify` has to run again.
+> [!TIP]
+> Export the bundle outside the project or to a folder in `.gitignore`.
+
+An unignored folder inside the project changes the working tree. `sdlc audit --export` warns that active changes'
+verification becomes stale. Run `sdlc verify` again.
 
 ### Open questions answered by a person
 
-Open questions under `## Open questions` in intent.md, proposal.md or design.md need a person's answer before the intent or spec gate can be approved. `sdlc answer --change <id> --list` shows them; `sdlc answer <n> --change <id> --text "…"` writes the answer under the question and records it in `.sdlc.yaml`. Only that record counts: an answer typed into the file by hand or by an agent does not, and a reworded question needs a new answer. Inside an agent session the command refuses, and the hook denies it; the intent and spec workflows leave the questions to you and give you the command. Turn the rule off with `questions: { required: false }` in `sdlc.yaml`.
+Open questions under `## Open questions` in intent.md, proposal.md or design.md need a person's answer before the intent
+or spec gate can be approved. `sdlc answer --change <id> --list` shows them; `sdlc answer <n> --change <id> --text "…"`
+writes the answer under the question and records it in `.sdlc.yaml`. Only that record counts: an answer typed into the
+file by hand or by an agent does not, and a reworded question needs a new answer. Inside an agent session the command
+refuses, and the hook denies it; the intent and spec workflows leave the questions to you and give you the command. Turn
+the rule off with `questions: { required: false }` in `sdlc.yaml`.
 
-### A judge before the person (0.20.0)
+### A judge before the person
 
 A judge is an independent model that checks a gate's artifacts by the team's rubric before a person approves. Set it
 on the gate, as a command or as an MCP tool of the registry:
@@ -333,7 +545,7 @@ author-critic loop stops and `sdlc next` hands the gate to a person, who may app
 (`judge_invalid_answer`); a judge that fails or times out is an error, never a pass. The rubric must be a file inside
 the project, and a judge has 60 seconds to answer. A failing verdict exits with code 1.
 
-### Extension packs (0.20.0)
+### Extension packs
 
 A pack from git or npm (`packs` in `openspec/sdlc.yaml`, 5.4) may bring review lenses, workflows and gate checks,
 next to roles and skills ([12.5](12-agent-team.md#125-packs-from-git-or-npm)):
@@ -371,17 +583,37 @@ See [13. Process hygiene and project health](13-process-health.md).
 
 ### Project health and explaining a change
 
-`sdlc health [--json]` lists findings about the process and its practices: flow (long or overdue waits on people, changes with no activity, old deferred work), quality (first-pass verification, the most common rework reason, plan drift, open review findings, scenarios without a verification row), discipline (frequent waivers, the lite track on behaviour changes, forced archives, repeated approvals, repeated hook denials of one rule, long test locks) and configuration (no verification commands, enforcement off or warn, one person holding every role, signing off, stale context packs, `sdlc doctor` problems). Each finding has a level (`bad`, `warn`, `info`), the facts and a recommendation; there is no single score, and the command always exits 0. `/sdlc:health` explains the findings and drafts the improvements you choose as backlog items (`--source-type health`). While a `bad` finding exists, the agent's session start says so in one line; `health.degraded` and `health.recovered` go to the log and to event receivers; the dashboard has a health section.
+`sdlc health [--json]` lists findings about process flow, quality, discipline, and configuration:
 
-`sdlc audit` (and the dashboard page of a change) also compares the people's decisions the track planned — the required gates and their approvals, counting `min_approvals` — with what happened: approvals, reworks, takeovers, waivers, answers and the hours gates waited for a person. New to sdlc? `sdlc guide tour` walks through the calculator demo in seven steps.
+- **Flow:** long or overdue waits, inactive changes, and old deferred work.
+- **Quality:** first-pass verification, common rework reasons, plan drift, open review findings, and scenarios
+  without a verification row.
+- **Discipline:** frequent waivers, lite changes to behaviour, forced archives, repeated approvals, repeated hook
+  denials of one rule, and long test locks.
+- **Configuration:** missing verification commands, enforcement off or warn, one person in every role, signing off,
+  stale context packs, and `sdlc doctor` problems.
 
-`sdlc explain --change <id> [--json]` says why a change is where it is: the stage, the open gate and its reason, what it waits for, the steps that unblock it and the latest decisions. It writes nothing.
+Each finding has a level (`bad`, `warn`, `info`), facts, and a recommendation. There is no single score.
+The command always exits 0. `/sdlc:health` explains findings and drafts chosen improvements as backlog items
+(`--source-type health`). While a `bad` finding exists, the agent's session start says so in one line.
+`health.degraded` and `health.recovered` go to the log and event receivers. The dashboard has a health section.
+
+`sdlc audit` and the change dashboard compare planned decisions with what happened.
+The plan includes required gates and approvals, counting `min_approvals`. The actual record shows:
+
+- approvals, reworks, takeovers, waivers, and answers;
+- the hours gates waited for a person.
+
+For a first tour, `sdlc guide tour` walks through the calculator demo in seven steps.
+
+`sdlc explain --change <id> [--json]` says why a change is where it is: the stage, the open gate and its reason, what it
+waits for, the steps that unblock it and the latest decisions. It writes nothing.
 
 ### Events and the daily summary
 
 `events` in `openspec/sdlc.yaml` push process events to the team's MCP servers: a gate that waits for a person, an
-approval, a verification, an archive ([10.10](10-integrations.md#1010-since-0100),
-[11.3](11-mcp-use-cases.md#pushing-events-to-a-central-server)). Since 0.19.0:
+approval, a verification, an archive ([10.10](10-integrations.md#1010-several-projects-and-process-events),
+[11.3](11-mcp-use-cases.md#pushing-events-to-a-central-server)).
 
 - **One wait, one id.** `gate.<g>.awaiting` and `gate.<g>.overdue` get an id from `project.name` (when set), the
   change, the gate, the event and the digest the gate waits on, not from the time. Every clone of the project and CI
@@ -414,7 +646,7 @@ sdlc has no chat API of its own: a Telegram MCP server is a receiver like any ot
 ### The sdlc MCP server over HTTP
 
 `sdlc mcp serve` gives other AI systems read tools, including `board_list`, over stdio
-([10.1](10-integrations.md#101-another-ai-system-reads-the-process)). Since 0.19.0,
+([10.1](10-integrations.md#101-another-ai-system-reads-the-process)).
 `sdlc mcp serve --http <host:port>` serves the same tools over MCP Streamable HTTP at `/mcp`, for a client on another
 machine or in another process:
 
@@ -437,11 +669,25 @@ Stop the server with Ctrl+C. Connecting a remote client: [11.2](11-mcp-use-cases
 
 ### Trace a change
 
-`sdlc trace <change> [--json]` links the intent, the requirements and scenarios of the delta specs, the tasks, the commits, the verification evidence and the review findings, for an active or archived change, and lists the gaps: a requirement without a scenario, a scenario without evidence, a task without a commit, a finding without a status. A commit belongs to a task through the trailers `SDLC-Change: <id>` and `SDLC-Task: <n.m>`; `/sdlc:build` asks the agent to add them.
+`sdlc trace <change> [--json]` links an active or archived change's work:
+
+- intent and delta specs;
+- tasks and commits;
+- verification evidence and review findings.
+
+It names gaps:
+
+- a requirement without a scenario;
+- a scenario without evidence;
+- a task without a commit;
+- a finding without a status.
+
+A commit belongs to a task through `SDLC-Change: <id>` and `SDLC-Task: <n.m>` trailers.
+`/sdlc:build` asks the agent to add them.
 
 ### Handing tasks to executors
 
-Since 0.19.0, the tasks of an approved plan can go to executors of any type: another agent, a script or a person. The
+The tasks of an approved plan can go to executors of any type: another agent, a script or a person. The
 task contract says what an executor gets and what it must return.
 
 - `sdlc task executors [--json]` lists the executors a person named in `openspec/executors.yaml` (empty list
@@ -486,16 +732,21 @@ branch, verification and review stay the usual steps of the change. The contract
 #### The task board
 
 Market mode opens a timed auction with `sdlc board auction --change <id> --task <n.m> [--window <s>]`.
-The default window is 300 seconds. An executor bids with `sdlc board bid --change <id> --task <n.m>
---executor <id> --agent <name> --minutes <n> [--cost <n>] [--note <text>]`.
+The default window is 300 seconds. An executor bids with
+`sdlc board bid --change <id> --task <n.m> --executor <id> --agent <name> --minutes <n> [--cost <n>] [--note <text>]`.
 While open, the board shows `auction`, `closesAt` and the bids. On the next board command after closing,
 it reserves the winner for a default dispatch lease. Set `board.market.rule` in `openspec/sdlc.yaml` to
 `fastest` (default), `cheapest`, or `first`, and `window_seconds` for the default window. Ties favor higher
 `max_risk`, then the earlier bid. With no bids, the task returns to open. A person or lead agent can award
 early or reassign with `sdlc board award --change <id> --task <n.m> --executor <id>`.
 
-Claim, heartbeat, release, submit, and bid accept `--request <key>` for peer retries. The key is 8–128
-letters, digits, `.`, `_`, `:`, or `-`. A repeated key and identical arguments return the stored answer for
+Claim, heartbeat, release, submit, and bid accept `--request <key>` for peer retries.
+The key has 8–128 characters and may contain:
+
+- letters and digits;
+- `.`, `_`, `:`, or `-`.
+
+A repeated key and identical arguments return the stored answer for
 24 hours without a second state change or log entry; different arguments yield `request_conflict`.
 The same write tools take `request` over MCP, and executor tokens can call `board_bid`. MCP accepts JSON numbers
 or numeric strings for `board_claim.lease`, `board_bid.minutes`, and `board_bid.cost`, with the same CLI ranges.
@@ -511,7 +762,7 @@ Over HTTP, an executor token exposes `board_list`, `board_claim`, `board_heartbe
 claim management checks that the claim belongs to it. A foreign claim id is `claim_unknown`. Calls are scoped
 to the token's project. No MCP tool dispatches or makes a gate decision.
 
-Since 0.21.0, the open tasks of every active change whose plan gate is open sit on a board that the agents of the
+The open tasks of every active change whose plan gate is open sit on a board that the agents of the
 registry's executors claim from, each claim under a lease. The board is `openspec/.sdlc/board.json`
 (`{version: 1, claims, dispatches}`) — a state file, git-ignored through `openspec/.sdlc/.gitignore` next to the log's
 `.gitattributes`, and off-limits to agents (the hook's `boardIntegrity` deny; it also lands in every work item's
@@ -561,11 +812,26 @@ local queue and board ignore rules in Git's local `info/exclude`, leaving tracke
 
 ### Roles and separation of duties
 
-With `openspec/roles.yaml`, approvals are tied to people in git: the approver's email must belong to a person holding a role the gate accepts, the authors of the code do not approve its review or release, listed gate pairs need different people, and a per-person limit applies. `sdlc roles who <gate> --change <id>` shows the roles needed for that change's risk and who may approve; people refused only for lacking the role are omitted from text. Without `--change`, it lists every role. The `Next:` hint and the workflows name eligible people. `gates.<g>.min_approvals: N` makes a gate wait for approvals from N different people; one person approving again replaces only their own approval. With `signing: warn | required`, `sdlc approvals verify` checks that each approval arrived in a commit signed by the approver. See [Roles, separation of duties and signed approvals](08-roles-and-signing.md).
+With `openspec/roles.yaml`, approvals are tied to people in git. The rules require:
 
-Since 0.18.0, the file also decides who takes team decisions: `sdlc team accept` (also with `--skill` and `--pack`) needs the `maintainer` role, and `sdlc backlog move` and `sdlc backlog drop` need `product-owner`. A person without the role is refused with `missing_role`, and the message names who may. Without the file any person may run them, as before; an agent never may. `sdlc team list` shows "a newer draft waits" (JSON `newerDraft: true`) when a draft in `docs/agents/drafts/` differs from the accepted role.
+- an approver email belonging to a person with an accepted role;
+- a different person from the code author for review and release;
+- different people at listed gate pairs and any per-person limit.
 
-Since 0.19.0, a person in `roles.yaml` may list chat handles, one per channel:
+`sdlc roles who <gate> --change <id>` shows the roles needed for that risk and who may approve.
+Text omits people refused only for lacking a role. Without `--change`, it lists every role.
+The `Next:` hint and workflows name eligible people. `gates.<g>.min_approvals: N` waits for N different people;
+one person's repeated approval replaces only their own. With `signing: warn | required`,
+`sdlc approvals verify` checks for a commit signed by each approver.
+See [roles and signed approvals](08-roles-and-signing.md).
+
+The file also decides who takes team decisions. `sdlc team accept` (including `--skill` and `--pack`)
+needs the `maintainer` role. `sdlc backlog move` and `sdlc backlog drop` need `product-owner`.
+A person without the role gets `missing_role` and a list of eligible people. Without the file, any person may run
+these commands; an agent cannot. `sdlc team list` shows "a newer draft waits" (JSON `newerDraft: true`)
+when a draft in `docs/agents/drafts/` differs from the accepted role.
+
+A person in `roles.yaml` may list chat handles, one per channel:
 
 ```yaml
 people:
@@ -579,17 +845,34 @@ A handle must be a non-empty string; anything else makes `roles.yaml` invalid (`
 receiver with `chat:` naming that channel gets the handles
 ([Events and the daily summary](#events-and-the-daily-summary)).
 
-**Decisions are taken in your own terminal, not in the agent chat.** In OpenCode and Claude Code a command typed with `!` runs in the agent's shell, so `!sdlc approve …` is refused like the agent's own attempt; custom commands are no way around it either (an agent can run them). The refusal gives the exact command to run in your terminal.
+> [!IMPORTANT]
+> Take decisions in your own terminal. In OpenCode and Claude Code, `!` runs in the agent's shell.
+
+`!sdlc approve …` is refused like the agent's own attempt. An agent can also run custom commands.
+The refusal gives the exact command to run in your terminal.
 
 ### Import BMAD planning
 
-Run `sdlc import bmad <path> --change <id> [--dry-run]` on BMAD PRD, SPEC and architecture spine artifacts. The importer keeps source copies under `sources/bmad/` and maps PRD vision to `intent.md`, SPEC purpose to `proposal.md`, capabilities or PRD requirements to `specs/`, architecture decisions to `design.md`, and deferred bullets to `openspec/deferred-work.md`. A dry run lists the files in text; use `--json` for JSON. Nothing is approved by the import. Review the output and run `sdlc validate --change <id>`.
+Run `sdlc import bmad <path> --change <id> [--dry-run]` on BMAD PRD, SPEC and architecture spine artifacts. The importer
+keeps source copies under `sources/bmad/` and maps PRD vision to `intent.md`, SPEC purpose to `proposal.md`,
+capabilities or PRD requirements to `specs/`, architecture decisions to `design.md`, and deferred bullets to
+`openspec/deferred-work.md`. A dry run lists the files in text; use `--json` for JSON. Nothing is approved by the
+import. Review the output and run `sdlc validate --change <id>`.
 
 ### BMAD epics and tickets into the backlog
 
-Run `sdlc import bmad <path> --to-backlog [--dry-run]` to load BMAD into `openspec/backlog.md` instead of a change. Supply exactly one of `--change` or `--to-backlog`. From `tickets.toml` / `bmad-ticket` output: each epic becomes a backlog epic, each entry an item (`story` → `feature`, `bug` → `bugfix`, `spike` → `chore`); acceptance comes from the story's criteria when present, otherwise `verify`; `after` becomes `Depends on`. From a PRD or SPEC without tickets: one epic named after the document, requirements as items. A dry run lists epics, items and warnings in text; use `--json` for JSON. Repeating an import skips matching BMAD sources and reports `Already imported: …` (JSON `skipped`). An imported epic may record `Source: bmad <folder>#<key>` below its `Goal:` line; older backlog files remain valid. Nothing is started or approved by the import.
+Run `sdlc import bmad <path> --to-backlog [--dry-run]` to load BMAD into `openspec/backlog.md` instead of a change.
+Supply exactly one of `--change` or `--to-backlog`. From `tickets.toml` / `bmad-ticket` output: each epic becomes a
+backlog epic, each entry an item (`story` → `feature`, `bug` → `bugfix`, `spike` → `chore`); acceptance comes from the
+story's criteria when present, otherwise `verify`; `after` becomes `Depends on`. From a PRD or SPEC without tickets: one
+epic named after the document, requirements as items. A dry run lists epics, items and warnings in text; use `--json`
+for JSON. Repeating an import skips matching BMAD sources and reports `Already imported: …` (JSON `skipped`). An
+imported epic may record `Source: bmad <folder>#<key>` below its `Goal:` line; older backlog files remain valid. Nothing
+is started or approved by the import.
 
 ## 5.4. Configuring `openspec/sdlc.yaml`
+
+Use this example to find the settings for gates, verification, integrations, and reporting.
 
 ```yaml
 version: 1
@@ -674,6 +957,8 @@ log:
   hook_decisions: true        # queue hook denials and warnings locally until the next log write
 ```
 
+### Decisions and optional gates
+
 The hook decision queue is `openspec/.sdlc/hook-log.jsonl`. Git ignores this local file, so denials do not dirty the
 working copy. `sdlc log`, `sdlc health`, audit, reports and the dashboard read queued decisions immediately. The next
 CLI command that writes the shared log moves them into `openspec/.sdlc/log.jsonl` in order. Set
@@ -683,27 +968,29 @@ CLI command that writes the shared log moves them into `openspec/.sdlc/log.jsonl
 full-track change whose spec gate applies and whose intent is decided or proposal/spec artifacts exist. At that point
 missing deltas fail validation; `sdlc approve spec` still refuses them.
 
-Since 0.17.0, the build workflow runs the `sdlc-simplifier` subagent after the last task and before `sdlc verify`.
+The build workflow runs the `sdlc-simplifier` subagent after the last task and before `sdlc verify`.
 You do not need to list it in `stages.build.agents`. `stages.build.simplify: false` turns this step off. Only the
-build stage takes `simplify`; under another stage it is a configuration error. Existing projects get the step with
-`sdlc update`.
+build stage takes `simplify`; under another stage it is a configuration error. Run `sdlc update` to add the step to
+an existing project.
 
-Since 0.18.0, `gates.qa: { required: true }` adds a `qa` gate between verify and review (default `required: false`,
+`gates.qa: { required: true }` adds a `qa` gate between verify and review (default `required: false`,
 `approvers: [qa]`). After verification passes, a person with the `qa` role accepts the evidence with
 `sdlc approve qa --change <id>`; the review gate waits for it. The approval covers `verification.md` and the recorded
 verify run, so a new `sdlc verify` makes it stale and `sdlc next` asks for it again.
 `sdlc reject qa --change <id> --note "…"` sends the change back to the agent to fix and verify again. When the gate is
 not required, it does not appear. An agent can never approve it.
 
-Since 0.18.0, `verify.require_behaviour: true` (default `false`) makes the verify gate also need the behavioural table
+`verify.require_behaviour: true` (default `false`) makes the verify gate also need the behavioural table
 of `verification.md`: one row per spec scenario, as `sdlc verify --check --strict` checks it. Without the rows the
 gate is not satisfied, its reason names the uncovered scenarios, and `sdlc next` asks the agent to fill the table.
 
-Since 0.19.0, `issues: { server, repo }` links the backlog to GitHub Issues through the team's GitHub MCP server:
+`issues: { server, repo }` links the backlog to GitHub Issues through the team's GitHub MCP server:
 `server` is a name in `mcp.servers`, and `repo` is `owner/name`. sdlc holds no token; the server has it. See
 [Backlog and epics](#backlog-and-epics).
 
-Since 0.19.0, `context.sources` lists the context packs that come from the team's knowledge server. Each source has a
+### Context sources
+
+`context.sources` lists the context packs that come from the team's knowledge server. Each source has a
 `name` (a plain file name), a `server` (a name in `mcp.servers`), a `resource` or a `tool` with optional `args`, the
 `stages`, the `owner` and an optional `fresh_days`. `sdlc context pull [--name <name>] [--json]` reads each source
 (an MCP resource, or the text a tool answers) and writes `docs/context/<name>.md` with the usual header: `owner`,
@@ -713,9 +1000,12 @@ a plain file name, or a server that is not in `mcp.servers`, is a configuration 
 packs stay in git and go through review like any file, and `sdlc instructions` stays offline: it reads the files, not
 the server. See [10.8](10-integrations.md#108-team-knowledge-at-the-right-stage).
 
-Project context and rules for artifacts are set in the same place as in OpenSpec: `openspec/config.yaml` → `context:` and `rules.<artifact>`. They are included in the instructions for intent, proposal, specs, design, plan and tasks.
+Project context and rules for artifacts are set in the same place as in OpenSpec: `openspec/config.yaml` → `context:`
+and `rules.<artifact>`. They are included in the instructions for intent, proposal, specs, design, plan and tasks.
 
 ## 5.5. CI and headless mode
+
+Use these commands when a job needs to check a project without prompts.
 
 ```bash
 sdlc validate --all --json            # deltas + cross-change overlaps
@@ -736,33 +1026,40 @@ CLI log entries made in an agent session include an optional `agent` name alongs
 `agentCommits` remains the separate count of commits with an `SDLC-Agent` trailer.
 In JSON, `total` counts the filtered entries.
 
-For `claude -p`, allow the required tools in advance: `--allowedTools "Bash(sdlc *),Read,Write,Edit"`. In CI, it is convenient to add `sdlc status --markdown` to the PR description.
+For `claude -p`, allow the required tools in advance: `--allowedTools "Bash(sdlc *),Read,Write,Edit"`. In CI, it is
+convenient to add `sdlc status --markdown` to the PR description.
 
-Since 0.17.0, a person writes the CI configuration with `sdlc ci init --provider github|gitlab [--check <server>]
+A person writes the CI configuration with `sdlc ci init --provider github|gitlab [--check <server>]
 [--force]`. GitHub gets `.github/workflows/sdlc.yml`; GitLab gets `.gitlab/sdlc.yml` and, when there is none, a
 `.gitlab-ci.yml` that includes it. The job runs `sdlc validate --all` and `sdlc approvals verify` on a full clone.
 With `signing: off`, the approval step checks no signatures; the generated CI files say so beside the step.
 An existing file is kept; `--force` rewrites it. `--check <server>` adds a `ci-green` check to `verify.mcp`. The
 command is refused in an agent session. See chapter 10.3.
 
-Since 0.19.0, the job ends with `sdlc events flush`, also when a check failed (`if: always()` on GitHub,
+The job ends with `sdlc events flush`, also when a check failed (`if: always()` on GitHub,
 `after_script` on GitLab), so the events queued in CI reach the receivers. An existing file keeps its old job until
 `sdlc ci init --force` rewrites it.
 
 ## 5.6. Keeping the dashboard current
 
-Since 0.16.1, `sdlc dashboard --watch [--out <file>] [--serve <host:port>] [--debounce <ms>]
-[--min-interval <ms>]` builds the page, then rebuilds it when `openspec/` changes. The default output is
+Watch the dashboard while the project changes, or build it on a schedule.
+
+`sdlc dashboard --watch [--out <file>] [--serve <host:port>] [--debounce <ms>] [--min-interval <ms>]`
+builds the page, then rebuilds it when `openspec/` changes. The default output is
 `reports/dashboard.html`. With `--serve`, it serves the page with auto-refresh; port 0 selects a free port.
-Stop it with Ctrl+C. `scripts/examples/dashboard-watch.mjs` remains for Windows Task Scheduler setups.
+Stop it with Ctrl+C. `scripts/examples/dashboard-watch.mjs` is available for Windows Task Scheduler setups.
 See [the demo and automation](09-demo-and-automation.md).
 
-When `openspec/executors.yaml` exists, the dashboard shows a task board grouped by change: each task's status,
-executor, agent, lease end, attempts and last reopening reason, plus claimed and submitted counts per executor.
+When `openspec/executors.yaml` exists, the dashboard shows a task board grouped by change. It includes:
+
+- each task's status, executor, agent, lease end, attempts, and last reopening reason;
+- claimed and submitted counts per executor.
 `sdlc report --format json` includes the same read-only snapshot as `board`; Markdown reports include a short table.
 An expired lease appears open without changing the board file or log. A broken board file shows a warning.
 
 ## 5.7. Updating and uninstalling
+
+Regenerate integrations after an upgrade, or remove the generated agent files and hooks.
 
 ```bash
 npm install -g https://github.com/marin-ai-tech/sdlc/releases/latest/download/sdlc.tgz   # the latest release
@@ -773,6 +1070,8 @@ sdlc uninstall                          # remove agent files and hooks; openspec
 ```
 
 ## 5.8. Reference
+
+Use these tables to look up CLI commands and generated files.
 
 ### CLI
 
@@ -831,7 +1130,8 @@ sdlc uninstall                          # remove agent files and hooks; openspec
 | `sdlc plugin build [dir] --marketplace` | render the Claude Code plugin |
 | `sdlc openspec <args>` | run the bundled OpenSpec CLI |
 
-Every command except `statusline`, `dashboard`, `mcp serve`, `hook` and the `openspec` pass-through supports `--json` and returns OpenSpec-style diagnostics (`{severity, code, message, fix}`) on failure.
+Every command except `statusline`, `dashboard`, `mcp serve`, `hook` and the `openspec` pass-through supports `--json`
+and returns OpenSpec-style diagnostics (`{severity, code, message, fix}`) on failure.
 
 ### What gets generated
 
@@ -846,14 +1146,20 @@ Cursor, Codex CLI, Qwen Code and GigaCode get the same workflows and subagents i
 hooks and rules: see [Cursor](15-cursor.md), [Codex CLI](16-codex.md) and
 [Qwen Code and GigaCode](17-qwen-gigacode.md).
 
-The workflows are 18 short skills: `help`, `guide`, `next`, `status`, `health`, `adopt`, `team`, `backlog`, `explore`,
-`intent`, `spec`, `plan`, `build`, `verify`, `review`, `release`, `archive`, `triage`. They pull state, templates and
+The workflows are 18 short skills:
+
+- `help`, `guide`, `next`, `status`, `health`, `adopt`;
+- `team`, `backlog`, `explore`, `intent`, `spec`, `plan`;
+- `build`, `verify`, `review`, `release`, `archive`, `triage`.
+
+They pull state, templates and
 instructions from the CLI at run time (`sdlc status|next|instructions --json`). Generated files are tracked in
 `openspec/.sdlc/manifest.json`, so `sdlc update` never overwrites a file you edited unless you pass `--force`.
 
 ### Version and license records
 
-Everything sdlc writes records the sdlc version and the license the project uses sdlc under (`license` in `openspec/sdlc.yaml`):
+Everything sdlc writes records the sdlc version and the license the project uses sdlc under (`license` in
+`openspec/sdlc.yaml`):
 
 | Where | What |
 |---|---|
@@ -866,7 +1172,21 @@ Everything sdlc writes records the sdlc version and the license the project uses
 
 ### Language
 
-Help, `Next:` hints, `status`, the init wizard, hook reasons, the report and the dashboard follow the locale: `--locale <code>` on any command, then `SDLC_LOCALE`, then `locale:` in `openspec/sdlc.yaml`, then the system locale (`LC_ALL`, `LC_MESSAGES`, `LANG`, the OS). Without a translation the text is English. Translations ship with sdlc. JSON output, the project log and change records are always English, so agents and CI read the same thing everywhere.
+The locale sets the language of the output you read:
+
+- help, `Next:` hints, and `status`;
+- the init wizard and hook reasons;
+- reports and the dashboard.
+
+sdlc checks these settings in order:
+
+1. `--locale <code>` on the command;
+1. `SDLC_LOCALE`;
+1. `locale:` in `openspec/sdlc.yaml`;
+1. system locale (`LC_ALL`, `LC_MESSAGES`, `LANG`, or the OS).
+
+Without a translation, the text is English. Translations ship with sdlc.
+JSON output, the project log, and change records are always English, so agents and CI read the same thing everywhere.
 
 ### Development
 
@@ -877,3 +1197,15 @@ npm test               # compiles, then runs unit + end-to-end tests (real OpenS
 node bin/sdlc.js --help
 node bin/sdlc.js plugin build plugin --marketplace   # regenerate the committed plugin
 ```
+
+## 📚 Terms
+
+The [glossary](glossary.md) explains [change](glossary.md), [gate](glossary.md),
+[evidence](glossary.md), [rework](glossary.md), and [waiver](glossary.md).
+
+## 📚 See also
+
+- [OpenSpec analysis](01-openspec-analysis.md) — understand delta specs and living specs.
+- [Architecture](04-architecture.md) — see how guards and hooks enforce decisions.
+- [Roles and signed approvals](08-roles-and-signing.md) — assign gate decisions to people.
+- [Process health](13-process-health.md) — interpret findings and improve the workflow.

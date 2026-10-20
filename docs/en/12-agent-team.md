@@ -1,12 +1,45 @@
 # 12. The agent team
 
-Since 0.11.0, a project can have role agents: an **analyst**, an **architect**, a **developer**, a **tester** and a **reviewer**. Each is a short file the team reads and edits. sdlc turns an accepted role into a subagent for every supported tool (Claude Code, OpenCode, Cursor, Codex CLI, Qwen Code and GigaCode), wires it to its stages, and adds what it knows about the project.
+A project can give agents defined roles that the team reads and edits. sdlc turns an accepted role into a subagent
+for each supported tool, connects it to its stages and adds project facts. Use this page to draft, accept and
+protect your team's roles.
 
-This chapter starts from situations a team runs into.
+## On this page
+
+- [What a role is](#121-what-a-role-is)
+- [Starting on an empty project](#122-starting-on-an-empty-project)
+- [Starting on an existing project](#123-starting-on-an-existing-project)
+- [The team's registry](#124-the-teams-registry)
+- [Packs from git or npm](#125-packs-from-git-or-npm)
+- [Skills that reach the agents](#126-skills-that-reach-the-agents)
+- [Accepting, changing and protecting roles](#127-accepting-changing-and-protecting-roles)
+- [Commands](#128-commands)
+- [Limits we accept](#129-limits-we-accept)
+- [Terms](#-terms)
+- [See also](#-see-also)
+
+This diagram shows how a role becomes an agent the team can use:
+
+```mermaid
+flowchart LR
+    A[Role source] -->|syncs| B[Draft]
+    B -->|person accepts| C[Accepted role]
+    C -->|generates| D[Subagent]
+    D -->|works in| E[Project stages]
+```
 
 ## 12.1. What a role is
 
-A role lives in `docs/agents/<role>.md`:
+A role lives in `docs/agents/<role>.md`. The built-in roles are:
+
+- analyst;
+- architect;
+- developer;
+- tester;
+- reviewer.
+
+sdlc generates subagents for Claude Code, OpenCode, Cursor, Codex CLI, Qwen Code and GigaCode.
+This example shows the role file:
 
 ```markdown
 ---
@@ -21,7 +54,7 @@ readonly: true
 ... responsibilities, how to work, the verdict rules, boundaries ...
 ```
 
-The **body** says *how* the role works. sdlc adds two blocks the role does not need to know:
+The **body** says *how* the role works. sdlc adds two blocks:
 
 - **Where to write.** The artifacts of the role's stages:
 
@@ -51,7 +84,7 @@ The built-in roles are rewritten from common role prompts to fit sdlc. For examp
 
 ## 12.2. Starting on an empty project
 
-*Situation.* A new repository, only an idea.
+Start with drafts when your new repository has only an idea.
 
 ```bash
 sdlc init
@@ -65,6 +98,9 @@ Then ask the agent to set up the team (`/sdlc:team`):
 
 Read the drafts, then accept them in your own terminal:
 
+> [!IMPORTANT]
+> Review each draft's project rules before you accept the role.
+
 ```bash
 sdlc team accept analyst
 sdlc team accept tester
@@ -72,7 +108,7 @@ sdlc team accept tester
 
 ## 12.3. Starting on an existing project
 
-*Situation.* A codebase with its own conventions, CI and owners.
+Let `/sdlc:team` learn a codebase's conventions, CI and owners before it drafts roles.
 
 `/sdlc:team` learns the project before it drafts:
 
@@ -88,7 +124,7 @@ It writes rules into each role, naming the file each rule comes from. For exampl
 
 ## 12.4. The team's registry
 
-*Situation.* A company keeps its roles and skills in one place, and every project should use the same version.
+Use a registry when your company keeps roles and skills in one place for its projects.
 
 ```yaml
 # openspec/sdlc.yaml
@@ -99,15 +135,21 @@ team:
   registry: team-roles
 ```
 
-The registry is an MCP server with four tools: `list_roles`, `get_role`, `list_skills`, `get_skill`.
+The registry is an [MCP](glossary.md) server with four tools:
 
-- `sdlc team sync` takes roles from it first and fills the gaps from the built-ins. Each item is checked against its checksum, and a mismatch is refused.
+- `list_roles`;
+- `get_role`;
+- `list_skills`;
+- `get_skill`.
+
+- `sdlc team sync` takes roles from it first and fills the gaps from the built-ins. Each item is checked against its
+  checksum, and a mismatch is refused.
 - A draft records the server, the version and the checksum.
 - A newer version of an accepted role arrives as a draft. It never replaces the accepted one silently.
 
 ## 12.5. Packs from git or npm
 
-*Situation.* No registry server, but the roles live in a repository or a package.
+Use a [pack](glossary.md) when roles live in a repository or package instead of a registry server.
 
 ```yaml
 packs:
@@ -125,7 +167,9 @@ A pack holds `roles/<id>.md` (or `roles/<locale>/<id>.md`) and `skills/<id>/…`
   `--ignore-scripts` — so put a repository in a `git:` pack.
 - An unreachable pack is reported, and sync goes on with the next source.
 
-**Lenses, workflows and checks (since 0.20.0).** A pack may also hold:
+### Lenses, workflows and checks
+
+A pack may also hold:
 
 - `lenses/<id>.md` — a review lens, named `<pack>-<id>` in the project. `sdlc review context` gives its text, and
   `sdlc review check` requires its coverage line in review.md like a configured lens.
@@ -149,6 +193,7 @@ Rules for these:
 ## 12.6. Skills that reach the agents
 
 The skills a role lists are installed when the role is accepted, and only with a matching checksum.
+Check where they go and what a person must accept separately.
 
 - **Where they go.** Into the skills folder of every tool the project is set up for: `.claude/skills/<id>/` (Claude
   Code; OpenCode reads it too, so with Claude Code there is no `.opencode` copy), `.opencode/skills/<id>/` (a project
@@ -168,7 +213,11 @@ Take only what the team needs, from sources it trusts. A skill is instructions a
 
 ## 12.7. Accepting, changing and protecting roles
 
-- **Accepting is a person's command.** `sdlc team accept <role>` is refused in an agent session, and the hook blocks it. It moves the draft into place, records it in `openspec/.sdlc/team.json` and generates the subagent. It also says whether the draft differs from its source, so you see what an agent changed.
+Acceptance controls which role text becomes a subagent. A person reviews drafts and changes before accepting them.
+
+- **Accepting is a person's command.** `sdlc team accept <role>` is refused in an agent session, and the hook blocks
+  it. It moves the draft into place, records it in `openspec/.sdlc/team.json` and generates the subagent. It also says
+  whether the draft differs from its source, so you see what an agent changed.
 - **Agents cannot edit what is accepted.** Agents cannot change:
   - the accepted roles;
   - the team record;
@@ -176,12 +225,16 @@ Take only what the team needs, from sources it trusts. A skill is instructions a
   - the generated `sdlc-*` subagents, skills and commands.
 
   Otherwise an agent could make the tester pass anything.
-- **A person may edit a role.** `sdlc team list` then shows it as `changed`. Like an approval bound to content, a changed role is not generated until it is accepted again. Meanwhile verify and review fall back to the built-in subagents.
+- **A person may edit a role.** `sdlc team list` then shows it as `changed`. Like an approval bound to content, a
+  changed role is not generated until it is accepted again. Meanwhile verify and review fall back to the built-in
+  subagents.
 - **Two roles replace built-ins.** The accepted tester and reviewer take the place of `sdlc-verifier` and
-  `sdlc-reviewer` in the verify and review workflows. The old names stay for one version. Generated subagents append
+  `sdlc-reviewer` in the verify and review workflows. Generated subagents append
   the built-in verification and review instructions after the team's role text, including the review.md finding format.
 
 ## 12.8. Commands
+
+Use these commands to sync, inspect and accept team roles and skills.
 
 | Command | Who | What |
 |---|---|---|
@@ -189,11 +242,25 @@ Take only what the team needs, from sources it trusts. A skill is instructions a
 | `sdlc team list [--json]` | anyone | roles, sources, status: draft, accepted, changed |
 | `sdlc team check [--json]` | anyone | the skills of the accepted roles, vetted |
 | `sdlc team accept <role>` / `--skill <id>` | a person | accept a role or a skill with scripts |
-| `sdlc team accept --pack <name>` | a person | accept the lenses, workflows and checks of a pack (0.20.0) |
+| `sdlc team accept --pack <name>` | a person | accept the lenses, workflows and checks of a pack |
 | `/sdlc:team` (`/sdlc-team`) | the agent | sync, learn the project, draft the project's rules |
 
 ## 12.9. Limits we accept
 
+Keep these limits in mind when reviewing a role or its source.
+
 - **Project facts follow the project only through `sdlc update`.** A role reflects the last update, not the live state.
 - **A Project rules section is as good as what the agent found.** A person reads it before accepting.
-- **The registry and packs are trusted sources the team chose.** The checksum proves that the content did not change on the way, not that the content is good.
+- **The registry and packs are trusted sources the team chose.** The checksum proves that the content did not change
+  on the way, not that the content is good.
+
+## 📚 Terms
+
+The [glossary](glossary.md) explains [stage](glossary.md), [pack](glossary.md), [lens](glossary.md) and
+[MCP](glossary.md).
+
+## 📚 See also
+
+- [User guide](05-guide.md) — follow a change through its stages.
+- [Integrations](10-integrations.md) — connect the team's MCP servers.
+- [Roles and signing](08-roles-and-signing.md) — see who makes each decision.
