@@ -15,6 +15,8 @@ export interface QueueItem {
   change: string;
   gate: string;
   action: string;
+  /** `approve-gate` only: the gate's digest in the same evaluation as `cli`, for `approve --expect-digest`. */
+  digest?: string;
   /** The exact command, `sdlc …` (the caller applies the project's CLI prefix). */
   cli: string;
   /** English; text output names the gate and the command instead. */
@@ -56,7 +58,9 @@ function waitingItem(view: LifecycleView, person: string | null): QueueItem[] {
   const next = view.next;
   if (next.actor !== 'human' || !['approve-gate', 'answer-questions'].includes(next.action)
     || !next.gate || !next.cli) return [];
-  const item = { change: view.change, gate: next.gate, action: next.action, cli: next.cli, message: next.message };
+  const digest = next.action === 'approve-gate' ? view.gates.find((gate) => gate.id === next.gate)?.digest : undefined;
+  const item = { change: view.change, gate: next.gate, action: next.action, cli: next.cli, message: next.message,
+    ...(digest ? { digest } : {}) };
   if (!person) return [item];
   const named = next.people?.find((candidate) => candidate.id === person);
   if (!named) return [];

@@ -17,6 +17,7 @@ import { readChangeState, type ChangeState } from './change-state.js';
 import type { ChangeRef } from './changes.js';
 import type { ApprovalGateId, SdlcConfig } from './config.js';
 import { SdlcError } from './errors.js';
+import { assertExpectedDigest, type ExpectedDigest } from './expected-digest.js';
 import { checkpointRef } from './checkpoint.js';
 import { defaultBaseRef, formatIdentity, git, gitIdentity } from './git.js';
 import { t } from './i18n.js';
@@ -42,6 +43,8 @@ export interface ApprovePreview {
   change: string;
   gate: ApprovalGateId;
   gateStatus: string;
+  /** The digest the approval would be bound to now; absent when there is nothing to approve. */
+  digest?: string;
   allowed: boolean;
   refusals: PreviewRefusal[];
   /** Different people with a valid approval of the gate now. */
@@ -70,6 +73,8 @@ export interface PreviewInput {
   as?: string;
   /** `--by <identity>`. */
   by?: string;
+  /** `--expect-digest <digest>`, parsed. */
+  expectDigest?: ExpectedDigest;
 }
 
 /** The preview of approving `input.gate` of `input.ref` as the current git identity. */
@@ -84,6 +89,7 @@ export function previewApproval(input: PreviewInput): ApprovePreview {
     change: input.ref.id,
     gate: input.gate,
     gateStatus: evaluation.status,
+    ...(evaluation.digest ? { digest: evaluation.digest } : {}),
     allowed: refusals.length === 0,
     refusals,
     approvals: new Set(evaluation.approvals.map(approverKey)).size,
@@ -104,6 +110,8 @@ function approvalRefusals(input: PreviewInput, evaluation: GateEvaluation, state
   roles: RolesFile | undefined): PreviewRefusal[] {
   const found: PreviewRefusal[] = [];
   attempt(found, () => assertByAllowed(input.config.gates[input.gate], roles !== undefined, input.by));
+  attempt(found, () => assertExpectedDigest(input.expectDigest,
+    { gate: input.gate, change: input.ref.id }, evaluation.digest));
   attempt(found, () => assertReady(input.gate, evaluation));
   found.push(...(roles ? rolesRefusals(input, state, roles) : configRefusals(input, evaluation)));
   attempt(found, () => assertQuestionsAnswered(input.config, input.ref.id, input.ref.dir, state, input.gate));

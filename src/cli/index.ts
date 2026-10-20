@@ -445,6 +445,8 @@ export function buildProgram(): Command {
       .option('--json', 'output JSON');
     if (name === 'approve') {
       decision.option('--preview', 'show what would be approved and whether you may approve it, without approving');
+      decision.option('--expect-digest <digest>',
+        "approve only if the gate's digest is still this one (sha256:<hex>, or the 12 characters approve prints)");
     }
     decision.action((gate, opts) => (opts.preview ? approvePreviewCommand(gate, opts) : fn(gate, opts)));
   }

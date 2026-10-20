@@ -2,7 +2,7 @@ import { appendHistory, writeChangeState, type ChangeState } from '../core/chang
 import type { ChangeRef } from '../core/changes.js';
 import { loadConfig, type SdlcConfig } from '../core/config.js';
 import { harnessStamp, type HarnessStamp } from '../core/license.js';
-import { appendLog } from '../core/log.js';
+import { appendLog, type LogInput } from '../core/log.js';
 import { projectPaths, requireProjectRoot, type ProjectPaths } from '../core/project.js';
 
 export interface ProjectContext {
@@ -31,9 +31,11 @@ export function recordChangeEvent(
   state: ChangeState,
   event: string,
   by?: string,
-  detail?: string
+  detail?: string,
+  fields: Pick<LogInput, 'digest'> = {},
 ): void {
   appendHistory(state, event, by, detail, ctx.stamp);
   writeChangeState(ref.dir, state, ctx.stamp);
-  appendLog(ctx.root, ctx.config, { event, change: ref.id, ...(by ? { by } : {}), ...(detail ? { detail } : {}) }, ctx.stamp);
+  appendLog(ctx.root, ctx.config,
+    { event, change: ref.id, ...(by ? { by } : {}), ...(detail ? { detail } : {}), ...fields }, ctx.stamp);
 }

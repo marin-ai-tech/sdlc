@@ -1,4 +1,8 @@
 {
+  "error.expectDigestChanged": "Гейт {gate} изменился с тех пор, как вы его прочитали: ожидался отпечаток {expected}, сейчас {current}. Ничего не записано.",
+  "fix.expectDigestChanged": "Прочитайте гейт ещё раз (sdlc approve {gate} --change {change} --preview) и утвердите ту версию, которую прочитали.",
+  "error.expectDigestInvalid": "--expect-digest принимает sha256: и 64 шестнадцатеричных символа или 12 символов, которые печатает approve; получено: {value}.",
+  "option.expectDigest": "утвердить, только если отпечаток гейта всё ещё такой (sha256:<hex> или 12 символов, которые печатает approve)",
   "note.secretMasked": "Секрет в заметке скрыт перед записью.",
   "hint.rootArtifact": "{file} находится в корне; перенесите в {path}",
   "board.auction.done": "Аукцион задачи {item} завершится в {at}.",

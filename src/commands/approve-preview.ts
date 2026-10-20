@@ -5,6 +5,7 @@ import { previewApproval, type ApprovePreview } from '../core/approve-preview.js
 import { resolveChange } from '../core/changes.js';
 import { APPROVAL_GATES, type ApprovalGateId } from '../core/config.js';
 import { t } from '../core/i18n.js';
+import { parseExpectedDigest } from '../core/expected-digest.js';
 import { approveCli } from '../core/lifecycle.js';
 import { assertHuman, parseGate } from './gates.js';
 
@@ -16,6 +17,7 @@ export interface PreviewOptions {
   change?: string;
   as?: string;
   by?: string;
+  expectDigest?: string;
   json?: boolean;
 }
 
@@ -24,8 +26,10 @@ export async function approvePreviewCommand(gateArg: string, opts: PreviewOption
     const ctx = loadProject();
     const gate = parseGate(gateArg, APPROVAL_GATES) as ApprovalGateId;
     assertHuman(ctx.config, 'approve');
+    const expectDigest = opts.expectDigest === undefined ? undefined : parseExpectedDigest(opts.expectDigest);
     const ref = resolveChange(ctx.paths, opts.change);
-    const preview = previewApproval({ root: ctx.root, config: ctx.config, ref, gate, as: opts.as, by: opts.by });
+    const preview = previewApproval({ root: ctx.root, config: ctx.config, ref, gate,
+      as: opts.as, by: opts.by, expectDigest });
     const cli = withCliPrefix(approveCli(ref.id, gate, opts.as), ctx.config.cli);
     if (opts.json) return printJson(previewJson(preview, cli));
     printPreview(preview, cli);

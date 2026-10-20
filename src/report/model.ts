@@ -7,9 +7,9 @@
 import type { ProjectContext } from '../cli/context.js';
 import type { HarnessStamp } from '../core/license.js';
 import type { LayoutReport } from '../core/layout.js';
-import type { GateStatus, StageId } from '../core/lifecycle.js';
+import type { GateEvaluation, GateStatus, StageId } from '../core/lifecycle.js';
 import type { LogEntry } from '../core/log.js';
-import type { ChangeState } from '../core/change-state.js';
+import type { ApprovalRecord, ChangeState } from '../core/change-state.js';
 import type { ChangeRef } from '../core/changes.js';
 import type { LifecycleView } from '../core/lifecycle.js';
 import { SdlcError } from '../core/errors.js';
@@ -43,10 +43,24 @@ export interface ReportOptions {
   now?: Date;
 }
 
+export interface ReportApproval {
+  role: string;
+  by: string;
+  person?: string;
+  at: string;
+  digest: string;
+}
+
 export interface ReportGate {
   id: string;
   status: GateStatus;
   required: boolean;
+  /** The digest an approval of the gate would be bound to now; absent when the gate has none. */
+  digest?: string;
+  /** The approvals that count now, in the recorded order. */
+  approvals: ReportApproval[];
+  /** The approvals whose digest no longer matches. */
+  staleApprovals: ReportApproval[];
 }
 
 export interface ReportChange {
@@ -177,6 +191,29 @@ export function projectName(root: string): string {
   }
 }
 
+/** An approval as the report publishes it: who, in which role, when, and the version it binds; nothing else. */
+function reportApproval(record: ApprovalRecord): ReportApproval {
+  return {
+    role: record.role,
+    by: record.by,
+    ...(record.person ? { person: record.person } : {}),
+    at: record.at,
+    digest: record.digest,
+  };
+}
+
+/** A gate with the digest an approval would bind now (absent when there is none) and its approvals. */
+function reportGate(gate: GateEvaluation): ReportGate {
+  return {
+    id: gate.id,
+    status: gate.status,
+    required: gate.required,
+    ...(gate.digest ? { digest: gate.digest } : {}),
+    approvals: gate.approvals.map(reportApproval),
+    staleApprovals: gate.staleApprovals.map(reportApproval),
+  };
+}
+
 function toReportChange(ref: ChangeRef, view: LifecycleView, state: ChangeState, since: string | undefined, now: Date,
   page: ChangePage): ReportChange {
   const ageHours = state.created
@@ -192,7 +229,7 @@ function toReportChange(ref: ChangeRef, view: LifecycleView, state: ChangeState,
     track: view.track,
     stage: view.stage,
     stageTitle: view.stageTitle,
-    gates: view.gates.map((gate) => ({ id: gate.id, status: gate.status, required: gate.required })),
+    gates: view.gates.map(reportGate),
     tasks: { complete: view.tasks.complete, total: view.tasks.total },
     verification: view.verification?.status ?? 'never',
     ...(view.review ? { review: { total: view.review.total, blockingOpen: view.review.blocking.length } } : {}),

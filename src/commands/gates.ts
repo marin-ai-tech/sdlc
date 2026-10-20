@@ -11,6 +11,7 @@ import { ALL_GATES, APPROVAL_GATES, type ApprovalGateId, type GateId, type SdlcC
 import { nextSeq } from '../core/decision-order.js';
 import { baseDigests, readChangeDeltas } from '../core/deltas.js';
 import { SdlcError } from '../core/errors.js';
+import { assertExpectedDigest, parseExpectedDigest } from '../core/expected-digest.js';
 import { humanCommandFix } from '../core/human-command.js';
 import { defaultBaseRef, formatIdentity, gitIdentity } from '../core/git.js';
 import { approvalEmails, changeAuthors, checkApproval, readRolesFile, type RolesFile } from '../core/roles.js';
@@ -134,6 +135,7 @@ function approvedFiles(view: LifecycleView, gate: ApprovalGateId, changeDir: str
 
 export interface DecisionOptions {
   change?: string;
+  expectDigest?: string;
   as?: string;
   note?: string;
   by?: string;
@@ -193,8 +195,10 @@ export async function approveCommand(gateArg: string, opts: DecisionOptions): Pr
     const gate = parseGate(gateArg, APPROVAL_GATES) as ApprovalGateId;
     assertHuman(ctx.config, 'approve');
     assertByAllowed(ctx.config.gates[gate], readRolesFile(ctx.root) !== undefined, opts.by);
+    const expected = opts.expectDigest === undefined ? undefined : parseExpectedDigest(opts.expectDigest);
     const ref = resolveChange(ctx.paths, opts.change);
     const view = evaluateChange(ctx.root, ref, ctx.config, { withQa: gate === 'qa' });
+    assertExpectedDigest(expected, { gate, change: ref.id }, view.gates.find((item) => item.id === gate)?.digest);
     recordAwaiting(ctx.root, ctx.config, view, ctx.stamp);
     const evaluation = view.gates.find((g) => g.id === gate)!;
     if (evaluation.status === 'blocked') {
@@ -248,6 +252,7 @@ export async function approveCommand(gateArg: string, opts: DecisionOptions): Pr
     recordChangeEvent(
       ctx, ref, state, `gate.${gate}.approved`, identity,
       `role ${role}${opts.note ? `: ${opts.note}` : ''}${warnings.length ? `; ${warnings.length} validation warning(s)` : ''}`,
+      { digest: evaluation.digest },
     );
     // The approved artifacts record which sdlc version and license approved them.
     const stamping = tryStampArtifacts(ref.dir, approvedFiles(view, gate, ref.dir), ctx.stamp);
@@ -309,7 +314,7 @@ export async function rejectCommand(gateArg: string, opts: DecisionOptions): Pro
         ...provenance(ctx.stamp),
       },
     };
-    recordChangeEvent(ctx, ref, state, `gate.${gate}.rejected`, identity, opts.note);
+    recordChangeEvent(ctx, ref, state, `gate.${gate}.rejected`, identity, opts.note, digest ? { digest } : {});
     const next = resolveNext(ctx, ref.id);
     if (opts.json) {
       printJson({ change: ref.id, gate, status: 'rejected', by: identity, note: opts.note, ...(next ? { next } : {}) });

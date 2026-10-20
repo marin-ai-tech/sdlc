@@ -25,6 +25,8 @@ export interface LogEntry {
   change?: string;
   by?: string;
   detail?: string;
+  /** The version a gate decision was about. */
+  digest?: string;
   /** Agent integration that triggered the entry (hook decisions). */
   agent?: string;
   /** Person ids from roles.yaml a waiting gate waits for (`gate.<g>.awaiting`, `gate.<g>.overdue`; B54). */
@@ -59,6 +61,7 @@ function logEntry(config: Pick<SdlcConfig, 'license'>, input: LogInput, stamp: H
     ...(input.change ? { change: input.change } : {}),
     ...(input.by ? { by: input.by } : {}),
     ...(input.detail ? { detail: input.detail } : {}),
+    ...(input.digest ? { digest: input.digest } : {}),
     ...(agent ? { agent } : {}),
     ...(input.waitingFor ? { waitingFor: input.waitingFor } : {}),
     ...(input.summary ? { summary: input.summary } : {}),

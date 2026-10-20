@@ -1,4 +1,8 @@
 {
+  "error.expectDigestChanged": "The {gate} gate changed since you read it: you expected {expected}, it is now {current}. Nothing was recorded.",
+  "fix.expectDigestChanged": "Read it again (sdlc approve {gate} --change {change} --preview) and approve the version you read.",
+  "error.expectDigestInvalid": "--expect-digest takes sha256: followed by 64 hexadecimal characters, or the 12 characters approve prints; got {value}.",
+  "option.expectDigest": "approve only if the gate's digest is still this one (sha256:<hex>, or the 12 characters approve prints)",
   "note.secretMasked": "A secret in the note was masked before recording.",
   "hint.rootArtifact": "{file} belongs at {path}",
   "stage.plan": "Plan (intent)",
