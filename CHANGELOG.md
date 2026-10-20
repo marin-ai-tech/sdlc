@@ -2,6 +2,25 @@
 
 All notable changes to sdlc. Versions follow [Semantic Versioning](https://semver.org/); while the major version is 0, a minor version may change behavior.
 
+## 0.24.0 — 2026-10-20
+
+### Added
+- `sdlc approve <gate> --expect-digest <digest>` approves only the version the person read. When the gate's digest
+  changed since, the approval is refused with the error code `digest_changed`, naming both versions, before anything
+  is written: no approval, no log entry, no wait record, no checkpoint. It takes the full `sha256:<hex>` or the 12
+  characters that `approve` prints; programs should pass the full digest. With `--preview`, the same check is listed
+  as a refusal.
+- `sdlc report --json`: each gate gains `digest` (when it has one), `approvals` and `staleApprovals`, each approval as
+  `{role, by, person?, at, digest}`.
+- `sdlc next --me --json`: an `approve-gate` item gains `digest`, from the same evaluation as its `cli`.
+- `sdlc approve --preview --json` gives the gate's current `digest`.
+- The `gate.<g>.approved` and `gate.<g>.rejected` log entries carry `digest` as a field, so `sdlc log --json` shows
+  which version was decided. Integration event bodies are unchanged.
+
+### Compatibility
+- Every JSON output only gains fields. Older log entries without `digest` read as before, and older versions read the
+  new entries.
+
 ## 0.23.7 — 2026-10-18
 
 ### Changed
