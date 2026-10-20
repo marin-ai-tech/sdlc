@@ -1,21 +1,48 @@
 # 23. Example: tracks, small changes and human decisions
 
-This example ran on October 16, 2026, on the TodoMVC project of the [from-scratch example](19-team-greenfield-example.md).
-Three changes of different weight: a documentation edit, a small feature on the lite track with questions for the
-product owner, and a high-risk fix. Each shows what the agent decides and what only a person does.
+On October 16, 2026, the TodoMVC team used three paths through sdlc: a documentation edit, a small feature on the
+lite track and a high-risk fix. Follow who chooses each track, answers questions and approves gates. This continues
+the [from-scratch example](19-team-greenfield-example.md).
+
+## On this page
+
+- [Meet the team](#231-the-team)
+- [Set the gate policy](#232-the-gate-policy)
+- [Follow the documentation change](#233-documentation-the-policy-and-a-persons-waiver)
+- [Follow the lite feature](#234-people-decide-the-questions-and-the-track)
+- [Follow the high-risk fix](#235-high-risk-and-the-gate-limit)
+- [Read the audit](#236-the-result-in-the-audit)
+- [Lessons](#237-lessons-for-a-team)
+- [Terms](#terms)
+- [See also](#see-also)
 
 ## 23.1. The team
+
+Each person has a role in choosing tracks or making gate decisions.
 
 | Person | sdlc roles | Does |
 |---|---|---|
 | Linda Carter | tech-lead, maintainer, code-owner, release-manager | the gate policy, the track, high-risk approvals |
-| Peter Owen | product-owner | answers to the intent's questions, item B8 |
+| Peter Owen | product-owner | answers to the intent's questions, the damaged-data item |
 | David Smith | engineer | documentation, the plan gate |
-| Kate Brown | engineer, later code-owner and release-manager | feature B5; review and release of B8 |
-| Evan Turner | engineer | B8 with an agent |
+| Kate Brown | engineer, later code-owner and release-manager | filter feature; review and release of the fix |
+| Evan Turner | engineer | damaged-data fix with an agent |
 | Olivia Miller | qa | checks in a browser, waives qa for documentation |
 
 ## 23.2. The gate policy
+
+Linda sets the waiver policy and approval limits in protected files.
+
+This diagram shows how the three changes reach their gate decisions:
+
+```mermaid
+flowchart LR
+    A[Documentation] -->|policy waives plan| D[Verify and qa]
+    B[Lite feature] -->|person chooses track| D
+    C[High-risk fix] -->|two people approve| E[Spec and plan]
+    E -->|builds| D
+    D -->|review and release| F[Archive]
+```
 
 Linda in the protected `openspec/sdlc.yaml` and `openspec/roles.yaml`:
 
@@ -37,6 +64,8 @@ separation:
 every change on lite, features included. So Linda kept only `kinds: [docs]`.
 
 ## 23.3. Documentation: the policy and a person's waiver
+
+The documentation change shows a policy waiver alongside a person's qa waiver.
 
 David from his own terminal:
 
@@ -62,7 +91,9 @@ verify runs 3, first run passed; rejections 0; waivers 1 (+1 by policy)
 For comparison, Evan's agent created a change itself with `sdlc new docs-probe --kind docs`: its record says
 `kind_by_agent: true`, and the policy did not waive plan, since a kind an agent chose does not count.
 
-## 23.4. B5 on lite: people decide the questions and the track
+## 23.4. People decide the questions and the track
+
+Kate explores a small feature, while Peter answers its open product questions.
 
 **Exploration.** Kate's agent ran `/sdlc-explore` and wrote the note `openspec/explorations/b5-remember-filter.md`:
 the filter already comes from the address (`#/active` survives a reload), while opening without `#` always shows
@@ -88,16 +119,28 @@ sdlc track set lite --change b5-remember-filter --note "One function in js/app.j
 
 | Step | Who | What happened |
 |---|---|---|
-| plan | Kate's agent, David | tasks without checkboxes, the store reading `window.location`, a test "skipped until the code exists": rejected; fixed, approved |
-| build | Kate's agent | a test with `t.skip` and logic against Peter's answer (`#/` opened the saved filter); from a table of expectations: the test red 16/1, after the code 24/0 |
+| plan | Kate's agent, David | David rejected the plan; the agent fixed it and David approved. |
+| build | Kate's agent | the test was red 16/1, then green 24/0 after the code. |
 | verify | Kate | `npm test` passed |
-| qa | Olivia | in the browser: Active, then opening without `#`, Active; but loading straight with `#/completed` did not save the filter: `sdlc reject qa` citing answer 4 |
+| qa | Olivia | browser check exposed a missing saved filter; `sdlc reject qa` |
 | fix | Kate's agent | the filter is saved on load too; Olivia checked again and approved |
-| review, release | Linda | the review, two gates, the archive; B5 `done` |
+| review, release | Linda | the review, two gates, the archive; the item `done` |
 
-Lite went through plan, build, verify, qa, review and release: no intent and no spec, but verify and qa stayed.
+David found tasks without checkboxes, a store reading `window.location` and a test marked "skipped until the code
+exists". During build, the agent used `t.skip` and logic against Peter's answer: `#/` opened the saved filter.
+The expectation table first gave 16/1 and then 24/0 after the code. Olivia selected Active and opened without `#`;
+Active remained. Loading directly with `#/completed` did not save the filter, so she cited answer 4 in the qa rejection.
 
-## 23.5. B8: high risk and the gate limit
+Lite went through these gates:
+
+- plan, build and verify;
+- qa, review and release.
+
+It skipped intent and spec. Verify and qa stayed.
+
+## 23.5. High risk and the gate limit
+
+The high-risk fix needs two people at early gates. Approval limits also affect review and release.
 
 Peter added "Damaged data in storage does not break the app" as a bugfix with `--risk high`. Evan's agent started it
 with `sdlc backlog start B8 --change b8-corrupt-storage`. Peter rejected a spec that treated a missing key as damage (a
@@ -121,13 +164,19 @@ Linda gave Kate the code-owner and release-manager roles: `may approve: Kate Bro
 | Step | Who | What happened |
 |---|---|---|
 | build | Evan's agent | tests first (red 25/1, green 26/0); Evan checked in the browser |
-| qa | Olivia | no key, `{}`, `"text"`, an empty string, broken JSON: an empty list, the damaged value kept in `todos-corrupt`; approved |
+| qa | Olivia | damaged data checks passed; approved |
 | review | Kate | F1 important: the agent removed the outer try, so a `getItem` that throws breaks the page |
-| fix | Evan's agent, Evan | the code fixed; Evan wrote the test: red on the old `load()`, green on the new one; after the new verify Olivia approved qa again |
+| fix | Evan's agent, Evan | code and test fixed; Olivia approved qa after verify. |
 | review | Kate | F1 fixed, approved |
 | release | Linda, Kate | Linda refused: `reached the gate approval limit. Ask one of: Kate Brown`; Kate approved |
 
+Olivia checked no key, `{}`, `"text"`, an empty string and broken JSON. Each gave an empty list, with the damaged
+value kept in `todos-corrupt`. Evan's new test was red on the old `load()` and green on the new one. Olivia approved
+qa again after the new verify.
+
 ## 23.6. The result in the audit
+
+The audit distinguishes a person's waiver from a policy waiver.
 
 ```text
 SDLC metrics across 3 change(s) (3 archived)
@@ -136,6 +185,8 @@ SDLC metrics across 3 change(s) (3 archived)
 ```
 
 ## 23.7. Lessons for a team
+
+These lessons show where policy helps and where a person must decide.
 
 - **A policy waives gates by kind or by track.** Put in `auto_waive` only what is always waived, and look at
   `sdlc status` of the first change it applies to.
@@ -147,3 +198,14 @@ SDLC metrics across 3 change(s) (3 archived)
   filter was not saved on load.
 - **High risk means two people on spec and plan.** Ask `sdlc roles who <gate> --change <id>` early: with
   `distinct_approvers` and a gate limit, the team needs a second code owner and release manager.
+
+## Terms
+
+- [Gate](glossary.md#-eh): a decision point before work advances.
+- [Track](glossary.md#-rw): a configured path through gates.
+- [Waiver](glossary.md#-rw): a recorded decision to skip a gate.
+
+## See also
+
+- [Roles and approvals](08-roles-and-signing.md) explains separation rules.
+- [Process health](13-process-health.md) explains how waivers appear in findings.

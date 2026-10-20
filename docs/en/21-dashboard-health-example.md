@@ -1,12 +1,25 @@
 # 21. Example: the dashboard, the report and the process health
 
-This example ran on October 16, 2026, on the same TodoMVC project as the
-[from-scratch example](19-team-greenfield-example.md) and the [newcomer example](20-onboarding-example.md). During
-the day the project log collected 136 entries: five changes went through every gate, with rejections, a rework and a
-waived gate. Linda, the tech-lead, and Peter, the product owner, look at how the work goes and where the process
-suffers, and turn the conclusions into backlog items.
+On October 16, 2026, Linda and Peter examine the TodoMVC team's process after five changes. Follow how they use the
+dashboard, report, audit and health findings to choose improvements. The project log has 136 entries. Five changes
+went through their gates, including rejections, a rework and a waived gate.
+
+## On this page
+
+- [Meet the team](#211-the-team)
+- [Review the inputs](#212-what-there-is-to-analyse)
+- [Open the dashboard](#213-the-dashboard)
+- [Read the report and audit](#214-the-report-and-the-audit)
+- [Check process health](#215-the-process-health)
+- [Draft improvements](#216-from-findings-to-the-backlog)
+- [Cross-check the numbers](#217-the-daily-summary-and-the-cross-check)
+- [Lessons](#218-lessons-for-a-team)
+- [Terms](#terms)
+- [See also](#see-also)
 
 ## 21.1. The team
+
+Linda reviews the process. Peter decides which improvements to order.
 
 | Person | sdlc roles | Does |
 |---|---|---|
@@ -17,12 +30,21 @@ suffers, and turn the conclusions into backlog items.
 
 ## 21.2. What there is to analyse
 
+The evidence comes from the [from-scratch run](19-team-greenfield-example.md) and
+[Evan's first change](20-onboarding-example.md).
+
 | Situation | Where it comes from |
 |---|---|
-| three features of version 1.0.0 | nine rejections on substance: intent, spec, plan three times, qa four times; B3 took three qa rounds |
-| hook denials | eight denials by six rules: `separation-of-duties`, `living-specs`, `change-not-created`, `state-integrity`, `agent-marker`, `guard-config` |
-| feature B4 | the intent waited 19 minutes for Peter; the spec was rejected, then sent back with `sdlc rework` for the reason `wrong-assumption` |
+| three features of release 1.0.0 | nine substantive rejections; the footer took three qa rounds |
+| hook denials | eight denials by six rules |
+| title-length feature | a 19-minute intent wait; a rejected spec and later rework |
 | change `readme-run` | the README only, the lite track; Olivia waived the qa gate |
+
+The nine feature rejections covered intent, spec, plan three times and qa four times. Peter handled the 19-minute
+intent wait. The spec was rejected, then sent back with `sdlc rework` for `wrong-assumption`.
+
+The denied rules were `separation-of-duties`, `living-specs`, `change-not-created`, `state-integrity`, `agent-marker`
+and `guard-config`.
 
 Waiving a gate is a person's decision with a reason, and it goes to the log:
 
@@ -41,14 +63,19 @@ health:
 
 ## 21.3. The dashboard
 
+Linda generates a local page for a quick view of the work.
+
 ```bash
 sdlc dashboard --out dashboard.html
 ```
 
 The file must be inside the project; sdlc warns when it is not in `.gitignore`, and Linda added it there. The result
-is one 76 KB page without a single external link, so it opens without a network. It shows 5 archived changes, 0
-awaiting a person, the stage pipeline, the 19-minute intent wait of `200`, the rework, every change's history and
-`waivers 1` on `readme-run`.
+is one 76 KB page without an external link, so it opens without a network. It shows:
+
+- 5 archived changes and 0 awaiting a person;
+- the stage pipeline and the 19-minute intent wait of `200`;
+- the rework and every change's history;
+- `waivers 1` on `readme-run`.
 
 A live view for the team:
 
@@ -56,13 +83,18 @@ A live view for the team:
 sdlc dashboard --watch --serve 127.0.0.1:5185 --debounce 500
 ```
 
-Linda refined the outcome of backlog item B5; the terminal printed "rebuilt dashboard.html in 905 ms" and the open
+Linda refined the outcome of the next backlog item; the terminal printed "rebuilt dashboard.html in 905 ms" and the open
 page refreshed on its own.
 
 ## 21.4. The report and the audit
 
-`sdlc report` is Markdown for a README or a wiki: the stages, the changes with their tasks and verification, the
-epic at 4 of 5, the backlog (B5 next), the deferred work D1, the median times between gates, the events.
+The report is for a document. The audit supplies counts and timings.
+
+`sdlc report` is Markdown for a README or a wiki. It includes:
+
+- stages and changes with their tasks and verification;
+- the epic at 4 of 5 and the next backlog item;
+- deferred work D1, median times between gates and events.
 
 `sdlc audit --since 2026-10-16`:
 
@@ -81,6 +113,8 @@ SDLC metrics across 5 change(s) (5 archived)
 six gates: the spec was approved again after the rework. `sdlc audit --json` gives the same numbers to scripts.
 
 ## 21.5. The process health
+
+Health findings show facts and recommendations when a threshold is crossed.
 
 ```text
 $ sdlc health
@@ -111,7 +145,10 @@ and the thresholds show why here:
 
 ## 21.6. From findings to the backlog
 
-Linda ran `/sdlc-health` in her agent: how the process goes after the B4 release and what to improve, and asked it
+Linda asks her agent to draft improvements. Peter chooses their order.
+
+Linda ran `/sdlc-health` in her agent after the title-length release. She asked how the process went and what to
+improve. She asked the agent
 to add nothing yet and explain first. The agent went through the three findings and asked which improvements to
 draft. Linda picked two and left the license as it is, and the agent drafted:
 
@@ -136,6 +173,8 @@ sdlc backlog move B7 --before B6
 
 ## 21.7. The daily summary and the cross-check
 
+The team checks the views against the log and git history.
+
 `sdlc events summary` wrote `summary.daily` to the log: "done 35, active 0, waiting 0, blocked 0"; 35 is 30
 approvals and 5 archives. With event receivers configured, the summary goes there too.
 
@@ -152,6 +191,8 @@ history:
 
 ## 21.8. Lessons for a team
 
+These observations came from comparing the dashboard, report and audit.
+
 - **The dashboard is for a glance, the report for a document, the audit for numbers.** All three read the same log,
   so the numbers agree; `--watch --serve` gives the team a live page that refreshes on its own.
 - **`health` shows only what crosses a threshold.** Tune the thresholds to your pace under `health` in
@@ -162,3 +203,14 @@ history:
   the thresholds in `sdlc.yaml`: the agent only proposes them.
 - **A waived gate is visible everywhere:** the waiver's reason is in the log, on the dashboard and in the audit, and a
   gate cannot be waived without a reason.
+
+## Terms
+
+- [Audit](glossary.md#-ad): recorded decisions and verification for a project or change.
+- [Process health](glossary.md#-ip): findings about flow, quality, discipline and configuration.
+- [Waiver](glossary.md#-rw): a recorded decision to skip a gate.
+
+## See also
+
+- [Process health and project hygiene](13-process-health.md) explains the findings.
+- [Onboard a new engineer](20-onboarding-example.md) follows one of these changes.

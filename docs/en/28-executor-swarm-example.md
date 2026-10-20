@@ -1,9 +1,23 @@
 # 28. Example: an executor swarm, the board and the auction
 
-This example ran on October 18, 2026, on the TodoMVC project of the [from-scratch example](19-team-greenfield-example.md).
+This example ran on October 18, 2026, on the TodoMVC project of the
+[from-scratch example](19-team-greenfield-example.md).
 The plan of one change was split into four tasks, and the tasks went to executors: an agent of the team, an outside
 agent and scripted bidders. The team checked leases, retries, auctions, a rejected result and that no executor can
 decide anything.
+
+## On this page
+
+- [Register executors](#281-the-registry)
+- [Host the board](#282-one-host-tokens-for-executors)
+- [Handle leases and bids](#283-leases-and-retries)
+- [Check a submitted result](#285-a-real-executor-and-a-rejected-result)
+- [Return to the gates](#286-back-to-the-gates)
+- [Lessons for a team](#287-what-the-team-takes-from-it)
+- [Terms](#-terms)
+- [See also](#-see-also)
+
+The people and executors had these roles:
 
 | Who | Role in this example |
 |---|---|
@@ -37,6 +51,17 @@ as usual. Its `tasks.md` had four numbered tasks:
 ```
 
 Once Evan approved the plan, the four tasks were on the board.
+
+The run follows the work from the plan back to review:
+
+```mermaid
+flowchart LR
+    A[Plan approved] -->|puts tasks on| B[Board]
+    B -->|dispatches| C[Executors]
+    C -->|submit branches| D[Result checks]
+    D -->|returns work| E[Change branch]
+    E -->|continues through| F[Gates]
+```
 
 ## 28.2. One host, tokens for executors
 
@@ -73,6 +98,8 @@ Auctions, awards, dispatch and gate decisions are not MCP tools.
 
 ## 28.4. The auction
 
+Linda opened an auction for task 1.2:
+
 ```bash
 sdlc board auction --change sort-todos-alphabetically --task 1.2 --window 40
 ```
@@ -90,9 +117,13 @@ so). Linda reassigned it with `sdlc board award … --executor market-a`; a clai
 
 ## 28.5. A real executor and a rejected result
 
-Evan's process claimed task 1.1 for `qwen-board` and got the work item (contract `sdlc.task/1`): the base commit, the
-plan's files, the spec scenarios, the checks, the paths it must not touch, the branch `sdlc/sort-todos-alphabetically/1.1`
-and the trailers:
+Evan's process claimed task 1.1 for `qwen-board` and got the work item (contract `sdlc.task/1`). It contains:
+
+- the base commit and the plan's files;
+- the spec scenarios and checks;
+- the paths it must not touch;
+- the branch `sdlc/sort-todos-alphabetically/1.1`;
+- these trailers:
 
 ```text
 SDLC-Change: sort-todos-alphabetically
@@ -132,8 +163,21 @@ each task's state, executor, agent, lease end, attempts and the last reason.
 
 ## 28.7. What the team takes from it
 
+The board coordinates work while people retain the decisions:
+
 - Name the executors in `executors.yaml` with the risk and kinds they may take; the board refuses the rest.
 - Host the board in one clone and give executors tokens: they claim, bid and submit over MCP, and decide nothing.
 - Use request keys for retries: a repeated call changes nothing twice.
 - Read a result before accepting it; reopen with a reason, and escalate to keep an executor off the task.
 - A result is a branch: it comes back to the change through merging, verification and review, like any code.
+
+## 📚 Terms
+
+- [Executor](glossary.md) — a registered worker that returns task results.
+- [Board](glossary.md) — the place where executors claim tasks.
+- [Gate](glossary.md) — a decision point that the board cannot approve.
+
+## 📚 See also
+
+- [Finishing with executors](30-finishing-with-executors-example.md) — how this change reaches release.
+- [Roles and signing](08-roles-and-signing.md) — who makes gate decisions.

@@ -1,9 +1,23 @@
 # 26. Example: signed approvals and an audit
 
-This example ran on October 17, 2026, on the TodoMVC project of the [from-scratch example](19-team-greenfield-example.md).
+This example ran on October 17, 2026, on the TodoMVC project of the
+[from-scratch example](19-team-greenfield-example.md).
 The project already had 45 approvals made without signatures. The team required signed approvals from that point on,
 took one feature through every gate with signed approvals, tried to forge approvals, and handed the project to an
 auditor who had never met the team.
+
+## On this page
+
+- [Set up signing keys](#261-keys)
+- [Require signatures](#262-signatures-from-now-on)
+- [Take a feature through the gates](#263-a-feature-with-signed-approvals)
+- [Try forged approvals](#264-forging-an-approval)
+- [Audit the change](#265-the-audit)
+- [Lessons for a team](#266-what-the-team-takes-from-it)
+- [Terms](#-terms)
+- [See also](#-see-also)
+
+The people in this run had these roles:
 
 | Person | Roles | Gates in this example |
 |---|---|---|
@@ -77,16 +91,40 @@ What sdlc stopped on the way:
 | Where | What happened |
 |---|---|
 | intent | Peter rejected the first intent (it showed "0 items completed"); the second one he approved |
-| spec | "The spec gate cannot be approved yet: 3 open question(s) in design.md have no recorded answer." Peter answered with `sdlc answer 1 --change b10 --artifact design --text "…"` and approved |
-| plan | The plan judge returned the plan twice: no test file under `test/`, no failing test first, no `sdlc tests lock`. Then it passed, and Evan approved |
+| spec | Three unanswered questions in `design.md` blocked approval. |
+| plan | The plan judge returned the plan twice before Evan approved. |
 | build | The agent tried to write the test before the plan was approved: `[sdlc:plan-gate]` denied it |
-| build | The agent's test expected the wrong number; the tests were locked, so the agent could not change them. David unlocked them with `sdlc tests unlock --change b10` (a person's command), the agent fixed the test and locked them again |
-| review | `review.md` must list every review pass under `## Coverage`, one line each, such as `- bugs: none found — checked: …`; until it did, the review gate could not be approved |
-| release | Linda rejected the first `release.md`: it described a staging environment and a rollback rehearsal that do not exist |
+| build | David unlocked a wrong test expectation for the agent to fix. |
+| review | `review.md` needed coverage for every review pass. |
+| release | Linda rejected the first `release.md` for describing nonexistent checks. |
+
+The spec gate said: "The spec gate cannot be approved yet: 3 open question(s) in design.md have no recorded answer."
+Peter answered with `sdlc answer 1 --change b10 --artifact design --text "…"` and approved.
+
+The plan had no test file under `test/`, no failing test first, and no `sdlc tests lock`. It passed after those were
+addressed. The agent tried to write the test before plan approval, and `[sdlc:plan-gate]` denied it.
+
+During build, the agent's test expected the wrong number. The tests were locked, so the agent could not change them.
+David unlocked them with `sdlc tests unlock --change b10` (a person's command). The agent fixed and relocked them.
+
+The review gate required every review pass under `## Coverage`, one line each. An example line is
+`- bugs: none found — checked: …`. Linda rejected `release.md` because its staging environment and rollback rehearsal
+do not exist.
 
 The tests were green while the app was broken: David opened it in a browser and the list did not render. The agent
 fixed the error, and Kate recorded the gap in the review (the footer rendering has no automated test). Olivia approved
 qa, Kate review, Linda release; the change was archived and merged, and the tag `v1.1.0` was signed.
+
+The run moved through these decisions:
+
+```mermaid
+flowchart LR
+    A[Peter: intent and spec] -->|approves| B[Evan: plan]
+    B -->|authorizes| C[David: build]
+    C -->|checks| D[Olivia: qa]
+    D -->|hands off| E[Kate: review]
+    E -->|hands off| F[Linda: release]
+```
 
 ```text
 $ sdlc approvals verify --mode required
@@ -107,11 +145,14 @@ In a separate clone, on branches off `main`, the team tried to pass an approval 
 |---|---|
 | Peter's approval in an unsigned commit | `✗ a1/intent peter unsigned … trailer: found`, exit 1 |
 | Peter's approval in a commit signed with David's key | `✗ a2/intent peter wrong-signer … trailer: found`, exit 1 |
-| Peter's approval written into `.sdlc.yaml` by hand and committed by David | `sdlc status` counts it in that clone; `sdlc approvals verify`: `✗ a3/intent peter wrong-signer … trailer: missing`, exit 1 |
+| Peter's approval written into `.sdlc.yaml` by hand and committed by David | It fails verification; see below. |
 | `intent.md` edited after Peter's signed approval | the approval no longer counts: the gate waits for Peter again |
 
 `sdlc status` trusts the change record; signatures are what make a forged record visible. That is why
 `sdlc approvals verify --mode required` belongs in CI on a full clone (`fetch-depth: 0`).
+
+In the forged-record clone, `sdlc status` counts the approval. `sdlc approvals verify` reports
+`✗ a3/intent peter wrong-signer … trailer: missing` and exits 1.
 
 ## 26.5. The audit
 
@@ -138,9 +179,22 @@ sdlc audit --export ../audit-export
 
 ## 26.6. What the team takes from it
 
+The audit gives the team several practices to keep:
+
 - Turn on signing in a project with history with `signing_since`: past approvals stay valid, new ones need a
   signature. Add the keys first, in one commit signed by a maintainer.
 - Read every settings proposal before applying it: the diff is the decision, not the agent's summary of it.
 - Green tests are not a working app: the person who looks at it in a browser is part of verification.
 - An unsigned or misattributed approval fails `sdlc approvals verify`; run it with `--mode required` in CI.
 - An auditor needs only a full clone: signatures, the change records, the log and the evidence bundle.
+
+## 📚 Terms
+
+- [Signed approval](glossary.md) — an approval in a signed commit.
+- [Trace](glossary.md) — the view connecting requirements and evidence.
+- [Gate](glossary.md) — the decision point before a change moves on.
+
+## 📚 See also
+
+- [Roles and signing](08-roles-and-signing.md) — how signatures are checked.
+- [Traceability and audit](14-traceability.md) — how to read the evidence.

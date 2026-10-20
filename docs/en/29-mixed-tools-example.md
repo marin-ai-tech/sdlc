@@ -1,9 +1,22 @@
 # 29. Example: one team, different agents
 
-This example ran on October 18, 2026, on the TodoMVC project of the [from-scratch example](19-team-greenfield-example.md).
-The team had worked with Qwen Code; now Claude Code and Codex CLI joined it in the same project. The team checked
-that every tool is refused the same things, that each one is named in the commits and the log, that the team's role
-agents reach all of them, and that one tool can leave without touching the others.
+This example ran on October 18, 2026, on the TodoMVC project of the
+[from-scratch example](19-team-greenfield-example.md).
+Claude Code and Codex CLI joined Qwen Code in the same project. The team checked refusals across all three tools.
+They also checked commit and log attribution, shared role agents, and what happens when one tool leaves.
+
+## On this page
+
+- [Set up three tools](#291-three-tools-in-one-project)
+- [Check the same refusals](#292-the-same-refusals-everywhere)
+- [Identify agent commits](#293-each-tool-signs-its-commits)
+- [Share role agents](#294-the-teams-role-agents-reach-every-tool)
+- [Remove one tool](#295-one-tool-leaves)
+- [Lessons for a team](#296-what-the-team-takes-from-it)
+- [Terms](#-terms)
+- [See also](#-see-also)
+
+Two people ran these checks:
 
 | Person | Role in this example |
 |---|---|
@@ -11,6 +24,8 @@ agents reach all of them, and that one tool can leave without touching the other
 | David Smith | engineer: his clone hosts the three agents for the checks |
 
 ## 29.1. Three tools in one project
+
+David's clone used three agent tools:
 
 ```bash
 sdlc init --tools claude,codex,qwen
@@ -45,8 +60,11 @@ Each agent got the same two-step task in David's clone, on a change whose tests 
 | Tool | Step 1 | Step 2 |
 |---|---|---|
 | Qwen Code | `[sdlc:separation-of-duties]` | `[sdlc:tests-locked]` |
-| Claude Code | did not run it: "Rule 1 in this project's AGENTS.md" | `PreToolUse:Edit hook error: [sdlc:tests-locked] …` |
-| Codex CLI | "rejected: a person's decision" (command rules) | "Command blocked by PreToolUse hook: [sdlc:tests-locked] …" (`Add-Content`) |
+| Claude Code | refused through `AGENTS.md` | `PreToolUse:Edit hook error: [sdlc:tests-locked] …` |
+| Codex CLI | refused by command rules | `[sdlc:tests-locked]` blocked `Add-Content` |
+
+Claude Code gave "Rule 1 in this project's AGENTS.md" for step 1. Codex CLI said "rejected: a person's decision".
+For step 2, Codex CLI said "Command blocked by PreToolUse hook: [sdlc:tests-locked] …".
 
 Every refusal names the rule and points to `sdlc guide denials`. The log records each one with the tool:
 
@@ -97,6 +115,8 @@ roles as accepted with their subagents.
 
 ## 29.5. One tool leaves
 
+The team removed Codex CLI from the project configuration:
+
 ```bash
 sdlc init --tools claude,qwen
 ```
@@ -111,8 +131,21 @@ stayed as they were. After a pull, `sdlc doctor` in David's clone listed two too
 
 ## 29.6. What the team takes from it
 
+The shared process gives the team these working practices:
+
 - Let each person keep the agent they like: the process, the gates and the refusals are the same in every tool.
 - Run `sdlc doctor` on every machine: it names what each tool needs (trusted hooks for Codex, the folder for Qwen).
 - Read the log by tool: refusals and commits say which agent did what.
 - Accept role agents once; they reach every tool the project uses.
 - Add or remove a tool with `sdlc init --tools …`; the others are not touched.
+
+## 📚 Terms
+
+- [Hook](glossary.md) — the callback that enforces a guard in an agent session.
+- [Guard](glossary.md) — a process rule around an agent action.
+- [Gate](glossary.md) — the decision point shared by every tool.
+
+## 📚 See also
+
+- [Agent team](12-agent-team.md) — how role agents are accepted and shared.
+- [Integrations](10-integrations.md) — how sdlc connects to tools.
