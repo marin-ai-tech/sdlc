@@ -58,6 +58,19 @@ const CONVERTED = [
   'docs/en/course/10-multi-agent.md',
   'docs/en/handbook/11-troubleshooting-and-reference.md',
   'docs/en/course/11-troubleshooting-and-reference.md',
+  'docs/en/18-team-example.md',
+  'docs/en/19-team-greenfield-example.md',
+  'docs/en/20-onboarding-example.md',
+  'docs/en/21-dashboard-health-example.md',
+  'docs/en/22-adopt-large-codebase-example.md',
+  'docs/en/23-tracks-and-decisions-example.md',
+  'docs/en/24-bugfix-incident-example.md',
+  'docs/en/25-ci-release-upgrade-example.md',
+  'docs/en/26-signed-audit-example.md',
+  'docs/en/27-mcp-integrations-example.md',
+  'docs/en/28-executor-swarm-example.md',
+  'docs/en/29-mixed-tools-example.md',
+  'docs/en/30-finishing-with-executors-example.md',
 ];
 
 const LONG_PAGE_WORDS = 800;
