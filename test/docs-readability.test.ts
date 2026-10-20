@@ -24,6 +24,14 @@ const CONVERTED = [
   'docs/en/10-integrations.md',
   'docs/en/11-mcp-use-cases.md',
   'docs/en/12-agent-team.md',
+  'docs/en/09-demo-and-automation.md',
+  'docs/en/15-cursor.md',
+  'docs/en/16-codex.md',
+  'docs/en/17-qwen-gigacode.md',
+  'docs/en/01-openspec-analysis.md',
+  'docs/en/02-sdlc-playbook.md',
+  'docs/en/03-landscape-and-reviews.md',
+  'docs/en/06-openspec-upstream.md',
 ];
 
 const LONG_PAGE_WORDS = 800;
