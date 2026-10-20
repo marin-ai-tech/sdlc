@@ -841,8 +841,8 @@ Every command except `statusline`, `dashboard`, `mcp serve`, `hook` and the `ope
 | Guardrails | hooks merged into `.claude/settings.json` | `.opencode/plugins/sdlc.js` |
 
 Cursor, Codex CLI, Qwen Code and GigaCode get the same workflows and subagents in their own folders, with their own
-hooks and rules: see [Cursor](docs/en/15-cursor.md), [Codex CLI](docs/en/16-codex.md) and
-[Qwen Code and GigaCode](docs/en/17-qwen-gigacode.md).
+hooks and rules: see [Cursor](15-cursor.md), [Codex CLI](16-codex.md) and
+[Qwen Code and GigaCode](17-qwen-gigacode.md).
 
 The workflows are 18 short skills: `help`, `guide`, `next`, `status`, `health`, `adopt`, `team`, `backlog`, `explore`,
 `intent`, `spec`, `plan`, `build`, `verify`, `review`, `release`, `archive`, `triage`. They pull state, templates and
