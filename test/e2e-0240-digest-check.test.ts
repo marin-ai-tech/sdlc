@@ -165,9 +165,21 @@ function atReview(): P {
   return p;
 }
 
-async function ruText(key: string, params: Record<string, string>): Promise<{ ru: string; en: string }> {
+/**
+ * An interface language other than English installed in this checkout, found at run time (the repository itself
+ * carries only English); undefined when none is installed, and the case that needs one is skipped visibly.
+ */
+function otherLocale(): string | undefined {
+  const dir = path.join(REPO_ROOT, 'assets/locales');
+  const files = fs.existsSync(dir) ? fs.readdirSync(dir).filter((f) => f.endsWith('.json')) : [];
+  return files.map((f) => f.slice(0, -5)).filter((code) => code !== 'en').sort()[0];
+}
+
+const OTHER_LOCALE = otherLocale();
+
+async function catalogText(locale: string, key: string, params: Record<string, string>) {
   const i18n = await import(pathToFileURL(path.join(REPO_ROOT, 'dist/core/i18n.js')).href);
-  return { ru: i18n.t(key, params, 'ru'), en: i18n.t(key, params, 'en') };
+  return { other: i18n.t(key, params, locale), en: i18n.t(key, params, 'en') };
 }
 
 describe('gate-reads: the report gives each gate its version and its approvals', () => {
@@ -374,15 +386,16 @@ describe('gate-approval: approve only the expected version', () => {
     expect(r.json<Json>().status[0]).toMatchObject({ severity: 'error', code: 'digest_changed' });
   }, 240000);
 
-  it('The refusal in Russian: the catalog text with both digests', async () => {
+  it.skipIf(!OTHER_LOCALE)('The refusal in another installed language: its catalog text and both digests', async () => {
+    const locale = OTHER_LOCALE!;
     const { p, before, after } = changedAfterReading();
-    const r = approve(p, ['--expect-digest', before, '--locale', 'ru']);
+    const r = approve(p, ['--expect-digest', before, '--locale', locale]);
     expect(r.code).toBe(1);
     const params = { gate: 'intent', expected: short(before), current: short(after) };
-    const text = await ruText('error.expectDigestChanged', params);
-    expect(text.ru).not.toBe(text.en);
-    expect(text.ru).not.toBe('error.expectDigestChanged');
-    expect(r.stderr).toContain(text.ru);
+    const text = await catalogText(locale, 'error.expectDigestChanged', params);
+    expect(text.other).not.toBe(text.en);
+    expect(text.other).not.toBe('error.expectDigestChanged');
+    expect(r.stderr).toContain(text.other);
   }, 240000);
 
   it('A blocked gate: gate_blocked, the same code and message as without the option, nothing written', () => {

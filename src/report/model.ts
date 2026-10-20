@@ -203,12 +203,12 @@ function reportApproval(record: ApprovalRecord): ReportApproval {
 }
 
 /** A gate with the digest an approval would bind now (absent when there is none) and its approvals. */
-function reportGate(gate: GateEvaluation): ReportGate {
+function reportGate(gate: GateEvaluation, archived: boolean): ReportGate {
   return {
     id: gate.id,
     status: gate.status,
     required: gate.required,
-    ...(gate.digest ? { digest: gate.digest } : {}),
+    ...(!archived && gate.digest ? { digest: gate.digest } : {}),
     approvals: gate.approvals.map(reportApproval),
     staleApprovals: gate.staleApprovals.map(reportApproval),
   };
@@ -229,7 +229,7 @@ function toReportChange(ref: ChangeRef, view: LifecycleView, state: ChangeState,
     track: view.track,
     stage: view.stage,
     stageTitle: view.stageTitle,
-    gates: view.gates.map(reportGate),
+    gates: view.gates.map((gate) => reportGate(gate, ref.archived)),
     tasks: { complete: view.tasks.complete, total: view.tasks.total },
     verification: view.verification?.status ?? 'never',
     ...(view.review ? { review: { total: view.review.total, blockingOpen: view.review.blocking.length } } : {}),

@@ -5,7 +5,6 @@ import { previewApproval, type ApprovePreview } from '../core/approve-preview.js
 import { resolveChange } from '../core/changes.js';
 import { APPROVAL_GATES, type ApprovalGateId } from '../core/config.js';
 import { t } from '../core/i18n.js';
-import { parseExpectedDigest } from '../core/expected-digest.js';
 import { approveCli } from '../core/lifecycle.js';
 import { assertHuman, parseGate } from './gates.js';
 
@@ -17,7 +16,7 @@ export interface PreviewOptions {
   change?: string;
   as?: string;
   by?: string;
-  expectDigest?: string;
+  expectDigest?: string[];
   json?: boolean;
 }
 
@@ -26,11 +25,11 @@ export async function approvePreviewCommand(gateArg: string, opts: PreviewOption
     const ctx = loadProject();
     const gate = parseGate(gateArg, APPROVAL_GATES) as ApprovalGateId;
     assertHuman(ctx.config, 'approve');
-    const expectDigest = opts.expectDigest === undefined ? undefined : parseExpectedDigest(opts.expectDigest);
     const ref = resolveChange(ctx.paths, opts.change);
     const preview = previewApproval({ root: ctx.root, config: ctx.config, ref, gate,
-      as: opts.as, by: opts.by, expectDigest });
-    const cli = withCliPrefix(approveCli(ref.id, gate, opts.as), ctx.config.cli);
+      as: opts.as, by: opts.by, expectDigest: opts.expectDigest });
+    const baseCli = withCliPrefix(approveCli(ref.id, gate, opts.as), ctx.config.cli);
+    const cli = preview.digest ? `${baseCli} --expect-digest ${preview.digest}` : baseCli;
     if (opts.json) return printJson(previewJson(preview, cli));
     printPreview(preview, cli);
   } catch (error) {
@@ -40,12 +39,13 @@ export async function approvePreviewCommand(gateArg: string, opts: PreviewOption
 
 function previewJson(preview: ApprovePreview, cli: string): Record<string, unknown> {
   const refusals = preview.refusals.map(({ rule, message }) => ({ rule, message }));
-  return { ...preview, refusals, ...(preview.allowed ? { cli } : {}) };
+  return { ...preview, refusals, ...(preview.allowed && preview.digest ? { cli } : {}) };
 }
 
 function printPreview(preview: ApprovePreview, cli: string): void {
   const status = t(`gateStatus.${preview.gateStatus}`);
   line(c.bold(t('preview.header', { gate: preview.gate, change: preview.change, status })));
+  if (preview.digest) line(t('preview.digest', { digest: preview.digest }));
   printArtifacts(preview);
   line(t('preview.approvals', { count: preview.approvals, min: preview.needed }));
   line(t('preview.requiredRoles', { roles: preview.requiredRoles.join(', ') || t('preview.none') }));

@@ -17,7 +17,8 @@ import { readChangeState, type ChangeState } from './change-state.js';
 import type { ChangeRef } from './changes.js';
 import type { ApprovalGateId, SdlcConfig } from './config.js';
 import { SdlcError } from './errors.js';
-import { assertExpectedDigest, type ExpectedDigest } from './expected-digest.js';
+import { assertExpectedDigest, parseExpectedOption } from './expected-digest.js';
+import { assertReady } from './gate-ready.js';
 import { checkpointRef } from './checkpoint.js';
 import { defaultBaseRef, formatIdentity, git, gitIdentity } from './git.js';
 import { t } from './i18n.js';
@@ -73,8 +74,8 @@ export interface PreviewInput {
   as?: string;
   /** `--by <identity>`. */
   by?: string;
-  /** `--expect-digest <digest>`, parsed. */
-  expectDigest?: ExpectedDigest;
+  /** Raw `--expect-digest <digest>` values. */
+  expectDigest?: string[];
 }
 
 /** The preview of approving `input.gate` of `input.ref` as the current git identity. */
@@ -110,8 +111,8 @@ function approvalRefusals(input: PreviewInput, evaluation: GateEvaluation, state
   roles: RolesFile | undefined): PreviewRefusal[] {
   const found: PreviewRefusal[] = [];
   attempt(found, () => assertByAllowed(input.config.gates[input.gate], roles !== undefined, input.by));
-  attempt(found, () => assertExpectedDigest(input.expectDigest,
-    { gate: input.gate, change: input.ref.id }, evaluation.digest));
+  attempt(found, () => assertExpectedDigest(
+    parseExpectedOption(input.expectDigest), input.ref.id, evaluation));
   attempt(found, () => assertReady(input.gate, evaluation));
   found.push(...(roles ? rolesRefusals(input, state, roles) : configRefusals(input, evaluation)));
   attempt(found, () => assertQuestionsAnswered(input.config, input.ref.id, input.ref.dir, state, input.gate));
@@ -135,19 +136,6 @@ function refusalOf(error: SdlcError): PreviewRefusal {
 
 function fromRefusal(refusal: Refusal): PreviewRefusal {
   return { rule: refusal.rule, message: refusal.message, text: t(refusal.ref.key, refusal.ref.params) };
-}
-
-/** `gate_blocked` / `gate_not_ready`, as `sdlc approve` raises them. */
-function assertReady(gate: ApprovalGateId, evaluation: GateEvaluation): void {
-  if (evaluation.status === 'blocked') {
-    // The reason as a catalog reference: English in JSON (the text `sdlc approve` gives), localized in text output.
-    const reason = evaluation.reasonKey ? { key: evaluation.reasonKey, params: evaluation.reasonParams } : undefined;
-    const params = { gate, evaluation_reason: reason ?? evaluation.reason ?? '' };
-    throw new SdlcError('gate_blocked', { key: 'error.the_x_gate_cannot_be_approved_yet_x', params });
-  }
-  if (!evaluation.digest) {
-    throw new SdlcError('gate_not_ready', { key: 'error.nothing_to_approve_for_the_x_gate_yet', params: { gate } });
-  }
 }
 
 /** With roles.yaml: the requested role, every role and separation rule, then the identity checks. */
