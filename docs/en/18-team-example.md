@@ -113,7 +113,7 @@ time and call limits keep it from wandering off for long.
 
 ## 18.4. Peter (product-owner) builds the backlog
 
-Peter turns the two requests into backlog items. He decides their order and epic membership himself.
+Peter turns an epic and two features into backlog items. He decides their order and epic membership himself.
 
 Peter described an epic and two features to his agent (`/sdlc-backlog`):
 
