@@ -276,8 +276,11 @@ design.
   you may approve. It writes nothing.
 - **Approve the version you read:** `sdlc approve <gate> --change <id> --expect-digest <digest>` approves only while the
   gate still has that digest. If the artifacts changed after you read them, the approval is refused and nothing is
-  recorded. Take the digest from `sdlc approve <gate> --change <id> --preview --json` or `sdlc next --me --json`: the
-  full `sha256:…` value, or the 12 characters that `approve` prints. Programs should pass the full digest.
+  recorded. The preview prints the gate's full `sha256:…` digest and suggests the approval with `--expect-digest`
+  already filled in; `sdlc next --me --json` gives the same digest. Only the full digest is accepted.
+- **Read the digest first, then the files.** The digest proves that the version did not change after the read that gave
+  it. It does not prove that the files you opened elsewhere are those bytes. Take the digest before you read the
+  artifacts, and read them again whenever the digest changes.
 - **Versions in the JSON reads:** in `sdlc report --json` each gate has its `digest`, its `approvals` and its
   `staleApprovals`, each approval with the digest it binds. In `sdlc next --me --json` an approval carries the gate's
   `digest`. The `gate.<g>.approved` and `gate.<g>.rejected` entries of `sdlc log --json` carry the digest of the version

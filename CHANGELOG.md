@@ -7,19 +7,26 @@ All notable changes to sdlc. Versions follow [Semantic Versioning](https://semve
 ### Added
 - `sdlc approve <gate> --expect-digest <digest>` approves only the version the person read. When the gate's digest
   changed since, the approval is refused with the error code `digest_changed`, naming both versions, before anything
-  is written: no approval, no log entry, no wait record, no checkpoint. It takes the full `sha256:<hex>` or the 12
-  characters that `approve` prints; programs should pass the full digest. With `--preview`, the same check is listed
-  as a refusal.
-- `sdlc report --json`: each gate gains `digest` (when it has one), `approvals` and `staleApprovals`, each approval as
-  `{role, by, person?, at, digest}`.
+  is written: no approval, no log entry, no wait record, no checkpoint. It takes only the full `sha256:<hex>`: a
+  shorter form could be matched by an agent that writes both versions. A gate without a digest gives the error the
+  approval gives without the option (`gate_blocked` with its reason, or `gate_not_ready`); two different values are
+  refused.
+- `sdlc approve <gate> --preview` prints the gate's full digest and suggests the approval with `--expect-digest`
+  filled in (the text line and the JSON `cli`); its JSON gives `digest`. With `--expect-digest` the same check is
+  listed as a refusal at the place the approval checks it.
+- `sdlc report --json`: each gate of an active change gains `digest` (when it has one), and every gate gains
+  `approvals` and `staleApprovals`, each approval as `{role, by, person?, at, digest}`.
 - `sdlc next --me --json`: an `approve-gate` item gains `digest`, from the same evaluation as its `cli`.
-- `sdlc approve --preview --json` gives the gate's current `digest`.
 - The `gate.<g>.approved` and `gate.<g>.rejected` log entries carry `digest` as a field, so `sdlc log --json` shows
   which version was decided. Integration event bodies are unchanged.
 
 ### Compatibility
 - Every JSON output only gains fields. Older log entries without `digest` read as before, and older versions read the
   new entries.
+
+### Known limits
+- The digest proves that the version did not change after the read that gave it, not that the files a person opened
+  elsewhere are those bytes. Read the digest first, then the files, and read them again when it changes.
 
 ## 0.23.7 — 2026-10-18
 

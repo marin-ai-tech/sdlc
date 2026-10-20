@@ -18,6 +18,9 @@ sdlc approve review --change add-export --as code-owner
 - Run it in your own terminal. Inside an agent session the CLI refuses, and the hook blocks it.
 - Before deciding, `sdlc approve <gate> --change <id> --preview` shows what you would approve, what changed since the
   last approval, and whether you may approve.
+- To approve exactly the version you read, pass its digest: `--expect-digest sha256:…`. The preview prints the digest
+  and suggests the command with it. If the artifacts changed in between, the approval is refused and nothing is
+  recorded. Take the digest before you read the files, and read them again when it changes.
 - With `openspec/roles.yaml`, your git identity must be a person holding the gate's role, and the separation rules
   apply (for example, the author of the code may not approve its review).
 - `min_approvals: 2` on a gate waits for two different people.

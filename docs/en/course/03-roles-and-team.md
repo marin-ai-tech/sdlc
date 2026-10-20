@@ -199,6 +199,7 @@ they are about to approve before they approve it.
    | `sdlc roles who <gate> --change <id>` | the same for one gate |
    | `sdlc next --me` | every gate, across all active changes, that **you** may decide now, with the command |
    | `sdlc approve <gate> --change <id> --preview` | what you would approve, what changed, and whether you may |
+   | `sdlc approve <gate> --change <id> --expect-digest <digest>` | approves only the version you read |
 
 2. The change `add-due-dates` waits for its plan. Ethan opens his own terminal and asks what waits for him:
 
