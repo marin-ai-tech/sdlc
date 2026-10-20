@@ -21,10 +21,11 @@ const CODE_IN_TEXT = new RegExp(
 );
 const CODE_IN_PATH = new RegExp(`(^|[/._-])${CODE}([/._-]|$)`);
 
+/** Tracked files still on disk (a file deleted in the working tree is on its way out of the index). */
 function tracked(): string[] {
   const listed = spawnSync('git', ['ls-files', '-z'], { cwd: REPO_ROOT, encoding: 'utf-8' });
   expect(listed.status).toBe(0);
-  return listed.stdout.split('\0').filter(Boolean);
+  return listed.stdout.split('\0').filter((file) => file && fs.existsSync(path.join(REPO_ROOT, file)));
 }
 
 function textFiles(): { file: string; text: string }[] {
