@@ -2,8 +2,8 @@
 
 This chapter is for **Laura**, the engineering manager at Northwind Labs. She does not write code and does not approve
 gates. She reads how the process works, finds where it suffers, and answers questions from management and from an
-external auditor. The commands in this chapter read the process or write a report file; only `sdlc events summary`
-also records and sends the daily summary event.
+external auditor. The commands in this chapter read the process or write a report file; `sdlc events summary` and `sdlc
+events flush` also send events.
 
 ## On this page
 
@@ -31,7 +31,7 @@ flowchart LR
 ```
 
 > [!NOTE]
-> Reports and audit exports show recorded decisions. A person still approves each gate in their own terminal.
+> Reports and audit exports show recorded decisions. People still approve their gates in their own terminal; verify is a gate of evidence.
 
 <a id="s9-1"></a>
 ## 9.1 The progress report

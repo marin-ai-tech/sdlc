@@ -1,9 +1,9 @@
 # Module 9. Managing and auditing the process
 
-This module is for **Laura**, the engineering manager at Northwind Labs. She does not write code or approve gates.
-She watches the process, finds where it suffers, and answers management and auditors. The commands here read the
-process or write a report; only `sdlc events summary` also sends the daily summary event. Anyone may run them,
-including the agent.
+This module is for **Laura**, the engineering manager at Northwind Labs. She does not write code or approve gates. She
+watches the process, finds where it suffers, and answers management and auditors. The commands here read the process or
+write a report; `sdlc events summary` and `sdlc events flush` also send events. Anyone may run them, including the
+agent.
 
 ## On this page
 
@@ -33,7 +33,7 @@ flowchart LR
 ```
 
 > [!NOTE]
-> Reports and audit exports show recorded decisions. A person still approves each gate in their own terminal.
+> Reports and audit exports show recorded decisions. People still approve their gates in their own terminal; verify is a gate of evidence.
 
 <a id="lesson-9-1"></a>
 ## Lesson 9.1 — The progress report            (video: ~5 min)

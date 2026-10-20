@@ -1,8 +1,8 @@
 # Module 5. One change from idea to archive (tasklet)
 
 Follow "Add due dates to tasks" (`add-due-dates`) through every stage in the `tasklet` API. Oliver guides the agent.
-Megan, Ethan, Grace, Paul and Emily handle their own decisions. Use this module to see the commands and evidence
-at each gate, from the first intent to the archived record.
+Megan, Ethan, Paul and Emily approve their gates; Grace reads the verification evidence. Use this module to see the
+commands and evidence at each gate, from the first intent to the archived record.
 
 ## On this page
 

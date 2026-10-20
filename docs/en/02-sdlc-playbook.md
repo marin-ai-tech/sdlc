@@ -99,13 +99,13 @@ These details guide sdlc's process controls:
 
 ### Adoption order
 
-The plays are adopted in prerequisite order:
+Prerequisites set the adoption order of the plays:
 
-- Start with `intent.md`, `CLAUDE.md`, skills, the feedback loop and hooks as approval gates.
-- Add requirements and design after intent and policy skills.
-- Add plan mode, parallel sessions and evals.
-- Add PR review, then CI/CD after review and hooks.
-- Close the loop after intent, review, hooks and rollback are in place.
+- No prerequisites: `intent.md`, `CLAUDE.md`, skills, the feedback loop and hooks as approval gates.
+- Requirements and design need intent and the policy skills.
+- Plan mode, parallel sessions, evals and PR review come next, with no stated prerequisites.
+- CI/CD needs review and hooks.
+- Closing the loop needs intent, review, hooks and rollback.
 
 ## 🧭 Mapping to OpenSpec
 
@@ -134,8 +134,8 @@ The mapping includes these controls:
   gate; review checks plan drift.
 - **Verification:** `/opsx:verify` is a prompt that runs nothing. `sdlc verify` runs real checks and records literal
   output bound to worktree contents. A verifier subagent uses a clean context and checks scenario coverage.
-- **Review:** `review.md` classifies findings. A reviewer subagent reports them; important open findings block the
-  gate until code-owner approval.
+- **Review:** `review.md` classifies findings. A reviewer subagent reports them; the gate stays blocked while
+  important findings are open, and it needs the code owner's approval.
 - **Hooks:** Claude Code, Cursor, Codex CLI, Qwen Code and GigaCode use `sdlc hook`; OpenCode uses its plugin. They
   guard the plan gate, locked tests, protected paths, self-approval and production release.
 - **People:** optional `openspec/roles.yaml` names people and roles in git. Authors cannot approve their own review
