@@ -1,42 +1,45 @@
-# 13. Process hygiene and project health: capabilities and use cases
+# Process health and project hygiene
 
-A process with gates can still be passed by form alone: a rework closed by the same "yes", a plan that names files
-nobody touched, evidence that is silent about what was not run, small changes that drag gates they do not need, a
-change that bounces between the agent and a person forever. sdlc 0.11.2 closes these holes in the gates themselves;
-0.11.3 adds a look at the whole project — `sdlc health` — and one command that explains a single change, `sdlc
-explain`; 0.11.4 makes people answer the open questions themselves, shows how much people took part, and adds a tour
-for newcomers.
+Use this page to see where your team's process needs attention and what each finding means.
+You can inspect one stuck change, review project health and choose improvements with the people who own them.
 
-## 13.1. What the team gets
+## On this page
 
-| Need | What sdlc does | Since |
-|---|---|---|
-| A rework must lead to a change | approving the same content again after a rework needs `--note` | 0.11.2 |
-| Endless rework loops stop | after `rework.max_cycles` reworks of a gate, `next` asks a person to take over or review the scope | 0.11.2 |
-| Commits are traceable to approvals | `sdlc approve` proposes a commit with an `SDLC-Approval` trailer; `approvals verify` finds it | 0.11.2 |
-| Evidence says what it does not cover | `verification.md` has "Not run / limits"; untouched planned files and attachments are listed | 0.11.2 |
-| Policy waiver | `auto_waive` matches kind OR track for intent, spec or plan | 0.11.2 |
-| The team sees where the process suffers | `sdlc health`: findings with facts and a recommendation, no score | 0.11.3 |
-| Improvements reach the backlog | `/sdlc:health` drafts backlog items; a person orders them | 0.11.3 |
-| Someone notices when it gets bad | a line at the agent's session start, `health.degraded` to the event receivers, a dashboard section | 0.11.3 |
-| "Why is my change stuck?" has one answer | `sdlc explain --change <id>` | 0.11.3 |
-| Open questions are answered by people | `sdlc answer`; the intent and spec gates wait for the answers | 0.11.4 |
-| The team sees how much people took part | the audit and the dashboard: planned vs actual decisions per change | 0.11.4 |
-| A newcomer learns sdlc in an hour | `sdlc guide tour`: seven steps through the calculator demo | 0.11.4 |
-| Repeated gate rejections surface | `quality.rejections` warns at two; `health.rejections` tunes it | 0.22.2 |
-| Other branches appear as hints | `next --me`, health, report and dashboard name them | 0.22.2 |
-| Missing gate decision log entries surface | `discipline.log-gaps` compares active and archived change records with the shared log and local queue | 0.23.2 |
+- [What the team gets](#-what-the-team-gets)
+- [Decisions and evidence](#-decisions-and-evidence)
+- [Health findings](#-health-findings)
+- [Questions and guidance](#-questions-and-guidance)
+- [Commands](#-commands)
+- [Limits](#-limits)
+- [Terms](#-terms)
+- [See also](#-see-also)
 
-`discipline.log-gaps` counts approved, rejected and waived gate decisions recorded in each change's history and
-compares them with the project log, including its local queue. Each fact names the change, gate and missing count.
-A missing or malformed log remains a separate log integrity concern; health reports gaps without failing the command.
-Wait observations from `status`, `next` and other reading commands go to the ignored local queue first, preserving
-their first-seen time for audit. The next project log write drains that queue into the shared log. Policy auto-waives
-also update the change record, so reading a change can still record that decision there.
-Health state signals from `sdlc health` and session start use the same queue; `sdlc log` includes queued entries.
-| A gate's artifacts are checked by the team's rubric before a person looks | `gates.<gate>.judge` and `sdlc judge`: a person cannot approve until a verdict passes | 0.20.0 |
+## 🧭 What the team gets
 
-## 13.2. Use cases
+Gates protect decisions, but the team also needs to see friction around them. Use these views to find it:
+
+| Need | What sdlc does |
+|---|---|
+| Rework with no revision | Re-approval of unchanged content after rework needs `--note`. |
+| Rework loops | After `rework.max_cycles`, `next` asks a person to take over or review scope. |
+| Approval trace | `sdlc approve` proposes an `SDLC-Approval` commit trailer; `approvals verify` finds it. |
+| Evidence limits | `verification.md` names "Not run / limits", untouched planned files and attachments. |
+| Policy waiver | `auto_waive` matches kind or track for intent, spec or plan. |
+| Project friction | `sdlc health` gives facts and recommendations without a score. |
+| Improvements | `/sdlc:health` drafts backlog items; a person orders them. |
+| Bad health | Session start, `health.degraded` and the dashboard surface it. |
+| A stuck change | `sdlc explain --change <id>` gives the reason and next steps. |
+| Open questions | `sdlc answer` records a person's answers before intent or spec approval. |
+| Participation | Audit and dashboard compare planned and actual decisions. |
+| Newcomer guidance | `sdlc guide tour` walks through seven calculator demo steps. |
+| Gate rejections | `quality.rejections` warns at two; `health.rejections` tunes it. |
+| Other branches | `next --me`, health, report and dashboard show hints. |
+| Log gaps | `discipline.log-gaps` compares change decisions with the shared log and local queue. |
+| Judge verdict | `gates.<gate>.judge` and `sdlc judge` check the rubric before approval. |
+
+## 🔁 Decisions and evidence
+
+These examples show what happens when a decision needs revision or supporting evidence.
 
 ### A rework answered by the same "yes"
 
@@ -53,6 +56,9 @@ sdlc approve spec --change basic-arithmetic --note "The rework was a mistake: th
 ```
 
 Every approver who signs the unchanged content gives their own note.
+
+> [!IMPORTANT]
+> If the artifact did not change after rework, explain why another approval is appropriate with `--note`.
 
 ### A change that bounces back and forth
 
@@ -107,6 +113,25 @@ approval still refuses them.
 `auto_waive` matches the kind **or** the track. `tracks: [lite]` waives that gate for every lite
 change, including features; `sdlc doctor` warns about this broad policy.
 
+## 📊 Health findings
+
+Health findings tell you what happened and recommend a next step. They do not collapse your process into one score.
+
+### What health looks at
+
+The findings cover four areas. A bad finding can add a session-start hint; a warning stays in the health report.
+
+- **Flow:** overdue gates (bad), long waits on people, inactive changes and old deferred work.
+- **Quality:** first-pass verification, the dominant rework reason and plan drift.
+  It also checks open blocking review findings and scenarios without a verification row.
+- **Discipline:** frequent waivers, the lite track on behaviour changes and forced archives.
+  It checks repeated gate approvals, repeated hook denials of one rule (with the guide article) and long test locks.
+- **Configuration:** no verification commands (bad), enforcement off (bad) or warn, and one person holding every role.
+  It also checks signing off, stale context packs and `sdlc doctor` problems.
+
+The session start looks only at findings that can be bad because that check is cheap.
+The dashboard skips expensive doctor, plan drift and trace checks. `sdlc health` looks at everything.
+
 ### A monthly look at the process
 
 The team lead runs `sdlc health` before the retrospective:
@@ -130,10 +155,13 @@ They ask the agent `/sdlc:health`; it explains the findings in plain words and, 
 drafts backlog items (`--source-type health --source-ref quality.rework_reason`). Ordering them is their decision:
 
 ```bash
-sdlc backlog move B81 --top
+sdlc backlog move <item-id> --top
 ```
 
 Thresholds live under `health` in `openspec/sdlc.yaml` (for example `rework_share: 0.6`, `wait_hours: 24`).
+
+> [!TIP]
+> Use a windowed health run for a retrospective. It does not record a health state signal.
 
 ### Someone switched the checks off
 
@@ -142,15 +170,46 @@ finding (`config.no_verify`), run `sdlc health`. `health.degraded` is logged and
 when the commands are back, `health.recovered` follows. Warnings never add a line: the session start stays quiet while
 nothing is bad.
 
+This diagram shows how the health signal follows a bad finding:
+
+```mermaid
+flowchart LR
+    A[Session starts] -->|checks| B[Bad findings]
+    B -->|adds| C[Context hint]
+    B -->|records| D[health.degraded]
+    D -->|sends| E[Event receivers]
+    B -->|clears| F[health.recovered]
+```
+
+### Missing decisions in the log
+
+`discipline.log-gaps` counts approved, rejected and waived gate decisions in each change's history.
+It compares them with the project log and its local queue. Each fact names the change, gate and missing count.
+A missing or malformed log is a separate integrity concern. Health reports gaps without failing the command.
+
+Wait observations from `status`, `next` and other reading commands go to the ignored local queue first.
+The queue keeps their first-seen time for audit. The next project log write drains it into the shared log.
+Policy auto-waives also update the change record, so reading a change can record that decision there.
+Health state signals from `sdlc health` and session start use the same queue. `sdlc log` includes queued entries.
+
 ### "Why is my change stuck?"
 
 ```bash
 sdlc explain --change basic-arithmetic
 ```
 
-The answer: the stage, the open gate and its reason (here: sent back for rework, with the reason and the note), what it
-waits for (the agent, a person, a check, review findings, a takeover), the steps that unblock it with their commands,
-and the five latest decisions. It writes nothing, so an agent can ask it as often as it likes.
+The answer gives you:
+
+- the stage, open gate and its reason, including any rework note;
+- who or what it waits for;
+- steps and commands that unblock it;
+- the five latest decisions.
+
+It writes nothing, so an agent can ask it as often as it likes.
+
+## 👥 Questions and guidance
+
+People answer open questions, and sdlc shows them where a change waits. These examples cover both jobs.
 
 ### Open questions only a person can answer
 
@@ -172,8 +231,8 @@ same way.
 
 ### How much did people take part?
 
-At the end of the quarter the team lead looks at `sdlc audit`: for every change, what the track planned (full track:
-intent, spec, plan, review — four approvals, more with `min_approvals`) and what happened.
+At the end of the quarter the team lead uses `sdlc audit` to compare planned and actual participation.
+The full track plans four approvals: intent, spec, plan and review. `min_approvals` can increase the number.
 
 ```text
 add-export: gates intent, spec, plan, review; approvals 4 / 7; reworks 2, takeovers 1, waivers 0, answers 2; waits 31.5 h
@@ -192,27 +251,25 @@ sdlc guide tour          # the steps, and step 1
 sdlc guide tour 3        # intent, spec and plan
 ```
 
-Seven short steps follow the calculator demo: setup, the backlog, the three planning gates, build and verify, review,
-release and archive, and keeping an eye on the process. Each names the real commands, in English or another language.
+Seven short steps follow the calculator demo:
 
-## 13.3. What health looks at
+- setup and the backlog;
+- the three planning gates;
+- build and verify;
+- review;
+- release and archive;
+- keeping an eye on the process.
 
-| Area | Findings |
-|---|---|
-| Flow | overdue gates (bad), long waits on people, changes with no activity, old deferred work |
-| Quality | first-pass verification, the dominant rework reason, plan drift, open blocking review findings, scenarios without a verification row |
-| Discipline | frequent waivers, the lite track on behaviour changes, forced archives, gates approved again and again, repeated hook denials of one rule (with the guide article), long test locks |
-| Configuration | no verification commands (bad), enforcement off (bad) or warn, one person holding every role, signing off, stale context packs, `sdlc doctor` problems |
+Each step names the real commands.
 
-The session start looks only at the findings that can be bad (cheap); the dashboard skips the expensive ones (doctor,
-plan drift, trace); `sdlc health` looks at everything.
+## 🛠️ Commands
 
-## 13.4. Commands
+Use these commands to inspect health, answer questions and follow up on findings.
 
 | Command | Who | What |
 |---|---|---|
-| `sdlc health [--since <date> \| --days <n>] [--json]` | anyone | findings; records `health.degraded` / `health.recovered` in the log; `--since` or `--days` replaces `health.window_days` for one run |
-| `sdlc judge --gate <gate> --change <id>` | anyone, the agent too | runs the gate's judge and records its verdict (0.20.0) |
+| `sdlc health [--since <date> \| --days <n>] [--json]` | anyone | findings and health state signals |
+| `sdlc judge --gate <gate> --change <id>` | anyone, the agent too | runs the gate's judge and records its verdict |
 | `/sdlc:health` (`/sdlc-health`) | agent with a person | explains the findings, drafts backlog items |
 | `sdlc explain --change <id> [--json]` | anyone | why a change is where it is; writes nothing |
 | `sdlc answer <n> --change <id> --text "…"` | person | answers an open question; `--list` shows them |
@@ -222,16 +279,32 @@ plan drift, trace); `sdlc health` looks at everything.
 | `sdlc approvals verify` | anyone | signatures and approval trailers |
 | `sdlc backlog move` | person | orders the drafted improvements |
 
-## 13.5. Limits we accept
+The `--since` or `--days` option replaces `health.window_days` for one run.
+An unwindowed health run records `health.degraded` or `health.recovered` in the log.
 
-- A policy waiver is recorded on the change the first time it applies (0.11.4): removing the policy later does not
+## 🛡️ Limits
+
+These limits matter when you interpret health and decide whether a gate can move.
+
+- A policy waiver is recorded on the change the first time it applies: removing the policy later does not
   undo it, and archived changes are never waived by a policy. The health thresholds are read from the current
   configuration.
 - An agent can still delete an open question from the artifact before anyone answers it; the approver sees the
   artifact they approve, so the deletion is in plain view.
 - `sdlc waive` does not ask for answers: waiving a gate is itself a person's decision. Answering a question after the
   gate was approved changes the artifact, so that approval goes stale and the gate needs approving again.
-- A change record with answers is format version 3: sdlc before 0.11.4 refuses it rather than drop the answers, so the
-  whole team updates together.
+- A change record with answers uses format version 3. Keep the team on a compatible sdlc installation.
 - Health has no single score on purpose: a number hides what to do.
 - A tool that answers `--version` very slowly is still found, but its version may stay unknown in `sdlc doctor`.
+
+## 📚 Terms
+
+The [glossary](glossary.md) explains [gate](glossary.md), [rework](glossary.md),
+[evidence](glossary.md) and [waiver](glossary.md) in plain words.
+
+## 📚 See also
+
+- [User guide](05-guide.md) — follow stages and gates from the first intent.
+- [Roles and signed approvals](08-roles-and-signing.md) — see who can decide.
+- [Traceability and audit](14-traceability.md) — inspect the recorded trail.
+- [Dashboard example](21-dashboard-health-example.md) — read health findings in a team run.

@@ -79,7 +79,7 @@ The course says so where it matters. The main points:
 
 Since 0.19.0 sdlc brings open GitHub issues into the backlog and closes them on archive
 (`sdlc backlog import --issues`, Lessons 4.3 and 8.5), sends the daily summary as an event (`sdlc events summary`,
-Lesson 9.7), takes alerts from monitoring (`sdlc triage intake`, Lesson 6.9), serves the read-only MCP tools over HTTP
+Lesson 9.7), takes alerts from monitoring (`sdlc triage intake`, Lesson 6.9), serves its MCP tools over HTTP
 with a token (`sdlc mcp serve --http`, Lesson 9.8), and hands a task to any executor (`sdlc task export`, Lesson 10.7).
 
 Since 0.20.0 a judge checks a gate's artifacts by the team's rubric before a person approves (`sdlc judge`,
