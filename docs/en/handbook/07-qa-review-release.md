@@ -3,7 +3,11 @@
 The code of `add-due-dates` is written. Now three people take over the decisions. **Grace** (QA engineer) makes sure the
 evidence is real and says what it does not cover. **Paul** (code owner) reviews the change and approves the review gate.
 
-## Contents
+## On this page
+
+This chapter follows the evidence and decisions from verification through archive.
+
+### Contents
 
 - [7.1 Verification evidence: `sdlc verify` and `verification.md`](#s7-1)
 - [7.2 CI results as evidence: `verify.mcp` and the inbox](#s7-2)
@@ -13,15 +17,26 @@ evidence is real and says what it does not cover. **Paul** (code owner) reviews 
 - [7.6 The code owner approves the review](#s7-6)
 - [7.7 Release: `release.md`, release checks and the production rule](#s7-7)
 - [7.8 Archive and the changelog](#s7-8)
+- [Terms](#terms)
+- [See also](#see-also)
 
-### Context
+**Emily** (release manager) authorizes the production release. The agent prepares evidence for each person, who reads
+the records before deciding. In this `tasklet` example, `gates.release.required: true` makes release approval required
+([Section 2.5](02-toolchain-mcp.md#s2-5)). The `github` MCP server answers CI questions
+([Section 2.4](02-toolchain-mcp.md#s2-4)); your server's tool names may differ.
 
-**Emily** (release manager) authorizes the production release. The agent does the preparation for each of them; none of
-them asks the agent "is it done?", they read the records. The outputs in this chapter come from sdlc 0.14.4 on a copy of
-`tasklet`. In that copy the release gate is required
-(`gates.release.required: true`, [Section 2.5](02-toolchain-mcp.md#s2-5)), and the `github` MCP server answers the CI
-questions ([Section 2.4](02-toolchain-mcp.md#s2-4)). The server in the copy was a small stand-in with the same tool name;
-your server's tool names may differ.
+This diagram shows who makes each decision after the build:
+
+```mermaid
+flowchart LR
+  B[Build complete] -->|checks evidence| G[Grace]
+  G -->|hands evidence to| P[Paul]
+  P -->|approves review| E[Emily]
+  E -->|authorizes release| A[Archive]
+```
+
+> [!IMPORTANT]
+> Each person reads the record and acts in their own terminal. An agent cannot approve a gate for them.
 
 
 <a id="s7-1"></a>
@@ -212,8 +227,11 @@ commit is green. The CLI asks GitHub itself; the agent never reports the result.
 
 ### Pitfalls
 
-- Since 0.15.0, `sdlc verify --list` shows the `verify.mcp` checks (name, server, tool, required) next to the
-  commands. In 0.14.4 it listed only `verify.commands`.
+- `sdlc verify --list` shows the `verify.mcp` checks next to `verify.commands`. For each check, it shows:
+  - name;
+  - server;
+  - tool;
+  - whether it is required.
 - CI writes inbox files on its own machine. They reach the developer only when CI commits them.
 - A server that cannot be reached fails a required check. That is on purpose: "could not ask" is not "green".
 - The CLI's own `verify.mcp` call is not an agent call, so the stage rule (`[sdlc:mcp-stage]`) does not apply to it.
@@ -293,7 +311,7 @@ follow a change from intent to evidence in one command.
    The task-to-commit links come from the `SDLC-Change` and `SDLC-Task` trailers (Chapter 6, [Lesson
    6.8](06-developer.md#s6-8)).
 
-5. Grace accepts the evidence. Since 0.18.0, a team can record this decision with the optional `qa` gate between
+5. Grace accepts the evidence. A team can record this decision with the optional `qa` gate between
    verify and review. Steven turns it on in `openspec/sdlc.yaml` and gives Grace the `qa` role in `roles.yaml`:
 
    ```yaml
@@ -325,10 +343,10 @@ follow a change from intent to evidence in one command.
 
 - The behavioural table is written by the agent from the verifier's report. Grace reads it against the attachments
   and her own spot checks; it is not machine evidence like the block above it.
-- A legacy task with no code (like "run sdlc verify") may show as a gap "task without a commit". Read the gaps, do not chase a
-  zero.
-- Since 0.15.2, `sdlc trace` shows `Status: deferred (D1)` as `deferred (D1)` and keeps the D1 link.
-- Since 0.18.0, `verify.require_behaviour: true` makes the verify gate wait for the behavioural table: one row per
+- A legacy task with no code (like "run sdlc verify") may show as a gap "task without a commit". Read the gaps.
+  Do not chase a zero.
+- `sdlc trace` shows `Status: deferred (D1)` as `deferred (D1)` and keeps the D1 link.
+- `verify.require_behaviour: true` makes the verify gate wait for the behavioural table: one row per
   spec scenario, as `sdlc verify --check --strict` checks it. Until then the gate's reason names the uncovered
   scenarios, and `sdlc next` asks the agent to fill the table. The default is `false`.
 
@@ -379,7 +397,7 @@ Paul knows what the agent's review covers before he reads the diff, and where ea
    | lens | verification-gaps | behaviour that tests and evidence do not prove |
 
    The same lists are in `review.passes` and `review.lenses` of `openspec/sdlc.yaml`. Paul adds the team's design
-   principles to `REVIEW.md` (for example "money is always a decimal type"). Since 0.20.0, an accepted pack can add
+   principles to `REVIEW.md` (for example "money is always a decimal type"). An accepted pack can add
    a lens of its own, named `<pack>-<id>` (lesson 3.7).
 
 3. The agent runs each pass and lens in a fresh context (the `sdlc-reviewer` subagent) and writes `review.md`:
@@ -401,9 +419,14 @@ Paul knows what the agent's review covers before he reads the diff, and where ea
    - verification-gaps: none found — checked: each scenario has a test
    ```
 
-   Severities: **important** (breaks behaviour, leaks data, breaches a policy), **nit** (style and naming, at most
-   five), **pre-existing** (a problem the change did not introduce). Every pass and lens needs a line under
-   `## Coverage`, with a count or `none found — checked: <what was checked>`.
+   Findings use these severities:
+
+   - **important** — breaks behaviour, leaks data or breaches a policy;
+   - **nit** — style or naming, at most five;
+   - **pre-existing** — a problem the change did not introduce.
+
+   Every pass and lens needs a line under `## Coverage`. Record a count or
+   `none found — checked: <what was checked>`.
 
 4. The agent checks the findings:
 
@@ -441,8 +464,8 @@ gate instead of finding design problems in review.
 
 ### Procedure
 
-1. For each finding with a real choice, the agent asks Oliver: fix, defer, or accept, with a recommendation and the
-   consequences. The decisions in `add-due-dates`:
+1. For each finding with a real choice, the agent asks Oliver to fix, defer or accept it. The agent gives a
+   recommendation and the consequences. The decisions in `add-due-dates` are:
 
    | Finding | Decision | Status line in `review.md` |
    |---|---|---|
@@ -510,7 +533,7 @@ gate instead of finding design problems in review.
 - Editing `plan.md` after the plan approval makes the plan gate stale. Record plan drift in `review.md` instead, or
   ask Ethan to send the change back (`sdlc rework plan`).
 - A fix after `sdlc verify` makes the evidence stale. Run `sdlc verify` again before Paul approves.
-- This lesson used sdlc 0.14.4. Since 0.15.2, `sdlc next` asks the agent to record the debate first;
+- `sdlc next` asks the agent to record the debate first;
   `sdlc next --me` lists the spec gate for Megan once `## Debate` is complete.
 - The debate is recorded text. sdlc checks that both positions and the decision are there, not how good they are.
 
@@ -615,8 +638,14 @@ checks in front of her. Production commands stay closed until she approves.
 
 ### Procedure
 
-1. Oliver runs `/sdlc:release` (or `/sdlc:next`). The agent writes `release.md` from `sdlc instructions release`: the
-   version and changelog, the rollout per environment, the monitoring signals and control bands, and the rollback.
+1. Oliver runs `/sdlc:release` (or `/sdlc:next`). The agent writes `release.md` from `sdlc instructions release`.
+   It covers:
+
+   - the version and changelog;
+   - the rollout per environment;
+   - monitoring signals and control bands;
+   - the rollback.
+
    The changelog section comes from the specs:
 
    ```bash
@@ -790,3 +819,15 @@ the specs.
   forced archives.
 - A change that alters no behaviour (tooling, docs) is archived with `--skip-specs`.
 - For an auditor, Laura exports the evidence: `sdlc audit --export evidence-q4 --since 2026-10-01` (Chapter 9).
+
+## Terms
+
+- [Evidence](../glossary.md) — recorded results tied to the working tree checked.
+- [Gate](../glossary.md) — a decision point before a change advances.
+- [Review](../glossary.md) — the gate where findings and their status are checked.
+
+## See also
+
+- [Course module 7](../course/07-qa-review-release.md) — watch the same decisions in short lessons.
+- [The developer's day](06-developer.md) — see how the build reaches verification.
+- [Glossary](../glossary.md) — look up process terms as you read.

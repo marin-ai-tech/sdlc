@@ -3,7 +3,11 @@
 Oliver is a developer at Northwind Labs. He works on `tasklet` with Claude Code in his terminal. The agent writes the
 artifacts and the code. Oliver steers it, reads what it produced and runs the commands that only a person may run.
 
-## Contents
+## On this page
+
+This chapter has nine lessons. Use the outline to jump to the part you need.
+
+### Contents
 
 - [6.1 Starting a session: what the agent knows](#s6-1)
 - [6.2 Moving a change on: `/sdlc:next` and `/sdlc:status`](#s6-2)
@@ -14,13 +18,26 @@ artifacts and the code. Oliver steers it, reads what it produced and runs the co
 - [6.7 The bug-fix protocol: locked tests](#s6-7)
 - [6.8 Commits, checkpoints and going back to the plan](#s6-8)
 - [6.9 From a failing build or an alert to a new change: `/sdlc:triage`](#s6-9)
+- [Terms](#terms)
+- [See also](#see-also)
 
-### Context
+The chapter follows Oliver from his first prompt to a bug fix and an afternoon alert. The examples use a copy of
+`tasklet`. Steven sets `enforcement.mode: block` and makes the release gate required. In `warn` mode, process rules
+remind the agent. Hard rules deny in both modes.
 
-This chapter follows one working day: from the first prompt in the morning to a bug fix and an alert in the afternoon.
-The outputs in this chapter come from sdlc 0.14.4 on a copy of `tasklet`. In `tasklet`, Steven set `enforcement.mode:
-block` and made the release gate required. In a project in `warn` mode
-the process rules only remind the agent; the hard rules deny in both modes.
+The handoff between Oliver, the agent and the approver follows this path:
+
+```mermaid
+flowchart LR
+  O[Oliver] -->|asks for next step| A[Agent]
+  A -->|prepares plan| G[Plan gate]
+  G -->|asks for approval| E[Ethan]
+  E -->|approves| A
+  A -->|implements| V[Verification]
+```
+
+> [!TIP]
+> Use `sdlc status` after a person acts in another terminal. The session summary is a snapshot.
 
 
 <a id="s6-1"></a>
@@ -81,7 +98,8 @@ what happened overnight. He turns on the status line.
    `inbox done` decides nothing, so the agent may run it. The inbox files themselves are written only by the CLI.
 
 3. Oliver turns on the status line once. Steven can do it for the project with `sdlc init --statusline`; it adds a
-   `statusLine` entry to `.claude/settings.json` that runs `sdlc statusline` (Claude Code passes the session on stdin; run bare in a terminal, the command prints nothing). Under the prompt Oliver now sees one line:
+   `statusLine` entry to `.claude/settings.json` that runs `sdlc statusline`. Claude Code passes the session on stdin.
+   Run the command bare in a terminal and it prints nothing. Under the prompt Oliver now sees one line:
 
    ```text
    add-due-dates · Build (plan + implementation) · next: person
@@ -121,8 +139,14 @@ what waits for him.
    > /sdlc:status
    ```
 
-   The agent runs `sdlc status` and summarizes each change: stage, the first open gate, stale approvals, verification
-   and review state, and the next actions grouped by actor. The CLI view of one change looks like this:
+   The agent runs `sdlc status` and summarizes each change:
+
+   - the stage and first open gate;
+   - stale approvals;
+   - verification and review state;
+   - next actions grouped by actor.
+
+   The CLI view of one change looks like this:
 
    ```text
    add-due-dates  [feature · risk medium · full track · schema sdlc]
@@ -144,7 +168,12 @@ what waits for him.
    ```
 
    The agent runs `sdlc next --change <id> --json`. If the next actor is the agent, it runs the workflow that
-   `next` names (spec, plan, build, verify, review, release or archive). If the next actor is a person, it stops,
+   `next` names. It may be:
+
+   - spec, plan or build;
+   - verify or review;
+   - release or archive.
+   If the next actor is a person, it stops,
    says what to read, and gives the exact command. For `add-due-dates` after the spec gate:
 
    ```text
@@ -220,10 +249,16 @@ an edit, and how to read any denial in two steps.
    `sdlc guide denials#plan-gate`.
    ```
 
-2. A shell write is checked like an edit (since 0.14.0, in every tool). The agent tries
-   `echo export const x = 1 > src/due.js` and gets the same rule for `src/due.js`. The hook also reads `tee`, `cp`,
-   `mv`, `sed -i`, PowerShell `Set-Content` and `Out-File`, `git checkout -- <paths>`, `git apply`, `curl -o`,
-   one-line `node -e` and `python -c`, and more. Reading a file is never denied.
+2. A shell write is checked like an edit in every tool. The agent tries
+   `echo export const x = 1 > src/due.js` and gets the same rule for `src/due.js`. The hook also reads writes from:
+
+   - `tee`, `cp`, `mv` and `sed -i`;
+   - PowerShell `Set-Content` and `Out-File`;
+   - `git checkout -- <paths>` and `git apply`;
+   - `curl -o`;
+   - one-line `node -e` and `python -c`.
+
+   Reading a file is never denied.
 
 3. Oliver reads the denial in two steps:
    - The rule name is in brackets: `[sdlc:plan-gate]`.
@@ -322,7 +357,7 @@ Oliver knows the rules that deny in every mode, what each protects, and what to 
 
 - Hard rules deny in `warn` mode too. Only `plan-gate` and `mcp-stage` are process rules.
 - The secret patterns are fixed prefixes. A secret in an unusual format is not caught; keep a secret scanner in CI.
-- Since 0.15.2, the `state-integrity` reason names `openspec/roles.yaml` and explains that only a person may change it.
+- The `state-integrity` reason names `openspec/roles.yaml` and explains that only a person may change it.
 - A team member who wants to "just switch the hook off" is asking to change `enforcement.mode` in
   `openspec/sdlc.yaml`. That is a person's decision, recorded in git, and `sdlc health` reports it.
 
@@ -468,10 +503,14 @@ Oliver starts a small, bounded change that skips intent and spec. He knows that 
 ### Pitfalls
 
 - Lite saves the writing and approving of intent and spec, nothing else.
-- Do not use lite for new behaviour users will notice, for security, data or public APIs, or when the scope is
-  unclear. `sdlc health` reports the lite track on behaviour changes.
+- Do not use lite when the scope is unclear or the change affects:
+  - behaviour users will notice;
+  - security;
+  - data;
+  - public APIs.
+  `sdlc health` reports the lite track on behaviour changes.
 - `track set` is refused after the plan is approved. Decide the track before the plan.
-- `--source-ref "GH-42"` alone only links the change to the issue. Since 0.19.0 sdlc can also close the issue: with
+- `--source-ref "GH-42"` alone only links the change to the issue. sdlc can also close the issue: with
   `issues:` in `openspec/sdlc.yaml`, `sdlc backlog import --issues` brings each open issue in as a backlog item with
   `Issue: GH-<n>` ([Section 8.5](08-brownfield.md#s8-5)). Start the change from that item with `sdlc backlog start`
   (Chapter 4). When the change is archived, sdlc comments on the issue and closes it through the team's GitHub MCP
@@ -620,8 +659,14 @@ change back to the plan.
 
 ### Pitfalls
 
-- `--reason` must be a category from `rework.reasons`: missing-requirement, wrong-assumption, design-flaw,
-  implementation-bug, test-gap, scope-change, other.
+- `--reason` must be a category from `rework.reasons`:
+  - missing-requirement;
+  - wrong-assumption;
+  - design-flaw;
+  - implementation-bug;
+  - test-gap;
+  - scope-change;
+  - other.
 - Approving again with nothing changed since the approval before the rework needs `--note` (why nothing had to
   change). `sdlc approve plan --change <id> --preview` shows it.
 - `rework` is a person's command. The agent proposes it and gives the command.
@@ -655,7 +700,7 @@ dismisses. No fix happens before that decision.
    [ALERT] tasklet prod: POST /tasks 5xx rate 7% for 10 min (band 5%)
    ```
 
-   Since 0.19.0 an alert can enter sdlc as data. A small script of the team's monitoring, or Oliver himself, passes
+   An alert can enter sdlc as data. A small script of the team's monitoring, or Oliver himself, passes
    it to `sdlc triage intake` as one JSON object (`id` and `title`; `severity` and `url` are optional):
 
    ```bash
@@ -685,7 +730,7 @@ dismisses. No fix happens before that decision.
    ```
 
    With `events` configured ([Section 2.6](02-toolchain-mcp.md#s2-6)), the waiting intent gate goes to the Telegram
-   bot, and Megan gets the message with her name in `waitingFor`. Since 0.19.0, when Megan has a `chat` handle in
+   bot, and Megan gets the message with her name in `waitingFor`. When Megan has a `chat` handle in
    `roles.yaml` and the receiver has `chat: telegram`, the message mentions her by that handle.
 
 ### You are done when
@@ -703,6 +748,19 @@ dismisses. No fix happens before that decision.
 - An agent may ask for `--track lite` for a bounded fix. The change stays full until a person runs
   `sdlc track set lite`.
 - A Telegram message is never an approval. Approvals happen only in a person's terminal.
-- The `github` server is listed for `plan`, `build`, `test` and `deploy` ([Section 2.3](02-toolchain-mcp.md#s2-3)). While other changes are
+- The `github` server is listed for `plan`, `build`, `test` and `deploy`
+  ([Section 2.3](02-toolchain-mcp.md#s2-3)). While other changes are
   active, a call outside their stages is reminded (warn) or denied (block) with `[sdlc:mcp-stage]`
   (`sdlc guide denials#mcp-stage`). With no active change this is not checked.
+
+## Terms
+
+- [Gate](../glossary.md) — a decision point before work advances.
+- [Guard](../glossary.md) — a process rule that protects a gate or file.
+- [Locked tests](../glossary.md) — tests the agent cannot edit during a bug fix.
+
+## See also
+
+- [Course module 6](../course/06-developer.md) — follow the same work as short video lessons.
+- [Quality, review and release](07-qa-review-release.md) — continue from the build to the release.
+- [Glossary](../glossary.md) — look up process terms as you read.

@@ -5,23 +5,40 @@ the evidence is real and says what it does not cover. **Paul** (code owner) revi
 review gate. **Emily** (release manager) authorizes the production release. The agent does the preparation for each of
 them; none of them asks the agent "is it done?", they read the records.
 
-The outputs in this module come from sdlc 0.14.4 on a copy of `tasklet`. In that copy the release gate is required (`gates.release.required: true`,
-Lesson 2.5), and the `github` MCP server answers the CI questions (Lesson 2.4). The server in the copy was a small
-stand-in with the same tool name; your server's tool names may differ.
+## On this page
 
-In this module:
+### In this module
 
-- Lesson 7.1 — Verification evidence: `sdlc verify` and `verification.md`
-- Lesson 7.2 — CI results as evidence: `verify.mcp` and the inbox
-- Lesson 7.3 — Independent verification and the trace
-- Lesson 7.4 — The agent's review: context, passes and lenses, `review.md`
-- Lesson 7.5 — Findings: fix, accept or defer; the debate lens
-- Lesson 7.6 — The code owner approves the review
-- Lesson 7.7 — Release: `release.md`, release checks and the production rule
-- Lesson 7.8 — Archive and the changelog
+- [Lesson 7.1 — Verification evidence: `sdlc verify` and `verification.md`](#lesson-7-1)
+- [Lesson 7.2 — CI results as evidence: `verify.mcp` and the inbox](#lesson-7-2)
+- [Lesson 7.3 — Independent verification and the trace](#lesson-7-3)
+- [Lesson 7.4 — The agent's review: context, passes and lenses, `review.md`](#lesson-7-4)
+- [Lesson 7.5 — Findings: fix, accept or defer; the debate lens](#lesson-7-5)
+- [Lesson 7.6 — The code owner approves the review](#lesson-7-6)
+- [Lesson 7.7 — Release: `release.md`, release checks and the production rule](#lesson-7-7)
+- [Lesson 7.8 — Archive and the changelog](#lesson-7-8)
+- [Terms](#terms)
+- [See also](#see-also)
+
+In this `tasklet` example, `gates.release.required: true` makes release approval required (Lesson 2.5). The `github`
+MCP server answers CI questions (Lesson 2.4); your server's tool names may differ.
+
+This diagram shows who makes each decision after the build:
+
+```mermaid
+flowchart LR
+  B[Build complete] -->|checks evidence| G[Grace]
+  G -->|hands evidence to| P[Paul]
+  P -->|approves review| E[Emily]
+  E -->|authorizes release| A[Archive]
+```
+
+> [!IMPORTANT]
+> Each person reads the record and acts in their own terminal. An agent cannot approve a gate for them.
 
 ---
 
+<a id="lesson-7-1"></a>
 ## Lesson 7.1 — Verification evidence: `sdlc verify` and `verification.md`            (video: ~6 min)
 
 **Role:** Grace (QA engineer), with the agent   **Project:** tasklet   **You need:** a change whose tasks are done
@@ -133,6 +150,7 @@ never evidence.
 
 ---
 
+<a id="lesson-7-2"></a>
 ## Lesson 7.2 — CI results as evidence: `verify.mcp` and the inbox            (video: ~5 min)
 
 **Role:** Grace (QA engineer), with the agent   **Project:** tasklet   **You need:** the `ci-green` check that Steven
@@ -214,8 +232,11 @@ commit is green. The CLI asks GitHub itself; the agent never reports the result.
 
 ### Pitfalls
 
-- Since 0.15.0, `sdlc verify --list` shows the `verify.mcp` checks (name, server, tool, required) next to the
-  commands. In 0.14.4 it listed only `verify.commands`.
+- `sdlc verify --list` shows the `verify.mcp` checks next to `verify.commands`. For each check, it shows:
+  - name;
+  - server;
+  - tool;
+  - whether it is required.
 - CI writes inbox files on its own machine. They reach the developer only when CI commits them.
 - A server that cannot be reached fails a required check. That is on purpose: "could not ask" is not "green".
 - The CLI's own `verify.mcp` call is not an agent call, so the stage rule (`[sdlc:mcp-stage]`) does not apply to it.
@@ -228,6 +249,7 @@ commit is green. The CLI asks GitHub itself; the agent never reports the result.
 
 ---
 
+<a id="lesson-7-3"></a>
 ## Lesson 7.3 — Independent verification and the trace            (video: ~6 min)
 
 **Role:** Grace (QA engineer), with the agent   **Project:** tasklet   **You need:** Lesson 7.1
@@ -300,7 +322,7 @@ follow a change from intent to evidence in one command.
 
    The task-to-commit links come from the `SDLC-Change` and `SDLC-Task` trailers (Module 6, Lesson 6.8).
 
-5. Grace accepts the evidence. Since 0.18.0, a team can record this decision with the optional `qa` gate between
+5. Grace accepts the evidence. A team can record this decision with the optional `qa` gate between
    verify and review. Steven turns it on in `openspec/sdlc.yaml` and gives Grace the `qa` role in `roles.yaml`:
 
    ```yaml
@@ -332,10 +354,10 @@ follow a change from intent to evidence in one command.
 
 - The behavioural table is written by the agent from the verifier's report. Grace reads it against the attachments
   and her own spot checks; it is not machine evidence like the block above it.
-- A legacy task with no code (like "run sdlc verify") may show as a gap "task without a commit". Read the gaps, do not chase a
-  zero.
-- Since 0.15.2, `sdlc trace` shows `Status: deferred (D1)` as `deferred (D1)` and keeps the D1 link.
-- Since 0.18.0, `verify.require_behaviour: true` makes the verify gate wait for the behavioural table: one row per
+- A legacy task with no code (like "run sdlc verify") may show as a gap "task without a commit". Read the gaps.
+  Do not chase a zero.
+- `sdlc trace` shows `Status: deferred (D1)` as `deferred (D1)` and keeps the D1 link.
+- `verify.require_behaviour: true` makes the verify gate wait for the behavioural table: one row per
   spec scenario, as `sdlc verify --check --strict` checks it. Until then the gate's reason names the uncovered
   scenarios, and `sdlc next` asks the agent to fill the table. The default is `false`.
 
@@ -347,6 +369,7 @@ follow a change from intent to evidence in one command.
 
 ---
 
+<a id="lesson-7-4"></a>
 ## Lesson 7.4 — The agent's review: context, passes and lenses, `review.md`            (video: ~7 min)
 
 **Role:** Paul (code owner) watches; the agent reviews   **Project:** tasklet   **You need:** the verify gate passed
@@ -392,7 +415,7 @@ follow a change from intent to evidence in one command.
    | lens | verification-gaps | behaviour that tests and evidence do not prove |
 
    The same lists are in `review.passes` and `review.lenses` of `openspec/sdlc.yaml`. Paul adds the team's design
-   principles to `REVIEW.md` (for example "money is always a decimal type"). Since 0.20.0, an accepted pack can add
+   principles to `REVIEW.md` (for example "money is always a decimal type"). An accepted pack can add
    a lens of its own, named `<pack>-<id>` (lesson 3.7).
 
 3. The agent runs each pass and lens in a fresh context (the `sdlc-reviewer` subagent) and writes `review.md`:
@@ -414,9 +437,14 @@ follow a change from intent to evidence in one command.
    - verification-gaps: none found — checked: each scenario has a test
    ```
 
-   Severities: **important** (breaks behaviour, leaks data, breaches a policy), **nit** (style and naming, at most
-   five), **pre-existing** (a problem the change did not introduce). Every pass and lens needs a line under
-   `## Coverage`, with a count or `none found — checked: <what was checked>`.
+   Findings use these severities:
+
+   - **important** — breaks behaviour, leaks data or breaches a policy;
+   - **nit** — style or naming, at most five;
+   - **pre-existing** — a problem the change did not introduce.
+
+   Every pass and lens needs a line under `## Coverage`. Record a count or
+   `none found — checked: <what was checked>`.
 
 4. The agent checks the findings:
 
@@ -451,6 +479,7 @@ follow a change from intent to evidence in one command.
 
 ---
 
+<a id="lesson-7-5"></a>
 ## Lesson 7.5 — Findings: fix, accept or defer; the debate lens            (video: ~6 min)
 
 **Role:** Oliver with the agent; Ethan (tech lead) for the debate lens   **Project:** tasklet   **You need:** Lesson 7.4
@@ -460,8 +489,8 @@ gate instead of finding design problems in review.
 
 ### Steps
 
-1. For each finding with a real choice, the agent asks Oliver: fix, defer, or accept, with a recommendation and the
-   consequences. The decisions in `add-due-dates`:
+1. For each finding with a real choice, the agent asks Oliver to fix, defer or accept it. The agent gives a
+   recommendation and the consequences. The decisions in `add-due-dates` are:
 
    | Finding | Decision | Status line in `review.md` |
    |---|---|---|
@@ -529,7 +558,7 @@ gate instead of finding design problems in review.
 - Editing `plan.md` after the plan approval makes the plan gate stale. Record plan drift in `review.md` instead, or
   ask Ethan to send the change back (`sdlc rework plan`).
 - A fix after `sdlc verify` makes the evidence stale. Run `sdlc verify` again before Paul approves.
-- This lesson used sdlc 0.14.4. Since 0.15.2, `sdlc next` asks the agent to record the debate first;
+- `sdlc next` asks the agent to record the debate first;
   `sdlc next --me` lists the spec gate for Megan once `## Debate` is complete.
 - The debate is recorded text. sdlc checks that both positions and the decision are there, not how good they are.
 
@@ -541,6 +570,7 @@ gate instead of finding design problems in review.
 
 ---
 
+<a id="lesson-7-6"></a>
 ## Lesson 7.6 — The code owner approves the review            (video: ~5 min)
 
 **Role:** Paul (code owner)   **Project:** tasklet   **You need:** `sdlc review check` green, verification fresh
@@ -637,6 +667,7 @@ cannot approve.
 
 ---
 
+<a id="lesson-7-7"></a>
 ## Lesson 7.7 — Release: `release.md`, release checks and the production rule            (video: ~7 min)
 
 **Role:** Emily (release manager), with the agent   **Project:** tasklet   **You need:** the review gate approved,
@@ -647,8 +678,14 @@ checks in front of her. Production commands stay closed until she approves.
 
 ### Steps
 
-1. Oliver runs `/sdlc:release` (or `/sdlc:next`). The agent writes `release.md` from `sdlc instructions release`: the
-   version and changelog, the rollout per environment, the monitoring signals and control bands, and the rollback.
+1. Oliver runs `/sdlc:release` (or `/sdlc:next`). The agent writes `release.md` from `sdlc instructions release`.
+   It covers:
+
+   - the version and changelog;
+   - the rollout per environment;
+   - monitoring signals and control bands;
+   - the rollback.
+
    The changelog section comes from the specs:
 
    ```bash
@@ -765,6 +802,7 @@ checks in front of her. Production commands stay closed until she approves.
 
 ---
 
+<a id="lesson-7-8"></a>
 ## Lesson 7.8 — Archive and the changelog            (video: ~5 min)
 
 **Role:** the agent; Emily and Laura read the results   **Project:** tasklet   **You need:** every required gate
@@ -834,3 +872,15 @@ the specs.
 - `sdlc next` showing "Done (ready to archive)".
 - The archive folder tree, then `openspec/specs/tasks/spec.md`.
 - `sdlc changelog --since` pasted into a GitHub release draft.
+
+## Terms
+
+- [Evidence](../glossary.md) — recorded results tied to the working tree checked.
+- [Gate](../glossary.md) — a decision point before a change advances.
+- [Review](../glossary.md) — the gate where findings and their status are checked.
+
+## See also
+
+- [Handbook chapter 7](../handbook/07-qa-review-release.md) — read the same decisions at your own pace.
+- [The developer's day](06-developer.md) — see how the build reaches verification.
+- [Glossary](../glossary.md) — look up process terms as you read.

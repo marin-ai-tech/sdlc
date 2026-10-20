@@ -4,23 +4,39 @@
 CODEOWNERS file and open GitHub issues. It has no sdlc. **Steven** (platform engineer) converts it, with **Ethan**
 (tech lead) deciding what the team keeps and what changes. The rest of the team keeps working while this happens.
 
-The outputs in this module are real. They come from sdlc 0.14.4 on a small copy of `billing-api` made for this
-course: `package.json` with `build`, `test` and `lint` scripts, `src/`, `test/`, `.github/workflows/ci.yml`,
-`.github/CODEOWNERS`, `ARCHITECTURE.md`, `CONTRIBUTING.md` and `docs/adr/`, with commits by Ethan, Paul and Oliver.
+## On this page
 
 In this module:
 
-- Lesson 8.1 — What you have, and the plan
-- Lesson 8.2 — `sdlc init` on an existing repository
-- Lesson 8.3 — The documents: `layout check`, `layout adapt` or `layout convert`
-- Lesson 8.4 — `/sdlc:adopt`, `sdlc adopt --apply` and the roles of the real team
-- Lesson 8.5 — Open issues and planning documents into the backlog
-- Lesson 8.6 — The first changes in warn mode: lite, then full
-- Lesson 8.7 — From warn to block
-- Lesson 8.8 — What to tell the team
+- [Lesson 8.1: What you have, and the plan](#lesson-8-1)
+- [Lesson 8.2: `sdlc init` on an existing repository](#lesson-8-2)
+- [Lesson 8.3: The documents: `layout check`, `layout adapt` or `layout convert`](#lesson-8-3)
+- [Lesson 8.4: `/sdlc:adopt`, `sdlc adopt --apply` and the roles of the real team](#lesson-8-4)
+- [Lesson 8.5: Open issues and planning documents into the backlog](#lesson-8-5)
+- [Lesson 8.6: The first changes in warn mode: lite, then full](#lesson-8-6)
+- [Lesson 8.7: From warn to block](#lesson-8-7)
+- [Lesson 8.8: What to tell the team](#lesson-8-8)
+- [Gaps found](#gaps-found)
+- [Terms](#terms)
+- [See also](#see-also)
+
 
 ---
 
+This sequence shows how Steven introduces gates while the team keeps working:
+
+```mermaid
+flowchart LR
+    A[Inspect project] -->|initialize| B[Warn mode]
+    B -->|adapt documents| C[Roles and backlog]
+    C -->|try changes| D[Lite and full]
+    D -->|enforce| E[Block mode]
+```
+
+> [!TIP]
+> Keep each conversion step in a separate commit so the team can review and revert it.
+
+<a id="lesson-8-1"></a>
 ## Lesson 8.1 — What you have, and the plan            (video: ~5 min)
 
 **Role:** Steven (platform engineer), Ethan (tech lead)   **Project:** billing-api   **You need:** the repository
@@ -28,6 +44,16 @@ cloned, sdlc installed (`sdlc --version`)
 
 **Goal.** Steven and Ethan list what the project already has, what sdlc adds, and in which order they switch it on,
 so that nobody's work stops.
+
+The example uses a small copy of `billing-api`. Its `package.json` has `build`, `test` and `lint` scripts.
+The copy also contains:
+
+- `src/` and `test/`;
+- `.github/workflows/ci.yml` and `.github/CODEOWNERS`;
+- `ARCHITECTURE.md` and `CONTRIBUTING.md`;
+- `docs/adr/`.
+
+Ethan, Paul and Oliver have commits in its history.
 
 ### Steps
 
@@ -72,6 +98,7 @@ so that nobody's work stops.
 
 ---
 
+<a id="lesson-8-2"></a>
 ## Lesson 8.2 — `sdlc init` on an existing repository            (video: ~6 min)
 
 **Role:** Steven (platform engineer)   **Project:** billing-api   **You need:** Lesson 8.1, a clean working copy
@@ -153,6 +180,7 @@ so that nobody's work stops.
 
 ---
 
+<a id="lesson-8-3"></a>
 ## Lesson 8.3 — The documents: `layout check`, `layout adapt` or `layout convert`            (video: ~7 min)
 
 **Role:** Steven (platform engineer), Ethan decides   **Project:** billing-api   **You need:** Lesson 8.2
@@ -276,6 +304,7 @@ For `billing-api`, Ethan chose adapt: the team knows `ARCHITECTURE.md`, and link
 
 ---
 
+<a id="lesson-8-4"></a>
 ## Lesson 8.4 — `/sdlc:adopt`, `sdlc adopt --apply` and the roles of the real team            (video: ~8 min)
 
 **Role:** Steven with the agent; Ethan checks the roles   **Project:** billing-api   **You need:** Lessons 8.2 and 8.3
@@ -398,9 +427,9 @@ For `billing-api`, Ethan chose adapt: the team knows `ARCHITECTURE.md`, and link
 5. CODEOWNERS stays the source of truth for the code owner. Keep `code-owner` in `roles.yaml` equal to the owners in
    CODEOWNERS, and change both in one pull request. `sdlc review suggest` reads CODEOWNERS to put the owners of the
    changed files first. An owner written as an email matches the person with that email. An owner written as a
-    `@handle` matches a person id or a listed `handles` value in `roles.yaml` since 0.16.2.
-    For example, `paul: { name: Paul, emails: [paul@northwind.example], handles: [paul-s] }`.
-    A team such as `@northwind/billing-reviewers` matches nobody.
+   `@handle` matches a person id or a listed `handles` value in `roles.yaml`.
+   For example, `paul: { name: Paul, emails: [paul@northwind.example], handles: [paul-s] }`.
+   A team such as `@northwind/billing-reviewers` matches nobody.
 
 6. Steven commits the documents, `openspec/sdlc.yaml` and `openspec/roles.yaml`, and adds `openspec/roles.yaml` to
    CODEOWNERS with the maintainers, so a change to it needs a maintainer's review.
@@ -413,7 +442,7 @@ For `billing-api`, Ethan chose adapt: the team knows `ARCHITECTURE.md`, and link
 
 ### Pitfalls
 
-- Since 0.16.2, `sdlc adopt` lists unresolved personal handles in text and JSON
+- `sdlc adopt` lists unresolved personal handles in text and JSON
   `owners_unresolved`. Add `handles` to the right people; team handles are not supported.
 - People who left the company are still in the git history. Remove them from the draft before you apply it.
 - `sdlc.yaml` that still has `roles:` keeps them; the draft points to `sdlc roles migrate` (a person's command).
@@ -427,6 +456,7 @@ For `billing-api`, Ethan chose adapt: the team knows `ARCHITECTURE.md`, and link
 
 ---
 
+<a id="lesson-8-5"></a>
 ## Lesson 8.5 — Open issues and planning documents into the backlog            (video: ~6 min)
 
 **Role:** Ethan (tech lead) with the agent; Megan orders the backlog   **Project:** billing-api   **You need:**
@@ -437,7 +467,7 @@ criteria. Planning documents, if the team has them in BMAD format, are imported.
 
 ### Steps
 
-1. Since 0.19.0 sdlc brings the open GitHub issues into the backlog itself, through the team's GitHub MCP server.
+1. sdlc brings the open GitHub issues into the backlog itself, through the team's GitHub MCP server.
    `openspec/sdlc.yaml` is a protected file, so Ethan adds the setting by hand:
 
    ```yaml
@@ -488,8 +518,7 @@ criteria. Planning documents, if the team has them in BMAD format, are imported.
    sdlc import bmad _bmad-output/refunds --to-backlog --dry-run --json
    ```
 
-   This JSON preview is from the sdlc 0.14.4 trial. Since 0.15.2, use `--json` for JSON;
-   the preview shows one epic named after the PRD and one item per functional requirement, with the
+   Use `--json` for a JSON preview. It shows one epic named after the PRD and one item per functional requirement, with
    acceptance from its testable consequences:
 
    ```text
@@ -515,14 +544,14 @@ criteria. Planning documents, if the team has them in BMAD format, are imported.
 - The agent may not edit `openspec/backlog.md` directly (`[sdlc:state-integrity]`); it uses `backlog add` and
   `backlog edit`. People may edit the file by hand.
 - `backlog move` and `backlog drop` are a person's commands.
-- Since 0.19.0, archiving a change whose item has `Issue: GH-<n>` comments on the issue (the comment names the
+- Archiving a change whose item has `Issue: GH-<n>` comments on the issue (the comment names the
   change) and closes it. The calls go through the event outbox: when the GitHub server fails, the archive still
   succeeds and `sdlc events flush` delivers them later. An item without an issue never calls GitHub.
 - sdlc holds no GitHub token. The import and the closing use the team's `github` server from `mcp.servers` and the
   token in each person's own environment.
 - The `github` server is checked against `stages` only while a change is active. List `plan` in its `stages` if the
   agent reads issues while changes are open.
-- Read the imported requirement text. Since 0.15.2, actor-first sentences become requirements such as
+- Read the imported requirement text. Actor-first sentences become requirements such as
   "The system SHALL let the policyholder see …".
 
 ### On screen (for the video)
@@ -533,6 +562,7 @@ criteria. Planning documents, if the team has them in BMAD format, are imported.
 
 ---
 
+<a id="lesson-8-6"></a>
 ## Lesson 8.6 — The first changes in warn mode: lite, then full            (video: ~7 min)
 
 **Role:** Oliver with the agent; Ethan, Megan, Paul decide   **Project:** billing-api   **You need:** Lesson 8.5
@@ -542,7 +572,7 @@ the gates, the people and the reminders before anything is denied.
 
 ### Steps
 
-1. The first change is the VAT bug, B2. Oliver asks the agent to start it:
+1. The first change is the VAT bug. Oliver asks the agent to start its backlog item:
 
    ```bash
    sdlc backlog start B2 --change fix-vat-rounding
@@ -583,7 +613,7 @@ the gates, the people and the reminders before anything is denied.
    openspec/sdlc.yaml). Change it through its owning process, not in an agent session.
    ```
 
-3. The second change is a full one, B1 (partial refunds): `sdlc backlog start B1`, then `/sdlc:intent`, Megan's intent
+3. The second change is a full one for partial refunds: `sdlc backlog start B1`, then `/sdlc:intent`, Megan's intent
    approval, `/sdlc:spec`, Megan's spec approval (Ethan's too when the risk is `high`), `/sdlc:plan`, Ethan's plan
    approval, and the rest as in Modules 6 and 7.
 
@@ -611,6 +641,7 @@ the gates, the people and the reminders before anything is denied.
 
 ---
 
+<a id="lesson-8-7"></a>
 ## Lesson 8.7 — From warn to block            (video: ~5 min)
 
 **Role:** Steven (platform engineer), Ethan decides   **Project:** billing-api   **You need:** at least one change
@@ -676,7 +707,7 @@ no surprise.
   (`agent_cannot_weaken_guard`), and the hook denies edits of `openspec/sdlc.yaml`.
 - Paths the team really wants open before a plan go under `enforcement.exempt_paths`, decided by a person. Do not
   return to `warn` for a single folder.
-- This output is from the trial with sdlc 0.14.4. Since 0.16.0, use `sdlc log --event hook.warned --json`
+- Use `sdlc log --event hook.warned --json`
   to inspect reminders before switching to block. Count them per rule in the filtered output.
 
 ### On screen (for the video)
@@ -687,6 +718,7 @@ no surprise.
 
 ---
 
+<a id="lesson-8-8"></a>
 ## Lesson 8.8 — What to tell the team            (video: ~5 min)
 
 **Role:** Ethan (tech lead), Steven (platform engineer)   **Project:** billing-api   **You need:** Lessons 8.2–8.7
@@ -717,7 +749,7 @@ no surprise.
 3. Steven points newcomers to the tour: `sdlc guide tour` (seven short steps), and to `sdlc guide` for the topics.
 
 4. Steven adds the sdlc checks to the CI pipeline. CI configuration is often a protected path and is a person's
-   decision, so he runs the command himself, in his own terminal: `sdlc ci init --provider github`. Since 0.17.0 it
+   decision, so he runs the command himself, in his own terminal: `sdlc ci init --provider github`. It
    writes `.github/workflows/sdlc.yml`, which runs `sdlc validate --all` and `sdlc approvals verify` on a full clone
    (`fetch-depth: 0`). `.github/workflows/ci.yml` stays as it is. Steven may add more steps himself, for example
    `sdlc review check --change <id>`.
@@ -744,9 +776,18 @@ no surprise.
 
 ## Gaps found
 
-Found while writing Modules 6–8 against sdlc 0.14.4 (temporary copies of `tasklet` and `billing-api`). sdlc 0.19.0
-closes both gaps listed here:
+These examples use temporary copies of `tasklet` and `billing-api`. These cases have supported commands:
 
-- GitHub issues: since 0.19.0 `sdlc backlog import --issues` brings them into the backlog, and archiving a change
+- GitHub issues: `sdlc backlog import --issues` brings them into the backlog, and archiving a change
   closes its linked issue (Lesson 8.5).
-- Alerts: since 0.19.0 `sdlc triage intake` adds an alert from monitoring to the backlog as data (Lesson 6.9).
+- Alerts: `sdlc triage intake` adds an alert from monitoring to the backlog as data (Lesson 6.9).
+
+## Terms
+
+- [Gate](../glossary.md) — a decision point before a change advances.
+- [Evidence](../glossary.md) — recorded results tied to the checked tree.
+
+## See also
+
+- [AI-ready project](../07-ai-ready-project.md) — the document layout used here.
+- [Roles and approvals](../08-roles-and-signing.md) — decisions after adoption.

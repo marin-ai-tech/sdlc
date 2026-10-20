@@ -1,10 +1,13 @@
 # 9. Managing and auditing the process
 
 This chapter is for **Laura**, the engineering manager at Northwind Labs. She does not write code and does not approve
-gates. She read how the process works, finds where it suffers, and answers questions from management and from an
-external auditor. Every command in this chapter only reads the process (or writes a report file).
+gates. She reads how the process works, finds where it suffers, and answers questions from management and from an
+external auditor. The commands in this chapter read the process or write a report file; only `sdlc events summary`
+also records and sends the daily summary event.
 
-## Contents
+## On this page
+
+Use this outline to find the report, health view or audit evidence you need.
 
 - [9.1 The progress report](#s9-1)
 - [9.2 The dashboard, and keeping it current](#s9-2)
@@ -14,13 +17,21 @@ external auditor. Every command in this chapter only reads the process (or write
 - [9.6 Evidence for the auditor](#s9-6)
 - [9.7 The daily summary and events in Telegram](#s9-7)
 - [9.8 A portfolio view over MCP](#s9-8)
+- [Terms](#terms)
+- [See also](#see-also)
 
-### Context
 
-Anyone may run them, including the agent. The outputs in this chapter come from a trial run of `tasklet` with sdlc
-0.14.4: Megan approved the intent and the spec, Ethan approved the plan (and sent it back once), Oliver's agent built
-and verified the change, and Paul approved the review. Times are short because the run took a few minutes.
+This sequence shows how a decision becomes evidence for a report or an auditor:
 
+```mermaid
+flowchart LR
+    A[Gate decision] -->|records| B[Project log]
+    B -->|summarizes| C[Report and dashboard]
+    B -->|exports| D[Audit bundle]
+```
+
+> [!NOTE]
+> Reports and audit exports show recorded decisions. A person still approves each gate in their own terminal.
 
 <a id="s9-1"></a>
 ## 9.1 The progress report
@@ -29,6 +40,10 @@ and verified the change, and Paul approved the review. Times are short because t
 
 Produce the progress report of a project in Markdown or JSON, for one period or one change, and save it to
 a file.
+
+Anyone may run these commands, including the agent. The outputs come from a short trial of `tasklet`.
+Megan approved the intent and spec. Ethan approved the plan after one rework. Oliver’s agent built
+and verified the change, and Paul approved the review.
 
 ### Procedure
 
@@ -133,7 +148,7 @@ Build the HTML dashboard of a project and keep it fresh while the team works.
 
 4. Limit the page like the report: `sdlc dashboard --since 2026-10-01 --change add-task-list --out reports/x.html`.
 
-5. Keep the page current. Since 0.16.1, run `sdlc dashboard --watch` in the project folder. It builds
+5. Keep the page current. Run `sdlc dashboard --watch` in the project folder. It builds
    `reports/dashboard.html` and rebuilds it when `openspec/` changes. With `--serve`, it serves the page with
    auto-refresh. Port 0 selects a free port. Stop it with Ctrl+C:
 
@@ -156,7 +171,7 @@ Build the HTML dashboard of a project and keep it fresh while the team works.
 ### Pitfalls
 
 - `--out` must stay inside the project, as for the report. Keep `reports/` in `.gitignore`, or the page makes the
-  verification of an active change stale ([Section 9.1](#s9-1)). Since 0.15.4, `report --out`, `dashboard --out` and
+  verification of an active change stale ([Section 9.1](#s9-1)). `report --out`, `dashboard --out` and
   `audit --export` warn about such output outside `openspec/` and suggest `.gitignore`. JSON audit exports include
   a top-level `warnings` array with `audit --export --json`.
 - Keep `--out` of the watcher outside `openspec/`, or every rebuild triggers the next one.
@@ -223,12 +238,16 @@ into backlog items that Megan orders.
      rework_share: 0.6    # one rework reason this common is a finding (default 0.5)
    ```
 
-   The other keys and their defaults: `stalled_days: 14`, `deferred_days: 30`, `first_pass_rate: 0.5`,
-   `waiver_share: 0.3`, `reapprovals: 3`, `rejections: 2`, `denials: 5`, `lock_days: 7`.
+   The other keys and their defaults are:
+
+   - `stalled_days: 14` and `deferred_days: 30`;
+   - `first_pass_rate: 0.5` and `waiver_share: 0.3`;
+   - `reapprovals: 3` and `rejections: 2`;
+   - `denials: 5` and `lock_days: 7`.
 
    The report's Markdown lists the newest 20 events unless `--since` asks for the full period; JSON keeps the
-   latest 200 events. The dashboard shows agent log events beside agent commits. `sdlc trace` groups missing task trailers
-   into one gap when no task has a named commit.
+   latest 200 events. The dashboard shows agent log events beside agent commits.
+   `sdlc trace` groups missing task trailers into one gap when no task has a named commit.
 
    Fractional day thresholds compare the full age; facts round it to one decimal. Repeated rejections of one gate
    on one change produce `quality.rejections`. Branch hints name changes as of the last fetch, while health counts
@@ -382,7 +401,7 @@ waits per gate, reworks, people's participation and the agents' share of commits
 
 ### Pitfalls
 
-- Since 0.16.2, `sdlc audit --since <date>` filters the plain audit for that period.
+- `sdlc audit --since <date>` filters the plain audit for that period.
 - The agents' share counts only commits made in an agent's terminal. A person who commits what an agent wrote makes a
   person's commit. `--change` shows the share for that change's commits.
 - An archived change audit also lists commits made while it was active; `--since` limits them.
@@ -521,7 +540,7 @@ evidence of a quarter.
    sdlc approvals verify --mode required     # exits 1 on any problem: use it in CI
    ```
 
-   Since 0.16.3, this needs full git history. Use `actions/checkout` with `fetch-depth: 0` in CI.
+   This needs full git history. Use `actions/checkout` with `fetch-depth: 0` in CI.
    A shallow clone reports `shallow_history`; grafts report `rewritten_history`.
 
    With no `roles.yaml` in history, or with `signing: off` and no mode override, the command prints
@@ -581,8 +600,8 @@ Get a short summary of the project into the team's Telegram chat every morning, 
 events (a gate waits for Megan, an approval, an overdue gate, health degraded) as they happen.
 
 sdlc has no chat API of its own. Everything goes through `events`: sdlc calls a tool of an MCP server you configure,
-with a ready one-line message if the receiver asks for one. A Telegram MCP server is a receiver like any other. Since
-0.19.0 the daily summary is an event too, `summary.daily`, so the same receiver delivers it.
+with a ready one-line message if the receiver asks for one. A Telegram MCP server is a receiver like any other.
+The daily summary is an event too, `summary.daily`, so the same receiver delivers it.
 
 ### Procedure
 
@@ -599,7 +618,7 @@ with a ready one-line message if the receiver asks for one. A Telegram MCP serve
        chat: telegram                   # mention people by their Telegram handle
    ```
 
-   Since 0.19.0 a person in `openspec/roles.yaml` may list chat handles, for example
+   A person in `openspec/roles.yaml` may list chat handles, for example
    `megan: { name: Megan, emails: [megan@northwind.example], chat: { telegram: "@megan_tg" } }`. A receiver with
    `chat: telegram` gets `waitingForChat` (the handles of the people in `waitingFor`), and its message mentions them.
    A receiver without `chat` never gets chat handles.
@@ -624,7 +643,7 @@ with a ready one-line message if the receiver asks for one. A Telegram MCP serve
 
 2. Know what the tool receives. Without `message`, sdlc calls the tool after a command with your static `args` plus
    one `event` object: `{ id, project, event, change, gate, at, sdlc, by, waitingFor }`. `waitingFor` names the
-   people from `roles.yaml` who may take a waiting gate. `id` is stable, so a bot can drop repeats. Since 0.19.0 the
+   people from `roles.yaml` who may take a waiting gate. `id` is stable, so a bot can drop repeats. The
    id of `gate.<g>.awaiting` and `gate.<g>.overdue` comes from `project.name` (when set), the change, the gate, the
    event and the digest the gate waits on, not from the time. Every clone and CI send the same id for the same wait,
    so the bot keeps one message. With
@@ -652,10 +671,10 @@ with a ready one-line message if the receiver asks for one. A Telegram MCP serve
    */15 * * * * cd /srv/northwind/tasklet && git pull --quiet && sdlc events flush
    ```
 
-   Since 0.19.0 the CI configuration from `sdlc ci init` (GitHub and GitLab) runs `sdlc events flush` at the end, also
+   The CI configuration from `sdlc ci init` (GitHub and GitLab) runs `sdlc events flush` at the end, also
    when a check failed, so waits seen in CI are delivered too.
 
-4. Send the daily summary. Since 0.19.0 one command records it and sends it to every receiver whose `on` matches:
+4. Send the daily summary. One command records it and sends it to every receiver whose `on` matches:
 
    ```bash
    cd /srv/northwind/tasklet
@@ -765,8 +784,7 @@ report.
    }
    ```
 
-   Restart Claude Desktop. The server prints, on its error stream, `[sdlc mcp] serving …\tasklet, …\billing-api over
-   stdio (version 0.14.4)`.
+   Restart Claude Desktop. The server prints its project names on the error stream when it serves them over stdio.
 
 2. See what the server offers. With several projects, every tool takes a `project` argument (the `project.name` in
    `openspec/sdlc.yaml`, else the folder name). The tools, from a real listing:
@@ -780,9 +798,9 @@ report.
    | `audit` | `change`, `project` | `sdlc audit --json` |
    | `help` | `topic`, `project` | `sdlc help --json` |
    | `guide` | `topic`, `project` | `sdlc guide <topic> --json` |
-   | `explain` | `change`, `project` | `sdlc explain --json` (since 0.19.0) |
-   | `health` | `since`, `days`, `project` | `sdlc health --json` (since 0.19.0) |
-   | `report` | `since`, `change`, `project` | `sdlc report --format json` (since 0.19.0) |
+   | `explain` | `change`, `project` | `sdlc explain --json` |
+   | `health` | `since`, `days`, `project` | `sdlc health --json` |
+   | `report` | `since`, `change`, `project` | `sdlc report --format json` |
 
    Read-only resources come with them: `sdlc://<project>/spec/<capability>`, `sdlc://<project>/change/<id>/<artifact>`
    and others.
@@ -798,7 +816,7 @@ report.
    The assistant answers from `status`, `next` and `audit`. It cannot approve anything: the decision commands are not
    tools.
 
-4. Since 0.19.0 `health`, `report` and `explain` are MCP tools too, so the assistant can answer from them. For a file
+4. `health`, `report` and `explain` are MCP tools too, so the assistant can answer from them. For a file
    per project on a schedule, a small script on the team server still works:
 
    ```bash
@@ -810,7 +828,7 @@ report.
 
    The process state lives in each repository, so a central job never needs anyone's laptop.
 
-5. A central dashboard over HTTP. Since 0.19.0 the same read-only tools are served over MCP Streamable HTTP at
+5. A central dashboard over HTTP. The same read-only tools are served over MCP Streamable HTTP at
    `/mcp`, so a client on another machine can reach them. A bearer token is always required, also on localhost. It
    comes only from the environment variable `SDLC_MCP_TOKEN` (at least 16 characters), never from a flag:
 
@@ -847,3 +865,13 @@ report.
 - Treat a connected chat client as someone with read access to the repository: it sees names, stages, file paths and
   audit history.
 - Each tool call starts the CLI anew (about half a second). That matters only for scripts with many calls.
+
+## Terms
+
+- [Gate](../glossary.md) — a decision point before a change advances.
+- [Evidence](../glossary.md) — recorded results tied to the checked tree.
+
+## See also
+
+- [Roles and approvals](../08-roles-and-signing.md) — who decides at each gate.
+- [Project health](../13-process-health.md) — investigate process friction.

@@ -6,7 +6,18 @@ It follows Northwind Labs as the team uses sdlc to plan, build, verify and relea
 **tasklet** is a new task-tracking web API, started from an empty folder.
 **billing-api** is an existing service with code, tests and CI that the team converts to the AI SDLC.
 
+## On this page
+
+- [The team](#the-team) — meet the people in the examples.
+- [Chapters](#chapters) — choose a topic.
+- [Tracks by role](#tracks-by-role) — find the sections for your work.
+- [Before you start](#before-you-start) — prepare your tools.
+- [Terms](#terms) — understand the process language.
+- [See also](#see-also) — continue with the course or guide.
+
 ## The team
+
+These people carry decisions through the examples. Their roles stay the same across both projects.
 
 | Person | Role | Main gates and commands |
 |---|---|---|
@@ -20,6 +31,8 @@ It follows Northwind Labs as the team uses sdlc to plan, build, verify and relea
 | Laura | Engineering manager | reports, health, audit |
 
 ## Chapters
+
+Read in order for the full story, or choose a chapter for the task in front of you.
 
 - [0. Introduction](00-introduction.md) — everyone.
 - [1. Setting up a new project](01-setup-greenfield.md) — Steven; 1.3 and 1.6 for everyone.
@@ -96,10 +109,11 @@ Start with chapters 0 and 5, then use the sections for your role.
 
 ### Platform engineer (Steven)
 
-- Chapters 1
-- 2
-- 3
-- 8 and 10
+- [Chapter 1](01-setup-greenfield.md)
+- [Chapter 2](02-toolchain-mcp.md)
+- [Chapter 3](03-roles-and-team.md)
+- [Chapter 8](08-brownfield.md)
+- [Chapter 10](10-multi-agent.md)
 - [6.4](06-developer.md#s6-4)
 - [9.2](09-management-and-audit.md#s9-2)
 - [9.7](09-management-and-audit.md#s9-7)
@@ -120,10 +134,18 @@ Start with chapters 0 and 5, then use the sections for your role.
 
 ## Before you start
 
-- sdlc 0.14.5 or later on the PATH (`sdlc --version`), Node.js 20.19 or later, git. Sections 3.7 and 5.11 need
-  sdlc 0.20.0; Sections 10.7 and 11.8 need sdlc 0.21.0.
+Prepare these tools and credentials before you follow a chapter.
+
+- sdlc on the PATH (`sdlc --version`), Node.js 20.19 or later, and git.
 - Claude Code installed and signed in.
 - For Chapter 2: a GitHub token, a Telegram bot token and the address of your knowledge server, as environment
   variables (`GITHUB_TOKEN`, `TELEGRAM_BOT_TOKEN`). The handbook never writes a secret into a file.
 
-There is also a [video course](../course/README.md) with the same examples and commands.
+## Terms
+
+The [glossary](../glossary.md) defines gates, evidence, MCP and other process terms.
+
+## See also
+
+- [Video course](../course/README.md) — watch the same examples and commands.
+- [User guide](../05-guide.md) — follow a change through its stages.

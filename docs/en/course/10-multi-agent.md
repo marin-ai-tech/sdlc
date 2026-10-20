@@ -1,22 +1,37 @@
 # Module 10. One project, several agent tools
 
-Most of this course uses Claude Code. sdlc supports six agent tools, and one project can serve several of them at once.
-The process stays the same in every tool: the same workflows, subagents, gates, checks and backlog. What differs is
-where each tool keeps its files, how you call a workflow, and how firmly the tool's own hooks hold the gates. This
-module shows those differences, so that Steven can set up a mixed team and everyone knows the limits.
+Most of this course uses Claude Code. This module helps Steven set up a project for six agent tools.
+You will see where each tool keeps its files, how to call workflows and what its hooks can enforce.
+The team shares one process across the tools.
 
-In this module:
+## On this page
 
-- Lesson 10.1 — Six tools, one process
-- Lesson 10.2 — What the hooks hold in each tool
-- Lesson 10.3 — Trust, failures and the limits of each tool
-- Lesson 10.4 — Agent markers and the SDLC-Agent trailer
-- Lesson 10.5 — One MCP registry for every tool
-- Lesson 10.6 — A mixed team at Northwind
-- Lesson 10.7 — Handing a task to any executor
+In this module, you can follow seven short lessons:
+
+- [Lesson 10.1 — Six tools, one process](#lesson-10-1)
+- [Lesson 10.2 — What the hooks hold in each tool](#lesson-10-2)
+- [Lesson 10.3 — Trust, failures and limits](#lesson-10-3)
+- [Lesson 10.4 — Agent markers](#lesson-10-4)
+- [Lesson 10.5 — One MCP registry](#lesson-10-5)
+- [Lesson 10.6 — A mixed team](#lesson-10-6)
+- [Lesson 10.7 — Handing off a task](#lesson-10-7)
+
+The task flow has a human review after an executor returns work:
+
+```mermaid
+flowchart LR
+    A[Approved plan] -->|exports| B[Task]
+    B -->|claimed by| C[Executor]
+    C -->|submits| D[Result check]
+    D -->|informs| E[Human review]
+```
+
+> [!IMPORTANT]
+> A result check does not replace verification or a person's review approval.
 
 ---
 
+<a id="lesson-10-1"></a>
 ## Lesson 10.1 — Six tools, one process            (video: ~6 min)
 
 **Role:** Steven   **Project:** tasklet   **You need:** sdlc installed, a git repository
@@ -32,10 +47,10 @@ workflow in it.
    |---|---|---|
    | Claude Code | `claude` | supported |
    | OpenCode | `opencode` | supported |
-   | Cursor IDE | `cursor` | supported (since 0.13.0) |
-   | Codex CLI | `codex` | supported (since 0.14.0; checked live with codex-cli 0.158.0) |
-   | Qwen Code | `qwen` | supported (since 0.14.1) |
-   | GigaCode CLI | `gigacode` | **experimental** (since 0.14.1; formats only, not checked on a live installation) |
+   | Cursor IDE | `cursor` | supported |
+   | Codex CLI | `codex` | supported |
+   | Qwen Code | `qwen` | supported |
+   | GigaCode CLI | `gigacode` | **experimental** (formats only; not checked on a live installation) |
 
 2. Set up the tools the team uses. Steven runs, in his own terminal:
 
@@ -125,6 +140,7 @@ heartbeat, release and submit reject another executor's claim id with `claim_unk
 
 ---
 
+<a id="lesson-10-2"></a>
 ## Lesson 10.2 — What the hooks hold in each tool            (video: ~7 min)
 
 **Role:** Steven, Ethan   **Project:** tasklet   **You need:** Lesson 10.1
@@ -200,6 +216,7 @@ heartbeat, release and submit reject another executor's claim id with `claim_unk
 
 ---
 
+<a id="lesson-10-3"></a>
 ## Lesson 10.3 — Trust, failures and the limits of each tool            (video: ~7 min)
 
 **Role:** Steven   **Project:** tasklet   **You need:** Lesson 10.2
@@ -253,8 +270,8 @@ heartbeat, release and submit reject another executor's claim id with `claim_unk
    | Claude Code | the check runs once more, then the call is blocked with the reason | the call goes through; `sdlc doctor` warns |
    | OpenCode | the plugin runs the check once more, then blocks the call | the call goes through; `sdlc doctor` warns |
    | Cursor | edits and shell commands are `failClosed`: if the hook cannot run, Cursor blocks the call | — |
-   | Codex CLI | sdlc answers a JSON `deny` itself, so the call is blocked (since 0.14.3) | the call goes through; a hook longer than its 30-second timeout too |
-   | Qwen Code, GigaCode | sdlc answers a JSON `deny` itself (since 0.14.3) | the call goes through; a timeout too |
+   | Codex CLI | sdlc answers a JSON `deny` itself, so the call is blocked | the call goes through; a hook longer than its 30-second timeout too |
+   | Qwen Code, GigaCode | sdlc answers a JSON `deny` itself | the call goes through; a timeout too |
 
    When sdlc has nothing to say (not an sdlc project, an internal error inside the CLI), it answers an explicit
    `allow`, so a broken guard never blocks every edit of an unrelated project.
@@ -292,6 +309,7 @@ heartbeat, release and submit reject another executor's claim id with `claim_unk
 
 ---
 
+<a id="lesson-10-4"></a>
 ## Lesson 10.4 — Agent markers and the SDLC-Agent trailer            (video: ~5 min)
 
 **Role:** Laura, Steven   **Project:** tasklet   **You need:** Lesson 10.1; the git hook from `sdlc init`
@@ -350,7 +368,7 @@ made by agents are marked.
 ### Pitfalls
 
 - A commit made outside the agent's shell is a person's commit, even if the agent wrote the code.
-- Since 0.15.4, GigaCode-only projects mark commits `SDLC-Agent: gigacode`. With both tools configured, the marker
+- GigaCode-only projects mark commits `SDLC-Agent: gigacode`. With both tools configured, the marker
   remains `qwen`; set `SDLC_AGENT=gigacode` in GigaCode's environment and run `sdlc update` after changing `tools`.
 - If a Cursor build sets no `CURSOR_AGENT`, the CLI treats the agent's terminal as a person's. The hooks still deny a
   person's commands by their text, and the agent's commits are not marked.
@@ -363,6 +381,7 @@ made by agents are marked.
 
 ---
 
+<a id="lesson-10-5"></a>
 ## Lesson 10.5 — One MCP registry for every tool            (video: ~6 min)
 
 **Role:** Steven   **Project:** tasklet   **You need:** Lesson 10.1; the tokens in the environment of each machine
@@ -470,6 +489,7 @@ format.
 
 ---
 
+<a id="lesson-10-6"></a>
 ## Lesson 10.6 — A mixed team at Northwind            (video: ~8 min)
 
 **Role:** Steven, Oliver, a contractor, Ethan, Paul   **Project:** billing-api   **You need:** Lessons 10.1–10.5
@@ -557,6 +577,7 @@ format.
 
 ---
 
+<a id="lesson-10-7"></a>
 ## Lesson 10.7 — Handing a task to any executor            (video: ~6 min)
 
 **Role:** Ethan (tech lead), an executor, Paul (code owner)   **Project:** billing-api   **You need:** Lesson 10.6,
@@ -564,7 +585,7 @@ a change whose plan is approved
 
 **Goal.** Ethan hands one task of an approved plan to an executor of any type (another agent tool, a script, or a
 person) and checks the branch it returns before the review. The executor registry (`openspec/executors.yaml`) lets a
-person name the executors work may go to, and since 0.21.0 the task board (`sdlc board`) is where a swarm's
+person name the executors work may go to. The task board (`sdlc board`) is where a swarm's
 agents claim the open tasks — each under a lease. Swarming itself (who splits work, retries, best-of-N) stays
 outside sdlc.
 
@@ -585,19 +606,25 @@ executors:
 ```
 
 `sdlc task executors [--json]` shows the registry (empty list without one; in JSON each entry also has `hasToken`).
-A broken file — a bad id, an unknown type, a missing or bad `max_risk`, a kind that is not a change kind, an
-unknown field, a `token_sha256` that is not exactly 64 lowercase hex — is refused with `executors_invalid`
-naming the executor and the field. With a registry, `sdlc task export` needs `--executor <id>`
+A broken registry is refused with `executors_invalid`. This includes:
+
+- a bad id or unknown type;
+- a missing or bad `max_risk`;
+- a kind that is not a change kind;
+- an unknown field;
+- a `token_sha256` that is not exactly 64 lowercase hex.
+
+The error names the executor and field. With a registry, `sdlc task export` needs `--executor <id>`
 and hands work only to an executor the change's risk and kind allow: risk order `low < medium < high`, the change
 risk at most `max_risk`, and the kind in `kinds` when given. It refuses with `executor_required`, `unknown_executor`,
 `no_executor_registry` or `executor_not_allowed`, and a refused export logs nothing.
 
-The trailers of a work item then also carry `SDLC-Agent: <executor>/<agent>` — the executor's agent puts its own
-name there — and `check-result` wants every commit's first `SDLC-Agent` trailer to name an executor that may take
-the change: `missing_agent`, `unknown_executor` or `executor_not_allowed` otherwise, and the result's `executors`
-list names the executors the commits used.
+The executor's agent adds `SDLC-Agent: <executor>/<agent>` to the work item's trailers.
+`check-result` checks every commit's first `SDLC-Agent` trailer against the executors allowed for the change.
+It reports `missing_agent`, `unknown_executor` or `executor_not_allowed` if the trailer fails that check.
+The result's `executors` list names the executors used by the commits.
 
-#### The executor token (0.21.0)
+#### The executor token
 
 A remote executor reaches the board over `sdlc mcp serve --http`, so the server must know which executor is
 calling. A person issues each executor its own token:
@@ -616,7 +643,7 @@ start the server — an executor token alone does not start it.
 
 ### Steps
 
-1. Export the work item. Since 0.19.0 sdlc gives each open task of a change as one work item, in the contract
+1. Export the work item. sdlc gives each open task of a change as one work item, in the contract
    `sdlc.task/1`:
 
    ```bash
@@ -705,8 +732,13 @@ open again. The board shows `attempts` and `lastReason`; the next work item incl
 reopen, including agents. It does not change `.sdlc.yaml` or approve a gate; verification and review remain
 separate decisions.
 
-The offline dashboard and Markdown report show this board by change, including task status, executor, agent, lease
-end, attempts and the last reopening reason, with claimed and submitted counts per executor. JSON reports expose
+The offline dashboard and Markdown report show this board by change. Each task shows:
+
+- status, executor and agent;
+- lease end and attempts;
+- the last reopening reason.
+
+They also show claimed and submitted counts per executor. JSON reports expose
 the same data under `board` when the executor registry exists. These views only read board state: expired leases
 appear open without writing a board or log entry, and a broken board file produces a dashboard warning.
 
@@ -735,3 +767,13 @@ appear open without writing a board or log entry, and a broken board file produc
 - Show `sdlc task export --json` and walk through the fields of one item.
 - Run `sdlc task check-result` on a branch with a missing trailer, then on a good one.
 - `sdlc board list`, a claim and a heartbeat, then `board submit` on the returned branch.
+
+## Terms
+
+The [glossary](../glossary.md) explains an [executor](../glossary.md), a [board](../glossary.md)
+and a [gate](../glossary.md).
+
+## See also
+
+- [Handbook chapter 10](../handbook/10-multi-agent.md) — read the same material as a chapter.
+- [Integrations](../10-integrations.md) — see how MCP connects the project to other tools.

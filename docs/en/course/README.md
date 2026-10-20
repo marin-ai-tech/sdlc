@@ -6,17 +6,33 @@ It follows one company, Northwind Labs, through two projects:
 - **tasklet** — a new task-tracking web API, started from an empty folder (Modules 1–7);
 - **billing-api** — an existing service with code, tests and CI, converted to the AI SDLC (Module 8).
 
-The agent is **Claude Code** in the terminal. The team's tools come in through MCP servers: **GitHub** (issues as
-the task manager, pull requests, Actions as the build server), a **knowledge** server (project data, roles and
-skills), **Telegram** (notifications) and **sdlc** itself. Module 10 shows the same process in Cursor, Codex CLI,
-Qwen Code, GigaCode and OpenCode.
+## On this page
+
+- [The team](#the-team) — meet the people in the lessons.
+- [Modules](#modules) — choose a topic.
+- [Tracks by role](#tracks-by-role) — find your lessons.
+- [Before you start](#before-you-start) — prepare your tools.
+- [Current capabilities and limits](#current-capabilities-and-limits) — know what to expect.
+- [Terms](#terms) — understand process language.
+- [See also](#see-also) — continue with the handbook or guide.
+
+The agent is **Claude Code** in the terminal. The team uses MCP servers for:
+
+- **GitHub:** issues, pull requests and Actions as the build server;
+- **knowledge:** project data, roles and skills;
+- **Telegram:** notifications;
+- **sdlc:** process information.
+
+Module 10 shows the same process in Cursor, Codex CLI, Qwen Code, GigaCode and OpenCode.
 
 This is the video version. To read the same material as a book, open [the sdlc handbook](../handbook/README.md).
 
-Every lesson has the same parts: the role, the goal, the steps with real commands and real output, a self-check,
-the pitfalls and notes for the video. A lesson is one short video (about 5–8 minutes).
+Each lesson is one short video of about 5–8 minutes. It gives you a role and goal, then steps with real commands
+and output. A self-check, pitfalls and video notes help you review what you learned.
 
 ## The team
+
+These people carry decisions through the lessons. Their roles stay the same across both projects.
 
 | Person | Role | Main gates and commands |
 |---|---|---|
@@ -30,6 +46,8 @@ the pitfalls and notes for the video. A lesson is one short video (about 5–8 m
 | Laura | Engineering manager | reports, health, audit |
 
 ## Modules
+
+Follow the modules in order for the full story, or choose the topic you need now.
 
 | Module | Lessons | For |
 |---|---|---|
@@ -64,27 +82,36 @@ Watch Module 0 and Module 5 first, whatever your role. Then:
 
 ## Before you start
 
-- sdlc 0.14.5 or later on the PATH (`sdlc --version`), Node.js 20.19 or later, git. Lessons 3.7 and 5.11 need
-  sdlc 0.20.0; Lesson 10.7 and Reference 11.8 need sdlc 0.21.0.
+- sdlc on the PATH (`sdlc --version`), Node.js 20.19 or later, and git.
 - Claude Code installed and signed in.
 - For Module 2: a GitHub token, a Telegram bot token and the address of your knowledge server, as environment
   variables (`GITHUB_TOKEN`, `TELEGRAM_BOT_TOKEN`). The course never writes a secret into a file.
 
-## What sdlc does not do (yet)
+## Current capabilities and limits
 
 The course says so where it matters. The main points:
 
 - CI evidence calls the tool your GitHub server exposes; a run that is still in progress fails the check until it is
   run again (Lesson 2.4).
 
-Since 0.19.0 sdlc brings open GitHub issues into the backlog and closes them on archive
-(`sdlc backlog import --issues`, Lessons 4.3 and 8.5), sends the daily summary as an event (`sdlc events summary`,
-Lesson 9.7), takes alerts from monitoring (`sdlc triage intake`, Lesson 6.9), serves its MCP tools over HTTP
-with a token (`sdlc mcp serve --http`, Lesson 9.8), and hands a task to any executor (`sdlc task export`, Lesson 10.7).
+sdlc also supports these tasks:
 
-Since 0.20.0 a judge checks a gate's artifacts by the team's rubric before a person approves (`sdlc judge`,
-Lesson 5.11), and a pack brings review lenses, workflows and verify checks that a person accepts
-(`sdlc team accept --pack`, Lesson 3.7).
+- Import open GitHub issues and close them on archive with `sdlc backlog import --issues` (Lessons 4.3 and 8.5).
+- Send a daily summary event with `sdlc events summary` (Lesson 9.7).
+- Take monitoring alerts with `sdlc triage intake` (Lesson 6.9).
+- Serve MCP tools over HTTP with a token using `sdlc mcp serve --http` (Lesson 9.8).
+- Export tasks to executors with `sdlc task export` (Lesson 10.7).
+- Check gate artifacts against a rubric with `sdlc judge` before a person approves (Lesson 5.11).
+- Accept a pack's review lenses, workflows and verify checks with `sdlc team accept --pack` (Lesson 3.7).
+- List executors in `openspec/executors.yaml` and let their agents claim board tasks with `sdlc board` (Lesson 10.7).
 
-Since 0.21.0 a person lists executors in `openspec/executors.yaml`, and their agents claim tasks from the board
-(`sdlc board`, Lesson 10.7). The dashboard and report show the board.
+The dashboard and report show the board.
+
+## Terms
+
+The [glossary](../glossary.md) defines gates, evidence, MCP and other process terms.
+
+## See also
+
+- [Handbook](../handbook/README.md) — read the same material at your own pace.
+- [User guide](../05-guide.md) — follow a change through its stages.

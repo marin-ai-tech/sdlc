@@ -1,13 +1,12 @@
 # 11. Troubleshooting and quick reference
 
-The first part of this chapter is three short lessons: checking the installation, reading a hook denial, and moving a
-change that does not move. The rest is reference material to keep open next to the terminal: common problems, the
-questions people ask, a cheat sheet per role, a glossary and the reference of every command. The chapter ends with
-the gaps this handbook found in sdlc. All outputs are real, from a trial run of `tasklet` with sdlc 0.14.4, unless a
-step says otherwise. The command reference (11.8) and the rows for 0.19.0, 0.20.0 and 0.21.0 were checked against
-sdlc 0.21.0.
+Use this chapter when an installation check fails, a hook denies an edit, or a change stops moving.
+The lessons walk you through each case. The reference sections collect common problems, role commands,
+terms, and commands you may need beside the terminal.
 
-## Contents
+## On this page
+
+Follow a lesson for a specific problem, or jump to the reference you need.
 
 - [11.1 Check the installation with `sdlc doctor`](#s11-1)
 - [11.2 Why the hook said no](#s11-2)
@@ -19,13 +18,14 @@ sdlc 0.21.0.
 - [11.8 Command reference](#s11-8)
 - [Known limitations](#known-limitations)
 
-
 <a id="s11-1"></a>
 ## 11.1 Check the installation with `sdlc doctor`
 
 *Steven (anyone may run it)  ·  both  · needs: sdlc installed*
 
 Run `sdlc doctor`, read each line, and apply the fix it names.
+
+The output below comes from a trial run of `tasklet`, unless a step says otherwise.
 
 After `sdlc init`, check that Git does not ignore `openspec/` or generated agent files. `sdlc doctor`
 names ignored paths and `.gitignore` exceptions. It also flags conflict markers in change records:
@@ -55,7 +55,7 @@ keep both sides' gate decisions and history entries in time order, then run `sdl
                       SDLC-Agent trailer
    ```
 
-   In sdlc 0.20.0 the output starts with one `Required Notice:` line of the license.
+   The output starts with one `Required Notice:` line about the license.
 
    `✓` is fine, `!` is a warning, `✗` is an error. The command exits 1 when there is an error, else 0. It never changes
    anything itself: it tells a person what to do.
@@ -87,9 +87,12 @@ keep both sides' gate decisions and history entries in time order, then run `sdl
    | `git` | a git repository, and `user.email` set (needed to record approvals) | `git init`; `git config user.email you@example.com` |
    | `git hook` | the `prepare-commit-msg` hook: current, chained, the project's own, missing, outdated, or a shared hooks folder | `sdlc update`, or add the one chain line to your hook |
 
-3. Since 0.16.1, run `sdlc doctor --fix` for fixes sdlc owns. Its JSON output lists `fixed` and `manual`.
+3. Run `sdlc doctor --fix` for fixes sdlc owns. Its JSON output lists `fixed` and `manual`.
    A person handles the remaining configuration findings: `openspec/sdlc.yaml` and tool settings are protected
    from the agent. After the fixes, run `sdlc doctor` again.
+
+   > [!TIP]
+   > Read the `manual` findings after `--fix`; they still need a person's attention.
 
 ### You are done when
 
@@ -180,6 +183,17 @@ Read a denial, find its rule, and know the right next step for each of the twelv
 *Megan, Ethan, Oliver  ·  tasklet  · needs: an active change*
 
 Find out why a change is stuck and unblock it: open questions, a stale approval, a rework, a takeover.
+
+This flow shows how to decide what to check first:
+
+```mermaid
+flowchart LR
+    A["Change is stuck"] -->|run| B["sdlc explain"]
+    B -->|open question| C["Person answers"]
+    B -->|stale gate| D["Person previews and approves"]
+    B -->|rework| E["Agent revises artifacts"]
+    B -->|takeover| F["Person releases control"]
+```
 
 ### Procedure
 
@@ -284,6 +298,8 @@ Find out why a change is stuck and unblock it: open questions, a stale approval,
 <a id="s11-4"></a>
 ## 11.4 Common problems
 
+Find the symptom first, then check its cause and suggested next step.
+
 
 | Problem | Likely cause | What to do |
 |---|---|---|
@@ -330,12 +346,15 @@ Find out why a change is stuck and unblock it: open questions, a stale approval,
 | `sdlc next` hands the gate to a person: "the author-critic loop stopped" | the judge rejected the artifacts `max_loops` times | the person reads the judge's notes and decides: approve, reject or `sdlc rework` |
 | `sdlc team sync` or `sdlc team accept --pack` names `pack_not_pinned` | a pack with workflows or checks points at a tag or a branch | set `ref` to the commit (`git rev-parse <tag>`) or `npm` to an exact version; `sdlc team sync`; accept again |
 | `pack_forbidden_command` | a check or a workflow of the pack calls a person's command (`approve`, `tests unlock`, ...) | remove that command from the pack; a pack can never approve or unlock (Lesson 3.7) |
-| A pack's lens, workflow or check is not in effect | nobody accepted the pack, or its content changed after the acceptance | a person (with `roles.yaml`, a maintainer) runs `sdlc team accept --pack <name>` || A change commits with no `SDLC-Agent` trailer | a person committed, the project has its own git hook, or the tool set no marker | `sdlc doctor` (`git hook` line); [Section 10.4](10-multi-agent.md#s10-4) |
+| A pack's lens, workflow or check is not in effect | nobody accepted the pack, or its content changed after the acceptance | a person (with `roles.yaml`, a maintainer) runs `sdlc team accept --pack <name>` |
+| A change commits with no `SDLC-Agent` trailer | a person committed, the project has its own git hook, or the tool set no marker | `sdlc doctor` (`git hook` line); [Section 10.4](10-multi-agent.md#s10-4) |
 
 
 
 <a id="s11-5"></a>
 ## 11.5 Questions people ask
+
+Use these answers for the decisions and commands that come up most often.
 
 
 **I typed "approve" in the chat. Why is the gate still waiting?**
@@ -364,9 +383,16 @@ The lite track: `sdlc track set lite --change <id>`, a person's decision (`sdlc 
 `sdlc takeover --change <id> --note "…"`, and `sdlc release-control --change <id> --note "…"` when you are done.
 
 **Can the agent run the reports and the audit?**
-Yes. `report`, `dashboard`, `health`, `audit`, `trace`, `changelog`, `log`, `explain` and `approvals verify` only
-read. Since 0.19.0, so do `sdlc task export` and `sdlc task check-result`. The agent cannot approve, reject, waive,
-rework, take over, unlock tests, order the backlog or set the license.
+Yes. These commands only read:
+
+- `report`, `dashboard`, `health`, and `audit`;
+- `trace`, `changelog`, `log`, and `explain`;
+- `approvals verify`, `sdlc task export`, and `sdlc task check-result`.
+The agent cannot make these decisions:
+
+- approve, reject, or waive a gate;
+- rework or take over a change;
+- unlock tests, order the backlog, or set the license.
 
 **Where is the history of decisions?**
 `sdlc audit --change <id>`, `sdlc log`, and `sdlc trace <id>` from intent to evidence.
@@ -385,11 +411,11 @@ Experimentally. Check on your installation that an early edit is denied and `sdl
 10.3](10-multi-agent.md#s10-3)).
 
 **Does sdlc send anything to Telegram, Slack or email by itself?**
-No. `events` call a tool of an MCP server you configure. Since 0.19.0 the daily summary is such an event too
+No. `events` call a tool of an MCP server you configure. The daily summary is such an event too
 (`sdlc events summary`). Your MCP server does the sending.
 
 **Can a person or a tool outside the team's agent tools do a task?**
-Yes. Since 0.19.0 `sdlc task export --change <id> --json` gives the work item, and
+Yes. `sdlc task export --change <id> --json` gives the work item, and
 `sdlc task check-result --change <id> --branch <ref> --json` checks the branch that comes back. The gates stay the same.
 
 **Can a model approve a gate for us?**
@@ -532,6 +558,9 @@ Claude Code spelling; in Cursor, OpenCode, Qwen Code and GigaCode use `/sdlc-<na
 <a id="s11-7"></a>
 ## 11.7 Glossary
 
+These short definitions help you read the lessons and command reference.
+The [main glossary](../glossary.md) gives you a broader set of process terms.
+
 
 | Term | Meaning |
 |---|---|
@@ -541,7 +570,7 @@ Claude Code spelling; in Cursor, OpenCode, Qwen Code and GigaCode use `/sdlc-<na
 | delta spec | the requirements a change adds, modifies or removes; merged into the living specs on archive |
 | living spec | `openspec/specs/<capability>/spec.md`: what the system does now |
 | plan | `plan.md` (files that change, order, risks, proof, rollback) and `tasks.md`; the third gate |
-| gate | a point where a person decides that the work may go on: intent, spec, plan, review, release (since 0.18.0 also the optional qa gate); verify is a gate of evidence |
+| gate | a point where a person decides that work may go on: intent, spec, plan, review, release, or optional qa; verify is a gate of evidence |
 | approval | a person's decision on a gate, recorded with the role and a digest of what was approved |
 | digest | a hash of the artifacts (and, for review and release, the code) at the time of approval |
 | stale | an approval or verification whose content changed afterwards; it no longer counts |
@@ -593,7 +622,9 @@ Claude Code spelling; in Cursor, OpenCode, Qwen Code and GigaCode use `/sdlc-<na
 <a id="s11-8"></a>
 ## 11.8 Command reference
 
-Every command of sdlc 0.21.0 and every workflow, from `sdlc help --json`. "Who" is the `actor` of the
+Look up the command you need, then check who may run it.
+
+Every command and workflow comes from `sdlc help --json`. "Who" is the `actor` of the
 command: **anyone** means a person or an agent; **a person** means the command refuses inside an agent session and
 the hook denies it to the agent. Options are the common ones; `sdlc <command> --help` lists all of them. Most
 commands also take `--json` and, with several active changes, `--change <id>`.
@@ -763,7 +794,14 @@ in Codex `$sdlc-<name>`. A workflow runs as the agent, so it never approves.
 ## Known limitations
 
 
-What this handbook needed and sdlc does not offer, or does differently from its documentation, checked against sdlc
-0.21.0. One line each.
+This section records a limitation found while preparing the handbook.
 
 - The health thresholds can be set only in `openspec/sdlc.yaml`.
+
+## See also
+
+Use these pages when you need a wider view:
+
+- [Glossary](../glossary.md) — definitions of the process terms used here.
+- [Integrations](../10-integrations.md) — MCP servers, hooks, and events.
+- [Process health](../13-process-health.md) — findings, reports, and project hygiene.
