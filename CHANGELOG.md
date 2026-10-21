@@ -2,7 +2,21 @@
 
 All notable changes to sdlc. Versions follow [Semantic Versioning](https://semver.org/); while the major version is 0, a minor version may change behavior.
 
-## 0.24.0 — 2026-10-20
+## 0.25.0 — 2026-10-21
+
+0.24.0 was not released; its changes are part of this release.
+
+### Changed
+- Interface languages are found at run time: a catalog in `assets/locales/<code>.json` (with `assets/guide/<code>/`
+  and `assets/roles/<code>/` when present) is used for that language, and English for any language without an
+  installed catalog. The repository and the released package carry English only. `--locale` takes `en` or another
+  installed catalog; the "Open questions" heading of a proposal is recognised in every installed catalog.
+- The documentation is rewritten for reading: each page opens with what it is about, then an outline, short
+  sections, lists instead of long enumerations, small diagrams and links onward. It describes the current behaviour
+  only. A glossary explains the terms.
+- The Claude Code plugin runs its PreToolUse check through `hooks/pre-tool.sh` inside the plugin (the same rules:
+  quiet without the CLI, one retry, then a block with the reason), so the Claude plugin directory can follow it. The
+  project install's hook command is unchanged.
 
 ### Added
 - `sdlc approve <gate> --expect-digest <digest>` approves only the version the person read. When the gate's digest
@@ -19,8 +33,20 @@ All notable changes to sdlc. Versions follow [Semantic Versioning](https://semve
 - `sdlc next --me --json`: an `approve-gate` item gains `digest`, from the same evaluation as its `cli`.
 - The `gate.<g>.approved` and `gate.<g>.rejected` log entries carry `digest` as a field, so `sdlc log --json` shows
   which version was decided. Integration event bodies are unchanged.
+- The plugin carries a listing icon (`.claude-plugin/icon.png`), and its README says what it stores and where it can
+  send data. `PRIVACY.md` states that the authors collect nothing.
+- Tests check that every relative link and anchor in the documentation resolves, and readability rules for the
+  rewritten pages.
+
+### Fixed
+- The plugin manifest pointed to an unrelated npm package; it now points to the GitHub release.
+- Three links of the user guide pointed to missing pages. The documentation called the MCP server read-only: it also
+  offers the executors' board operations, never a person's decision. After a review rejection the course said the
+  gate still waited for the reviewer; `sdlc next` hands the change to the agent.
 
 ### Compatibility
+- A project that used an interface language other than English keeps working; its messages are English until that
+  language's catalog is installed locally in `assets/locales`.
 - Every JSON output only gains fields. Older log entries without `digest` read as before, and older versions read the
   new entries.
 
