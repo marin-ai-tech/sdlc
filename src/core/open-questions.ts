@@ -1,9 +1,11 @@
 /**
  * Open questions of an artifact (0.11.4, B62): the top-level list items (`- `, `* `, `1. `) under the
  * `## Open questions` heading, up to the next `## ` heading. Indented sub-items are not questions; an item that
- * says only "None", "Нет", "-" or "n/a" means there are none. HTML comments (template hints) are skipped.
+ * says only the catalog's no-questions value, "-" or "n/a" means there are none. HTML comments are skipped.
  * The text of a question is the item text, trimmed, without its marker.
  */
+
+import { installedLocales, catalog } from './i18n.js';
 
 export interface OpenQuestion {
   /** 1-based number of the question in the section. */
@@ -13,15 +15,31 @@ export interface OpenQuestion {
   line: number;
 }
 
-// `## Open questions`, `### Open Questions (2):`, a Russian heading, or a bold label `**Open questions:**`.
-const NAME = String.raw`(?:open questions|открытые вопросы)`;
-const SECTION = new RegExp(String.raw`^#{1,3}\s+${NAME}\s*(?:\(\d+\))?\s*:?\s*$`, 'i');
-const BOLD_SECTION = new RegExp(String.raw`^\*\*${NAME}\s*:?\*\*\s*:?\s*(.*)$`, 'i');
+/** Headings supplied by installed catalogs. */
+function headingPattern(): string {
+  const headings = installedLocales().map((locale) => catalog(locale)['openQuestions.heading'])
+    .filter((heading): heading is string => Boolean(heading));
+  return `(?:${headings.map((heading) => heading.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|')})`;
+}
+
+function sectionPattern(): RegExp {
+  return new RegExp(`^#{1,3}\\s+${headingPattern()}\\s*(?:\\(\\d+\\))?\\s*:?\\s*$`, 'i');
+}
+
+function boldPattern(): RegExp {
+  return new RegExp(`^\\*\\*${headingPattern()}\\s*:?\\*\\*\\s*:?\\s*(.*)$`, 'i');
+}
 const NEXT_SECTION = /^#{1,6}\s/;
 const BOLD_LABEL = /^\*\*[^*]+\*\*\s*:?/;
 const FENCE = /^\s*(?:```|~~~)/;
 const TOP_LEVEL_ITEM = /^(?:[-*]|\d+\.)\s+(.*)$/;
-const NO_QUESTIONS = /^(?:none|нет|-|n\/a)\.?$/i;
+function noQuestions(text: string): boolean {
+  if (/^(?:-|n\/a)\.?$/i.test(text)) return true;
+  return installedLocales().some((locale) => {
+    const value = catalog(locale)['openQuestions.none'];
+    return value !== undefined && text.replace(/\.$/, '').toLowerCase() === value.toLowerCase();
+  });
+}
 const ANSWER_ITEM = /^\s+[-*]\s+Answer \(/;
 
 /** The file's lines with every HTML comment blanked out, line for line. */
@@ -31,7 +49,7 @@ function visibleLines(text: string): string[] {
 }
 
 function isSectionStart(text: string): boolean {
-  return SECTION.test(text.trim()) || BOLD_SECTION.test(text.trim());
+  return sectionPattern().test(text.trim()) || boldPattern().test(text.trim());
 }
 
 /** The line range [start, end) of the section's body; undefined without the heading. Fenced code does not end it. */
@@ -50,9 +68,9 @@ function sectionRange(lines: string[]): { start: number; end: number } | undefin
 
 /** A question written on the bold label's own line (`**Open questions:** - Which DB?`). */
 function inlineQuestion(lines: string[], heading: number): string | undefined {
-  const rest = BOLD_SECTION.exec(lines[heading].trim())?.[1] ?? '';
+  const rest = boldPattern().exec(lines[heading].trim())?.[1] ?? '';
   const item = TOP_LEVEL_ITEM.exec(rest.trim())?.[1]?.trim() ?? rest.trim();
-  return item && !NO_QUESTIONS.test(item) ? item : undefined;
+  return item && !noQuestions(item) ? item : undefined;
 }
 
 /** The questions of an artifact's text, numbered from 1. */
@@ -69,7 +87,7 @@ export function parseOpenQuestions(text: string): OpenQuestion[] {
     if (fence) continue;
     const item = TOP_LEVEL_ITEM.exec(lines[index].trimEnd());
     const question = item?.[1].trim();
-    if (!question || NO_QUESTIONS.test(question)) continue;
+    if (!question || noQuestions(question)) continue;
     found.push({ n: found.length + 1, text: question, line: index });
   }
   return found;

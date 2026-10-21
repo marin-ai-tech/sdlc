@@ -10,7 +10,7 @@ import { tempDir, write } from './helpers.js';
 
 /**
  * B16 beyond the lead's acceptance test: OpenCode inputs, unified diffs, renames and deletions, notebooks, the size
- * cap, look-alikes, the Russian reason and the saved config. The samples are assembled at run time, so this file
+ * cap, look-alikes, a reason in another language and the saved config. The samples are assembled at run time, so this file
  * itself carries no secret.
  */
 const AWS = ['AS', 'IA', 'QWERTY0123456789'].join('');
@@ -113,18 +113,18 @@ describe('assignments and look-alikes', () => {
 });
 
 describe('the reason and the config', () => {
-  it('the Russian reason names the kind and the file, not the value', () => {
-    setLocale('ru');
-    const p = project();
-    const reason = p.call('Write', { file_path: path.join(p.root, 'src/n.js'), content: `${GITHUB}\n` }).reason ?? '';
-    expect(reason).toMatch(/Секрет в src\/n\.js/);
-    expect(reason).toMatch(/GitHub/);
-    expect(reason).not.toContain(GITHUB.slice(4, 16));
-  });
 
   it('secret_allow is saved back under its own name', () => {
     const config = parseConfig({ version: 1, enforcement: { secret_allow: ['test/fixtures/**'] } });
     const saved = serializeConfig(config) as { enforcement: Record<string, unknown> };
     expect(saved.enforcement.secret_allow).toEqual(['test/fixtures/**']);
+  });
+  it('the English reason names the kind and the file, not the value', () => {
+    setLocale('en');
+    const p = project();
+    const reason = p.call('Write', { file_path: path.join(p.root, 'src/n.js'), content: `${GITHUB}\n` }).reason ?? '';
+    expect(reason).toMatch(/Secret in src\/n\.js/);
+    expect(reason).toMatch(/GitHub/);
+    expect(reason).not.toContain(GITHUB.slice(4, 16));
   });
 });

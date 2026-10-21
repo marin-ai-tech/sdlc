@@ -72,17 +72,6 @@ describe('health thresholds', () => {
 });
 
 describe('health findings', () => {
-  it('order bad, warn, info, then by id; findings without facts are left out', () => {
-    const draft = (id: string, level: FindingDraft['level'], facts = 1): FindingDraft => ({
-      id, area: 'config', level, facts: Array.from({ length: facts }, () => ({ key: 'health.fact.signing' })),
-    });
-    const drafts = [draft('b.x', 'info'), draft('a.y', 'warn'), draft('z.z', 'bad'), draft('a.a', 'warn', 0)];
-    const order = orderFindings(drafts).map((d) => `${d.level}:${d.id}`);
-    expect(order).toEqual(['bad:z.z', 'warn:a.y', 'info:b.x']);
-    const report = healthReport(orderFindings(drafts), 'ru');
-    expect(report.counts).toEqual({ bad: 1, warn: 1, info: 1 });
-    expect(report.findings[2].facts[0]).toMatch(/[а-я]/i);
-  });
 
   it('stalled changes, locked tests and lite-track deltas; the light form skips the doctor; nothing is written', () => {
     const p = project();
@@ -139,4 +128,14 @@ describe('health findings', () => {
     expect(ids).not.toContain('flow.deferred');
     expect(ids).not.toContain('config.signing');
   }, 240000);
+  it('order bad, warn, info, then by id; findings without facts are left out', () => {
+    const draft = (id: string, level: FindingDraft['level'], facts = 1): FindingDraft => ({
+      id, area: 'config', level, facts: Array.from({ length: facts }, () => ({ key: 'health.fact.signing' })),
+    });
+    const drafts = [draft('b.x', 'info'), draft('a.y', 'warn'), draft('z.z', 'bad'), draft('a.a', 'warn', 0)];
+    const order = orderFindings(drafts).map((d) => `${d.level}:${d.id}`);
+    expect(order).toEqual(['bad:z.z', 'warn:a.y', 'info:b.x']);
+    const report = healthReport(orderFindings(drafts), 'en');
+    expect(report.counts).toEqual({ bad: 1, warn: 1, info: 1 });
+  });
 });

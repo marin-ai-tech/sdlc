@@ -6,7 +6,7 @@ import { parse, stringify } from 'yaml';
 import { git, humanEnv, initGitRepo, read, runCli, tempDir, write } from './helpers.js';
 
 /**
- * 0.11.3 (docs/ru/23, B66, B67): the health workflow drafts backlog items with source health; the session start
+ * 0.11.3 (docs/xx/23, B66, B67): the health workflow drafts backlog items with source health; the session start
  * shows one line only for a bad finding; the dashboard has a health section; health.degraded and health.recovered
  * go to the log once per change of state.
  */

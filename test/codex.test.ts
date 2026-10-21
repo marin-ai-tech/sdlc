@@ -5,7 +5,7 @@ import { describe, expect, it } from 'vitest';
 import { git, humanEnv, initGitRepo, read, runCli, tempDir, write } from './helpers.js';
 
 /**
- * 0.14.0 (docs/ru/32, B82): Codex CLI as a tool. Payloads below are the ones Codex 0.158.0 sent to a hook on this
+ * 0.14.0 (docs/xx/32, B82): Codex CLI as a tool. Payloads below are the ones Codex 0.158.0 sent to a hook on this
  * machine (2026-10-09): Claude Code's format, `tool_name: "Bash"` with PowerShell commands for file edits on Windows,
  * and `apply_patch` with the patch text in `tool_input.command`.
  */

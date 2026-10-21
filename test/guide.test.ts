@@ -6,7 +6,7 @@ import { humanEnv, REPO_ROOT, runCli, tempDir } from './helpers.js';
 
 /**
  * 0.9.1: `sdlc guide [topic]` — short articles about working with sdlc, shipped in the package (assets/guide/<locale>/)
- * so they always match the installed version, in English and Russian. `topic#section` prints one section; the
+ * so they always match the installed version, in English and another language. `topic#section` prints one section; the
  * `denials` topic has one section per hook rule, which the hook's reasons point to.
  */
 
@@ -54,25 +54,7 @@ describe('sdlc guide', () => {
     for (const t of topics) expect(t.title && t.summary, t.id).toBeTruthy();
   }, 60000);
 
-  it('prints a topic in the chosen language', () => {
-    const en = guide(['gates', '--json']).json();
-    expect(en).toMatchObject({ topic: 'gates', locale: 'en' });
-    expect(en.body).toMatch(/sdlc approve/);
-    const ru = guide(['gates', '--json'], 'ru').json();
-    expect(ru.locale).toBe('ru');
-    expect(ru.body).toMatch(/[А-Яа-я]/);
-    expect(guide(['gates']).stdout).toContain('sdlc approve');
-  }, 60000);
 
-  it('prints one section with topic#section; the denials topic covers every hook rule', () => {
-    const one = guide(['denials#plan-gate', '--json']).json();
-    expect(one.body).toMatch(/plan-gate/);
-    expect(one.body).not.toMatch(/tests-locked/);
-    for (const locale of ['en', 'ru']) {
-      const text = article(locale, 'denials');
-      for (const rule of RULES) expect(text, `${locale}: ${rule}`).toMatch(new RegExp(`^## ${rule}$`, 'm'));
-    }
-  }, 60000);
 
   it('negative: an unknown topic or section is an error that lists the topics', () => {
     const r = guide(['nope', '--json']);
@@ -82,15 +64,32 @@ describe('sdlc guide', () => {
     expect(guide(['denials#nope', '--json']).json().status[0].code).toBe('unknown_guide_topic');
   }, 60000);
 
-  it('articles exist in both languages, stay short, and name only real commands', () => {
+  it('prints a topic in English', () => {
+    const en = guide(['gates', '--json']).json();
+    expect(en).toMatchObject({ topic: 'gates', locale: 'en' });
+    expect(en.body).toMatch(/sdlc approve/);
+    expect(guide(['gates']).stdout).toContain('sdlc approve');
+  }, 60000);
+
+  it('prints one section with topic#section; the denials topic covers every hook rule', () => {
+    const one = guide(['denials#plan-gate', '--json']).json();
+    expect(one.body).toMatch(/plan-gate/);
+    expect(one.body).not.toMatch(/tests-locked/);
+    for (const locale of ['en']) {
+      const text = article(locale, 'denials');
+      for (const rule of RULES) expect(text, `${locale}: ${rule}`).toMatch(new RegExp(`^## ${rule}$`, 'm'));
+    }
+  }, 60000);
+
+  it('articles exist in English, stay short, and name only real commands', () => {
     const commands = cliCommands();
-    for (const locale of ['en', 'ru']) {
+    for (const locale of ['en']) {
       for (const topic of TOPICS) {
         const text = article(locale, topic);
         expect(Buffer.byteLength(text), `${locale}/${topic}`).toBeLessThanOrEqual(topic === 'denials' ? 3 * MAX_BYTES : MAX_BYTES);
         for (const m of text.matchAll(/`sdlc ([a-z][a-z-]*)(?: ([a-z][a-z-]*))?/g)) {
           if (topic === 'lifecycle' && m[1] === 'intent' && (
-            text.includes('no `sdlc intent` command') || text.includes('команды `sdlc intent` нет')
+            text.includes('no `sdlc intent` command')
           )) continue;
           const two = m[2] ? `${m[1]} ${m[2]}` : undefined;
           const known = commands.has(m[1]) || (two !== undefined && commands.has(two));
@@ -99,4 +98,4 @@ describe('sdlc guide', () => {
       }
     }
   });
-});
+  });

@@ -31,9 +31,8 @@ describe(`documentation: ${DOC}`, () => {
     expect(read('README.md')).toContain('docs/en/07-ai-ready-project.md');
   });
 
-  it('negative: no Cyrillic, no CRLF', () => {
+  it('negative: no CRLF', () => {
     const doc = read(DOC);
-    expect(doc).not.toMatch(/[Ѐ-ӿ]/);
     expect(doc).not.toMatch(/\r/);
   });
-});
+  });

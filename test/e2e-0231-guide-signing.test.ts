@@ -8,17 +8,17 @@ import { git, humanEnv, initGitRepo, read, runCli, tempDir, write } from './help
  * Findings of the E6 (bug fix from an alert) and E12 (CI, release, upgrade) team runs of 2026-10-17, decided by the
  * owner for 0.23.1, part B: the guide, approval signing and config proposals.
  *
- * Б1 (option A): `sdlc guide bugfix` told the agent to write the failing test before the plan was approved, while the
+ * finding 1 (option A): `sdlc guide bugfix` told the agent to write the failing test before the plan was approved, while the
  * plan gate denies test edits before approval. The guide now follows the rule: the plan names the test, a person
  * approves the plan, then the agent writes the failing test, `sdlc tests lock`, the fix.
- * Б3: a judge answer must carry `pass`, `route` and `rework`; nothing said so, nor what `route` is. The gates topic of
+ * finding 3: a judge answer must carry `pass`, `route` and `rework`; nothing said so, nor what `route` is. The gates topic of
  * the guide does.
- * Ц1: `signing: required` in a project with history made every past approval invalid (45 of 45) and CI red. With
+ * finding 1: `signing: required` in a project with history made every past approval invalid (45 of 45) and CI red. With
  * `signing_since: <commit>` in roles.yaml, approvals recorded in that commit or before it count as pre-signing.
- * Ц2: with `signing: off`, `sdlc approvals verify` (a CI step) said only "Approval signing is off". It now says that
+ * finding 2: with `signing: off`, `sdlc approvals verify` (a CI step) said only "Approval signing is off". It now says that
  * signatures are not checked and how to turn signing on; the CI file from `sdlc ci init` says so too.
- * Ц4: the log entries of config proposals recorded `by` without the email.
- * Ц5: `sdlc config show` of an applied proposal compared it with the current file, so later edits showed as its diff;
+ * finding 4: the log entries of config proposals recorded `by` without the email.
+ * finding 5: `sdlc config show` of an applied proposal compared it with the current file, so later edits showed as its diff;
  * it shows the diff the person applied.
  */
 
@@ -57,36 +57,9 @@ function approvedIntent(p: P, id: string): void {
   git(p.root, ['commit', '-q', '-m', message]);
 }
 
-describe('Б1: the bug-fix guide follows the plan gate', () => {
-  it('approving the plan comes before writing the failing test, in both languages', () => {
-    const p = project();
-    for (const [locale, failing] of [['en', /fails? for the right reason|failing test/i], ['ru', /пада/i]] as const) {
-      const text = p.cli(['guide', 'bugfix', '--locale', locale]).stdout;
-      const steps = text.slice(text.search(/^(Steps|Шаги)/m));
-      const approve = steps.indexOf('sdlc approve plan');
-      const test = steps.search(failing);
-      expect(approve, locale).toBeGreaterThan(-1);
-      expect(test, locale).toBeGreaterThan(-1);
-      expect(approve, locale).toBeLessThan(test);
-    }
-  }, 120000);
-});
 
-describe('Б3: the guide describes the judge verdict', () => {
-  it('the gates topic names pass, route and rework as required and says what route is', () => {
-    const p = project();
-    for (const locale of ['en', 'ru']) {
-      const text = p.cli(['guide', 'gates', '--locale', locale]).stdout;
-      expect(text, locale).toMatch(/judge|судья/i);
-      for (const field of ['pass', 'route', 'rework']) expect(text, `${locale} ${field}`).toContain(field);
-    }
-    const en = p.cli(['guide', 'gates', '--locale', 'en']).stdout;
-    expect(en).toMatch(/route[^.\n]*(who|next|where)/i);
-    expect(en).toMatch(/(all three|every field|required)/i);
-  }, 120000);
-});
 
-describe('Ц1: signing from a commit on', () => {
+describe('finding 1: signing from a commit on', () => {
   function signed(p: P, since: string | undefined) {
     const rolesFile = p.file('openspec/roles.yaml');
     const roles: Record<string, unknown> = {
@@ -129,7 +102,7 @@ describe('Ц1: signing from a commit on', () => {
   }, 300000);
 });
 
-describe('Ц2: signing off is said plainly', () => {
+describe('finding 2: signing off is said plainly', () => {
   it('approvals verify says signatures are not checked and how to turn signing on; the CI file says so too', () => {
     const p = project();
     const r = p.cli(['approvals', 'verify']);
@@ -141,7 +114,7 @@ describe('Ц2: signing off is said plainly', () => {
   }, 240000);
 });
 
-describe('Ц4 and Ц5: config proposals', () => {
+describe('finding 4 and finding 5: config proposals', () => {
   it('the log names the proposer and the applier with their email; show of an applied proposal keeps its diff', () => {
     const p = project();
     const id = p.cli(['config', 'propose', '--set', 'gates.plan.auto_waive.kinds=[docs]', '--reason', 'Docs', '--json'])
@@ -157,4 +130,28 @@ describe('Ц4 and Ц5: config proposals', () => {
     expect(show.diff).toMatch(/auto_waive/);
     expect(show.diff).not.toMatch(/a later note/);
   }, 240000);
+  it('approving the plan comes before writing the failing test, in English', () => {
+    const p = project();
+    for (const [locale, failing] of [['en', /fails? for the right reason|failing test/i]] as const) {
+      const text = p.cli(['guide', 'bugfix', '--locale', locale]).stdout;
+      const steps = text.slice(text.search(/^Steps/m));
+      const approve = steps.indexOf('sdlc approve plan');
+      const test = steps.search(failing);
+      expect(approve, locale).toBeGreaterThan(-1);
+      expect(test, locale).toBeGreaterThan(-1);
+      expect(approve, locale).toBeLessThan(test);
+    }
+  }, 120000);
+
+  it('the gates topic names pass, route and rework as required and says what route is', () => {
+    const p = project();
+    for (const locale of ['en']) {
+      const text = p.cli(['guide', 'gates', '--locale', locale]).stdout;
+      expect(text, locale).toMatch(/judge/i);
+      for (const field of ['pass', 'route', 'rework']) expect(text, `${locale} ${field}`).toContain(field);
+    }
+    const en = p.cli(['guide', 'gates', '--locale', 'en']).stdout;
+    expect(en).toMatch(/route[^.\n]*(who|next|where)/i);
+    expect(en).toMatch(/(all three|every field|required)/i);
+  }, 120000);
 });

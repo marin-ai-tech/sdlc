@@ -6,7 +6,7 @@ import { readLog } from '../src/core/log.js';
 import { git, humanEnv, initGitRepo, read, runCli, tempDir, write } from './helpers.js';
 
 /**
- * 0.13.0 (docs/ru/28, B80): Cursor IDE as a tool. `sdlc init --tools cursor` writes skills, thin commands, subagents,
+ * 0.13.0 (docs/xx/28, B80): Cursor IDE as a tool. `sdlc init --tools cursor` writes skills, thin commands, subagents,
  * a rule, the MCP server and Cursor's own `.cursor/hooks.json`; the hook dispatcher reads Cursor's input and answers
  * in Cursor's format; `CURSOR_AGENT=1` is an agent session; the Cursor files are guarded like the other tools' files.
  */

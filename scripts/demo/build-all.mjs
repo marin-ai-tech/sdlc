@@ -9,13 +9,15 @@ import { fileURLToPath } from 'node:url';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 /** Each language runs the scenario with its own team names (SDLC_DEMO_PEOPLE), so the output stays real. */
-const DECKS = [
-  { lang: 'en', dir: 'docs/demo' },
-  { lang: 'ru', dir: 'docs/ru/demo' },
-].map(({ lang, dir }) => ({
+const installed = path.join(root, 'scripts/demo/lang');
+const languages = fs.existsSync(installed)
+  ? fs.readdirSync(installed).filter((name) => /^[a-z]{2,8}\.mjs$/.test(name))
+    .map((name) => name.slice(0, -4)).sort()
+  : [];
+const DECKS = ['en', ...languages.filter((lang) => lang !== 'en')].map((lang) => ({
   lang,
-  transcript: path.join(root, dir, `calculator-transcript.${lang}.json`),
-  out: path.join(root, dir, `sdlc-calculator-demo.${lang}.pptx`),
+  transcript: path.join(root, lang === 'en' ? 'docs/demo' : `docs/${lang}/demo`, `calculator-transcript.${lang}.json`),
+  out: path.join(root, lang === 'en' ? 'docs/demo' : `docs/${lang}/demo`, `sdlc-calculator-demo.${lang}.pptx`),
 }));
 const buildDeck = path.join(root, 'scripts/demo/build-deck.mjs');
 const skipTest = process.argv.includes('--skip-test');
@@ -42,7 +44,9 @@ function scenario(deck) {
 
 function deckFile(deck) {
   fs.mkdirSync(path.dirname(deck.out), { recursive: true });
-  const code = run(process.execPath, [buildDeck, '--transcript', deck.transcript, '--lang', deck.lang, '--out', deck.out]);
+  const code = run(process.execPath, [
+    buildDeck, '--transcript', deck.transcript, '--lang', deck.lang, '--out', deck.out,
+  ]);
   if (code !== 0) process.exit(code);
 }
 

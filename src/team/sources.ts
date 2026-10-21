@@ -1,7 +1,7 @@
 import * as path from 'node:path';
 import type { SdlcConfig } from '../core/config.js';
 import { isFile, normalizeNewlines, readText } from '../core/fs-utils.js';
-import { currentLocale, LOCALES, normalizeLocale, type Locale } from '../core/i18n.js';
+import { currentLocale, installedLocales, normalizeLocale, type Locale } from '../core/i18n.js';
 import { harnessVersion } from '../core/version.js';
 import { assetsDir } from '../integrations/assets.js';
 import { builtinDraft, withoutSource } from './draft.js';
@@ -31,7 +31,7 @@ export interface RoleSource {
 export const BUILTIN_ROLE_IDS = ['analyst', 'architect', 'developer', 'tester', 'reviewer'] as const;
 
 function isLocale(value: string | undefined): value is Locale {
-  return value !== undefined && (LOCALES as readonly string[]).includes(value);
+  return value !== undefined && installedLocales().includes(value);
 }
 
 /** The project's language: `locale` in sdlc.yaml, else the active locale. */
@@ -61,7 +61,7 @@ export function isBuiltinRole(id: string): boolean {
  */
 export function builtinVersion(id: string, text: string): string | undefined {
   const plain = withoutSource(text);
-  const same = LOCALES.some((locale) => {
+  const same = installedLocales().some((locale) => {
     const asset = roleAsset(locale, id);
     return asset !== undefined && withoutSource(asset) === plain;
   });

@@ -4,7 +4,7 @@ import { describe, expect, it } from 'vitest';
 import { git, humanEnv, initGitRepo, read, runCli, tempDir, write } from './helpers.js';
 
 /**
- * 0.12.0 (docs/ru/26, B21): `sdlc audit --export <dir>` bundles, for auditors, every approval with its signature and
+ * 0.12.0 (docs/xx/26, B21): `sdlc audit --export <dir>` bundles, for auditors, every approval with its signature and
  * trailer status, the change files and the project log of the period. Nothing outside openspec/ is included.
  */
 

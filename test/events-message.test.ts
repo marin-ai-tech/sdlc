@@ -73,12 +73,6 @@ describe('events as a ready message', () => {
     expect(String(approved?.text)).toContain('Alice Ivanova');
   }, 180000);
 
-  it('the text follows the locale (here --locale of the command)', () => {
-    const p = project({ args: { chat_id: '1' }, message: 'text' });
-    expect(p.cli(['approve', 'intent', '--change', 'add-x', '--locale', 'ru', '--json']).code).toBe(0);
-    const approved = p.received().map((call) => String(call.text)).find((text) => text.includes('Alice Ivanova'));
-    expect(approved).toMatch(/[А-Яа-я]/);
-  }, 180000);
 
   it('negative: a receiver without message still gets the event object', () => {
     const p = project({ args: { project: 'claims' } });

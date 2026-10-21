@@ -10,7 +10,7 @@ const CONTENT = path.join(REPO_ROOT, 'scripts/demo/deck-content.mjs');
 
 interface Slide { id: string; layout: string; steps?: string[]; more?: string[]; title: Record<string, string> }
 const load = async () => (await import(`file://${CONTENT.replace(/\\/g, '/')}`)) as {
-  SLIDES: Slide[]; STEP_NOTE_RU: Record<string, string>; LANGS: string[];
+  SLIDES: Slide[];
 };
 
 /** Step ids the demo scenario records, read from the e2e test source. */
@@ -40,34 +40,29 @@ async function slideTexts(file: string): Promise<{ slides: string[]; notes: stri
 }
 
 describe('demo deck (scripts/demo)', () => {
-  it('the story only refers to steps the scenario records, and every step has a Russian note', async () => {
-    const { SLIDES, STEP_NOTE_RU } = await load();
-    const ids = new Set(scenarioSteps());
-    const referenced = SLIDES.flatMap((s) => [...(s.steps ?? []), ...(s.more ?? [])]);
-    expect(referenced.filter((id) => !ids.has(id))).toEqual([]);
-    expect([...ids].filter((id) => !STEP_NOTE_RU[id])).toEqual([]);
-  });
-
-  it('slide titles fit on one line (57 characters is the longest seen to fit at 30 pt on the wide layout)', async () => {
+  it('the English story only refers to steps the scenario records', async () => {
     const { SLIDES } = await load();
-    const long = SLIDES.flatMap((s) => ['en', 'ru'].map((lang) => s.title[lang])).filter((title) => title.length > 57);
-    expect(long).toEqual([]);
+    const ids = new Set(scenarioSteps());
+    const referenced = SLIDES.flatMap((slide) => [...(slide.steps ?? []), ...(slide.more ?? [])]);
+    expect(referenced.filter((id) => !ids.has(id))).toEqual([]);
   });
 
-  it('builds an English and a Russian deck: one slide per story slide, titles and speaker notes in the language', async () => {
+  it('English slide titles fit on one line', async () => {
+    const { SLIDES } = await load();
+    expect(SLIDES.map((slide) => slide.title.en).filter((title) => title.length > 57)).toEqual([]);
+  });
+
+  it('builds the English deck with story slides and speaker notes', async () => {
     const { SLIDES } = await load();
     const dir = tempDir('sdlc-deck-');
-    const transcript = fixture(dir);
-    for (const lang of ['en', 'ru']) {
-      const out = path.join(dir, `deck.${lang}.pptx`);
-      const r = run(['--transcript', transcript, '--lang', lang, '--out', out]);
-      expect(r.status, r.stderr).toBe(0);
-      expect(fs.readFileSync(out).subarray(0, 2).toString()).toBe('PK');
-      const { slides, notes } = await slideTexts(out);
-      expect(slides).toHaveLength(SLIDES.length);
-      SLIDES.forEach((s, i) => expect(slides[i]).toContain(s.title[lang].replace(/&/g, '&amp;')));
-      expect(notes.join(' ')).toMatch(lang === 'ru' ? /[а-я]{4}/i : /the/i);
-    }
+    const out = path.join(dir, 'deck.en.pptx');
+    const result = run(['--transcript', fixture(dir), '--lang', 'en', '--out', out]);
+    expect(result.status, result.stderr).toBe(0);
+    expect(fs.readFileSync(out).subarray(0, 2).toString()).toBe('PK');
+    const { slides, notes } = await slideTexts(out);
+    expect(slides).toHaveLength(SLIDES.length);
+    SLIDES.forEach((slide, index) => expect(slides[index]).toContain(slide.title.en.replace(/&/g, '&amp;')));
+    expect(notes.join(' ')).toMatch(/the/i);
   }, 60000);
 
   it('steps slides show the command, the actor and the output; the refusals slide lists every refused step', async () => {
@@ -84,12 +79,12 @@ describe('demo deck (scripts/demo)', () => {
     for (const id of ['move-agent', 'track-agent', 'approve-intent-agent', 'tests-unlock-agent']) expect(refusals).toContain(`sdlc demo ${id}`);
   }, 60000);
 
-  it('negative: a missing transcript or a bad --lang fails with a message and exit 1 or 2', () => {
+  it('a missing transcript or an uninstalled deck language fails with a message and exit code', () => {
     const missing = run(['--transcript', path.join(tempDir('sdlc-deck-'), 'none.json'), '--lang', 'en', '--out', 'x.pptx']);
     expect(missing.status).toBe(1);
     expect(missing.stderr).toMatch(/transcript/i);
-    const lang = run(['--transcript', 'x.json', '--lang', 'de', '--out', 'x.pptx']);
-    expect(lang.status).toBe(2);
-    expect(lang.stderr).toMatch(/en|ru/);
+    const language = run(['--transcript', 'x.json', '--lang', 'xx', '--out', 'x.pptx']);
+    expect(language.status).toBe(2);
+    expect(language.stderr).toMatch(/installed/i);
   });
 });

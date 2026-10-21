@@ -16,27 +16,27 @@ import { REPO_ROOT, git, humanEnv, initGitRepo, read, runCli, tempDir, write } f
  * Findings of the E3 (onboarding) and E8 (dashboard and health) team runs of 2026-10-16, decided by the owner the same
  * day for 0.22.2.
  *
- * О1: the tour starts with `sdlc init` and the demo; a person joining a project that already uses sdlc gets no path
+ * finding 1: the tour starts with `sdlc init` and the demo; a person joining a project that already uses sdlc gets no path
  * (clone, `sdlc doctor --fix`, the entry in roles.yaml, `sdlc next --me`).
- * О2: the stage table of `sdlc guide lifecycle` has no qa gate, so an agent answering from it skipped a required qa.
- * О3: "The workflows" does not say they are the agent's workflows nor how to call them; an agent invented
+ * finding 2: the stage table of `sdlc guide lifecycle` has no qa gate, so an agent answering from it skipped a required qa.
+ * finding 3: "The workflows" does not say they are the agent's workflows nor how to call them; an agent invented
  * `sdlc intent --change <id>`.
- * О4: `sdlc explain` with no active change advised `sdlc new <name>` while `sdlc next` offered a ready backlog item.
- * О5: a title without Latin letters but with digits gave the change id `200`; the `b<n>` fallback only covered an
+ * finding 4: `sdlc explain` with no active change advised `sdlc new <name>` while `sdlc next` offered a ready backlog item.
+ * finding 5: a title without Latin letters but with digits gave the change id `200`; the `b<n>` fallback only covered an
  * empty id.
- * О6: on the lite track the terminal stepper marked intent as current, though intent does not apply.
- * А1, О7 (as a hint): changes on other branches were invisible on `main` to `next --me`, `health`, the report and the
+ * finding 6: on the lite track the terminal stepper marked intent as current, though intent does not apply.
+ * finding 1, finding 7 (as a hint): changes on other branches were invisible on `main` to `next --me`, `health`, the report and the
  * dashboard. They now name the changes found on other branches (as of the last fetch) and the branch.
- * А2: `daysSince` rounded down to whole days, so fractional `stalled_days` and `lock_days` never triggered.
- * А3: the dashboard showed agent commits only, not the agent's share of the log.
- * А4: with no SDLC-Task trailers in the history, every task was a separate "task without a commit" gap.
- * А5: `sdlc report` without `--since` printed the whole log, oldest first, under "Recent events".
- * А6: the sdlc-health workflow gave no form of `sdlc backlog move`; an agent invented `move B6 ready`.
- * А7: no health finding looked at gate rejections: three qa rounds on one change went unnoticed.
+ * finding 2: `daysSince` rounded down to whole days, so fractional `stalled_days` and `lock_days` never triggered.
+ * finding 3: the dashboard showed agent commits only, not the agent's share of the log.
+ * finding 4: with no SDLC-Task trailers in the history, every task was a separate "task without a commit" gap.
+ * finding 5: `sdlc report` without `--since` printed the whole log, oldest first, under "Recent events".
+ * finding 6: the sdlc-health workflow gave no form of `sdlc backlog move`; an agent invented `move B6 ready`.
+ * finding 7: no health finding looked at gate rejections: three qa rounds on one change went unnoticed.
  */
 
 const DAY = 86_400_000;
-const RU_TITLE = 'Название задачи не длиннее 200 символов';
+const NON_LETTER_TITLE = '!!! 200 ???';
 
 function project(tools = 'claude') {
   const root = tempDir('sdlc-onboarding-health-');
@@ -74,7 +74,7 @@ function finding(drafts: FindingDraft[], id: string): FindingDraft | undefined {
   return drafts.find((draft) => draft.id === id);
 }
 
-describe('А2: fractional day thresholds', () => {
+describe('finding 2: fractional day thresholds', () => {
   it('stalled_days 0.5 finds a change idle for 0.75 day and not one idle for 0.25 day; the age is not shown as 0', () => {
     const p = project();
     setHealth(p, { stalled_days: 0.5 });
@@ -97,10 +97,10 @@ describe('А2: fractional day thresholds', () => {
   }, 180000);
 });
 
-describe('О5: change ids from backlog titles', () => {
+describe('finding 5: change ids from backlog titles', () => {
   it('a title with digits but no Latin letters starts the change as b<n>, never as the digits', () => {
     const p = project();
-    expect(p.cli(['backlog', 'add', RU_TITLE, '--outcome', 'O', '--accept', 'A', '--json']).code).toBe(0);
+    expect(p.cli(['backlog', 'add', NON_LETTER_TITLE, '--outcome', 'O', '--accept', 'A', '--json']).code).toBe(0);
     const r = p.cli(['backlog', 'start', 'B1', '--json']);
     expect(r.code, r.stdout + r.stderr).toBe(0);
     const ids = listActiveChanges(projectPaths(p.root)).map((ref) => ref.id);
@@ -116,7 +116,7 @@ describe('О5: change ids from backlog titles', () => {
   }, 180000);
 });
 
-describe('О4: explain with no active change', () => {
+describe('finding 4: explain with no active change', () => {
   it('points to the ready backlog item, not to `sdlc new`', () => {
     const p = project();
     expect(p.cli(['backlog', 'add', 'Add export', '--outcome', 'O', '--accept', 'A', '--json']).code).toBe(0);
@@ -137,7 +137,7 @@ describe('О4: explain with no active change', () => {
   }, 180000);
 });
 
-describe('О6: the stepper on the lite track', () => {
+describe('finding 6: the stepper on the lite track', () => {
   const gate = (id: string, status: string, required: boolean) => ({ id, status, required });
   it('does not mark intent or spec as current when they do not apply', () => {
     const lite = stepper({
@@ -158,35 +158,8 @@ describe('О6: the stepper on the lite track', () => {
   });
 });
 
-describe('О1, О2, О3: the guide', () => {
-  it('the first tour step tells a person joining an existing project what to run, in both languages', () => {
-    const p = project();
-    for (const locale of ['en', 'ru']) {
-      const r = p.cli(['guide', 'tour', '--locale', locale]);
-      expect(r.code).toBe(0);
-      expect(r.stdout, locale).toContain('sdlc doctor --fix');
-      expect(r.stdout, locale).toContain('sdlc next --me');
-      expect(r.stdout, locale).toContain('roles.yaml');
-    }
-  }, 180000);
 
-  it('the lifecycle guide names the qa gate and how the workflows are called, in both languages', () => {
-    const p = project();
-    for (const locale of ['en', 'ru']) {
-      const r = p.cli(['guide', 'lifecycle', '--locale', locale]);
-      expect(r.code).toBe(0);
-      expect(r.stdout, locale).toMatch(/\bqa\b/);
-      expect(r.stdout, locale).toContain('/sdlc:intent');
-      expect(r.stdout, locale).toContain('$sdlc-intent');
-      expect(r.stdout, locale).toContain('/sdlc-intent');
-      expect(r.stdout, locale).toContain('sdlc intent');
-    }
-    const en = p.cli(['guide', 'lifecycle', '--locale', 'en']).stdout;
-    expect(en).toMatch(/no `?sdlc intent`? command|not `?sdlc`? (sub)?commands/i);
-  }, 180000);
-});
-
-describe('А6: the health workflow names the backlog move form', () => {
+describe('finding 6: the health workflow names the backlog move form', () => {
   it('step 6 gives `sdlc backlog move <B-id>` with --top, --before or --after; no status argument', () => {
     const text = read(path.join(REPO_ROOT, 'assets/workflows/health.md'));
     expect(text).toMatch(/sdlc backlog move <B-id> (--top|--before <B-id>|--after <B-id>)/);
@@ -194,7 +167,7 @@ describe('А6: the health workflow names the backlog move form', () => {
   });
 });
 
-describe('А7: repeated gate rejections are a health finding', () => {
+describe('finding 7: repeated gate rejections are a health finding', () => {
   it('a gate rejected twice on one change is quality.rejections; a single rejection is not', () => {
     expect(parseHealth({ rejections: 3 }, 'h')?.rejections).toBe(3);
     const p = project();
@@ -213,7 +186,7 @@ describe('А7: repeated gate rejections are a health finding', () => {
   }, 180000);
 });
 
-describe('А5: the report lists recent events, newest first', () => {
+describe('finding 5: the report lists recent events, newest first', () => {
   it('without --since: at most 20 events, the newest first; with --since: the whole period', () => {
     const p = project('none');
     for (let index = 1; index <= 25; index += 1) {
@@ -233,7 +206,7 @@ describe('А5: the report lists recent events, newest first', () => {
   }, 300000);
 });
 
-describe('А3: the dashboard shows the agent share of the log', () => {
+describe('finding 3: the dashboard shows the agent share of the log', () => {
   it('has an "Agent log events" tile next to agent commits', () => {
     const p = project('none');
     const out = path.join(p.root, 'dashboard.html');
@@ -244,7 +217,7 @@ describe('А3: the dashboard shows the agent share of the log', () => {
   }, 180000);
 });
 
-describe('А4: trace gaps without SDLC-Task trailers', () => {
+describe('finding 4: trace gaps without SDLC-Task trailers', () => {
   function withTasks() {
     const p = project('none');
     expect(p.cli(['new', 'add-x', '--json']).code).toBe(0);
@@ -273,7 +246,7 @@ describe('А4: trace gaps without SDLC-Task trailers', () => {
   }, 180000);
 });
 
-describe('А1, О7: changes on other branches are named', () => {
+describe('finding 1, finding 7: changes on other branches are named', () => {
   /** main has `here`; feat/away adds `away`; feat/here-too carries `here` as well; feat/done carries `done`, archived on main. */
   function branches() {
     const p = project('none');
@@ -325,5 +298,30 @@ describe('А1, О7: changes on other branches are named', () => {
     expect(p.cli(['next', '--me', '--json']).json<{ otherBranches: unknown[] }>().otherBranches).toEqual([]);
     expect(finding(p.health(), 'flow.branches')?.facts ?? []).toEqual([]);
     expect(fs.existsSync(path.join(p.root, '.git'))).toBe(true);
+  }, 180000);
+  it('the first tour step tells a person joining an existing project what to run, in English', () => {
+    const p = project();
+    for (const locale of ['en']) {
+      const r = p.cli(['guide', 'tour', '--locale', locale]);
+      expect(r.code).toBe(0);
+      expect(r.stdout, locale).toContain('sdlc doctor --fix');
+      expect(r.stdout, locale).toContain('sdlc next --me');
+      expect(r.stdout, locale).toContain('roles.yaml');
+    }
+  }, 180000);
+
+  it('the lifecycle guide names the qa gate and how the workflows are called, in English', () => {
+    const p = project();
+    for (const locale of ['en']) {
+      const r = p.cli(['guide', 'lifecycle', '--locale', locale]);
+      expect(r.code).toBe(0);
+      expect(r.stdout, locale).toMatch(/\bqa\b/);
+      expect(r.stdout, locale).toContain('/sdlc:intent');
+      expect(r.stdout, locale).toContain('$sdlc-intent');
+      expect(r.stdout, locale).toContain('/sdlc-intent');
+      expect(r.stdout, locale).toContain('sdlc intent');
+    }
+    const en = p.cli(['guide', 'lifecycle', '--locale', 'en']).stdout;
+    expect(en).toMatch(/no `?sdlc intent`? command|not `?sdlc`? (sub)?commands/i);
   }, 180000);
 });

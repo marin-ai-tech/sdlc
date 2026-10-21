@@ -6,7 +6,7 @@ import { describe, expect, it } from 'vitest';
 import { humanEnv, initGitRepo, git, runCli, tempDir } from './helpers.js';
 
 /**
- * 0.11.3 (docs/ru/23).
+ * 0.11.3 (docs/xx/23).
  * B77: a test that drives the init wizard must not reach the machine: every `initCommand` call that answers prompts
  *      passes a stub `installer` and a stub `probe` (directly or through a helper that does).
  * B44: two `sdlc doctor --json` runs on an unchanged project print the same JSON, also under parallel load.

@@ -97,7 +97,7 @@ All notable changes to sdlc. Versions follow [Semantic Versioning](https://semve
   reference. An unset variable keeps the event waiting and is named by `sdlc events list`, `flush` and `sdlc doctor`.
 - The hint about an artifact at the repository root matches the exact file name (the project's `REVIEW.md` is not a
   misplaced `review.md`) and is translated.
-- Russian messages write MCP plainly.
+- Messages in another language write MCP plainly.
 
 ## 0.23.3 — 2026-10-18
 

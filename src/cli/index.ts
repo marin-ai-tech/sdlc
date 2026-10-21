@@ -90,14 +90,14 @@ function applyLocale(flag: string | undefined): void {
 
 function withLocaleOption(command: Command): void {
   if (!command.options.some((option) => option.long === '--locale')) {
-    command.option('--locale <locale>', 'UI locale (en, ru)');
+    command.option('--locale <locale>', 'UI locale (en, or another installed catalog)');
   }
   for (const child of command.commands) withLocaleOption(child);
 }
 
 export function buildProgram(): Command {
   const program = new Command();
-  program.option('--locale <locale>', 'UI locale (en, ru)');
+  program.option('--locale <locale>', 'UI locale (en, or another installed catalog)');
   program.hook('preAction', (_thisCommand, actionCommand) => {
     const opts = actionCommand.optsWithGlobals() as { locale?: string };
     applyLocale(opts.locale);

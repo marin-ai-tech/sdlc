@@ -38,17 +38,6 @@ describe('sdlc guide in a terminal', () => {
     expect(r.stdout).toMatch(/^Lifecycle and stages\n[=─━]+$/m);
   }, 120000);
 
-  it('the same in Russian, and for a section and a tour step', () => {
-    const ru = cli(['guide', 'lifecycle', '--locale', 'ru']);
-    expect(markdownMarks(ru.stdout)).toEqual([]);
-    expect(ru.stdout).toContain('Жизненный цикл и стадии');
-    const section = cli(['guide', 'denials#plan-gate']);
-    expect(section.code, section.stderr).toBe(0);
-    expect(markdownMarks(section.stdout)).toEqual([]);
-    const tour = cli(['guide', 'tour', '1']);
-    expect(tour.code, tour.stderr).toBe(0);
-    expect(markdownMarks(tour.stdout)).toEqual([]);
-  }, 120000);
 
   it('an agent session keeps the Markdown; --markdown forces it; --json is unchanged', () => {
     const agent = cli(['guide', 'lifecycle'], AGENT);
@@ -60,5 +49,13 @@ describe('sdlc guide in a terminal', () => {
     const json = cli(['guide', 'lifecycle', '--json']).json<{ body: string }>();
     expect(json.body).toMatch(/^\| Stage \|/m);
     expect(json.body).toMatch(/^```$/m);
+  }, 120000);
+  it('the English, and for a section and a tour step', () => {
+    const section = cli(['guide', 'denials#plan-gate']);
+    expect(section.code, section.stderr).toBe(0);
+    expect(markdownMarks(section.stdout)).toEqual([]);
+    const tour = cli(['guide', 'tour', '1']);
+    expect(tour.code, tour.stderr).toBe(0);
+    expect(markdownMarks(tour.stdout)).toEqual([]);
   }, 120000);
 });

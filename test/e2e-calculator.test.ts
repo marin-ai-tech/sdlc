@@ -19,12 +19,12 @@ import { BIN, git, humanEnv, initGitRepo, read, REPO_ROOT, runCli, tempDir, writ
 type Actor = 'alice' | 'bob' | 'carol' | 'agent';
 interface Step { id: string; section: string; actor: Actor; command: string; exit: number | null; output: string; note: string }
 
-/** The team, named for the deck's language: SDLC_DEMO_PEOPLE=en (default) or ru. */
+/** The team, named for the deck's language: SDLC_DEMO_PEOPLE=en (default) or xx. */
 const SURNAMES = {
   en: { alice: 'Walker', bob: 'Turner', carol: 'Hughes' },
-  ru: { alice: 'Ivanova', bob: 'Petrov', carol: 'Smirnova' },
+  xx: { alice: 'Ivanova', bob: 'Petrov', carol: 'Smirnova' },
 };
-const surnames = process.env.SDLC_DEMO_PEOPLE === 'ru' ? SURNAMES.ru : SURNAMES.en;
+const surnames = process.env.SDLC_DEMO_PEOPLE === 'xx' ? SURNAMES.xx : SURNAMES.en;
 const PEOPLE: Record<Exclude<Actor, 'agent'>, { name: string; email: string }> = {
   alice: { name: `Alice ${surnames.alice}`, email: 'alice@calc.example' },
   bob: { name: `Bob ${surnames.bob}`, email: 'bob@calc.example' },

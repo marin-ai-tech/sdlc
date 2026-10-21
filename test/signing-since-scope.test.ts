@@ -4,7 +4,7 @@ import { stringify } from 'yaml';
 import { git, humanEnv, initGitRepo, runCli, tempDir, write } from './helpers.js';
 
 /**
- * Review of 0.23.1 part B (Ц1): `signing_since` is resolved with git where signatures are checked (`sdlc approvals
+ * Review of 0.23.1 part B (finding 1): `signing_since` is resolved with git where signatures are checked (`sdlc approvals
  * verify`, the evidence export, a roles.yaml proposal), not on every read of roles.yaml. A value git cannot resolve (a
  * typo, a commit missing from a clone) does not break commands that never check signatures: a person can still
  * approve, and `sdlc doctor` reports the problem instead of failing on it.
@@ -36,7 +36,7 @@ function project() {
   return { root, cli };
 }
 
-describe('Ц1 review: an unresolvable signing_since breaks only the signature checks', () => {
+describe('finding 1 review: an unresolvable signing_since breaks only the signature checks', () => {
   it('a person approves; doctor reports signing_since; approvals verify refuses it', () => {
     const p = project();
     expect(p.cli(['new', 'add-x', '--json']).code).toBe(0);

@@ -4,17 +4,17 @@ import { parse, stringify } from 'yaml';
 import { git, humanEnv, initGitRepo, read, runCli, tempDir, write } from './helpers.js';
 
 /**
- * The E2E team run of 2026-10-15 (TodoMVC with Qwen Code, protocol Н12, Н13, Н14), decided by the owner the same day.
+ * The E2E team run of 2026-10-15 (TodoMVC with Qwen Code, protocol finding 12, finding 13, finding 14), decided by the owner the same day.
  *
- * Н13: an agent wrote a delta spec straight into the living specs (`openspec/specs/**`): the requirement changed
+ * finding 13: an agent wrote a delta spec straight into the living specs (`openspec/specs/**`): the requirement changed
  * without the spec gate. Living specs change only when `sdlc archive` merges an approved change, so an agent's edit
  * or shell write there is a process rule `living-specs`: deny in block mode, a reminder in warn mode.
  *
- * Н12: an agent created `openspec/changes/<id>/` with `mkdir` and wrote `intent.md` without `sdlc new` (no kind, risk
+ * finding 12: an agent created `openspec/changes/<id>/` with `mkdir` and wrote `intent.md` without `sdlc new` (no kind, risk
  * or source). A write into a change folder that `sdlc new` (or `openspec new change`) did not create — no
  * `.sdlc.yaml` and no `.openspec.yaml` in it — is the process rule `change-not-created`; the reason names `sdlc new`.
  *
- * Н14: the agent-marker refusal named only `CLAUDECODE`, `OPENCODE`, `AGENT` and `SDLC_AGENT` while the command
+ * finding 14: the agent-marker refusal named only `CLAUDECODE`, `OPENCODE`, `AGENT` and `SDLC_AGENT` while the command
  * cleared `QWEN_CODE`. The reason names the variables the command clears.
  */
 
@@ -43,7 +43,7 @@ function project(mode: 'block' | 'warn' = 'block') {
   return { root, cli, decision, reason, writeFile, shell, file: (rel: string) => path.join(root, rel) };
 }
 
-describe('Н13: living specs change only through the archive', () => {
+describe('finding 13: living specs change only through the archive', () => {
   it('block mode: an agent edit or shell write under openspec/specs is denied as living-specs', () => {
     const p = project();
     const edit = p.writeFile('openspec/specs/todo-title/spec.md');
@@ -72,7 +72,7 @@ describe('Н13: living specs change only through the archive', () => {
   }, 180000);
 });
 
-describe('Н12: a change folder is created by sdlc new', () => {
+describe('finding 12: a change folder is created by sdlc new', () => {
   it('block mode: writing into openspec/changes/<id>/ without .sdlc.yaml or .openspec.yaml is denied', () => {
     const p = project();
     const edit = p.writeFile('openspec/changes/trim-titles-by-hand/intent.md');
@@ -106,7 +106,7 @@ describe('Н12: a change folder is created by sdlc new', () => {
   }, 180000);
 });
 
-describe('Н14: the agent-marker refusal names the variables the command clears', () => {
+describe('finding 14: the agent-marker refusal names the variables the command clears', () => {
   it('QWEN_CODE and QWEN_CODE_SESSION_ID are named; CLAUDECODE when that one is cleared', () => {
     const p = project();
     const qwen = p.shell('env -u QWEN_CODE -u QWEN_CODE_SESSION_ID sdlc approve release --change x');

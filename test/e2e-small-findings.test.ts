@@ -7,14 +7,14 @@ import { git, humanEnv, initGitRepo, read, runCli, tempDir, write } from './help
 /**
  * The smaller findings of the E4 and E5 team runs of 2026-10-16, decided by the owner for 0.22.4.
  *
- * П3: the adopt draft listed 94 people with commit counts but no date, so authors who left could not be told apart;
+ * finding 3: the adopt draft listed 94 people with commit counts but no date, so authors who left could not be told apart;
  * `--apply` wrote all of them into roles.yaml. The draft shows each person's last commit, and `--apply` leaves out
  * people with no commit in the last 12 months.
- * П4: `sdlc layout scaffold` named the project after its folder ("lead") instead of package.json ("semver").
- * П10: init took both `npm test` and `npm run lint` although `posttest` already runs lint: every verify ran lint twice.
+ * finding 4: `sdlc layout scaffold` named the project after its folder ("lead") instead of package.json ("semver").
+ * finding 10: init took both `npm test` and `npm run lint` although `posttest` already runs lint: every verify ran lint twice.
  * A script that the test script's pre/post hooks already run is not added again.
- * Т2: `sdlc new` said nothing about the lite track it suggested; only the last line of `sdlc status` did.
- * Т8: the audit planned one approval per gate, also on a high-risk change where spec and plan need the tech lead as
+ * finding 2: `sdlc new` said nothing about the lite track it suggested; only the last line of `sdlc status` did.
+ * finding 8: the audit planned one approval per gate, also on a high-risk change where spec and plan need the tech lead as
  * well (4 planned for 6 required approvals).
  */
 
@@ -42,7 +42,7 @@ function commitAs(root: string, author: string, date: Date, file: string): void 
   execFileSync('git', ['commit', '-q', '-m', file, '--author', author], { cwd: root, env });
 }
 
-describe('П3: the adopt draft dates people and leaves out those who left', () => {
+describe('finding 3: the adopt draft dates people and leaves out those who left', () => {
   it('each person has a last commit date; --apply writes only people active in the last 12 months', () => {
     const p = repo({ name: 'demo' });
     commitAs(p.root, 'Old Author <old@example.com>', new Date(Date.now() - 3 * YEAR), 'old.txt');
@@ -61,7 +61,7 @@ describe('П3: the adopt draft dates people and leaves out those who left', () =
   }, 240000);
 });
 
-describe('П4: the scaffold names the project from its manifest', () => {
+describe('finding 4: the scaffold names the project from its manifest', () => {
   it('package.json name is the project name in the generated documents', () => {
     const p = repo({ name: 'semver' });
     expect(p.cli(['init', '--tools', 'none', '--json']).code).toBe(0);
@@ -79,7 +79,7 @@ describe('П4: the scaffold names the project from its manifest', () => {
   }, 240000);
 });
 
-describe('П10: verify commands are not run twice', () => {
+describe('finding 10: verify commands are not run twice', () => {
   it('lint run by posttest is not added again; init says why', () => {
     const p = repo({ name: 'demo', scripts: { test: 'node -e 0', posttest: 'npm run lint', lint: 'node -e 0' } });
     const init = p.cli(['init', '--tools', 'none']);
@@ -97,7 +97,7 @@ describe('П10: verify commands are not run twice', () => {
   }, 240000);
 });
 
-describe('Т2: sdlc new says which track it suggests', () => {
+describe('finding 2: sdlc new says which track it suggests', () => {
   it('a low-risk docs change: the output names lite and the command a person runs', () => {
     const p = repo({ name: 'demo' });
     expect(p.cli(['init', '--tools', 'none', '--json']).code).toBe(0);
@@ -115,7 +115,7 @@ describe('Т2: sdlc new says which track it suggests', () => {
   }, 240000);
 });
 
-describe('Т8: the audit plans the high-risk approvals', () => {
+describe('finding 8: the audit plans the high-risk approvals', () => {
   function planned(risk: string): number {
     const p = repo({ name: 'demo' });
     expect(p.cli(['init', '--tools', 'none', '--json']).code).toBe(0);

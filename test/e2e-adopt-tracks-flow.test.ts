@@ -9,18 +9,18 @@ import { git, humanEnv, initGitRepo, read, runCli, tempDir, write } from './help
  * Findings of the E4 (adopting node-semver) and E5 (tracks and human decisions) team runs of 2026-10-16, decided by
  * the owner for 0.22.3: the lifecycle and the change record.
  *
- * П6: after `sdlc rework <gate>` the hint asked the person to approve the artifact that had not changed yet; it is
+ * finding 6: after `sdlc rework <gate>` the hint asked the person to approve the artifact that had not changed yet; it is
  * the agent's turn to revise it from the rework note, as after a rejection.
- * П7: a change created with `sdlc new` could not be tied to a backlog item afterwards: `sdlc backlog link <B> --change
+ * finding 7: a change created with `sdlc new` could not be tied to a backlog item afterwards: `sdlc backlog link <B> --change
  * <id>` links it (the item becomes in progress, the change records the item as its source).
- * П8: `sdlc new <id>` and `sdlc backlog start <B> --change <id>` accepted the id of an archived change and the audit
+ * finding 8: `sdlc new <id>` and `sdlc backlog start <B> --change <id>` accepted the id of an archived change and the audit
  * showed two changes with one id.
- * П9: a change created by mistake could only be removed with git: `sdlc drop <change> --note` (a person only) closes
+ * finding 9: a change created by mistake could only be removed with git: `sdlc drop <change> --note` (a person only) closes
  * it as dropped: logged, moved to the archive with the reason, its deltas never reach the living specs, its backlog
  * item goes back to open.
- * Т3: a change whose plan gate was waived (by the policy or a person) has no tasks.md, and the verify gate stayed
+ * finding 3: a change whose plan gate was waived (by the policy or a person) has no tasks.md, and the verify gate stayed
  * blocked on "no tasks.md" forever while `next` repeated "Implement the approved plan".
- * Т6: running `sdlc approve` again for the same person, role and content recorded another approval event; the
+ * finding 6: running `sdlc approve` again for the same person, role and content recorded another approval event; the
  * audit counted it.
  */
 
@@ -73,7 +73,7 @@ function nextOf(p: P, id: string) {
   return r.json<{ next: { actor: string; action?: string; gate?: string; cli?: string; message: string } }>().next;
 }
 
-describe('П6: after a rework the agent revises first', () => {
+describe('finding 6: after a rework the agent revises first', () => {
   for (const [approvePlan, rejectSpecFirst] of [[true, false], [false, false], [false, true]]) {
   it(`rework spec after the plan was ${approvePlan ? 'approved' : 'rejected'}${rejectSpecFirst ? ', the spec rejected once' : ''}: the agent revises the spec first, then the person approves`, () => {
     const p = project();
@@ -98,7 +98,7 @@ describe('П6: after a rework the agent revises first', () => {
   }
 });
 
-describe('П8: an archived id is not reused', () => {
+describe('finding 8: an archived id is not reused', () => {
   function archived(p: P, id: string): void {
     expect(p.cli(['new', id, '--json']).code).toBe(0);
     fs.renameSync(path.join(p.root, 'openspec/changes', id), path.join(p.root, 'openspec/changes/archive', `2026-10-16-${id}`));
@@ -121,7 +121,7 @@ describe('П8: an archived id is not reused', () => {
   }, 240000);
 });
 
-describe('П7: link an existing change to a backlog item', () => {
+describe('finding 7: link an existing change to a backlog item', () => {
   it('backlog link B1 --change <id>: the item is in progress with the change; the change records the item', () => {
     const p = project();
     expect(p.cli(['new', 'add-export', '--json']).code).toBe(0);
@@ -148,7 +148,7 @@ describe('П7: link an existing change to a backlog item', () => {
   }, 240000);
 });
 
-describe('П9: sdlc drop closes a change created by mistake', () => {
+describe('finding 9: sdlc drop closes a change created by mistake', () => {
   it('a person drops a change with a note: logged, archived as dropped, specs untouched, the backlog item open again', () => {
     const p = project();
     expect(p.cli(['backlog', 'add', 'Export', '--outcome', 'O', '--accept', 'A', '--json']).code).toBe(0);
@@ -182,7 +182,7 @@ describe('П9: sdlc drop closes a change created by mistake', () => {
   }, 240000);
 });
 
-describe('Т3: verify without tasks.md when plan was waived', () => {
+describe('finding 3: verify without tasks.md when plan was waived', () => {
   function docsChange(p: P, waive: 'policy' | 'person') {
     if (waive === 'policy') {
       const config = parse(read(p.file));
@@ -223,7 +223,7 @@ describe('Т3: verify without tasks.md when plan was waived', () => {
   }, 240000);
 });
 
-describe('Т6: approving twice records one approval', () => {
+describe('finding 6: approving twice records one approval', () => {
   it('a second sdlc approve of the same content by the same person says so and writes nothing', () => {
     const p = project();
     expect(p.cli(['new', 'add-farewell', '--json']).code).toBe(0);

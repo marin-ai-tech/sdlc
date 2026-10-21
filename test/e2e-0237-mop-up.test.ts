@@ -9,14 +9,14 @@ import { REPO_ROOT, git, humanEnv, initGitRepo, read, runCli, tempDir, write } f
 /**
  * Findings of the E13 mop-up run (2026-10-18), decided by the owner for 0.23.7.
  *
- * Ж1: after every board task was submitted and merged, tasks.md was unticked and `sdlc next` said "4 of 4 tasks left"
+ * finding 1: after every board task was submitted and merged, tasks.md was unticked and `sdlc next` said "4 of 4 tasks left"
  * with no word that the merged tasks only need marking. next names the tasks whose commits (trailers SDLC-Change and
  * SDLC-Task) are already in HEAD.
- * Ж2: on the board host, board events piled up in the shared log uncommitted and `git pull` refused. `sdlc board list`
+ * finding 2: on the board host, board events piled up in the shared log uncommitted and `git pull` refused. `sdlc board list`
  * says that the log has uncommitted entries.
- * Ж3: a wait event that could not be sent (an unset variable) stayed queued after the wait ended and would reach the
+ * finding 3: a wait event that could not be sent (an unset variable) stayed queued after the wait ended and would reach the
  * chat out of date. A queued wait for a gate that no longer waits on that digest is dropped when the queue is sent.
- * Ж4: reading commands created openspec/.sdlc/.gitignore in a project that had none, and rewrote one with CRLF line
+ * finding 4: reading commands created openspec/.sdlc/.gitignore in a project that had none, and rewrote one with CRLF line
  * ends, so the working copy changed. They leave tracked files alone; the queue is ignored through .git/info/exclude.
  */
 
@@ -67,7 +67,7 @@ function planned(p: P): void {
   p.commit('plan approved');
 }
 
-describe('Ж1: next names tasks whose commits are merged', () => {
+describe('finding 1: next names tasks whose commits are merged', () => {
   it('a task with an SDLC-Task commit in HEAD is named for marking; negative: none without such a commit', () => {
     const p = project();
     planned(p);
@@ -82,7 +82,7 @@ describe('Ж1: next names tasks whose commits are merged', () => {
   }, 240000);
 });
 
-describe('Ж2: the board host is told to commit the log', () => {
+describe('finding 2: the board host is told to commit the log', () => {
   it('board list mentions uncommitted log entries after a claim; negative: nothing once committed', () => {
     const p = project();
     planned(p);
@@ -98,7 +98,7 @@ describe('Ж2: the board host is told to commit the log', () => {
   }, 240000);
 });
 
-describe('Ж3: a wait that ended is not sent late', () => {
+describe('finding 3: a wait that ended is not sent late', () => {
   it('the queued awaiting event is dropped once the gate is approved; the approval is sent', () => {
     const sink = path.join(tempDir('sdlc-0237-sink-'), 'events.jsonl');
     const p = project({ FAKE_EVENTS_FILE: sink });
@@ -120,7 +120,7 @@ describe('Ж3: a wait that ended is not sent late', () => {
   }, 240000);
 });
 
-describe('Ж4: reading commands leave tracked files alone', () => {
+describe('finding 4: reading commands leave tracked files alone', () => {
   it('without openspec/.sdlc/.gitignore a wait is queued, the queue is ignored and git status stays clean', () => {
     const p = project();
     expect(p.cli(['new', 'add-x', '--json']).code).toBe(0);

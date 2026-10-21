@@ -4,7 +4,7 @@ import { parse, stringify } from 'yaml';
 import { git, humanEnv, initGitRepo, read, REPO_ROOT, runCli, tempDir, write } from './helpers.js';
 
 /**
- * 0.12.0 (docs/ru/26, B20): the debate lens, off by default. When `design.debate` is on, the spec gate waits for a
+ * 0.12.0 (docs/xx/26, B20): the debate lens, off by default. When `design.debate` is on, the spec gate waits for a
  * `## Debate` section in design.md with two positions and the decision.
  */
 

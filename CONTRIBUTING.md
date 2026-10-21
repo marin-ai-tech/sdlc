@@ -21,9 +21,10 @@ Thank you for helping improve sdlc.
    generated files.
 
 
-## Adding a language (i18n)
+## Installing another language locally
 
-1. Copy `assets/locales/en.json` to `assets/locales/<code>.json` (for example `de.json`).
+1. Copy `assets/locales/en.json` to `assets/locales/xx.json` on your machine.
 2. Translate the values. Keep the keys, `{params}` placeholders, command names, flags and ids as they are.
-3. Add the language code to `LOCALES` in `src/core/i18n.ts`.
-4. Run `npm test` — the catalog tests check that every locale has every English key and matching placeholders.
+3. Keep the new catalog and any `assets/guide/xx/` or `assets/roles/xx/` files untracked.
+   Installed catalogs are discovered at run time; no source change is needed.
+4. Run `npm test` to check that installed catalogs have every English key and matching placeholders.

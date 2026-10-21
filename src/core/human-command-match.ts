@@ -7,7 +7,7 @@ import { HUMAN_COMMANDS } from './human-commands.js';
 
 /** The binary as agents spell it: `sdlc`, its old name, `sdlc.js` and the Windows shims `sdlc.cmd`, `sdlc.ps1`. */
 const CLI_BINARY = String.raw`\b(?:sdlc|scdl)(?:\.(?:js|cmd|ps1|exe))?`;
-/** Global options between the binary and the subcommand: `--locale en`, `--locale=ru`, `-h`. */
+/** Global options between the binary and the subcommand: `--locale en`, `--locale=xx`, `-h`. */
 const GLOBAL_OPTIONS = String.raw`(?:\s+--?[a-z][\w-]*(?:=[^\s;&|]+|\s+[^\s;&|-][^\s;&|]*)?)*`;
 /** The CLI and its global options, as the takeover rule matches an sdlc step on a held change. */
 export const CLI_PREFIX = `${CLI_BINARY}${GLOBAL_OPTIONS}`;

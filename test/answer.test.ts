@@ -4,7 +4,7 @@ import { parse, stringify } from 'yaml';
 import { git, humanEnv, initGitRepo, read, runCli, tempDir, write } from './helpers.js';
 
 /**
- * 0.11.4 (docs/ru/25, B62): a person answers the open questions of an artifact with `sdlc answer`; the answer is
+ * 0.11.4 (docs/xx/25, B62): a person answers the open questions of an artifact with `sdlc answer`; the answer is
  * written into the artifact and recorded in .sdlc.yaml; the gate cannot be approved while a question has no recorded
  * answer. Only the record counts, never an "Answer" line written into the file by hand or by an agent.
  */

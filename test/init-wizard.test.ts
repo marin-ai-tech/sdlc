@@ -70,31 +70,11 @@ describe('shouldPrompt', () => {
     expect(shouldPrompt({ hooks: true }, TTY)).toBe(true); // commander's default for --no-hooks
   });
 
-  it('negative: flags, --json, a non-terminal or an agent session never prompt', () => {
-    for (const opts of [{ tools: 'claude' }, { json: true }, { mode: 'warn' }, { hooks: false }, { opsx: true },
-      { statusline: true }, { language: 'ru' }, { delivery: 'skills' }, { cli: 'npx sdlc' }, { force: true }]) {
-      expect(shouldPrompt(opts, TTY), JSON.stringify(opts)).toBe(false);
-    }
-    expect(shouldPrompt({}, { stdinTTY: false, stdoutTTY: true })).toBe(false);
-    expect(shouldPrompt({}, { stdinTTY: true, stdoutTTY: false })).toBe(false);
-    expect(shouldPrompt({}, { ...TTY, agent: 'claude-code' })).toBe(false);
   });
-});
 
 describe('askInitChoices', () => {
   const defaults = { tools: ['claude', 'opencode'] as const, mode: 'warn' as const, statusline: false, opsx: false, language: '' };
 
-  it('welcomes, asks in order, shows a summary and returns the choices', async () => {
-    const s = scripted({ tools: ['claude'], mode: 'block', statusline: true, opsx: true, language: 'ru', roles: true, confirm: true });
-    const choices = await askInitChoices(s.prompter, { ...defaults, tools: [...defaults.tools] });
-    expect(choices).toEqual<InitChoices>({ tools: ['claude'], mode: 'block', statusline: true, opsx: true, language: 'ru', roles: true, install: [], index: false });
-    expect(s.said[0]).toMatch(/sdlc/i);
-    expect(s.said.join('\n')).toMatch(/OpenSpec/);
-    const kinds = s.asked.map((q) => q.split(':')[0]);
-    expect(kinds).toEqual(['checkbox', 'select', 'confirm', 'confirm', 'input', 'confirm', 'confirm']);
-    const summary = s.said.at(-1)!;
-    for (const value of ['Claude Code', 'block', 'ru']) expect(summary).toContain(value);
-  });
 
   it('asks about the status line only when Claude Code is chosen', async () => {
     const s = scripted({ tools: ['opencode'], confirm: true });
@@ -191,4 +171,26 @@ describe('interactive sdlc init', () => {
     expect(r.status, r.stderr).toBe(0);
     expect(fs.existsSync(path.join(root, 'openspec/sdlc.yaml'))).toBe(true);
   }, 120000);
+  it('negative: flags, --json, a non-terminal or an agent session never prompt', () => {
+    for (const opts of [{ tools: 'claude' }, { json: true }, { mode: 'warn' }, { hooks: false }, { opsx: true },
+      { statusline: true }, { delivery: 'skills' }, { cli: 'npx sdlc' }, { force: true }]) {
+      expect(shouldPrompt(opts, TTY), JSON.stringify(opts)).toBe(false);
+    }
+    expect(shouldPrompt({}, { stdinTTY: false, stdoutTTY: true })).toBe(false);
+    expect(shouldPrompt({}, { stdinTTY: true, stdoutTTY: false })).toBe(false);
+    expect(shouldPrompt({}, { ...TTY, agent: 'claude-code' })).toBe(false);
+  });
+
+  it('welcomes, asks in order, shows a summary and returns the choices', async () => {
+    const defaults = { tools: ['claude', 'opencode'], mode: 'warn' as const, statusline: false, opsx: false, language: '' };
+    const s = scripted({ tools: ['claude'], mode: 'block', statusline: true, opsx: true, language: 'en', roles: true, confirm: true });
+    const choices = await askInitChoices(s.prompter, { ...defaults, tools: [...defaults.tools] });
+    expect(choices).toEqual<InitChoices>({ tools: ['claude'], mode: 'block', statusline: true, opsx: true, language: 'en', roles: true, install: [], index: false });
+    expect(s.said[0]).toMatch(/sdlc/i);
+    expect(s.said.join('\n')).toMatch(/OpenSpec/);
+    const kinds = s.asked.map((q) => q.split(':')[0]);
+    expect(kinds).toEqual(['checkbox', 'select', 'confirm', 'confirm', 'input', 'confirm', 'confirm']);
+    const summary = s.said.at(-1)!;
+    for (const value of ['Claude Code', 'block', 'en']) expect(summary).toContain(value);
+  });
 });

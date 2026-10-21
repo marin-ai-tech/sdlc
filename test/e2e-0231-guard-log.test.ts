@@ -9,15 +9,15 @@ import { git, humanEnv, initGitRepo, read, runCli, tempDir, write } from './help
  * Findings of the E6 (bug fix from an alert) and E12 (CI, release, upgrade) team runs of 2026-10-17, decided by the
  * owner for 0.23.1, part A: the guard, the log, validation in CI and the license command.
  *
- * Б2: Qwen's read tools (`grep_search`, `read_many_files`, `list_directory`) with a path counted as edits, so the plan
+ * finding 2: Qwen's read tools (`grep_search`, `read_many_files`, `list_directory`) with a path counted as edits, so the plan
  * gate and a takeover denied an agent's search; the denials guide promises that reads still work.
- * Б4: hook decisions were appended to the tracked `openspec/.sdlc/log.jsonl`: after an agent run with denials the working
+ * finding 4: hook decisions were appended to the tracked `openspec/.sdlc/log.jsonl`: after an agent run with denials the working
  * copy was dirty, `git pull` refused and the agent went on with a stale copy. Decisions now go to an untracked
  * `openspec/.sdlc/hook-log.jsonl` and move into the shared log with the next CLI command that writes the log; `sdlc log`
  * and `sdlc health` read both.
- * Ц3: `sdlc validate --all`, the CI step, failed with "No delta specs" on every change before its spec stage and on
+ * finding 3: `sdlc validate --all`, the CI step, failed with "No delta specs" on every change before its spec stage and on
  * lite or docs changes that need no spec: the CI from `sdlc ci init` was red in ordinary work.
- * Ц6: `sdlc license set` rewrote `openspec/sdlc.yaml` and added defaults nobody asked for (`gates.qa.approvers`).
+ * finding 6: `sdlc license set` rewrote `openspec/sdlc.yaml` and added defaults nobody asked for (`gates.qa.approvers`).
  */
 
 interface HookOut {
@@ -58,7 +58,7 @@ function project() {
 
 type P = ReturnType<typeof project>;
 
-describe('Б2: Qwen read tools are reads', () => {
+describe('finding 2: Qwen read tools are reads', () => {
   function atPlanGate(p: P) {
     expect(p.cli(['new', 'add-x', '--json']).code).toBe(0);
     write(p.file('openspec/changes/add-x/intent.md'), INTENT);
@@ -91,7 +91,7 @@ describe('Б2: Qwen read tools are reads', () => {
   }, 240000);
 });
 
-describe('Б4: hook decisions do not dirty the working copy', () => {
+describe('finding 4: hook decisions do not dirty the working copy', () => {
   function denyFiveTimes(p: P) {
     expect(p.cli(['new', 'add-x', '--json']).code).toBe(0);
     git(p.root, ['add', '-A']);
@@ -128,7 +128,7 @@ describe('Б4: hook decisions do not dirty the working copy', () => {
   }, 300000);
 });
 
-describe('Ц3: validate --all in CI', () => {
+describe('finding 3: validate --all in CI', () => {
   it('a new change before its spec stage and a lite docs change pass; nothing says "No delta specs"', () => {
     const p = project();
     expect(p.cli(['new', 'feature-x', '--json']).code).toBe(0);
@@ -151,7 +151,7 @@ describe('Ц3: validate --all in CI', () => {
   }, 300000);
 });
 
-describe('Ц6: license set changes only the license', () => {
+describe('finding 6: license set changes only the license', () => {
   it('sdlc.yaml gains only license lines', () => {
     const p = project();
     const configFile = p.file('openspec/sdlc.yaml');

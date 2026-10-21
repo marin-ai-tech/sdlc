@@ -1,7 +1,7 @@
 /**
  * Builds the demo deck (.pptx) from a calculator e2e transcript and the story in deck-content.mjs.
  *
- *   node scripts/demo/build-deck.mjs --transcript <json> --lang en|ru --out <file.pptx>
+ *   node scripts/demo/build-deck.mjs --transcript <json> --lang en|<installed> --out <file.pptx>
  *
  * Text is fitted by font metrics (Courier New is 0.6 em per character; Calibri about 0.5 em),
  * so nothing relies on PowerPoint's autofit.
@@ -9,7 +9,14 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import pptxgen from 'pptxgenjs';
-import { ACTOR_LABEL, LANGS, ROLES, SLIDES, STAGES, STAGE_LABEL, STEP_NOTE_RU } from './deck-content.mjs';
+import * as english from './deck-content.mjs';
+
+let ACTOR_LABEL = english.ACTOR_LABEL;
+let SLIDES = english.SLIDES;
+let STAGE_LABEL = english.STAGE_LABEL;
+let STEP_NOTE = {};
+let UI = {};
+const { ROLES, STAGES } = english;
 
 const W = 13.33;
 const H = 7.5;
@@ -28,7 +35,12 @@ const MONO = 'Courier New';
 const SANS = 'Calibri';
 const SERIF = 'Cambria';
 
-const USAGE = 'Usage: node scripts/demo/build-deck.mjs --transcript <json> --lang en|ru --out <file.pptx>\n';
+const USAGE = 'Usage: node scripts/demo/build-deck.mjs --transcript <json> --lang en|<installed> --out <file.pptx>\n';
+
+function available(lang) {
+  return lang === 'en' || (typeof lang === 'string' && /^[a-z]{2,8}$/.test(lang)
+    && fs.existsSync(path.join(import.meta.dirname, 'lang', `${lang}.mjs`)));
+}
 
 function fail(message, code) {
   process.stderr.write(message);
@@ -41,7 +53,9 @@ function parseArgs(argv) {
     if (!['--transcript', '--lang', '--out'].includes(argv[i]) || argv[i + 1] === undefined) fail(USAGE, 2);
     args[argv[i].slice(2)] = argv[i + 1];
   }
-  if (!args.transcript || !args.out || !LANGS.includes(args.lang)) fail(`${USAGE}--lang is one of: en, ru\n`, 2);
+  if (!args.transcript || !args.out || !available(args.lang)) {
+    fail(`${USAGE}--lang needs an installed deck module\n`, 2);
+  }
   return args;
 }
 
@@ -121,7 +135,7 @@ function pillRows(slide, labels, x, y, right, opts = {}) {
 }
 
 const actorShort = (actor, lang) => ACTOR_LABEL[actor][lang].split(' · ')[0];
-const stepNote = (step, lang) => (lang === 'ru' ? STEP_NOTE_RU[step.id] ?? step.note : step.note) ?? '';
+const stepNote = (step) => STEP_NOTE[step.id] ?? step.note ?? '';
 const refused = (step) => (step.exit ?? 0) !== 0;
 
 // ---- the terminal card (the motif) --------------------------------------
@@ -153,7 +167,10 @@ function hardWrap(line, max) {
 
 function outputLines(step, max, rows) {
   const lines = String(step.output ?? '').split('\n').filter((line) => line.trim());
-  const wrapped = lines.flatMap((line) => hardWrap(line.replace(/^(error|ошибка):\s*/i, ''), max));
+  const errorPrefix = UI.errorPrefix ?? 'error';
+  const wrapped = lines.flatMap((line) => hardWrap(
+    line.replace(new RegExp(`^(error|${errorPrefix}):\\s*`, 'i'), ''), max,
+  ));
   const kept = wrapped.slice(0, rows);
   if (wrapped.length > rows) kept[rows - 1] = '…';
   return kept.length ? kept : ['(no output)'];
@@ -261,7 +278,7 @@ function personCard(slide, x, y, w, actor, lang, people) {
   });
   const name = actor === 'agent' ? ACTOR_LABEL.agent[lang] : people[actor]?.name ?? actor;
   text(slide, name, { x: x + 0.1, y: y + 0.9, w: w - 0.2, h: 0.35, fontSize: 14, bold: true, align: 'center' });
-  const none = lang === 'ru' ? 'без ролей: не утверждает' : 'no roles: never approves';
+  const none = UI.none ?? 'no roles: never approves';
   const roles = ROLES[actor].length ? ROLES[actor] : [none];
   roles.forEach((role, i) => {
     box(slide, SHAPE.round, x + 0.2, y + 1.32 + i * 0.3, w - 0.4, 0.25, C.paper, { rectRadius: 0.12 });
@@ -317,7 +334,7 @@ function layerNote(slide, value) {
 }
 
 function moreRow(slide, def, lang, steps) {
-  const label = lang === 'ru' ? 'Также в этой части:' : 'Also in this part:';
+  const label = UI.also ?? 'Also in this part:';
   text(slide, label, { x: ML, y: 6.62, w: 1.9, h: 0.28, fontSize: 11, color: C.muted, valign: 'middle' });
   const names = [...new Set(resolve(def.more, steps).map((step) => step.name ?? step.command.replace(/^sdlc /, '')))];
   pillRows(slide, names, ML + 1.95, 6.62, W - ML, { bottom: 7.0 });
@@ -345,7 +362,8 @@ function refusalRow(slide, step, frame, lang) {
     x: x + 1.75, y: y + 0.08, w: cw, h: 0.3, fontFace: MONO, fontSize: 11, valign: 'middle',
   });
   const reason = String(step.output ?? '').split('\n').find((line) => line.trim()) ?? '';
-  text(slide, cut(reason.replace(/^(error|ошибка):\s*/i, ''), fits(w - 0.6, 11, 0.5)), {
+  const errorPrefix = UI.errorPrefix ?? 'error';
+  text(slide, cut(reason.replace(new RegExp(`^(error|${errorPrefix}):\\s*`, 'i'), ''), fits(w - 0.6, 11, 0.5)), {
     x: x + 0.45, y: y + 0.42, w: w - 0.6, h: 0.26, fontSize: 11, color: C.refused, valign: 'middle',
   });
 }
@@ -377,9 +395,8 @@ function layoutCoverage(pres, def, lang, transcript) {
   const used = new Set(transcript.steps.map((step) => step.name ?? step.command.split(' ')[1]));
   const all = transcript.commands ?? [...used];
   const covered = all.filter((name) => used.has(name)).length;
-  const labels = lang === 'ru'
-    ? ['шагов', `команд из ${all.length}`, 'отказов', 'человека (и агенты)']
-    : ['steps', `of ${all.length} commands`, 'refusals', 'people (and agents)'];
+  const labels = (UI.stats ?? ['steps', 'of {count} commands', 'refusals', 'people (and agents)'])
+    .map((label) => label.replace('{count}', String(all.length)));
   const people = Object.keys(transcript.people ?? {}).length;
   const values = [transcript.steps.length, covered, transcript.steps.filter(refused).length, people];
   const w = (CW - 3 * 0.25) / 4;
@@ -417,9 +434,17 @@ const LAYOUTS = {
 };
 
 async function build(transcript, lang, out) {
+  if (lang !== 'en') {
+    const content = await import(`./lang/${lang}.mjs`);
+    ACTOR_LABEL = content.ACTOR_LABEL;
+    STAGE_LABEL = content.STAGE_LABEL;
+    SLIDES = content.SLIDES;
+    STEP_NOTE = content.STEP_NOTE ?? {};
+    UI = content.UI ?? {};
+  }
   const pres = new pptxgen();
   pres.layout = 'LAYOUT_WIDE';
-  pres.title = lang === 'ru' ? 'sdlc · демо «калькулятор»' : 'sdlc · calculator demo';
+  pres.title = UI.title ?? 'sdlc · calculator demo';
   const steps = transcript.steps ?? [];
   const data = { ...transcript, steps, byId: new Map(steps.map((step) => [step.id, step])) };
   for (const def of SLIDES) {

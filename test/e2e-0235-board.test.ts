@@ -11,14 +11,14 @@ import { BIN, git, humanEnv, initGitRepo, read, runCli, tempDir, write } from '.
  * Findings of the E11 team run (an executor swarm, the board and the auction, 2026-10-18), decided by the owner for
  * 0.23.5.
  *
- * Р1: `sdlc instructions --json` gave `outputPath: "plan.md"`, relative to the change folder; agents wrote it relative
+ * finding 1: `sdlc instructions --json` gave `outputPath: "plan.md"`, relative to the change folder; agents wrote it relative
  * to the repository root (five times in three runs). `outputPath` is relative to the project root.
- * Р2: the board tools over MCP took numbers (`lease`) only as strings; a JSON number is accepted.
- * Р3: a result branch the executor pushed to origin was `unknown_ref` until the board host fetched it; the submit
+ * finding 2: the board tools over MCP took numbers (`lease`) only as strings; a JSON number is accepted.
+ * finding 3: a result branch the executor pushed to origin was `unknown_ref` until the board host fetched it; the submit
  * fetches a valid branch name from origin itself, and refuses a name that is not a branch name.
- * Р4: every attempt at a task used the same result branch, so a retry overwrote the rejected attempt; each attempt
+ * finding 4: every attempt at a task used the same result branch, so a retry overwrote the rejected attempt; each attempt
  * after the first gets its own branch, and `previousAttempts` keeps the head commit of the rejected one.
- * Р5: `sdlc board list` showed a dispatched task as `executor/?`.
+ * finding 5: `sdlc board list` showed a dispatched task as `executor/?`.
  */
 
 const SERVER_TOKEN = 'server-token-0123456789';
@@ -124,7 +124,7 @@ interface Claimed {
   item: { result: { branch: string; trailers: Record<string, string> }; previousAttempts?: Array<{ head?: string }> };
 }
 
-describe('Р1: outputPath is relative to the project root', () => {
+describe('finding 1: outputPath is relative to the project root', () => {
   it('instructions plan names openspec/changes/<id>/plan.md', () => {
     const p = project();
     const r = p.cli(['instructions', 'plan', '--change', 'add-farewell', '--json']);
@@ -133,7 +133,7 @@ describe('Р1: outputPath is relative to the project root', () => {
   }, 240000);
 });
 
-describe('Р2–Р4: claiming and submitting over MCP', () => {
+describe('finding 2–finding 4: claiming and submitting over MCP', () => {
   it('a numeric lease is accepted; a pushed branch is submitted without a manual fetch; a bad name is refused', async () => {
     const p = project();
     const client = await connect(await serve(p.root, p.env), p.token());
@@ -168,7 +168,7 @@ describe('Р2–Р4: claiming and submitting over MCP', () => {
   }, 300000);
 });
 
-describe('Р5: a dispatched task without an agent', () => {
+describe('finding 5: a dispatched task without an agent', () => {
   it('board list does not show executor/?', () => {
     const p = project();
     expect(p.cli(['board', 'dispatch', '--change', 'add-farewell', '--task', '1.2', '--executor', 'rep-a']).code).toBe(0);

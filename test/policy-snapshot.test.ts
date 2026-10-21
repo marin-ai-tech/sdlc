@@ -4,7 +4,7 @@ import { parse, stringify } from 'yaml';
 import { git, humanEnv, initGitRepo, read, runCli, tempDir, write } from './helpers.js';
 
 /**
- * 0.11.4 (docs/ru/25).
+ * 0.11.4 (docs/xx/25).
  * B78: the first evaluation that applies an auto_waive policy records the waiver on the change, so removing the
  *      policy later does not change what that change shows.
  * B79: a rework record written before 0.11.2 has no cycle counter; the count comes from the history.

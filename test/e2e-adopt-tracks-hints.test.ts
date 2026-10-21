@@ -8,17 +8,17 @@ import { git, humanEnv, initGitRepo, read, runCli, tempDir, write } from './help
  * Findings of the E4 (adopting node-semver) and E5 (tracks and human decisions) team runs of 2026-10-16, decided by
  * the owner for 0.22.3: hints that tell a person what sdlc cannot fix itself.
  *
- * П1: the project's `.gitignore` was an allow-list ("ignore everything in the root"); `openspec/`, the agent files and
+ * finding 1: the project's `.gitignore` was an allow-list ("ignore everything in the root"); `openspec/`, the agent files and
  * REVIEW.md were ignored, and neither `init` nor `doctor` said so, so the team would never get the process.
- * П2: the adopt draft took "npm CLI robot <npm-cli+bot@github.com>" for a person; only `[bot]` and noreply addresses
+ * finding 2: the adopt draft took "npm CLI robot <npm-cli+bot@github.com>" for a person; only `[bot]` and noreply addresses
  * were recognised as bots.
- * Т1: `auto_waive: { kinds, tracks }` waives a gate when the kind OR the track matches; nothing said so, and
+ * finding 1: `auto_waive: { kinds, tracks }` waives a gate when the kind OR the track matches; nothing said so, and
  * `tracks: [lite]` waives the gate for every change on lite. The guide says "or"; doctor warns about `tracks: [lite]`.
- * Т4: two people writing one change record on a branch got a git conflict in `.sdlc.yaml`; nothing said how to
+ * finding 4: two people writing one change record on a branch got a git conflict in `.sdlc.yaml`; nothing said how to
  * resolve it. doctor names the file and how to merge it.
- * Т5: on a high-risk change `approve --preview` said "0 of 1, you may approve it" to the product owner and `roles who`
+ * finding 5: on a high-risk change `approve --preview` said "0 of 1, you may approve it" to the product owner and `roles who`
  * listed the product owner and the tech lead without saying both are needed.
- * Т7: a high-risk change reached a gate nobody may approve (distinct approvers and the per-person limit); only
+ * finding 7: a high-risk change reached a gate nobody may approve (distinct approvers and the per-person limit); only
  * `roles who --change` said "no one". `status` and `next` warn now.
  */
 
@@ -53,7 +53,7 @@ function warnings(p: P, needle: RegExp): Check[] {
   return doctorChecks(p).filter((c) => c.status !== 'ok' && needle.test(`${c.message} ${c.fix ?? ''}`));
 }
 
-describe('П1: process files ignored by git', () => {
+describe('finding 1: process files ignored by git', () => {
   it('init and doctor say that openspec/ is ignored by .gitignore and how to allow it', () => {
     const p = project('/*\n!/.gitignore\n!/package.json\n');
     const init = p.cli(['init', '--tools', 'none']);
@@ -72,7 +72,7 @@ describe('П1: process files ignored by git', () => {
   }, 240000);
 });
 
-describe('П2: bots in the adopt draft', () => {
+describe('finding 2: bots in the adopt draft', () => {
   it('bot-like names and addresses are left out; people whose names merely contain "bot" stay', () => {
     const p = project();
     const authors = ['npm CLI robot <npm-cli+bot@github.com>', 'renovate-bot <bot@renovateapp.com>',
@@ -91,7 +91,7 @@ describe('П2: bots in the adopt draft', () => {
   }, 240000);
 });
 
-describe('Т1: auto_waive matches the kind or the track', () => {
+describe('finding 1: auto_waive matches the kind or the track', () => {
   function withPolicy(p: P, policy: Record<string, string[]>) {
     expect(p.cli(['init', '--tools', 'none', '--json']).code).toBe(0);
     const config = parse(read(p.file));
@@ -116,7 +116,7 @@ describe('Т1: auto_waive matches the kind or the track', () => {
   }, 240000);
 });
 
-describe('Т4: a git conflict in a change record', () => {
+describe('finding 4: a git conflict in a change record', () => {
   it('doctor names the record with conflict markers and says how to merge it', () => {
     const p = project();
     expect(p.cli(['init', '--tools', 'none', '--json']).code).toBe(0);
@@ -172,7 +172,7 @@ function highRisk(codeOwners: string) {
   return p;
 }
 
-describe('Т5: high risk says that the tech lead is needed too', () => {
+describe('finding 5: high risk says that the tech lead is needed too', () => {
   it('the product owner\'s preview and roles who name the tech-lead approval still needed', () => {
     const p = highRisk('lida');
     const preview = p.cli(['approve', 'spec', '--change', 'b8-corrupt', '--preview']);
@@ -183,7 +183,7 @@ describe('Т5: high risk says that the tech lead is needed too', () => {
   }, 240000);
 });
 
-describe('Т7: a gate nobody may approve is a warning', () => {
+describe('finding 7: a gate nobody may approve is a warning', () => {
   function approvedByLida(codeOwners: string) {
     const p = highRisk(codeOwners);
     ok(p.cli(['approve', 'spec', '--change', 'b8-corrupt', '--json']));

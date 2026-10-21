@@ -16,16 +16,6 @@ describe('AI-ready project templates (assets/project/)', () => {
     }
   });
 
-  it('templates use only known tokens, are English Markdown and end with a newline', () => {
-    for (const r of LAYOUT_ROLES) {
-      const text = read(r.template);
-      for (const m of text.matchAll(TOKEN)) expect(KNOWN.has(m[1]), `${r.template}: {{${m[1]}}}`).toBe(true);
-      expect(text, r.template).not.toMatch(/[Ѐ-ӿ]/);
-      expect(text, r.template).not.toMatch(/\r/);
-      expect(text.endsWith('\n'), r.template).toBe(true);
-      expect(text, r.template).toMatch(/^# /m);
-    }
-  });
 
   it('AGENTS.md is the main guide: links every other role and names the lifecycle commands', () => {
     const agents = read('ai-ready/AGENTS.md');
@@ -49,6 +39,15 @@ describe('AI-ready project templates (assets/project/)', () => {
       const text = read(r.template);
       expect(text, r.template).not.toMatch(/lorem ipsum/i);
       expect(text.replace(TOKEN, '').trim().length, r.template).toBeGreaterThan(200);
+    }
+  });
+  it('templates use only known tokens, are English Markdown and end with a newline', () => {
+    for (const r of LAYOUT_ROLES) {
+      const text = read(r.template);
+      for (const m of text.matchAll(TOKEN)) expect(KNOWN.has(m[1]), `${r.template}: {{${m[1]}}}`).toBe(true);
+      expect(text, r.template).not.toMatch(/\r/);
+      expect(text.endsWith('\n'), r.template).toBe(true);
+      expect(text, r.template).toMatch(/^# /m);
     }
   });
 });

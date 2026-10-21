@@ -5,7 +5,7 @@ import { parse, stringify } from 'yaml';
 import { git, humanEnv, initGitRepo, read, runCli, tempDir, write } from './helpers.js';
 
 /**
- * 0.11.3, project health (docs/ru/23, B65, B68): `sdlc health` lists findings with a level, the facts and a
+ * 0.11.3, project health (docs/xx/23, B65, B68): `sdlc health` lists findings with a level, the facts and a
  * recommendation; no single score; thresholds from `health.*` in sdlc.yaml with defaults; exit 0 always.
  */
 

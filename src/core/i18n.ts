@@ -6,12 +6,12 @@
  * Contract (the lead's; implementation by the executor):
  * - Catalogs: `assets/locales/<locale>.json`, flat { "key": "text" }; `{name}` placeholders take params.
  *   `en` is complete for every key the code uses; every shipped locale has every key of `en`.
- * - `normalizeLocale('ru_RU.UTF-8') === 'ru'`, `'ru-RU' → 'ru'`, `'EN' → 'en'`; `'C'`, `'POSIX'`, `''`,
+ * - `normalizeLocale('xx_XX.UTF-8') === 'xx'`, `'xx-XX' → 'xx'`, `'EN' → 'en'`; `'C'`, `'POSIX'`, `''`,
  *   undefined → undefined.
  * - `resolveLocale(sources)`: the first source that is set wins, in this order — `flag` (`--locale`),
  *   `env.SDLC_LOCALE`, `config` (`locale:` in openspec/sdlc.yaml), `system`. The winner normalized; when it is
- *   not one of LOCALES the result is `en` (an explicit choice without a translation means English, it does not
- *   fall through to the next source). Nothing set → `en`.
+ *   without an installed catalog the result is `en`. An explicit choice without a translation means English;
+ *   it does not fall through to the next source. Nothing set → `en`.
  * - `systemLocale(env, intlLocale)`: `env.LC_ALL`, then `env.LC_MESSAGES`, then `env.LANG`, then `intlLocale`
  *   (default `Intl.DateTimeFormat().resolvedOptions().locale`); the first non-empty one that normalizes.
  * - `t(key, params?, locale?)`: text in `locale` (default: the current one set by `setLocale`), else in `en`,
@@ -23,8 +23,21 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { assetsDir } from '../integrations/assets.js';
 
-export const LOCALES = ['en', 'ru'] as const;
-export type Locale = (typeof LOCALES)[number];
+export type Locale = string;
+
+/** Catalogs installed beside the English catalog, in stable display order. */
+export function localesIn(dir: string): string[] {
+  if (!fs.existsSync(dir)) return ['en'];
+  return ['en', ...fs.readdirSync(dir)
+    .filter((name) => name.endsWith('.json') && name !== 'en.json'
+      && fs.statSync(path.join(dir, name)).isFile())
+    .map((name) => path.basename(name, '.json'))
+    .sort()];
+}
+
+export function installedLocales(): string[] {
+  return localesIn(path.join(assetsDir(), 'locales'));
+}
 
 export interface LocaleSources {
   flag?: string;
@@ -36,8 +49,8 @@ export interface LocaleSources {
 const cache = new Map<Locale, Record<string, string>>();
 let current: Locale = 'en';
 
-function isLocale(value: string): value is Locale {
-  return (LOCALES as readonly string[]).includes(value);
+function isLocale(value: string): boolean {
+  return installedLocales().includes(value);
 }
 
 function loadCatalog(locale: Locale): Record<string, string> {

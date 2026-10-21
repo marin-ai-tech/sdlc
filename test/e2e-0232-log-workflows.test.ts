@@ -9,16 +9,16 @@ import { git, humanEnv, initGitRepo, read, REPO_ROOT, runCli, tempDir, write } f
  * Findings of the E7 team run (signed approvals and an audit, 2026-10-17), decided by the owner for 0.23.2, part A:
  * the log, the agent workflows and the gates.
  *
- * С6: `sdlc status` and `sdlc next` appended `gate.<gate>.awaiting` to the tracked shared log, so after an agent run
- * the working copy was dirty and `git pull` refused (the class of Б4, whose test covered only hook decisions). Waits
+ * finding 6: `sdlc status` and `sdlc next` appended `gate.<gate>.awaiting` to the tracked shared log, so after an agent run
+ * the working copy was dirty and `git pull` refused (the class of finding 4, whose test covered only hook decisions). Waits
  * recorded by commands that only read go to the local queue like hook decisions.
- * С10: a gate decision deleted from the shared log by hand went unnoticed; `sdlc health` compares the log with the
+ * finding 10: a gate decision deleted from the shared log by hand went unnoticed; `sdlc health` compares the log with the
  * change records.
- * С7: the plan workflow (and build, verify, review, release) did not say where to write, and an agent put plan.md and
+ * finding 7: the plan workflow (and build, verify, review, release) did not say where to write, and an agent put plan.md and
  * tasks.md at the repository root; `sdlc next` now says where such a file belongs.
- * С1: the agent guide did not say that the process settings change only through a proposal.
- * С8: `sdlc tests unlock` took no reason; the reason is recorded.
- * С9: a review record whose coverage used `### <pass>` headings was refused with a message that did not show the form.
+ * finding 1: the agent guide did not say that the process settings change only through a proposal.
+ * finding 8: `sdlc tests unlock` took no reason; the reason is recorded.
+ * finding 9: a review record whose coverage used `### <pass>` headings was refused with a message that did not show the form.
  */
 
 const INTENT = [
@@ -55,7 +55,7 @@ function atIntentGate(p: P): void {
   p.commit('intent');
 }
 
-describe('С6: commands that only read keep the working copy clean', () => {
+describe('finding 6: commands that only read keep the working copy clean', () => {
   it('status and next record the wait locally; log sees it; the next log write moves it into the shared log', () => {
     const p = project();
     atIntentGate(p);
@@ -72,7 +72,7 @@ describe('С6: commands that only read keep the working copy clean', () => {
   }, 240000);
 });
 
-describe('С10: health notices a gate decision missing from the shared log', () => {
+describe('finding 10: health notices a gate decision missing from the shared log', () => {
   it('a gate.intent.approved line deleted by hand is a finding; negative: an untouched log has none', () => {
     const p = project();
     atIntentGate(p);
@@ -92,7 +92,7 @@ describe('С10: health notices a gate decision missing from the shared log', () 
   }, 240000);
 });
 
-describe('С7: artifacts go into the change folder', () => {
+describe('finding 7: artifacts go into the change folder', () => {
   it('the plan, build, verify, review and release workflows name resolvedOutputPath', () => {
     const p = project('claude');
     for (const step of ['plan', 'build', 'verify', 'review', 'release']) {
@@ -112,7 +112,7 @@ describe('С7: artifacts go into the change folder', () => {
   }, 120000);
 });
 
-describe('С1: the agent guide names the settings proposal', () => {
+describe('finding 1: the agent guide names the settings proposal', () => {
   it('AGENTS.md says that sdlc.yaml and roles.yaml change only through sdlc config propose', () => {
     const guide = read(path.join(REPO_ROOT, 'assets/project/ai-ready/AGENTS.md'));
     expect(guide).toMatch(/sdlc config propose/);
@@ -121,7 +121,7 @@ describe('С1: the agent guide names the settings proposal', () => {
   });
 });
 
-describe('С8: unlocking the tests records why', () => {
+describe('finding 8: unlocking the tests records why', () => {
   it('tests unlock --note puts the reason into the log entry', () => {
     const p = project();
     expect(p.cli(['new', 'add-x', '--json']).code).toBe(0);
@@ -135,7 +135,7 @@ describe('С8: unlocking the tests records why', () => {
   }, 120000);
 });
 
-describe('С9: review coverage', () => {
+describe('finding 9: review coverage', () => {
   it('a coverage section with one ### heading per pass is read like the list form', () => {
     const content = [
       '# Review', '', '## Coverage', '', '### bugs', 'none found — checked: the counter logic', '',
@@ -146,10 +146,10 @@ describe('С9: review coverage', () => {
   });
 
   it('the refusal shows the line a pass needs and drops an empty unchecked part', () => {
-    for (const locale of ['en', 'ru'] as const) {
+    for (const locale of ['en']) {
       const text = t('gate.reviewCoverage', { missing: 'bugs, security', unchecked: '' }, locale);
       expect(text, locale).toMatch(/- bugs: none found — checked:/);
       expect(text, locale).not.toMatch(/: \.?$/);
     }
   });
-});
+  });

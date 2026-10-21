@@ -5,7 +5,7 @@ import { describe, expect, it } from 'vitest';
 import { git, humanEnv, initGitRepo, read, runCli, tempDir, write } from './helpers.js';
 
 /**
- * 0.12.0 (docs/ru/26, B24): sdlc installs a prepare-commit-msg git hook that adds `SDLC-Agent: <agent>` to commits
+ * 0.12.0 (docs/xx/26, B24): sdlc installs a prepare-commit-msg git hook that adds `SDLC-Agent: <agent>` to commits
  * made in an agent session and never to a person's; the audit counts the agent's commits.
  */
 

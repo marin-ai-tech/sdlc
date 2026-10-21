@@ -5,7 +5,7 @@ import { parse, stringify } from 'yaml';
 import { git, humanEnv, initGitRepo, read, runCli, tempDir, write } from './helpers.js';
 
 /**
- * 0.11.2, process hygiene — verification (docs/ru/22, B57, B58).
+ * 0.11.2, process hygiene — verification (docs/xx/22, B57, B58).
  * B57: `sdlc verify` warns about files the plan lists under "Files that change" that were not touched (JSON
  *      `planDrift.untouched`, and in verification.md); a warning, not a failure.
  * B58: verification.md has a "Not run / limits" section, and the files in the change's `verification/` folder are

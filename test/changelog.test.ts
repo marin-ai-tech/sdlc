@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { git, humanEnv, initGitRepo, runCli, tempDir, write } from './helpers.js';
 
 /**
- * 0.12.0 (docs/ru/26, B22): `sdlc changelog` builds a readable changelog from the delta specs: ADDED -> Added,
+ * 0.12.0 (docs/xx/26, B22): `sdlc changelog` builds a readable changelog from the delta specs: ADDED -> Added,
  * MODIFIED and RENAMED -> Changed, REMOVED -> Removed. A change without deltas adds nothing.
  */
 

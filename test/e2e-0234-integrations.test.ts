@@ -7,17 +7,17 @@ import { REPO_ROOT, git, humanEnv, initGitRepo, read, runCli, tempDir, write } f
 /**
  * Findings of the E10 team run (MCP and integrations, 2026-10-18), decided by the owner for 0.23.4.
  *
- * М1: the settings check let unknown keys through: a receiver with `events:` instead of `on:` silently got the
+ * finding 1: the settings check let unknown keys through: a receiver with `events:` instead of `on:` silently got the
  * default patterns, a server had an invented `role`, and a context source without `server` failed only at
  * `sdlc context pull`. A proposal with such content is refused naming the key; doctor names unknown keys of a file
  * already in place, and the commands keep working.
- * М2: an agent's shell turned `${HEAD}` and `${CHAT_ID}` into empty strings in `--set`; `config show` warns about empty
+ * finding 2: an agent's shell turned `${HEAD}` and `${CHAT_ID}` into empty strings in `--set`; `config show` warns about empty
  * values in `args`, `headers` and `env`, and the workflow says to single-quote `${…}`.
- * М3: the root artifact hint fired on the project's REVIEW.md (case-insensitive file systems) and was not translated.
- * М4: Russian messages wrote "`MCP`" as code instead of the plain name.
- * М5: `${VAR}` in a receiver's `args` was sent literally; it is expanded from the environment when the event is sent.
- * М6: without `project.name` events named the clone's folder; the package.json name comes first.
- * М7: a secret in a person's note went verbatim into the shared log and the change record; it is masked.
+ * finding 3: the root artifact hint fired on the project's REVIEW.md (case-insensitive file systems) and was not translated.
+ * finding 4: another language messages wrote "`MCP`" as code instead of the plain name.
+ * finding 5: `${VAR}` in a receiver's `args` was sent literally; it is expanded from the environment when the event is sent.
+ * finding 6: without `project.name` events named the clone's folder; the package.json name comes first.
+ * finding 7: a secret in a person's note went verbatim into the shared log and the change record; it is masked.
  */
 
 const FAKE = path.join(REPO_ROOT, 'test/fixtures/mcp/fake-server.mjs').replace(/\\/g, '/');
@@ -74,7 +74,7 @@ function proposalFile(p: P, edit: (config: Record<string, any>) => void): string
   return out;
 }
 
-describe('М1: unknown keys and incomplete entries are named', () => {
+describe('finding 1: unknown keys and incomplete entries are named', () => {
   it('a proposal with events: instead of on:, a server role or a source without server is refused naming the key', () => {
     const p = project();
     const cases: Array<[string, (c: Record<string, any>) => void, RegExp]> = [
@@ -101,7 +101,7 @@ describe('М1: unknown keys and incomplete entries are named', () => {
   }, 240000);
 });
 
-describe('М2: empty values that a shell left behind', () => {
+describe('finding 2: empty values that a shell left behind', () => {
   it('config show warns about an empty args value; the workflow says to single-quote ${…}', () => {
     const p = project({ receiver: { on: ['gate.*'] } });
     const file = proposalFile(p, (c) => { c.events[0].args = { chat_id: '' }; });
@@ -114,29 +114,9 @@ describe('М2: empty values that a shell left behind', () => {
   }, 240000);
 });
 
-describe('М3: the root artifact hint', () => {
-  it('REVIEW.md is not review.md; a real intent.md at the root is hinted, in the command locale', () => {
-    const p = project();
-    expect(p.cli(['new', 'add-x', '--json']).code).toBe(0);
-    write(p.file('REVIEW.md'), '# Review policy\n');
-    const quiet = p.cli(['next', '--change', 'add-x', '--locale', 'ru']);
-    expect(quiet.stdout + quiet.stderr).not.toMatch(/review\.md/i);
-    write(p.file('intent.md'), INTENT);
-    fs.rmSync(p.file('openspec/changes/add-x/intent.md'), { force: true });
-    const hinted = p.cli(['next', '--change', 'add-x', '--locale', 'ru']);
-    expect(hinted.stdout + hinted.stderr).toMatch(/openspec\/changes\/add-x\/intent\.md/);
-    expect(hinted.stdout + hinted.stderr).not.toMatch(/belongs at/);
-  }, 240000);
-});
 
-describe('М4: MCP is written plainly in Russian', () => {
-  it('no Russian message wraps MCP in backticks', () => {
-    const ru = read(path.join(REPO_ROOT, 'assets/locales/ru.json'));
-    expect(ru).not.toContain('`MCP`');
-  });
-});
 
-describe('М5 and М6: what a receiver gets', () => {
+describe('finding 5 and finding 6: what a receiver gets', () => {
   it('${VAR} in args is expanded from the environment; the project is named from package.json', () => {
     const p = project({ receiver: { args: { chat_id: '${CHAT_ID}' }, message: 'text' }, env: { CHAT_ID: '-100777' },
       pkg: 'todo-app' });
@@ -159,7 +139,7 @@ describe('М5 and М6: what a receiver gets', () => {
   }, 240000);
 });
 
-describe('М7: a secret in a person\'s note', () => {
+describe('finding 7: a secret in a person\'s note', () => {
   it('reject --note with a token: the log and the change record keep the note without the token', () => {
     const p = project();
     p.atIntentGate();
@@ -170,5 +150,16 @@ describe('М7: a secret in a person\'s note', () => {
       expect(text, rel).not.toContain(TOKEN);
       expect(text, rel).toMatch(/Wrong scope/);
     }
+  }, 240000);
+  it('REVIEW.md is not review.md; a real intent.md at the root is hinted, in English', () => {
+    const p = project();
+    expect(p.cli(['new', 'add-x', '--json']).code).toBe(0);
+    write(p.file('REVIEW.md'), '# Review policy\n');
+    const quiet = p.cli(['next', '--change', 'add-x']);
+    expect(quiet.stdout + quiet.stderr).not.toMatch(/review\.md/i);
+    write(p.file('intent.md'), INTENT);
+    fs.rmSync(p.file('openspec/changes/add-x/intent.md'), { force: true });
+    const hinted = p.cli(['next', '--change', 'add-x']);
+    expect(hinted.stdout + hinted.stderr).toMatch(/openspec\/changes\/add-x\/intent\.md/);
   }, 240000);
 });

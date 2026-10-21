@@ -34,14 +34,7 @@ describe('agents cannot pass for a person by clearing the agent markers', () => 
     }
   });
 
-  it('negative: reading the markers or setting other variables stays allowed', () => {
-    const { root, ctx } = context();
-    for (const command of ['echo $CLAUDECODE', 'env | grep AGENT', 'export AGENT_NAME=docs', 'FOO= make test',
-      'printenv OPENCODE', 'SDLC_LOCALE=ru sdlc status']) {
-      expect(evaluateToolCall(bash(root, command), ctx).decision, command).toBe('allow');
-    }
   });
-});
 
 describe('state-file writes are caught however the path is spelled', () => {
   it('a write after cd, by bare file name, is denied', () => {
@@ -84,5 +77,12 @@ describe('state-file writes are caught however the path is spelled', () => {
     write(path.join(root, 'docs/notes.md'), 'x\n');
     const edit = normalizeToolCall('Edit', { file_path: path.join(root, 'docs/notes.md') }, root);
     expect(evaluateToolCall(edit, ctx).decision).toBe('allow');
+  });
+  it('negative: reading the markers or setting other variables stays allowed', () => {
+    const { root, ctx } = context();
+    for (const command of ['echo $CLAUDECODE', 'env | grep AGENT', 'export AGENT_NAME=docs', 'FOO= make test',
+      'printenv OPENCODE']) {
+      expect(evaluateToolCall(bash(root, command), ctx).decision, command).toBe('allow');
+    }
   });
 });

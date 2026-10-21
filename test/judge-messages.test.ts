@@ -12,7 +12,7 @@ import { REPO_ROOT, git, humanEnv, initGitRepo, read, runCli, tempDir, write } f
 
 const JUDGE = path.join(REPO_ROOT, 'test/fixtures/judge/judge.mjs').replace(/\\/g, '/');
 
-function project(locale: 'en' | 'ru') {
+function project(locale: 'en' | 'xx') {
   const root = tempDir('sdlc-judge-msg-');
   const env = humanEnv(tempDir('sdlc-home-'));
   initGitRepo(root);
@@ -35,7 +35,7 @@ function project(locale: 'en' | 'ru') {
 }
 
 describe('judge messages', () => {
-  for (const locale of ['en', 'ru'] as const) {
+  for (const locale of ['en', 'xx'] as const) {
     it(`${locale}: the rework text is not followed by a second period, and the escalation has a colon`, () => {
       const p = project(locale);
       expect(p.judge().code).toBe(1);

@@ -50,11 +50,9 @@ describe('guide tables fit the terminal', () => {
     }
   }, 120000);
 
-  it('the same in Russian; a wide window and no width keep the natural table', () => {
-    const ru = tableOf(guide({ COLUMNS: '72' }, ['guide', 'lifecycle', '--locale', 'ru']), /^Стадия\s+Что пишется/);
-    for (const line of ru) expect(length(line), line).toBeLessThanOrEqual(72);
+  it('the English; a wide window and no width keep the natural table', () => {
     const natural = tableOf(guide({}), /^Stage\s+What is written/);
     const wide = tableOf(guide({ COLUMNS: '200' }), /^Stage\s+What is written/);
     expect(wide).toEqual(natural);
   }, 120000);
-});
+  });

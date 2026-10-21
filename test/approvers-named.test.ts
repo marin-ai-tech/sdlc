@@ -45,19 +45,6 @@ function project(options: { roles?: boolean; minApprovals?: number } = {}) {
 }
 
 describe('B1: the Next hint names the people who may take the decision', () => {
-  it('with roles.yaml, next lists the same people as roles who, and the text names them', () => {
-    const p = project();
-    const next = p.cli(['next', '--change', 'demo', '--json']).json().next ?? p.cli(['next', '--change', 'demo', '--json']).json();
-    const allowed = p.cli(['roles', 'who', 'intent', '--change', 'demo', '--json']).json().allowed
-      .map((person: { id: string }) => person.id);
-    expect(next.people.map((person: { id: string }) => person.id)).toEqual(allowed);
-    expect(next.people[0]).toMatchObject({ id: 'alice', name: 'Alice Ivanova', role: 'product-owner' });
-    const text = p.cli(['status', '--change', 'demo']).stdout;
-    expect(text).toMatch(/Alice Ivanova/);
-    expect(text).toMatch(/Carol Smirnova/);
-    expect(text).not.toMatch(/Bob Petrov/);
-    expect(p.cli(['status', '--change', 'demo', '--locale', 'ru']).stdout).toMatch(/Alice Ivanova/);
-  }, 120000);
 
   it('negative: without roles.yaml the hint names the role as before', () => {
     const p = project({ roles: false });
@@ -113,4 +100,16 @@ describe('B5: several approvers for one gate (min_approvals)', () => {
     expect(r.code).toBe(1);
     expect(r.json().status[0].code).toBe('invalid_config');
   }, 180000);
+  it('with roles.yaml, next lists the same people as roles who, and the text names them', () => {
+    const p = project();
+    const next = p.cli(['next', '--change', 'demo', '--json']).json().next ?? p.cli(['next', '--change', 'demo', '--json']).json();
+    const allowed = p.cli(['roles', 'who', 'intent', '--change', 'demo', '--json']).json().allowed
+      .map((person: { id: string }) => person.id);
+    expect(next.people.map((person: { id: string }) => person.id)).toEqual(allowed);
+    expect(next.people[0]).toMatchObject({ id: 'alice', name: 'Alice Ivanova', role: 'product-owner' });
+    const text = p.cli(['status', '--change', 'demo']).stdout;
+    expect(text).toMatch(/Alice Ivanova/);
+    expect(text).toMatch(/Carol Smirnova/);
+    expect(text).not.toMatch(/Bob Petrov/);
+  }, 120000);
 });

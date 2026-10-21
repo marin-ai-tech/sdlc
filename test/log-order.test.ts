@@ -4,14 +4,14 @@ import { readLog } from '../src/core/log.js';
 import { tempDir, write } from './helpers.js';
 
 /**
- * Review of 0.23.1 part A (Б4): `readLog` returns the shared log in file order, then the local hook decision queue in
+ * Review of 0.23.1 part A (finding 4): `readLog` returns the shared log in file order, then the local hook decision queue in
  * file order. The shared log is merged from several people's branches (`merge=union`) whose clocks differ, so its
  * entries are not re-sorted by time.
  */
 
 const entry = (event: string, ts: string) => JSON.stringify({ ts, event, sdlc: '0.0.0', license: 'community' });
 
-describe('Б4 review: the log keeps file order', () => {
+describe('finding 4 review: the log keeps file order', () => {
   it('the shared log out of time order is returned unchanged, followed by the queue', () => {
     const root = tempDir('sdlc-log-order-');
     write(path.join(root, 'openspec/.sdlc/log.jsonl'), [

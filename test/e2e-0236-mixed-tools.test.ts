@@ -7,15 +7,15 @@ import { git, humanEnv, initGitRepo, read, runCli, tempDir, write } from './help
 /**
  * Findings of the E9 team run (one team, different agent tools, 2026-10-18), decided by the owner for 0.23.6.
  *
- * Д1: running `sdlc init --tools …` again rewrote untouched lines of openspec/sdlc.yaml (`[a]` became `[ a ]`).
- * Д2: on Windows Claude Code did not find Git Bash (Git installed for the user), so sdlc's hooks failed and blocked
+ * finding 1: running `sdlc init --tools …` again rewrote untouched lines of openspec/sdlc.yaml (`[a]` became `[ a ]`).
+ * finding 2: on Windows Claude Code did not find Git Bash (Git installed for the user), so sdlc's hooks failed and blocked
  * every call, while `sdlc doctor` said the Claude hooks were fine. doctor checks where Claude Code will find bash.
- * Д3: one tool had two names: hook decisions said `claude`, commit trailers and log events `claude-code`.
- * Д4: accepting the reviewer role replaced the built-in sdlc-reviewer subagent and lost the finding format that the
+ * finding 3: one tool had two names: hook decisions said `claude`, commit trailers and log events `claude-code`.
+ * finding 4: accepting the reviewer role replaced the built-in sdlc-reviewer subagent and lost the finding format that the
  * parsing of review.md needs.
- * Д5: doctor and the docs spoke only of trusting the hooks in `/hooks`, while a headless `codex exec` ran no project
+ * finding 5: doctor and the docs spoke only of trusting the hooks in `/hooks`, while a headless `codex exec` ran no project
  * hooks after that trust.
- * Д6: a denial of a shell write recorded `tests-locked: Bash` without the file.
+ * finding 6: a denial of a shell write recorded `tests-locked: Bash` without the file.
  */
 
 function project(tools = 'claude,qwen', extra: NodeJS.ProcessEnv = {}) {
@@ -40,7 +40,7 @@ function project(tools = 'claude,qwen', extra: NodeJS.ProcessEnv = {}) {
   return { root, cli, file, queue, hook };
 }
 
-describe('Д1: init keeps the lines it does not change', () => {
+describe('finding 1: init keeps the lines it does not change', () => {
   it('flow collections and their spacing survive a second init with another tool list', () => {
     const p = project('qwen');
     const configFile = p.file('openspec/sdlc.yaml');
@@ -58,7 +58,7 @@ describe('Д1: init keeps the lines it does not change', () => {
   }, 240000);
 });
 
-describe.runIf(process.platform === 'win32')('Д2: doctor checks where Claude Code finds Git Bash', () => {
+describe.runIf(process.platform === 'win32')('finding 2: doctor checks where Claude Code finds Git Bash', () => {
   it('a CLAUDE_CODE_GIT_BASH_PATH that does not exist, or no bash where Claude Code looks, is a warning', () => {
     const missing = project('claude', { CLAUDE_CODE_GIT_BASH_PATH: 'C:\\nowhere\\bash.exe' });
     const r = missing.cli(['doctor']);
@@ -76,7 +76,7 @@ describe.runIf(process.platform === 'win32')('Д2: doctor checks where Claude Co
   }, 240000);
 });
 
-describe('Д3 and Д6: what a hook decision records', () => {
+describe('finding 3 and finding 6: what a hook decision records', () => {
   it('a Claude Code denial is recorded as claude-code, like its commits', () => {
     const p = project('claude');
     expect(p.cli(['new', 'add-x', '--json']).code).toBe(0);
@@ -99,7 +99,7 @@ describe('Д3 and Д6: what a hook decision records', () => {
   }, 240000);
 });
 
-describe('Д4: the reviewer role keeps the finding format', () => {
+describe('finding 4: the reviewer role keeps the finding format', () => {
   it('after team accept reviewer, the sdlc-reviewer subagent still prescribes the review.md finding format', () => {
     const p = project('claude,qwen');
     expect(p.cli(['team', 'sync']).code).toBe(0);
@@ -113,7 +113,7 @@ describe('Д4: the reviewer role keeps the finding format', () => {
   }, 240000);
 });
 
-describe('Д5: doctor and the docs on headless Codex runs', () => {
+describe('finding 5: doctor and the docs on headless Codex runs', () => {
   it('doctor names codex exec when Codex is a tool', () => {
     const p = project('codex');
     expect(p.cli(['doctor']).stdout).toMatch(/codex exec/);

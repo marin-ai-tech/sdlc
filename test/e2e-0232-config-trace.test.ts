@@ -8,16 +8,16 @@ import { git, humanEnv, initGitRepo, read, runCli, tempDir, write } from './help
  * Findings of the E7 team run (signed approvals and an audit, 2026-10-17), decided by the owner for 0.23.2, part B:
  * settings proposals, roles.yaml, the trace and the evidence bundle.
  *
- * С2: `sdlc config show` of a roles.yaml with CRLF line ends showed every line changed (`\u000d`), and a key added at
+ * finding 2: `sdlc config show` of a roles.yaml with CRLF line ends showed every line changed (`\u000d`), and a key added at
  * the end showed the whole file removed and added; untouched lines lost their alignment. A proposal changes only the
  * lines it changes, keeps the file's line ends, and its diff shows only those lines.
- * С4: a `signing_key` that is not a public key (a path) passed the validation.
- * С3: an agent split one change into six proposals against the same file; a second open proposal for the same file
+ * finding 4: a `signing_key` that is not a public key (a path) passed the validation.
+ * finding 3: an agent split one change into six proposals against the same file; a second open proposal for the same file
  * is now named when proposing, and the workflow asks for one proposal per change.
- * С5: proposing `signing: warn|required` in a project with unsigned approvals and no `signing_since` did not say that
+ * finding 5: proposing `signing: warn|required` in a project with unsigned approvals and no `signing_since` did not say that
  * those approvals would fail.
- * С11: `sdlc trace` dropped tasks without an `n.m` number and a review coverage count without findings, silently.
- * С12: the evidence bundle did not name the signing mode and the `signing_since` cutoff.
+ * finding 11: `sdlc trace` dropped tasks without an `n.m` number and a review coverage count without findings, silently.
+ * finding 12: the evidence bundle did not name the signing mode and the `signing_since` cutoff.
  */
 
 const INTENT = [
@@ -83,7 +83,7 @@ function approvedIntent(p: P): void {
   p.commit(r.json<{ commitMessage?: string }>().commitMessage ?? 'approve');
 }
 
-describe('С2: a proposal changes only its lines', () => {
+describe('finding 2: a proposal changes only its lines', () => {
   it('CRLF file: the diff shows only the signing lines, and applying keeps every other line byte for byte', () => {
     const p = project();
     const { r, id } = p.propose(['signing=warn', `signing_since=${p.head()}`]);
@@ -101,7 +101,7 @@ describe('С2: a proposal changes only its lines', () => {
   }, 240000);
 });
 
-describe('С4: signing_key must be a public key', () => {
+describe('finding 4: signing_key must be a public key', () => {
   it('a path is refused naming signing_key; negative: an ssh public key is accepted', () => {
     const p = project();
     const bad = p.propose(['people.pat.signing_key=../keys/pat.pub']);
@@ -112,7 +112,7 @@ describe('С4: signing_key must be a public key', () => {
   }, 240000);
 });
 
-describe('С3: one proposal per change', () => {
+describe('finding 3: one proposal per change', () => {
   it('a second open proposal for the same file names the first; the workflow asks for one proposal', () => {
     const p = project();
     const first = p.propose(['signing=warn']);
@@ -125,7 +125,7 @@ describe('С3: one proposal per change', () => {
   }, 240000);
 });
 
-describe('С5: turning signing on in a project with unsigned approvals', () => {
+describe('finding 5: turning signing on in a project with unsigned approvals', () => {
   it('without signing_since the proposal warns about the unsigned approvals; with it, it does not', () => {
     const p = project();
     approvedIntent(p);
@@ -139,7 +139,7 @@ describe('С5: turning signing on in a project with unsigned approvals', () => {
   }, 300000);
 });
 
-describe('С11: the trace shows every task and the review coverage it cannot match', () => {
+describe('finding 11: the trace shows every task and the review coverage it cannot match', () => {
   it('unnumbered tasks are listed with a gap; a coverage count without findings is a gap', () => {
     const p = project();
     expect(p.cli(['new', 'add-x', '--json']).code).toBe(0);
@@ -169,7 +169,7 @@ describe('С11: the trace shows every task and the review coverage it cannot mat
   }, 240000);
 });
 
-describe('С12: the evidence bundle names the signing mode and the cutoff', () => {
+describe('finding 12: the evidence bundle names the signing mode and the cutoff', () => {
   it('index.json and index.md carry the mode and signing_since; negative: none without roles.yaml', () => {
     const p = project();
     approvedIntent(p);

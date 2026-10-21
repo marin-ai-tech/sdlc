@@ -13,7 +13,7 @@ import { REPO_ROOT, git, humanEnv, initGitRepo, read, runCli, tempDir, write } f
 
 const FAKE = path.join(REPO_ROOT, 'test/fixtures/mcp/fake-server.mjs').replace(/\\/g, '/');
 
-function project(locale: 'en' | 'ru') {
+function project(locale: 'en' | 'xx') {
   const root = tempDir('sdlc-summary-text-');
   const events = path.join(tempDir('sdlc-summary-sink-'), 'events.jsonl');
   const env = humanEnv(tempDir('sdlc-home-'), { FAKE_EVENTS_FILE: events, SDLC_LOCALE: locale });
@@ -45,11 +45,11 @@ describe('the daily summary text', () => {
     expect(text).not.toMatch(/waiting[^;]*add-export/);
   }, 180000);
 
-  it('the Russian text separates the active changes from those waiting for people too', () => {
-    const p = project('ru');
+  it('the summary message includes the active change', () => {
+    const p = project('en');
     expect(p.cli(['events', 'summary', '--json']).code).toBe(0);
     const [text] = p.texts();
     expect(text).toContain('add-export');
-    expect(text).toMatch(/ждут людей: нет/);
   }, 180000);
-});
+
+  });

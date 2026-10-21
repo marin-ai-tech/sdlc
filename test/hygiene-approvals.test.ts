@@ -5,7 +5,7 @@ import { parse, stringify } from 'yaml';
 import { git, humanEnv, initGitRepo, read, runCli, tempDir, write } from './helpers.js';
 
 /**
- * 0.11.2, process hygiene — the approval side (docs/ru/22, B56, B59, B60, B61).
+ * 0.11.2, process hygiene — the approval side (docs/xx/22, B56, B59, B60, B61).
  * B56: after a rework, approving the gate again with the digest approved before it needs a note.
  * B59: `gates.<g>.auto_waive` waives a gate for matching kinds or tracks, logged as policy (never verify or review).
  * B60: `sdlc approve` proposes a commit message with `SDLC-Approval: <change>:<gate>:<digest12>`; approvals verify

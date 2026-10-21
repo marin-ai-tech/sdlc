@@ -141,7 +141,7 @@ export interface SdlcConfig {
   layout: LayoutMapping;
   /** Reason categories `sdlc rework --reason` accepts. */
   rework: { reasons: string[]; maxCycles: number };
-  /** UI locale (en, ru). Optional; absent means resolve from flag/env/system. */
+  /** UI locale (en, or another installed catalog). Optional; absent means resolve from flag/env/system. */
   locale?: string;
   /**
    * MCP (B13): `serve` registers `sdlc mcp serve` for the configured tools. Absent when sdlc.yaml has no `mcp`

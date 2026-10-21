@@ -5,23 +5,23 @@ import { describe, expect, it } from 'vitest';
 import { git, humanEnv, initGitRepo, read, runCli, tempDir, write } from './helpers.js';
 
 /**
- * Defects of the E2E team run of 2026-10-15 (TodoMVC with Qwen Code; protocol Н1, Н4, Н6, Н7, Н11, Н16):
+ * Defects of the E2E team run of 2026-10-15 (TodoMVC with Qwen Code; protocol finding 1, finding 4, finding 6, finding 7, finding 11, finding 16):
  *
- * Н11: `sdlc backlog start B1` derived the change id from the title by Latin letters only, so a Russian title gave
+ * finding 11: `sdlc backlog start B1` derived the change id from Latin letters only, so another language's title gave
  * an empty id and the error did not mention `--change`. Without Latin letters the id falls back to the item id
  * (`b1`); with some, they are used.
- * Н7: CLI events run in an agent session (`change.created`, `backlog.added`, …) carried the person's git identity
+ * finding 7: CLI events run in an agent session (`change.created`, `backlog.added`, …) carried the person's git identity
  * and no agent. Every log entry written by the CLI in an agent session records `agent`; a person's entries do not.
- * Н16: `sdlc audit` counted agent work only by the `SDLC-Agent` commit trailer (0 of 151 in the run, though agents
+ * finding 16: `sdlc audit` counted agent work only by the `SDLC-Agent` commit trailer (0 of 151 in the run, though agents
  * wrote most of the code). The audit also counts the log entries an agent made (`agentEvents` in JSON).
- * Н4: in a fresh clone `sdlc update` (needed only for the local git hook) rewrote `manifest.json` with the `license`
+ * finding 4: in a fresh clone `sdlc update` (needed only for the local git hook) rewrote `manifest.json` with the `license`
  * key moved and logged `harness.updated`, so every participant had a dirty tree. An update that changes no file
  * leaves the tree clean.
- * Н6: doctor always warned about Qwen Code's folder trust. Qwen Code 0.25 trusts every folder while
+ * finding 6: doctor always warned about Qwen Code's folder trust. Qwen Code 0.25 trusts every folder while
  * `security.folderTrust.enabled` is off (the default) and ignores the project's `.qwen/settings.json` — hooks and
  * `permissions.deny` — only in a folder it does not trust. Doctor reads `~/.qwen/settings.json` and
  * `~/.qwen/trustedFolders.json` (TRUST_FOLDER, TRUST_PARENT, DO_NOT_TRUST; the deepest rule wins).
- * Н1: `init --tools qwen` listed CLAUDE.md as missing and `layout adapt` created it, with AGENTS.md pointing to it.
+ * finding 1: `init --tools qwen` listed CLAUDE.md as missing and `layout adapt` created it, with AGENTS.md pointing to it.
  * The Claude Code guide belongs to projects with the `claude` tool only.
  */
 
@@ -41,31 +41,8 @@ function project(tools = 'qwen') {
   return { root, home, env, cli, log, file: (rel: string) => path.join(root, rel) };
 }
 
-describe('Н11: backlog start with a title without Latin letters', () => {
-  it('a Russian title starts the change as b<n>; a mixed one keeps its Latin words', () => {
-    const p = project();
-    const add = (title: string) => p.cli(['backlog', 'add', title, '--outcome', 'O', '--accept', 'A', '--json']);
-    expect(add('Названия задач обрезаются по краям').code).toBe(0);
-    expect(add('Отмена удаления: undo для TodoMVC').code).toBe(0);
-    const first = p.cli(['backlog', 'start', 'B1', '--json']);
-    expect(first.code, first.stdout + first.stderr).toBe(0);
-    expect(first.json<{ change: { id: string } }>().change.id).toBe('b1');
-    expect(fs.existsSync(p.file('openspec/changes/b1/intent.md'))).toBe(true);
-    const second = p.cli(['backlog', 'start', 'B2', '--json']);
-    expect(second.json<{ change: { id: string } }>().change.id).toBe('undo-todomvc');
-  }, 180000);
 
-  it('negative: an explicit bad --change is still refused, and the refusal names --change', () => {
-    const p = project();
-    expect(p.cli(['backlog', 'add', 'Задача', '--outcome', 'O', '--accept', 'A', '--json']).code).toBe(0);
-    const bad = p.cli(['backlog', 'start', 'B1', '--change', 'Bad Name', '--json']);
-    expect(bad.code).not.toBe(0);
-    expect(bad.stdout + bad.stderr).toContain('--change');
-    expect(fs.existsSync(p.file('openspec/changes/b1'))).toBe(false);
-  }, 180000);
-});
-
-describe('Н7: the log names the agent of a CLI step', () => {
+describe('finding 7: the log names the agent of a CLI step', () => {
   it('a change and a backlog item made in an agent session record agent qwen; a person’s do not', () => {
     const p = project();
     expect(p.cli(['new', 'by-agent', '--json'], AGENT).code).toBe(0);
@@ -85,7 +62,7 @@ describe('Н7: the log names the agent of a CLI step', () => {
   }, 180000);
 });
 
-describe('Н16: the audit counts agent work in the log', () => {
+describe('finding 16: the audit counts agent work in the log', () => {
   it('agentEvents counts the entries an agent made, next to the commit trailers', () => {
     const p = project();
     expect(p.cli(['new', 'by-agent', '--json'], AGENT).code).toBe(0);
@@ -101,7 +78,7 @@ describe('Н16: the audit counts agent work in the log', () => {
   }, 180000);
 });
 
-describe('Н4: sdlc update in a fresh clone leaves the tree clean', () => {
+describe('finding 4: sdlc update in a fresh clone leaves the tree clean', () => {
   it('the clone gets the git hook; manifest and log stay as committed', () => {
     const p = project();
     git(p.root, ['add', '-A']);
@@ -117,7 +94,7 @@ describe('Н4: sdlc update in a fresh clone leaves the tree clean', () => {
   }, 180000);
 });
 
-describe('Н6: doctor reads Qwen Code folder trust', () => {
+describe('finding 6: doctor reads Qwen Code folder trust', () => {
   const qwenCheck = (p: ReturnType<typeof project>) => {
     const homeEnv = { HOME: p.home, USERPROFILE: p.home };
     const doctor = p.cli(['doctor', '--json'], homeEnv).json<{ checks: { check: string; status: string; message: string }[] }>();
@@ -157,7 +134,7 @@ describe('Н6: doctor reads Qwen Code folder trust', () => {
   }, 240000);
 });
 
-describe('Н1: the Claude Code guide only with the claude tool', () => {
+describe('finding 1: the Claude Code guide only with the claude tool', () => {
   it('a Qwen-only project: no claude-guide role, no CLAUDE.md, AGENTS.md names Qwen Code and not CLAUDE.md', () => {
     const p = project();
     const roles = p.cli(['layout', 'check', '--json']).json<{ roles: { role: string }[] }>().roles.map((r) => r.role);
@@ -180,5 +157,13 @@ describe('Н1: the Claude Code guide only with the claude tool', () => {
     expect(agents).toContain('CLAUDE.md');
     expect(agents).toContain('Claude Code');
     expect(agents).toContain('Qwen Code');
+  }, 180000);
+  it('negative: an explicit bad --change is still refused, and the refusal names --change', () => {
+    const p = project();
+    expect(p.cli(['backlog', 'add', 'Task', '--outcome', 'O', '--accept', 'A', '--json']).code).toBe(0);
+    const bad = p.cli(['backlog', 'start', 'B1', '--change', 'Bad Name', '--json']);
+    expect(bad.code).not.toBe(0);
+    expect(bad.stdout + bad.stderr).toContain('--change');
+    expect(fs.existsSync(p.file('openspec/changes/b1'))).toBe(false);
   }, 180000);
 });

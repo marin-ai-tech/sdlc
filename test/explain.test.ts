@@ -4,7 +4,7 @@ import { describe, expect, it } from 'vitest';
 import { git, humanEnv, initGitRepo, read, runCli, tempDir, write } from './helpers.js';
 
 /**
- * 0.11.3 (docs/ru/23, B53): `sdlc explain --change <id>` says why a change is where it is: the stage, the open gate
+ * 0.11.3 (docs/xx/23, B53): `sdlc explain --change <id>` says why a change is where it is: the stage, the open gate
  * and its reason, what it waits for, what unblocks it, and the latest decisions. Anyone may run it; it writes nothing.
  */
 

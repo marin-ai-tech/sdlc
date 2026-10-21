@@ -5,7 +5,7 @@ import { describe, expect, it } from 'vitest';
 import { BIN, git, humanEnv, initGitRepo, read, REPO_ROOT, runCli, tempDir } from './helpers.js';
 
 /**
- * 0.12.0 (docs/ru/26, B25): an example script, shipped with sdlc, writes a daily summary file from `sdlc report`
+ * 0.12.0 (docs/xx/26, B25): an example script, shipped with sdlc, writes a daily summary file from `sdlc report`
  * (done, next, blocked, waiting on people). It publishes nothing by itself.
  */
 

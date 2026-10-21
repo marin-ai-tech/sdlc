@@ -4,7 +4,7 @@ import { parse, stringify } from 'yaml';
 import { git, humanEnv, initGitRepo, read, runCli, tempDir, write } from './helpers.js';
 
 /**
- * 0.11.4 (docs/ru/25, B63): the audit and the dashboard compare, per change, the people's decisions the track plans
+ * 0.11.4 (docs/xx/25, B63): the audit and the dashboard compare, per change, the people's decisions the track plans
  * with what happened: approvals, reworks, takeovers, waivers, answers and waits.
  */
 
