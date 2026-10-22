@@ -37,10 +37,24 @@ function subdirs(dir: string): string[] {
     .sort();
 }
 
+/**
+ * The active changes that reads and suggested commands are built from: a folder whose name is not a change id is left
+ * out, so its name never reaches a command a person copies (B129).
+ */
 export function listActiveChanges(paths: ProjectPaths): ChangeRef[] {
+  return listChangeFolders(paths).filter((change) => isValidChangeId(change.id));
+}
+
+/** Every change folder, valid name or not: enforcement (locked tests, the plan gate, takeovers) sees them all. */
+export function listChangeFolders(paths: ProjectPaths): ChangeRef[] {
   return subdirs(paths.changesDir)
     .filter((name) => name !== 'archive')
     .map((name) => ({ id: name, dir: path.join(paths.changesDir, name), archived: false }));
+}
+
+/** The folder names `listActiveChanges` leaves out, for the doctor and the text warnings. */
+export function invalidChangeFolders(paths: ProjectPaths): string[] {
+  return listChangeFolders(paths).filter((change) => !isValidChangeId(change.id)).map((change) => change.id);
 }
 
 export function listArchivedChanges(paths: ProjectPaths): ChangeRef[] {

@@ -1842,5 +1842,10 @@
   "config.warning.role": "{role} role is empty",
   "config.commitMessage": "Apply config proposal {id}: {reason}",
   "config.applied": "Applied {id}. Suggested commit message: {message}",
-  "config.dismissed": "Dismissed {id}"
+  "config.dismissed": "Dismissed {id}",
+  "error.roleNameNotPlain": "{file}: {field} names the role {role}, which is not a plain name: use a letter, then letters, digits, ., _ or -.",
+  "error.cliNotProgram": "{field} must end with the sdlc program (sdlc, or a path ending in /sdlc or /sdlc.js), with nothing after it and single spaces between words; got {value}.",
+  "warn.invalidChangeFolder": "Skipped openspec/changes/{folder}: the folder name is not a valid change id (lowercase letters, digits and hyphens), so it is not listed as a change.",
+  "doctor.changeFolderName": "openspec/changes/{folder} is not a valid change id (lowercase letters, digits and hyphens); sdlc does not list it as a change.",
+  "doctor.fix.changeFolderName": "Rename it to a change id, or move it out of openspec/changes."
 }

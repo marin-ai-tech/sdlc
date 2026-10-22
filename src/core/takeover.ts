@@ -1,6 +1,6 @@
 import * as path from 'node:path';
 import { readChangeState, type ChangeState, type TakeoverRecord } from './change-state.js';
-import { listActiveChanges } from './changes.js';
+import { listChangeFolders } from './changes.js';
 import { toPosix } from './fs-utils.js';
 import { quotedCommand } from './human-command.js';
 import { t } from './i18n.js';
@@ -43,7 +43,7 @@ function safeState(dir: string): ChangeState | undefined {
 
 function heldChanges(paths: ProjectPaths): HeldChange[] {
   const held: HeldChange[] = [];
-  for (const ref of listActiveChanges(paths)) {
+  for (const ref of listChangeFolders(paths)) {
     const takeover = safeState(ref.dir)?.takeover;
     if (!takeover) {
       continue;

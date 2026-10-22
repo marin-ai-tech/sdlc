@@ -1,6 +1,6 @@
 import * as path from 'node:path';
 import { loadConfig, type SdlcConfig } from './config.js';
-import { listActiveChanges } from './changes.js';
+import { invalidChangeFolders, listActiveChanges } from './changes.js';
 import { detectDependencies, onSearchPath } from './dependencies.js';
 import { isFile, readText } from './fs-utils.js';
 import { gitIdentity, isGitRepo } from './git.js';
@@ -297,6 +297,10 @@ function projectConfigChecks(
 }
 
 function changeChecks(out: Checks, root: string, paths: ProjectPaths, config: SdlcConfig): void {
+  for (const folder of invalidChangeFolders(paths)) {
+    out.add(`change ${folder}`, 'warn', out.tt('doctor.changeFolderName', { folder }),
+      out.tt('doctor.fix.changeFolderName'));
+  }
   for (const ref of listActiveChanges(paths)) {
     try {
       const view = evaluateChange(root, ref, config, { skipFingerprint: true });

@@ -1,7 +1,7 @@
 import picomatch from 'picomatch';
 import type { SdlcConfig } from './config.js';
 import { readChangeState } from './change-state.js';
-import { listActiveChanges } from './changes.js';
+import { listActiveChanges, listChangeFolders } from './changes.js';
 import { harnessStamp, stampText } from './license.js';
 import { evaluateChange, sharedFingerprint, type LifecycleView } from './lifecycle.js';
 import type { ProjectPaths } from './project.js';
@@ -156,7 +156,7 @@ interface ChangeSnapshot {
 
 function snapshots(ctx: PolicyContext, full = false): ChangeSnapshot[] {
   const fingerprint = full ? sharedFingerprint(ctx.paths.root) : undefined;
-  return listActiveChanges(ctx.paths).map((ref) => {
+  return listChangeFolders(ctx.paths).map((ref) => {
     try {
       // The hook never needs the names of the people who may approve (roles.yaml lookups): skipPeople.
       const options = full ? { fingerprint, skipPeople: true } : { skipFingerprint: true, skipPeople: true };
@@ -411,7 +411,7 @@ export function sessionSummary(ctx: PolicyContext, observe?: (view: LifecycleVie
 export function stopCheck(ctx: PolicyContext): string | undefined {
   if (!ctx.config.enforcement.verifyBeforeStop || ctx.config.enforcement.mode === 'off') return undefined;
   const fingerprint = sharedFingerprint(ctx.paths.root);
-  for (const ref of listActiveChanges(ctx.paths)) {
+  for (const ref of listChangeFolders(ctx.paths)) {
     try {
       const view = evaluateChange(ctx.paths.root, ref, ctx.config, { fingerprint });
       const verify = view.gates.find((g) => g.id === 'verify');

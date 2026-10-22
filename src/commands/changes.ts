@@ -23,6 +23,7 @@ import {
 import {
   assertValidChangeId,
   assertUnusedArchivedId,
+  invalidChangeFolders,
   listActiveChanges,
   listArchivedChanges,
   resolveChange,
@@ -290,6 +291,9 @@ function noChangesHint(config: SdlcConfig): string {
 export async function statusCommand(opts: StatusOptions): Promise<void> {
   try {
     const ctx = loadProject();
+    if (!opts.json) {
+      for (const folder of invalidChangeFolders(ctx.paths)) warn(t('warn.invalidChangeFolder', { folder }));
+    }
     const overlaps = overlapsFor(ctx);
     const invocation = (wf: string) =>
       ctx.config.tools.includes('claude') ? `/sdlc:${wf}` : `/sdlc-${wf}`;
@@ -348,6 +352,9 @@ export async function statusCommand(opts: StatusOptions): Promise<void> {
 export async function nextCommand(opts: { change?: string; json?: boolean }): Promise<void> {
   try {
     const ctx = loadProject();
+    if (!opts.json) {
+      for (const folder of invalidChangeFolders(ctx.paths)) warn(t('warn.invalidChangeFolder', { folder }));
+    }
     if (!opts.change && listActiveChanges(ctx.paths).length === 0) {
       const item = nextBacklogItem(readBacklog(ctx.root));
       if (item) {

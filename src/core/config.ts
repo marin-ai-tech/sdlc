@@ -1,6 +1,7 @@
 import { parseMinApprovals } from './approval-quorum.js';
 import { parseAutoWaive, type AutoWaive } from './auto-waive.js';
 import { SdlcError } from './errors.js';
+import { isRoleName } from './role-name.js';
 import { parseHealth, serializeHealth, type HealthThresholds } from './health/thresholds.js';
 import { isFile } from './fs-utils.js';
 import { LAYOUT_ROLE_IDS, type LayoutMapping, type LayoutRoleId } from './layout.js';
@@ -288,6 +289,22 @@ function asStringArray(value: unknown, where: string): string[] | undefined {
   return value as string[];
 }
 
+function roleNames(value: unknown, file: string, field: string): string[] | undefined {
+  const names = asStringArray(value, `${file}: ${field}`);
+  for (const role of names ?? []) {
+    assertRoleName(role, file, field);
+  }
+  return names;
+}
+
+function assertRoleName(role: string, file: string, field: string): void {
+  if (!isRoleName(role)) {
+    throw new SdlcError('invalid_config', {
+      key: 'error.roleNameNotPlain', params: { file, field, role },
+    });
+  }
+}
+
 function asBool(value: unknown, where: string): boolean | undefined {
   if (value === undefined || value === null) return undefined;
   if (typeof value !== 'boolean') throw new SdlcError(
@@ -380,9 +397,9 @@ export function parseConfig(raw: Raw, file = 'openspec/sdlc.yaml'): SdlcConfig {
       }
       const target = config.gates[id as ApprovalGateId];
       target.required = asBool(gate.required, where(`gates.${id}.required`)) ?? target.required;
-      target.approvers = asStringArray(gate.approvers, where(`gates.${id}.approvers`)) ?? target.approvers;
+      target.approvers = roleNames(gate.approvers, file, `gates.${id}.approvers`) ?? target.approvers;
       target.highRiskApprovers =
-        asStringArray(gate.high_risk_approvers, where(`gates.${id}.high_risk_approvers`)) ??
+        roleNames(gate.high_risk_approvers, file, `gates.${id}.high_risk_approvers`) ??
         target.highRiskApprovers;
       const artifacts = asStringArray(gate.artifacts, where(`gates.${id}.artifacts`));
       if (artifacts) target.artifacts = artifacts;
@@ -400,6 +417,7 @@ export function parseConfig(raw: Raw, file = 'openspec/sdlc.yaml'): SdlcConfig {
   const roles = asObject(raw.roles, where('roles'));
   if (roles) {
     for (const [role, people] of Object.entries(roles)) {
+      assertRoleName(role, file, 'roles');
       config.roles[role] = asStringArray(people, where(`roles.${role}`)) ?? [];
     }
   }
@@ -590,11 +608,21 @@ function serializeRework(rework: SdlcConfig['rework']): Record<string, unknown> 
 /**
  * How agents and hooks call the CLI, written into hook commands: letters, digits, spaces and `. _ / @ - :` only, so no
  * shell character can ride along. The colon is a Windows drive letter (`node C:/tools/sdlc.js`); paths use `/`.
+ * The value ends with the program (`sdlc`, or a path to `sdlc` / `sdlc.js`): nothing may follow it, or it would ride
+ * along in every suggested command (`sdlc waive --note` turned approvals into waivers). A launcher's options before
+ * the program stay allowed (`npx --no-install sdlc`).
  */
 export function assertCliValue(value: string, where: string): void {
-  if (/^[A-Za-z0-9@._/: -]+$/.test(value)) return;
-  const key = 'error.x_may_only_contain_letters_digits_spaces_and';
-  throw new SdlcError('invalid_config', { key, params: { p1: where } });
+  if (!/^[A-Za-z0-9@._/: -]+$/.test(value)) {
+    const key = 'error.x_may_only_contain_letters_digits_spaces_and';
+    throw new SdlcError('invalid_config', { key, params: { p1: where } });
+  }
+  const words = value.split(' ');
+  if (words.includes('') || !/^(?:.*\/)?sdlc(?:\.js)?$/.test(words.at(-1) ?? '')) {
+    throw new SdlcError('invalid_config', {
+      key: 'error.cliNotProgram', params: { field: where, value },
+    });
+  }
 }
 
 /** The qa gate as the defaults have it (B110): not written, so an older project's sdlc.yaml stays as it was. */

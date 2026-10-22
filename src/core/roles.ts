@@ -25,6 +25,7 @@ import { parse } from 'yaml';
 import type { ChangeState } from './change-state.js';
 import { APPROVAL_GATES, type ApprovalGateId } from './config.js';
 import { SdlcError } from './errors.js';
+import { isRoleName } from './role-name.js';
 import { git, defaultBaseRef } from './git.js';
 import { t, type MessageParams, type MessageRef } from './i18n.js';
 
@@ -215,6 +216,11 @@ function parseRoles(value: unknown, people: unknown, file: string): Record<strin
   const rolesRaw = mapping(value, file, 'roles');
   const roles: Record<string, string[]> = {};
   for (const [role, value] of Object.entries(rolesRaw)) {
+    if (!isRoleName(role)) {
+      throw new SdlcError('invalid_roles', {
+        key: 'error.roleNameNotPlain', params: { file, field: 'roles', role },
+      });
+    }
     roles[role] = strings(value, file, `roles.${role}`);
     for (const id of roles[role]) {
       if (!(id in peopleRaw)) invalid(file, `roles.${role}`, `unknown person ${id}`);
