@@ -2,6 +2,34 @@
 
 All notable changes to sdlc. Versions follow [Semantic Versioning](https://semver.org/); while the major version is 0, a minor version may change behavior.
 
+## 0.26.0 — 2026-10-22
+
+A repository could reshape the approval command sdlc suggests into another decision: a role named
+`product-owner --change other` approved another change, a `cli` of `sdlc waive --note` turned approvals into
+waivers, and a change folder name put shell syntax into the command. The values that go into a suggested approval
+now have a fixed shape.
+
+### Changed
+- **Breaking:** role names are plain tokens: a letter, then letters, digits, `.`, `_` or `-`. A role name in
+  `openspec/roles.yaml` (`roles:`) or in `openspec/sdlc.yaml` (`roles:`, `approvers`, `high_risk_approvers`) that is
+  not one is refused when the file is read (`invalid_roles` or `invalid_config`), and the message names the file, the
+  field and the role.
+- **Breaking:** the `cli` setting ends with the program: `sdlc`, or a path ending in `/sdlc` or `/sdlc.js`. A launcher
+  and its options may come before it (`npx --no-install sdlc`, `node ./bin/sdlc.js`). Words after the program and empty
+  words are refused with `invalid_config`.
+
+### Fixed
+- A folder under `openspec/changes/` whose name is not a change id (lowercase letters, digits and hyphens) is no
+  longer listed as a change, so its name never reaches a suggested command. `sdlc doctor` names each such folder with
+  a warning, and the text of `sdlc status` and `sdlc next` warns about it.
+- Enforcement still reads every folder: locked tests, the plan gate, the stop check and takeovers apply to a folder
+  with any name.
+
+### Compatibility
+- A project with a refused role name or `cli` value stops loading until it is renamed; the message says which value
+  and why. A Windows npm shim path (`…/sdlc.cmd`) is refused: use `sdlc` on PATH or `node <path>/sdlc.js`.
+- No stored format changes. JSON outputs keep their fields.
+
 ## 0.25.0 — 2026-10-21
 
 0.24.0 was not released; its changes are part of this release.

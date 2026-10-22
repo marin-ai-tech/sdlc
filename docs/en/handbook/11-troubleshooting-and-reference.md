@@ -84,6 +84,7 @@ keep both sides' gate decisions and history entries in time order, then run `sdl
    | `verify commands` | `verify.commands` exist ("none configured - the verify gate cannot pass") | add build, test and lint commands |
    | `review policy` | `REVIEW.md` (or `review.policy`) exists | `sdlc init` creates a starter |
    | `change <id>` | each active change can be read; its stage | — |
+   | `change <folder>` (warn) | a folder under `openspec/changes/` whose name is not a change id; it is not listed as a change | rename it to a change id, or move it out of `openspec/changes/` |
    | `git` | a git repository, and `user.email` set (needed to record approvals) | `git init`; `git config user.email you@example.com` |
    | `git hook` | the `prepare-commit-msg` hook: current, chained, the project's own, missing, outdated, or a shared hooks folder | `sdlc update`, or add the one chain line to your hook |
 

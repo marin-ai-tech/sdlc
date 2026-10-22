@@ -189,6 +189,8 @@ Use this path to prepare an existing project, order its work, and complete the f
 An existing active change can be attached to an open backlog item with
 `sdlc backlog link B1 --change add-export`. The item becomes in progress and archiving the change marks it done.
 An archived change id cannot be reused by `sdlc new` or `sdlc backlog start`.
+A folder under `openspec/changes/` whose name is not a change id (lowercase letters, digits and hyphens) is not listed
+as a change: `sdlc doctor` names it, and `sdlc status` and `sdlc next` warn about it. The hooks still apply to it.
 To close a mistaken change without merging its delta specs, a person runs
 `sdlc drop add-export --note "Created by mistake"`. Its linked backlog item returns to open. The archived record
 retains the drop reason, and reports and audits identify it as dropped.
@@ -881,7 +883,7 @@ Use this example to find the settings for gates, verification, integrations, and
 ```yaml
 version: 1
 schema: sdlc                  # schema for sdlc new
-cli: sdlc                     # or "npx --no-install sdlc"
+cli: sdlc                     # or "npx --no-install sdlc"; must end with the sdlc program
 locale: <code>                # optional: language for people (default: the system locale, else en)
 tools: [claude, opencode]   # also: cursor, codex, qwen, gigacode
 delivery: both                # both | skills | commands (sdlc init --delivery)
@@ -960,6 +962,12 @@ log:
   enabled: true               # log in openspec/.sdlc/log.jsonl
   hook_decisions: true        # queue hook denials and warnings locally until the next log write
 ```
+
+Two values go into the commands sdlc suggests, so they have a fixed shape:
+- `cli` ends with the program: `sdlc`, or a path ending in `/sdlc` or `/sdlc.js`. A launcher and its options may come
+  before it (`npx --no-install sdlc`). Words after it are refused, because they would ride along in every command.
+- Role names in `roles:`, `approvers` and `high_risk_approvers` are plain tokens. A name starts with a letter and
+  goes on with letters, digits and the signs `.` `_` `-`.
 
 ### Decisions and optional gates
 

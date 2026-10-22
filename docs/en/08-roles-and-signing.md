@@ -54,6 +54,9 @@ separation:
   list handles it could not resolve.
 - **roles**: role names from the gates in `sdlc.yaml` (`approvers`, `high_risk_approvers`) and their holders.
   `maintainer` may change this file and accepts agent roles. `qa` approves the optional `qa` gate.
+  A role name is a plain token: a letter, then letters, digits, `.`, `_` or `-` (`product-owner`, `tech_lead`).
+  Role names go into the approval commands sdlc suggests, so any other name is refused when the file is read, and the
+  message names the file, the field and the role.
 - **separation** (the defaults are shown):
   - `author_cannot_approve`: gates the authors of the change's code may not approve. Authors are the commit authors and
     `Co-authored-by` trailers on the branch since the review base, counting only files outside `openspec/`.
