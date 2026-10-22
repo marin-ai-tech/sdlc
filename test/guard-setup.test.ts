@@ -47,7 +47,8 @@ describe('setup commands run by an agent', () => {
 
   it('refuse another CLI prefix, which the hooks would call instead of sdlc', () => {
     const p = project();
-    refused(p.cli(['init', '--cli', 'true', '--json'], AGENT));
+    // A valid prefix that is not the current one: `true` is refused as malformed since 0.26.0, before the guard runs.
+    refused(p.cli(['init', '--cli', 'node ./bin/sdlc.js', '--json'], AGENT));
     expect(p.config().cli).toBe('sdlc');
   }, 120000);
 
