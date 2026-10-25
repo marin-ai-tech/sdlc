@@ -10,7 +10,10 @@ const initial = '111 44 111\n222 111 111\n777 222 777\n778 777 777\n999 44 999\n
 describe('B131: POSIX ancestry independent of process groups', () => {
   beforeEach(() => {
     Object.defineProperty(process, 'platform', { ...platform, value: 'linux' });
-    vi.spyOn(process, 'kill').mockReturnValue(true);
+    vi.spyOn(process, 'kill').mockImplementation((_pid, name) => {
+      if (name === 0) throw Object.assign(new Error('gone'), { code: 'ESRCH' });
+      return true;
+    });
     vi.mocked(execFile).mockReset();
   });
 
@@ -49,5 +52,30 @@ describe('B131: POSIX ancestry independent of process groups', () => {
     processTables([''], new Error('ps unavailable'));
     await expect(stopProcessTree(111)).rejects.toThrow('ps unavailable');
     expect(process.kill).toHaveBeenCalledWith(-111, 'SIGKILL');
+  });
+
+  it('waits for asynchronous signal delivery before reporting cleanup complete', async () => {
+    processTables([initial]);
+    const remaining = new Set([111, 222, 777, 778]);
+    const delivery: ReturnType<typeof setTimeout>[] = [];
+    vi.mocked(process.kill).mockImplementation((pid, name) => {
+      if (name === 'SIGKILL' && remaining.has(pid)) {
+        delivery.push(setTimeout(() => remaining.delete(pid), 30));
+      }
+      if (name === 0 && !remaining.has(pid)) throw Object.assign(new Error('gone'), { code: 'ESRCH' });
+      return true;
+    });
+    try {
+      await stopProcessTree(111);
+      expect([...remaining]).toEqual([]);
+    } finally { delivery.forEach(clearTimeout); }
+  });
+
+  it('reports unacknowledged exits within the cleanup deadline', async () => {
+    processTables([initial]);
+    vi.mocked(process.kill).mockReturnValue(true);
+    const started = Date.now();
+    await expect(stopProcessTree(111)).rejects.toThrow('did not exit after SIGKILL');
+    expect(Date.now() - started).toBeLessThan(6000);
   });
 });

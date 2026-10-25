@@ -1,4 +1,5 @@
 import { execFile } from 'node:child_process';
+import { setTimeout as delay } from 'node:timers/promises';
 
 interface ProcessEntry { pid: number; parent: number; group: number }
 
@@ -35,6 +36,22 @@ function descendants(rows: ProcessEntry[], ownedGroup: number, known: Set<number
   return [...found].filter((pid) => !known.has(pid));
 }
 
+async function waitForExit(pids: Set<number>): Promise<void> {
+  const pending = new Set(pids);
+  const deadline = Date.now() + 2000;
+  while (pending.size > 0) {
+    for (const pid of pending) {
+      try { process.kill(pid, 0); } catch (error) {
+        if ((error as NodeJS.ErrnoException).code !== 'ESRCH') throw error;
+        pending.delete(pid);
+      }
+    }
+    if (pending.size === 0) return;
+    if (Date.now() >= deadline) throw new Error('Verification descendants did not exit after SIGKILL.');
+    await delay(20);
+  }
+}
+
 /** Freeze parents before collecting another table, so detached children cannot keep forking unnoticed. */
 export async function stopPosixProcessTree(pid: number): Promise<void> {
   const known = new Set([pid]);
@@ -60,6 +77,7 @@ export async function stopPosixProcessTree(pid: number): Promise<void> {
     for (const target of [...known].reverse().concat(-pid)) {
       try { signal(target, 'SIGKILL'); } catch (error) { failure ??= error; }
     }
+    try { await waitForExit(known); } catch (error) { failure ??= error; }
     if (failure) throw failure;
   }
 }

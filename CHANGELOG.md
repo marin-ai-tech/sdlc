@@ -32,7 +32,8 @@ All notable changes to sdlc. Versions follow [Semantic Versioning](https://semve
   planning gate, including schemas that map the tracked task artifact to intent or spec.
 - Timed-out checks terminate their Windows Job Object or POSIX group and observed descendants across sessions.
   POSIX cleanup freezes parents and discovers detached children through bounded process-table scans; timeout
-  completion also bounds output-pipe waiting independently. Windows checks run inside a
+  cleanup also waits for signalled owned PIDs to disappear before completing. Output-pipe waiting has an
+  independent deadline. Windows checks run inside a
   non-breakaway kill-on-close job created before the check starts, avoiding a race with new descendants.
 - Harness Runtime responses are limited while streaming; oversized and HTTP-error bodies are cancelled before
   full buffering, while diagnostics continue to omit provider bodies.
