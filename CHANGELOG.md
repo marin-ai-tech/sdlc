@@ -4,6 +4,8 @@ All notable changes to sdlc. Versions follow [Semantic Versioning](https://semve
 
 ## Unreleased
 
+## 0.27.0 — 2026-10-25
+
 ### Added
 - `sdlc next --me --no-branches` skips other-branch discovery and omits `otherBranches` from JSON.
 - `sdlc gate read <gate> --change <id> --json` returns normalized artifact texts and their digest from one evaluation.
@@ -40,8 +42,8 @@ All notable changes to sdlc. Versions follow [Semantic Versioning](https://semve
   fingerprint. Approvals that relied on excluding embedded provenance lines become stale and need a new decision.
 - During review or release approval, concurrent changes to the raw checkpoint tree require a retry, including edits
   that leave normalized code unchanged. Windows checks require PowerShell with Add-Type enabled to create their job.
-  POSIX descendant discovery requires `ps` with PID, PPID and PGID output; it is not an OS sandbox for processes
-  deliberately daemonized and reparented before the timeout.
+  POSIX descendant discovery requires `ps` with PID, PPID and PGID output. Detached descendants already reparented
+  outside the owned group before cleanup may survive; reparenting-proof containment is deferred.
 
 ## 0.26.0 — 2026-10-22
 
