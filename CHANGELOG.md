@@ -2,6 +2,47 @@
 
 All notable changes to sdlc. Versions follow [Semantic Versioning](https://semver.org/); while the major version is 0, a minor version may change behavior.
 
+## Unreleased
+
+### Added
+- `sdlc next --me --no-branches` skips other-branch discovery and omits `otherBranches` from JSON.
+- `sdlc gate read <gate> --change <id> --json` returns normalized artifact texts and their digest from one evaluation.
+  Code-bound snapshots include the fingerprint; QA snapshots include the recorded verification identity.
+- A developer Harness Runtime prototype: registry type `harness`, a typed DigitalOcean API client, a coordinator
+  and a host bundle bridge for credential-free preparation, lease renewal and independent candidate verification.
+  Live provider acceptance is deferred until access is configured; no hosted-task CLI command is exposed.
+  Candidate checks require an explicit isolated validator, with no host execution fallback, and must report fresh
+  complete clean evidence matching the immutable candidate tree. Unrelated history and mismatched task/agent
+  trailers are refused.
+
+### Fixed
+- Embedded provenance-shaped lines remain covered by digests and survive stamping; only the final stamp is excluded.
+- Approval rechecks content after slow checks and inspects immutable checkpoint artifacts before recording the ref.
+  Covered ignored artifacts are explicitly included in the temporary checkpoint index; the real index stays intact.
+  In-project artifact links resolve against that immutable tree, including ignored targets and link chains.
+  A failed optional checkpoint attempt also rechecks the digest before recording the approval.
+- Missing or incomplete fingerprints cannot yield code-bound approval digests or fresh verification, including
+  MCP-only runs. Fingerprint exclusions are relative to a nested project's location within the repository.
+  Failed/empty index-path metadata and unreadable index files are refused; valid older-Git fallback is retained.
+- Approval records and log entries are parsed before use; malformed entries are skipped and legacy entries remain
+  readable. Unknown approval/check extension fields survive round trips. `approveCommand` is organized as short
+  named steps with the original refusal order. Checkpoint proof uses the task-checkbox normalization of each
+  planning gate, including schemas that map the tracked task artifact to intent or spec.
+- Timed-out checks terminate their Windows Job Object or POSIX group and observed descendants across sessions.
+  POSIX cleanup freezes parents and discovers detached children through bounded process-table scans; timeout
+  completion also bounds output-pipe waiting independently. Windows checks run inside a
+  non-breakaway kill-on-close job created before the check starts, avoiding a race with new descendants.
+- Harness Runtime responses are limited while streaming; oversized and HTTP-error bodies are cancelled before
+  full buffering, while diagnostics continue to omit provider bodies.
+
+### Compatibility
+- Stored record versions and default queue output remain unchanged. Code verification now requires a complete git
+  fingerprint. Approvals that relied on excluding embedded provenance lines become stale and need a new decision.
+- During review or release approval, concurrent changes to the raw checkpoint tree require a retry, including edits
+  that leave normalized code unchanged. Windows checks require PowerShell with Add-Type enabled to create their job.
+  POSIX descendant discovery requires `ps` with PID, PPID and PGID output; it is not an OS sandbox for processes
+  deliberately daemonized and reparented before the timeout.
+
 ## 0.26.0 — 2026-10-22
 
 A repository could reshape the approval command sdlc suggests into another decision: a role named

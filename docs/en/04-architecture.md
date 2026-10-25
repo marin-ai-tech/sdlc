@@ -122,9 +122,22 @@ Mechanics:
   the approvals and stale approvals, and `next --me --json` per queued approval. `approve --expect-digest` compares it
   right after the gate is evaluated and refuses before anything is written (`src/core/expected-digest.ts`); the preview
   lists the same refusal. The `gate.<g>.approved` and `gate.<g>.rejected` log entries carry the digest as a field.
+- **One-read snapshots.** `sdlc gate read <gate> --change <id> --json` captures normalized artifact texts during
+  that evaluation's digest calculation. It does not reopen the files to build the response. The final provenance
+  stamp is excluded; embedded stamp-shaped lines remain covered. Approval checks the version again after slow
+  checks and compares the checkpoint's immutable artifact texts before recording its ref. Explicitly covered
+  artifacts are included even when ignored by Git, using only the temporary index.
+  Safe artifact links keep their raw Git representation; immutable comparison resolves their captured link
+  chains and target bytes. Ignored targets are included as dependencies. Broken, cyclic or escaping links
+  cannot prove artifact content. Every checkpoint attempt is followed by a digest recheck, including failures.
+  The tracked task artifact uses checkbox normalization in every planning gate that covers it, including custom
+  intent/spec mappings. Approval parsing validates known fields and preserves uninterpreted extensions on write.
 - **The worktree fingerprint for verify, review and release** is the git tree id of all files (tracked + untracked,
   excluding ignored files and `openspec/`). It is computed in a temporary index and does not depend on commits:
   committing verified code does not make the verification stale, while any change to the content does.
+  Failed/empty index-path metadata or an unreadable index yields no fingerprint; it must not silently construct an
+  unseeded tree that omits tracked ignored files. A legitimately absent index before staging and the relative
+  index-path fallback for older Git remain supported.
 - **Separation of duties: agents.** `approve`, `reject`, `waive`, `track set`, `tests unlock`, `archive --force`,
   `license set`, `backlog move`, `backlog drop`, `roles migrate` and the other person's commands of `HUMAN_COMMANDS`
   (4.6) refuse to run in an agent session (`CLAUDECODE=1`, `OPENCODE=1`/`AGENT=1`, `SDLC_AGENT`, `CURSOR_AGENT=1`,
@@ -474,7 +487,7 @@ can list the board but cannot call a write tool. No MCP tool handles dispatch or
 | A custom schema instead of custom formats | `/opsx:*` and `openspec` keep working | some instructions depend on the OpenSpec version (pinned to ≥ 1.13.2) |
 | State in `.sdlc.yaml`, not in `.openspec.yaml` | OpenSpec rewrites its metadata through zod and drops unknown keys | one more file in the change folder |
 | Digests instead of "approved" flags | an approval cannot "survive" an edit to the artifact | fixing a typo requires a new approval |
-| Git tree id instead of "HEAD + diff" | a commit does not make verification stale | git is required; outside git, freshness is not checked (a warning) |
+| Git tree id instead of "HEAD + diff" | a commit does not make verification stale | without a complete fingerprint, verification is not fresh and code-bound approvals have no digest |
 | Hooks allow when the CLI is missing, block when a check fails | a missing installation does not paralyze work, a flaky check does not open a hole | without the CLI the rules do not apply (`doctor` catches this; Cursor's `failClosed` hooks block instead); a check that exceeds the hook timeout (30 s in Claude Code and Codex CLI) is still allowed by Claude Code, Codex CLI and Qwen Code themselves |
 | Identity = git user | zero infrastructure | a git email can be forged by a person with access to the repository; `roles.yaml` with `signing: required` and `sdlc approvals verify` in CI close this, together with branch protection (see the playbook) |
 

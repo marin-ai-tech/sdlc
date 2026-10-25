@@ -5,6 +5,8 @@ import * as path from 'node:path';
 import { git, headCommit, isGitRepo } from './git.js';
 import { SdlcError } from './errors.js';
 import { hasProvenance, stripProvenance } from './license.js';
+import { isWithin } from './fs-utils.js';
+import { checkpointReader, coveredSnapshotPaths } from './checkpoint-links.js';
 
 /**
  * Checkpoints: approving a gate stores a snapshot commit of the working tree at
@@ -31,6 +33,24 @@ interface Repo {
   prefix: string;
 }
 
+export interface CheckpointTree extends Repo {
+  tree: string;
+  /** Ordinary worktree tree, before explicitly covered ignored artifacts are included. */
+  ordinaryTree: string;
+  read(projectRelativePath: string): string | undefined;
+}
+
+/** A raw snapshot, not yet a checkpoint ref or a commit. The reader always reads that immutable tree. */
+export function captureCheckpoint(root: string, include: string[] = []): CheckpointTree | undefined {
+  const repo = repoOf(root);
+  if (include.some((file) => !isWithin(root, path.resolve(root, file)))) return undefined;
+  const covered = coveredSnapshotPaths(root, include);
+  const snapshot = repo && covered ? snapshotTree(repo.top, covered.map((file) => `${repo.prefix}${file}`)) : undefined;
+  if (!repo || !snapshot) return undefined;
+  const read = checkpointReader(repo.top, snapshot.tree, root);
+  return { ...repo, ...snapshot, read: (rel) => read(`${repo.prefix}${rel}`) };
+}
+
 /** Files to restore from a checkpoint: repository-relative paths, and which of them the checkpoint holds. */
 export interface CheckpointScope extends Repo {
   ref: string;
@@ -55,7 +75,7 @@ function nulList(output: string): string[] {
   return output.split('\0').filter(Boolean);
 }
 
-function snapshotTree(top: string): string | undefined {
+function snapshotTree(top: string, include: string[]): { tree: string; ordinaryTree: string } | undefined {
   const name = `sdlc-checkpoint-${process.pid}-${Date.now()}-${Math.random().toString(36).slice(2)}`;
   const index = path.join(os.tmpdir(), name);
   const env = { ...process.env, GIT_INDEX_FILE: index };
@@ -63,8 +83,11 @@ function snapshotTree(top: string): string | undefined {
     { cwd: top, env, encoding: 'utf-8', maxBuffer: MAX_BUFFER });
   try {
     if (run(['add', '-A', '--', '.']).status !== 0) return undefined;
+    const ordinary = run(['write-tree']);
+    if (ordinary.status !== 0) return undefined;
+    if (include.length && run([LITERAL, 'add', '-f', '--', ...include]).status !== 0) return undefined;
     const tree = run(['write-tree']);
-    return tree.status === 0 ? tree.stdout.trim() : undefined;
+    return tree.status === 0 ? { tree: tree.stdout.trim(), ordinaryTree: ordinary.stdout.trim() } : undefined;
   } finally {
     fs.rmSync(index, { force: true });
   }
@@ -79,14 +102,17 @@ function commitSnapshot(top: string, tree: string, message: string): string | un
 }
 
 /** Records the gate's checkpoint. Without a git repository, or when git fails, nothing is recorded or thrown. */
-export function recordCheckpoint(root: string, change: string, gate: string): boolean {
+export function recordCheckpoint(root: string, change: string, gate: string,
+  inspect?: (snapshot: CheckpointTree) => void, include: string[] = []): boolean {
   try {
-    const repo = repoOf(root);
-    const tree = repo ? snapshotTree(repo.top) : undefined;
-    const commit = repo && tree ? commitSnapshot(repo.top, tree, `sdlc checkpoint: ${change} ${gate}`) : undefined;
-    if (!repo || !commit) return false;
-    return git(repo.top, ['update-ref', checkpointRef(change, gate), commit]).ok;
-  } catch {
+    const snapshot = captureCheckpoint(root, include);
+    if (!snapshot) return false;
+    inspect?.(snapshot);
+    const commit = commitSnapshot(snapshot.top, snapshot.tree, `sdlc checkpoint: ${change} ${gate}`);
+    if (!commit) return false;
+    return git(snapshot.top, ['update-ref', checkpointRef(change, gate), commit]).ok;
+  } catch (error) {
+    if (error instanceof SdlcError) throw error;
     return false;
   }
 }

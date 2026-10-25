@@ -169,7 +169,7 @@ describe('B83: a Qwen Code agent session', () => {
 });
 
 describe('B83 follow-up: sdlc recognizes its deny entries whatever the cli', () => {
-  for (const cli of ['node C:/tools/sdlc/bin/sdlc.js', 'sdlc.cmd', 'npx --no-install sdlc']) {
+  for (const cli of ['node C:/tools/sdlc/bin/sdlc.js', './bin/sdlc', 'npx --no-install sdlc']) {
     it(`uninstall leaves no deny entry of cli "${cli}"`, () => {
       const p = project('qwen', (root) => write(path.join(root, '.qwen/settings.json'), '{"model": {"name": "m"}}'));
       const config = read(p.file('openspec/sdlc.yaml')).replace(/^cli: .*$/m, `cli: ${cli}`);
@@ -182,6 +182,32 @@ describe('B83 follow-up: sdlc recognizes its deny entries whatever the cli', () 
       expect(after.model.name).toBe('m');
     }, 180000);
   }
+
+  it('refuses a legacy .cmd cli under the approved B129 program rule without rewriting settings', () => {
+    const p = project();
+    const before = read(p.file('.qwen/settings.json'));
+    write(p.file('openspec/sdlc.yaml'), read(p.file('openspec/sdlc.yaml')).replace(/^cli: .*$/m, 'cli: sdlc.cmd'));
+    const refused = p.cli(['update', '--json']);
+    expect(refused.code).toBe(1);
+    expect(refused.json().status[0].code).toBe('invalid_config');
+    expect(read(p.file('.qwen/settings.json'))).toBe(before);
+  }, 180000);
+
+  it('removes legacy .cmd deny entries when installing a valid cli and preserves personal entries', () => {
+    const legacy = ['Bash(sdlc.cmd approve *)', 'Bash(sdlc.cmd tests unlock *)'];
+    const own = 'Bash(echo *)';
+    const p = project('qwen', (root) => write(path.join(root, '.qwen/settings.json'), JSON.stringify({
+      model: { name: 'm' }, permissions: { deny: [...legacy, ...legacy, own] },
+    })));
+    // The current installation deliberately protects .cmd spellings too: old duplicates become one managed rule.
+    for (const rule of legacy) {
+      expect(settings(p).permissions.deny.filter((entry: string) => entry === rule)).toHaveLength(1);
+    }
+    expect(settings(p).permissions.deny).toContain('Bash(sdlc approve *)');
+    expect(p.cli(['uninstall', '--json']).code).toBe(0);
+    expect(settings(p).permissions.deny).toEqual([own]);
+    expect(settings(p).model.name).toBe('m');
+  }, 180000);
 
   it("negative: the person's own deny entries that mention sdlc stay", () => {
     const deny = ['Bash(sdlc archive *)', 'Bash(rm -rf openspec)', 'Bash(approve-all *)'];

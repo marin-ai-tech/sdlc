@@ -13,6 +13,7 @@ import { myQueue, type MyQueue } from '../core/my-queue.js';
 export interface NextMeOptions {
   change?: string;
   json?: boolean;
+  branches?: boolean;
 }
 
 export async function nextMeCommand(opts: NextMeOptions): Promise<void> {
@@ -20,10 +21,11 @@ export async function nextMeCommand(opts: NextMeOptions): Promise<void> {
     const ctx = loadProject();
     const refs = opts.change ? [resolveChange(ctx.paths, opts.change)] : listActiveChanges(ctx.paths);
     const queue = myQueue({ root: ctx.root, config: ctx.config, refs });
-    const otherBranches = otherBranchChanges(ctx.root);
+    const otherBranches = opts.branches === false ? undefined : otherBranchChanges(ctx.root);
     const items = queue.items.map((item) => ({ ...item, cli: withCliPrefix(item.cli, ctx.config.cli) }));
-    if (opts.json) return printJson({ ...queue, items, otherBranches, root: { path: ctx.root } });
-    printQueue({ ...queue, items }, otherBranches);
+    if (opts.json) return printJson({ ...queue, items,
+      ...(otherBranches ? { otherBranches } : {}), root: { path: ctx.root } });
+    printQueue({ ...queue, items }, otherBranches ?? []);
   } catch (error) {
     reportFailure(error, opts.json, { me: null, items: [] });
   }

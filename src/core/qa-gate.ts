@@ -9,7 +9,9 @@ import { createHash } from 'node:crypto';
 import type { ChangeRef } from './changes.js';
 import type { ChangeState, GateState } from './change-state.js';
 import type { SdlcConfig } from './config.js';
-import { digestFiles } from './digest.js';
+import { digestFiles, type DigestCapture } from './digest.js';
+import { isFile } from './fs-utils.js';
+import * as path from 'node:path';
 import { t, type MessageParams } from './i18n.js';
 import { evaluateApprovalGate, type LocalizedReason } from './approval-gate.js';
 import type { GateEvaluation, LifecycleView, NextAction } from './lifecycle.js';
@@ -36,12 +38,16 @@ function recordedRun(state: ChangeState): string {
 }
 
 /** What a qa approval covers: the recorded verify run and verification.md (provenance aside). */
-export function qaDigest(changeDir: string, state: ChangeState): string {
+export function qaDigest(changeDir: string, state: ChangeState, capture?: DigestCapture): string {
   const hash = createHash('sha256');
   hash.update(recordedRun(state));
   hash.update('\0');
-  hash.update(digestFiles(changeDir, [QA_EVIDENCE]));
-  return `sha256:${hash.digest('hex')}`;
+  const files = isFile(path.join(changeDir, QA_EVIDENCE)) ? [QA_EVIDENCE] : [];
+  const artifactDigest = digestFiles(changeDir, files, undefined, capture);
+  hash.update(artifactDigest);
+  const digest = `sha256:${hash.digest('hex')}`;
+  if (capture) capture.set(digest, { digest, files: capture.get(artifactDigest)!.files, verification: recordedRun(state) });
+  return digest;
 }
 
 /**
@@ -54,11 +60,11 @@ export function evaluateQaGate(
   state: ChangeState,
   gateState: GateState | undefined,
   blocked: LocalizedReason | undefined,
-  options: { skipFingerprint?: boolean; withQa?: boolean } = {}
+  options: { skipFingerprint?: boolean; withQa?: boolean; capture?: DigestCapture } = {}
 ): GateEvaluation | undefined {
   if (!qaInUse(config, state, options.withQa)) return undefined;
   const trustRecorded = ref.archived || options.skipFingerprint === true;
-  return evaluateApprovalGate('qa', config, state, gateState, qaDigest(ref.dir, state), blocked, [],
+  return evaluateApprovalGate('qa', config, state, gateState, qaDigest(ref.dir, state, options.capture), blocked, [],
     trustRecorded, ref.archived);
 }
 

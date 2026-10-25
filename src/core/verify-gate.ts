@@ -40,9 +40,7 @@ export function evaluateVerifyGate(input: VerifyGateInput): {
   let verification: LifecycleView['verification'] = { status: 'never' };
   if (state.verify) {
     const fresh = ref.archived
-      || !input.fingerprint
-      || !state.verify.fingerprint
-      || state.verify.fingerprint === input.fingerprint;
+      || (!!input.fingerprint && !!state.verify.fingerprint && state.verify.fingerprint === input.fingerprint);
     verification = {
       status: state.verify.status === 'passed' ? (fresh ? 'passed' : 'stale') : 'failed',
       at: state.verify.at,

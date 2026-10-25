@@ -6,6 +6,7 @@ import { parse } from 'yaml';
 import { defaultConfig } from '../src/core/config.js';
 import { evaluateToolCall, normalizeToolCall } from '../src/core/policy.js';
 import { projectPaths } from '../src/core/project.js';
+import { LOG_PATH, readLog } from '../src/core/log.js';
 import { git, humanEnv, initGitRepo, read, REPO_ROOT, runCli, tempDir, write } from './helpers.js';
 
 const INTENT = '# Intent: x\n\nAuthor: Pat. Status: draft. Source: idea\n\n## Problem\nP.\n\n## Proposed outcome\nO.\n\n## Affected users and systems\nAll.\n\n## Constraints\nNone\n\n## Success measures\nM.\n\n## Out of scope\nNone\n\n## Open questions\nNone\n';
@@ -81,10 +82,15 @@ describe('projects written before the rename from scdl', () => {
   });
 
   it('negative: nothing in the repository points at the old name, apart from the deliberate compatibility spots', () => {
-    const r = spawnSync('git', ['grep', '-n', '-I', '-i', 'scdl', '--', '.', ':!test/rename-compat.test.ts', ':!package-lock.json',
+    const r = spawnSync('git', ['grep', '--untracked', '--exclude-standard', '-n', '-I', '-i', 'scdl', '--',
+      '.', ':!test/rename-compat.test.ts', ':!package-lock.json',
       ':!CHANGELOG.md'], { cwd: REPO_ROOT, encoding: 'utf-8' });
     const allowed = [/^package\.json:.*"scdl": "\.\/bin\/scdl\.js"/, /^bin\/scdl\.js:/, /^src\/core\/policy\.ts:.*\(\?:sdlc\|scdl\)/,
-      /^src\/integrations\/settings\.ts:/, /^src\/core\/license\.ts:.*\(\?:sdlc\|scdl\)/, /^src\/core\/(change-state|log)\.ts:.*scdl/,
+      /^src\/integrations\/settings\.ts:/, /^src\/core\/license\.ts:.*\(\?:sdlc\|scdl\)/,
+      /^src\/core\/change-state\.ts:.*scdl/,
+      // B126: the existing log-key migration moved into its boundary parser; only these two forms are compatibility.
+      /^src\/core\/log-record\.ts:\d+:\s*const sdlc = raw\.sdlc === undefined \? raw\.scdl : raw\.sdlc;\s*$/,
+      /^src\/core\/log-record\.ts:\d+:\s*delete entry\.scdl;\s*$/,
       /^README\.md:.*under its old name \(`marin-ai-tech\/scdl`/,
       // 0.14.2 (B84): the second layer of Codex and Qwen refuses a person's commands under the `scdl` alias bin too.
       /^src\/integrations\/second-layer\.ts:/, /^src\/integrations\/qwen-settings\.ts:.*\(\?:sdlc\|scdl\)/,
@@ -94,5 +100,16 @@ describe('projects written before the rename from scdl', () => {
     const leftovers = r.stdout.split('\n').filter((line) => line && !allowed.some((re) => re.test(line)));
     expect(leftovers).toEqual([]);
     expect(fs.existsSync(path.join(REPO_ROOT, 'LICENSES/sdlc-Additional-Permissions.md'))).toBe(true);
+  });
+
+  it('skips malformed log fields while migrating a valid legacy record (B126)', () => {
+    const root = tempDir();
+    const valid = { ts: '2026-10-24', event: 'gate.plan.approved', by: 'Pat',
+      scdl: '0.5.0', license: 'community' };
+    const lines = [null, 42, {}, { ...valid, ts: [] }, { ...valid, sdlc: null }, { ...valid, digest: {} },
+      { ...valid, waitingFor: [42] }, valid].map((entry) => JSON.stringify(entry));
+    write(path.join(root, LOG_PATH), lines.join('\n'));
+    const { scdl, ...rest } = valid;
+    expect(readLog(root)).toEqual([{ ...rest, sdlc: scdl }]);
   });
 });

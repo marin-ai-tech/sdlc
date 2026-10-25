@@ -67,28 +67,48 @@ export function hasUncommittedChanges(cwd: string, excludePaths: string[] = []):
 export function worktreeFingerprint(cwd: string, excludePaths: string[] = []): string | undefined {
   const top = git(cwd, ['rev-parse', '--show-toplevel']);
   if (!top.ok) return undefined;
+  const prefix = git(cwd, ['rev-parse', '--show-prefix']);
+  if (!prefix.ok) return undefined;
   let indexPath = git(cwd, ['rev-parse', '--path-format=absolute', '--git-path', 'index']);
   if (!indexPath.ok) {
     // git < 2.31 has no --path-format; --git-path is then relative to cwd.
     const rel = git(cwd, ['rev-parse', '--git-path', 'index']);
-    indexPath = { ...rel, stdout: rel.ok ? path.resolve(cwd, rel.stdout) : rel.stdout };
+    if (!rel.ok || !rel.stdout) return undefined;
+    indexPath = { ...rel, stdout: path.resolve(cwd, rel.stdout) };
   }
+  if (!indexPath.stdout) return undefined;
   const tmpIndex = path.join(os.tmpdir(), `sdlc-index-${process.pid}-${Date.now()}-${Math.random().toString(36).slice(2)}`);
   try {
-    if (indexPath.ok && fs.existsSync(indexPath.stdout)) fs.copyFileSync(indexPath.stdout, tmpIndex);
+    if (!copyFingerprintIndex(indexPath.stdout, tmpIndex)) return undefined;
     const env = { ...process.env, GIT_INDEX_FILE: tmpIndex };
     const run = (args: string[]) => spawnSync('git', args, { cwd: top.stdout, env, encoding: 'utf-8', maxBuffer: 64 * 1024 * 1024 });
     if (run(['add', '-A', '--', '.']).status !== 0) return undefined;
-    for (const p of excludePaths) run(['rm', '-r', '--cached', '-q', '--ignore-unmatch', '--', p]);
+    for (const p of excludePaths) {
+      const excluded = `${prefix.stdout}${p}`;
+      if (run(['--literal-pathspecs', 'rm', '-r', '--cached', '-q', '--ignore-unmatch', '--', excluded])
+        .status !== 0) return undefined;
+    }
     const tree = run(['write-tree']);
     if (tree.status !== 0) return undefined;
     return `git-tree:${(tree.stdout ?? '').trim()}`;
+  } catch {
+    return undefined;
   } finally {
     try {
       fs.rmSync(tmpIndex, { force: true });
     } catch {
       // best effort
     }
+  }
+}
+
+/** A missing index is legitimate before staging; unreadable index evidence must never become an empty seed. */
+function copyFingerprintIndex(source: string, target: string): boolean {
+  try {
+    fs.copyFileSync(source, target);
+    return true;
+  } catch (error) {
+    return (error as NodeJS.ErrnoException).code === 'ENOENT';
   }
 }
 

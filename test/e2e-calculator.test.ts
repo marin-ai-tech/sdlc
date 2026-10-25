@@ -233,6 +233,11 @@ describe('demo: a team builds a calculator with sdlc (every command)', { timeout
 
   it('6. intent → spec → plan, each approved by the right person', () => {
     write(path.join(change('basic-arithmetic'), 'intent.md'), INTENT);
+    const snapshot = step('gate-read', 'gates', 'agent',
+      ['gate', 'read', 'intent', '--change', 'basic-arithmetic', '--json'],
+      'The agent reads the exact normalized intent and its digest without recording a decision.');
+    expect(snapshot.json().snapshot.digest).toMatch(/^sha256:[a-f0-9]{64}$/);
+    expect(snapshot.json().snapshot.files[0].text).toContain('People need quick sums at the counter');
     step('approve-intent-agent', 'gates', 'agent', ['approve', 'intent', '--change', 'basic-arithmetic'], 'The agent cannot approve.', { expect: 1 });
     step('approve-intent-bob', 'gates', 'bob', ['approve', 'intent', '--change', 'basic-arithmetic'], 'Bob is not the product owner.', { expect: 1 });
     // 0.11.4 (B62): the intent has an open question; Alice answers it herself before she approves.

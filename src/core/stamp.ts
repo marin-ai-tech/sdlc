@@ -13,7 +13,8 @@ import { withProvenance, type HarnessStamp } from './license.js';
  * @param files paths relative to the change folder; others are skipped
  * @returns the files that were rewritten
  */
-export function stampArtifacts(changeDir: string, files: string[], stamp: HarnessStamp): string[] {
+export function stampArtifacts(changeDir: string, files: string[], stamp: HarnessStamp,
+  assertCurrent?: () => void): string[] {
   const stamped: string[] = [];
   for (const rel of [...new Set(files)].sort()) {
     if (rel.includes('/') || rel.includes('\\') || !rel.endsWith('.md')) continue;
@@ -22,6 +23,7 @@ export function stampArtifacts(changeDir: string, files: string[], stamp: Harnes
     if (content === undefined) continue;
     const next = withProvenance(content, stamp);
     if (next === content) continue;
+    assertCurrent?.();
     writeTextAtomic(file, next);
     stamped.push(rel);
   }
@@ -35,10 +37,11 @@ export function stampArtifacts(changeDir: string, files: string[], stamp: Harnes
 export function tryStampArtifacts(
   changeDir: string,
   files: string[],
-  stamp: HarnessStamp
+  stamp: HarnessStamp,
+  assertCurrent?: () => void,
 ): { stamped: string[]; error?: string } {
   try {
-    return { stamped: stampArtifacts(changeDir, files, stamp) };
+    return { stamped: stampArtifacts(changeDir, files, stamp, assertCurrent) };
   } catch (error) {
     return { stamped: [], error: error instanceof Error ? error.message : String(error) };
   }

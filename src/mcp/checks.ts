@@ -248,6 +248,6 @@ export function withMcpChecks(run: VerificationRun, config: SdlcConfig, mcp: Mcp
   // Without commands, `runVerification` reports `failed` for running nothing; the MCP checks decide then.
   const commandsOk = config.verify.commands.length === 0 || run.status === 'passed';
   const mcpOk = mcp.length === total && mcp.every((check) => check.ok || !check.required);
-  const passed = commandsOk && mcpOk;
+  const passed = !!run.fingerprint && commandsOk && mcpOk;
   return { ...run, status: passed ? 'passed' : 'failed', mcp };
 }

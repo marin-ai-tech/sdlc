@@ -6,7 +6,7 @@
 import type { ChangeRef } from './changes.js';
 import type { ChangeState } from './change-state.js';
 import type { SdlcConfig } from './config.js';
-import { digestFiles, withoutCheckboxState } from './digest.js';
+import { digestFiles, withoutCheckboxState, type DigestCapture } from './digest.js';
 import type { ArtifactState, SchemaInfo } from './openspec-schema.js';
 import {
   evaluateApprovalGate,
@@ -27,7 +27,8 @@ export function evaluatePlanningGates(
   schema: SchemaInfo,
   mapping: Record<'intent' | 'spec' | 'plan', string[]>,
   artifacts: ArtifactState[],
-  tracks: string
+  tracks: string,
+  capture?: DigestCapture,
 ): { gates: GateEvaluation[]; upstreamOpen?: LocalizedReason } {
   const byId = new Map(artifacts.map((a) => [a.id, a]));
   const coveredFiles = (ids: string[]) => ids.flatMap((id) => byId.get(id)?.files ?? []);
@@ -50,7 +51,8 @@ export function evaluatePlanningGates(
     }
     const missing = missingOf(covered);
     const digest = missing.length === 0
-      ? digestFiles(ref.dir, coveredFiles(covered), (rel, content) => (rel === tracks ? withoutCheckboxState(content) : content))
+      ? digestFiles(ref.dir, coveredFiles(covered),
+        (rel, content) => (rel === tracks ? withoutCheckboxState(content) : content), capture)
       : undefined;
     const judgeBlock = judgeBlockReason(config, state, id, digest);
     const blocked = missing.length > 0

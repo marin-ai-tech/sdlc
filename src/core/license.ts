@@ -107,14 +107,14 @@ export function stampTextLocalized(stamp: HarnessStamp): string {
  * arbitrary content.
  */
 const PROVENANCE_LINE =
-  /^[ \t]*<!-- sdlc-provenance: (?:sdlc|scdl) [\w.+-]+ \| license: [^|<>\r\n]+ \| https?:\/\/[^\s|<>]+ -->[ \t]*\r?$\n?/gm;
+  /(?:^|\r?\n)[ \t]*<!-- sdlc-provenance: (?:sdlc|scdl) [\w.+-]+ \| license: [^|<>\r\n]+ \| https?:\/\/[^\s|<>]+ -->[ \t]*(?:\r?\n[ \t]*)*$/;
 
 /** One-line provenance comment the CLI keeps at the end of change artifacts. */
 export function provenanceComment(stamp: HarnessStamp): string {
   return `<!-- sdlc-provenance: sdlc ${stamp.version} | license: ${stamp.license} | ${PROJECT_URL} -->`;
 }
 
-/** Content without provenance lines (used for digests and parsers). */
+/** Content without the single trailing stamp; embedded stamp-shaped lines remain content. */
 export function stripProvenance(content: string): string {
   return content.replace(PROVENANCE_LINE, '');
 }
@@ -126,7 +126,7 @@ export function hasProvenance(content: string): boolean {
   return found;
 }
 
-/** Replaces any provenance line with a current one, appended at the end (keeping the file's line endings). */
+/** Replaces the trailing stamp, preserving embedded lines and the file's line endings. */
 export function withProvenance(content: string, stamp: HarnessStamp): string {
   const eol = content.includes('\r\n') ? '\r\n' : '\n';
   const body = content.replace(PROVENANCE_LINE, '').replace(/\s+$/u, '');

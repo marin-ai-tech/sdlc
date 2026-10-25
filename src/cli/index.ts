@@ -58,6 +58,7 @@ import { nextMeCommand } from '../commands/next-me.js';
 import { approvePreviewCommand } from '../commands/approve-preview.js';
 import { releaseCheckCommand } from '../commands/release.js';
 import { explainCommand } from '../commands/explain.js';
+import { gateReadCommand } from '../commands/gate-read.js';
 import { resolveLocale, setLocale, systemLocale, t } from '../core/i18n.js';
 import { applyCommanderLocale, localizeDescriptions, peekLocaleFlag } from './commander-i18n.js';
 import { loadConfig } from '../core/config.js';
@@ -420,8 +421,15 @@ export function buildProgram(): Command {
     .description(cmdDesc('cmd.next'))
     .option('--change <id>', 'change id (defaults to the only active change)')
     .option('--me', 'what waits for me: the gates I may decide now, across every active change (read-only)')
+    .option('--no-branches', 'skip other-branch discovery in next --me')
     .option('--json', 'output JSON')
     .action((opts) => (opts.me ? nextMeCommand(opts) : nextCommand(opts)));
+
+  program.command('gate').description(cmdDesc('cmd.gateRead'))
+    .command('read <gate>').description(cmdDesc('cmd.gateRead'))
+    .option('--change <id>', 'change id')
+    .option('--json', 'output JSON')
+    .action((gate, opts) => gateReadCommand(gate, opts));
 
   program
     .command('instructions <artifact>')
@@ -755,7 +763,7 @@ export function buildProgram(): Command {
  * Commands after which queued events are not sent (B45): a hook must stay fast, the MCP server's stdout is the
  * protocol, and `events flush` has just sent them.
  */
-const NO_DELIVERY = ['hook', 'mcp serve', 'events flush'];
+const NO_DELIVERY = ['hook', 'mcp serve', 'events flush', 'gate read'];
 
 /** `mcp serve` for the `serve` subcommand of `mcp`. */
 function commandPath(command: Command): string {

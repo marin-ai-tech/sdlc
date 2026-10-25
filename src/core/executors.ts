@@ -14,7 +14,7 @@ import { parse, parseDocument } from 'yaml';
  */
 export const EXECUTORS_PATH = 'openspec/executors.yaml';
 
-export const EXECUTOR_TYPES = ['representative', 'board', 'market', 'mesh'] as const;
+export const EXECUTOR_TYPES = ['representative', 'board', 'market', 'mesh', 'harness'] as const;
 export type ExecutorType = (typeof EXECUTOR_TYPES)[number];
 
 const EXECUTOR_ID_PATTERN = '[a-z0-9][a-z0-9._-]{0,63}';

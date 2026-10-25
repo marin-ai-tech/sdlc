@@ -1,3 +1,4 @@
+import * as path from 'node:path';
 import { t } from '../core/i18n.js';
 import { loadProject, recordChangeEvent, type ProjectContext } from '../cli/context.js';
 import { c, line, printJson, reportFailure, warn } from '../cli/output.js';
@@ -16,16 +17,18 @@ import { humanCommandFix } from '../core/human-command.js';
 import { defaultBaseRef, formatIdentity, gitIdentity } from '../core/git.js';
 import { approvalEmails, changeAuthors, checkApproval, readRolesFile, type RolesFile } from '../core/roles.js';
 import { assertByAllowed, sameApprover, stillNeeded } from '../core/approval-quorum.js';
-import { evaluateChange, type LifecycleView } from '../core/lifecycle.js';
+import { evaluateChange, type GateEvaluation, type LifecycleView } from '../core/lifecycle.js';
 import { recordAwaiting } from '../core/awaiting.js';
 import { changeMarkdown, tryStampArtifacts } from '../core/stamp.js';
-import { recordCheckpoint } from '../core/checkpoint.js';
+import { captureCheckpoint, recordCheckpoint } from '../core/checkpoint.js';
+import { assertSnapshotContent } from '../core/approval-snapshot.js';
+import type { CapturedDigest, DigestCapture } from '../core/digest.js';
 import { approvalChecks } from '../mcp/release-checks.js';
 import { approvalCommitMessage, assertChangedSinceRework, shortDigest } from '../core/approval-hygiene.js';
 import { assertQuestionsAnswered } from '../core/answers.js';
 import { assertDebateRecorded } from '../core/debate.js';
 import { assertJudgeCleared } from '../core/judge-gate.js';
-import { validateOne } from '../core/validate-change.js';
+import { validateOne, type ValidationIssue } from '../core/validate-change.js';
 import { effectiveGates } from '../core/rework.js';
 
 /**
@@ -189,99 +192,138 @@ function approvalRecord(
   };
 }
 
+interface ApprovalWork {
+  ctx: ProjectContext;
+  ref: ChangeRef;
+  gate: ApprovalGateId;
+  view: LifecycleView;
+  evaluation: GateEvaluation;
+  state: ChangeState;
+  role: string;
+  person?: string;
+  identity: string;
+  digest: string;
+  opts: DecisionOptions;
+  snapshot?: CapturedDigest;
+  initialTree?: string;
+}
+
+function prepareApproval(gateArg: string, opts: DecisionOptions): ApprovalWork {
+  const ctx = loadProject();
+  const gate = parseGate(gateArg, APPROVAL_GATES) as ApprovalGateId;
+  assertHuman(ctx.config, 'approve');
+  assertByAllowed(ctx.config.gates[gate], readRolesFile(ctx.root) !== undefined, opts.by);
+  const expected = parseExpectedOption(opts.expectDigest);
+  const ref = resolveChange(ctx.paths, opts.change);
+  const initialTree = gate === 'review' || gate === 'release' ? captureCheckpoint(ctx.root)?.tree : undefined;
+  const capture: DigestCapture = new Map();
+  const view = evaluateChange(ctx.root, ref, ctx.config, { withQa: gate === 'qa', capture });
+  const evaluation = view.gates.find((item) => item.id === gate)!;
+  assertExpectedDigest(expected, ref.id, evaluation);
+  recordAwaiting(ctx.root, ctx.config, view, ctx.stamp);
+  assertApprovalReady(gate, evaluation);
+  const roles = readRolesFile(ctx.root);
+  const state = readChangeState(ref.dir);
+  const { role, person } = approvalRole(ctx.config, roles, ctx.root, gate, state, opts.as, evaluation.missingRoles);
+  const identity = approvalIdentity(ctx.root, roles, opts.by);
+  if (!roles) assertRoleMember(ctx.config, role, identity);
+  return { ctx, ref, gate, view, evaluation, state, role, person, identity, digest: evaluation.digest!, opts,
+    snapshot: capture.get(evaluation.digest!), initialTree };
+}
+
+function assertApprovalReady(gate: ApprovalGateId, evaluation: GateEvaluation): void {
+  if (evaluation.status === 'blocked') {
+    throw new SdlcError('gate_blocked', {
+      key: 'error.the_x_gate_cannot_be_approved_yet_x',
+      params: { gate, evaluation_reason: evaluation.reason ?? '' },
+    });
+  }
+  if (!evaluation.digest) {
+    throw new SdlcError('gate_not_ready', { key: 'error.nothing_to_approve_for_the_x_gate_yet', params: { gate } });
+  }
+}
+
+function reportExistingApproval(work: ApprovalWork): boolean {
+  const { state, gate, identity, person, role, digest, evaluation, ref, opts } = work;
+  const existing = effectiveGates(state)[gate]?.approvals?.some((approval) =>
+    sameApprover(approval, identity, person) && approval.role === role && approval.digest === digest);
+  if (!existing || evaluation.status === 'rejected' || evaluation.status === 'stale') return false;
+  if (opts.json) printJson({ change: ref.id, gate, role, by: identity, digest, alreadyApproved: true });
+  else line(t('gate.alreadyApproved', { gate, identity, role, digest }));
+  return true;
+}
+
+function checkApprovalArtifacts(work: ApprovalWork): ValidationIssue[] {
+  const { ctx, ref, state, gate, digest, opts } = work;
+  assertChangedSinceRework(state, gate, digest, opts.note);
+  assertQuestionsAnswered(ctx.config, ref.id, ref.dir, state, gate);
+  assertDebateRecorded(ctx.config, ref.dir, gate);
+  assertJudgeCleared(ctx.config, state, gate, digest);
+  const validation = gate === 'spec' ? validateOne(ctx, ref) : undefined;
+  if (validation && !validation.valid) {
+    const errors = validation.issues.filter((issue) => issue.level === 'error');
+    throw new SdlcError('spec_invalid', errors.map((issue) => issue.message).join('\n'));
+  }
+  return validation?.issues.filter((issue) => issue.level === 'warning') ?? [];
+}
+
+function assertApprovalUnchanged(work: ApprovalWork): void {
+  const { ctx, ref, gate, digest } = work;
+  const current = evaluateChange(ctx.root, ref, ctx.config, { withQa: gate === 'qa' });
+  assertExpectedDigest(digest, ref.id, current.gates.find((item) => item.id === gate)!);
+}
+
+function persistApproval(work: ApprovalWork, warnings: ValidationIssue[], checks?: ReleaseCheckRecord[]): void {
+  const { ctx, ref, state, gate, identity, person, role, digest, opts, view } = work;
+  assertApprovalUnchanged(work);
+  recordCheckpoint(ctx.root, ref.id, gate, (snapshot) => {
+    assertSnapshotContent(ctx.root, ref.dir, gate, snapshot, work.snapshot,
+      view.tasks.file ?? 'tasks.md', work.initialTree);
+    assertApprovalUnchanged(work);
+  }, work.snapshot?.files.map((file) => path.relative(ctx.root, path.join(ref.dir, file.path))));
+  assertApprovalUnchanged(work);
+  const current: GateState = state.gates[gate] ?? {};
+  const approvals = (current.approvals ?? []).filter((a) => !sameApprover(a, identity, person));
+  approvals.push(approvalRecord(ctx, ref, state, gate, { role, person, identity, digest, note: opts.note, checks }));
+  state.gates[gate] = { ...current, approvals };
+  const note = `role ${role}${opts.note ? `: ${opts.note}` : ''}`;
+  const detail = `${note}${warnings.length ? `; ${warnings.length} validation warning(s)` : ''}`;
+  recordChangeEvent(ctx, ref, state, `gate.${gate}.approved`, identity, detail, { digest });
+  const stamping = tryStampArtifacts(ref.dir, approvedFiles(view, gate, ref.dir), ctx.stamp,
+    () => assertApprovalUnchanged(work));
+  if (stamping.error && !opts.json) warn(t('warn.approvalProvenance', { error: stamping.error }));
+}
+
+function presentApproval(work: ApprovalWork, warnings: ValidationIssue[], checks?: ReleaseCheckRecord[]): void {
+  const { ctx, ref, gate, role, identity, digest, opts } = work;
+  const after = evaluateChange(ctx.root, ref, ctx.config, { withQa: gate === 'qa' });
+  const status = after.gates.find((item) => item.id === gate)!;
+  const next = resolveNext(ctx, ref.id);
+  const commitMessage = approvalCommitMessage(ref.id, gate, digest);
+  if (opts.json) {
+    printJson({ change: ref.id, gate, role, by: identity, status: status.status,
+      missingRoles: status.missingRoles, ...(checks ? { checks } : {}),
+      warnings: warnings.map((issue) => issue.message), commitMessage, ...(next ? { next } : {}) });
+    return;
+  }
+  line(`${c.green(t('gate.approvedLine', { gate, identity, role }))} ${c.dim(`(${shortDigest(digest)})`)}`);
+  for (const issue of warnings) warn(issue.message);
+  if (status.status !== 'approved') line(`  ${t('gate.stillNeeded', { roles: stillNeeded(status) })}`);
+  const [subject, , trailer] = commitMessage.split('\n');
+  line(c.dim(t('gate.commitMessage')));
+  line(c.dim(`  $ git commit -m "${subject}" -m "${trailer}"`));
+  emitNextHint(ctx, ref.id);
+}
+
 export async function approveCommand(gateArg: string, opts: DecisionOptions): Promise<void> {
   try {
-    const ctx = loadProject();
-    const gate = parseGate(gateArg, APPROVAL_GATES) as ApprovalGateId;
-    assertHuman(ctx.config, 'approve');
-    assertByAllowed(ctx.config.gates[gate], readRolesFile(ctx.root) !== undefined, opts.by);
-    const expected = parseExpectedOption(opts.expectDigest);
-    const ref = resolveChange(ctx.paths, opts.change);
-    const view = evaluateChange(ctx.root, ref, ctx.config, { withQa: gate === 'qa' });
-    assertExpectedDigest(expected, ref.id, view.gates.find((item) => item.id === gate)!);
-    recordAwaiting(ctx.root, ctx.config, view, ctx.stamp);
-    const evaluation = view.gates.find((g) => g.id === gate)!;
-    if (evaluation.status === 'blocked') {
-      throw new SdlcError(
-      'gate_blocked',
-      { key: 'error.the_x_gate_cannot_be_approved_yet_x', params: { gate: gate, evaluation_reason: evaluation.reason ?? '' } }
-    );
-    }
-    if (!evaluation.digest) {
-      throw new SdlcError(
-        'gate_not_ready',
-        { key: 'error.nothing_to_approve_for_the_x_gate_yet', params: { gate: gate } }
-      );
-    }
-    const roles = readRolesFile(ctx.root);
-    const state = readChangeState(ref.dir);
-    const { role, person } = approvalRole(
-      ctx.config, roles, ctx.root, gate, state, opts.as, evaluation.missingRoles,
-    );
-    const identity = approvalIdentity(ctx.root, roles, opts.by);
-    if (!roles) assertRoleMember(ctx.config, role, identity);
-    const existing = effectiveGates(state)[gate]?.approvals?.find((approval) =>
-      sameApprover(approval, identity, person) && approval.role === role
-      && approval.digest === evaluation.digest);
-    if (existing && evaluation.status !== 'rejected' && evaluation.status !== 'stale') {
-      if (opts.json) printJson({ change: ref.id, gate, role, by: identity,
-        digest: evaluation.digest, alreadyApproved: true });
-      else line(t('gate.alreadyApproved', { gate, identity, role, digest: evaluation.digest }));
-      return;
-    }
-    assertChangedSinceRework(state, gate, evaluation.digest, opts.note);
-    assertQuestionsAnswered(ctx.config, ref.id, ref.dir, state, gate);
-    assertDebateRecorded(ctx.config, ref.dir, gate);
-    assertJudgeCleared(ctx.config, state, gate, evaluation.digest);
-    const validation = gate === 'spec' ? validateOne(ctx, ref) : undefined;
-    if (validation && !validation.valid) {
-      const errors = validation.issues.filter((issue) => issue.level === 'error');
-      throw new SdlcError('spec_invalid', errors.map((issue) => issue.message).join('\n'));
-    }
-    const warnings = validation?.issues.filter((issue) => issue.level === 'warning') ?? [];
-    // B47: the release checks run after every other check and before anything is written.
+    const work = prepareApproval(gateArg, opts);
+    if (reportExistingApproval(work)) return;
+    const warnings = checkApprovalArtifacts(work);
+    const { ctx, ref, gate } = work;
     const checks = gate === 'release' ? await approvalChecks(ctx.config, ctx.root, ref.id) : undefined;
-
-    recordCheckpoint(ctx.root, ref.id, gate);
-    const current: GateState = state.gates[gate] ?? {};
-    // A person approving again replaces only their own approval; other people's approvals stay.
-    const approvals = (current.approvals ?? []).filter((a) => !sameApprover(a, identity, person));
-    const fields = { role, person, identity, digest: evaluation.digest, note: opts.note, checks };
-    approvals.push(approvalRecord(ctx, ref, state, gate, fields));
-    state.gates[gate] = { ...current, approvals };
-    recordChangeEvent(
-      ctx, ref, state, `gate.${gate}.approved`, identity,
-      `role ${role}${opts.note ? `: ${opts.note}` : ''}${warnings.length ? `; ${warnings.length} validation warning(s)` : ''}`,
-      { digest: evaluation.digest },
-    );
-    // The approved artifacts record which sdlc version and license approved them.
-    const stamping = tryStampArtifacts(ref.dir, approvedFiles(view, gate, ref.dir), ctx.stamp);
-    if (stamping.error && !opts.json) {
-      warn(t('warn.approvalProvenance', { error: stamping.error }));
-    }
-
-    const after = evaluateChange(ctx.root, ref, ctx.config, { withQa: gate === 'qa' });
-    const status = after.gates.find((g) => g.id === gate)!;
-    const next = resolveNext(ctx, ref.id);
-    const commitMessage = approvalCommitMessage(ref.id, gate, evaluation.digest);
-    if (opts.json) {
-      printJson({
-        change: ref.id, gate, role, by: identity, status: status.status,
-        missingRoles: status.missingRoles, ...(checks ? { checks } : {}),
-        warnings: warnings.map((issue) => issue.message), commitMessage, ...(next ? { next } : {}),
-      });
-      return;
-    }
-    line(`${c.green(t('gate.approvedLine', { gate, identity, role }))} `
-      + c.dim(`(${shortDigest(evaluation.digest)})`));
-    for (const issue of warnings) warn(issue.message);
-    if (status.status !== 'approved') {
-      line(`  ${t('gate.stillNeeded', { roles: stillNeeded(status) })}`);
-    }
-    const [subject, , trailer] = commitMessage.split('\n');
-    line(c.dim(t('gate.commitMessage')));
-    line(c.dim(`  $ git commit -m "${subject}" -m "${trailer}"`));
-    emitNextHint(ctx, ref.id);
+    persistApproval(work, warnings, checks);
+    presentApproval(work, warnings, checks);
   } catch (error) {
     reportFailure(error, opts.json);
   }

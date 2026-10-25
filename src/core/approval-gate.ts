@@ -9,7 +9,7 @@ import type { ApprovalGateId, SdlcConfig } from './config.js';
 import type { ChangeState, GateState } from './change-state.js';
 import { t } from './i18n.js';
 import { decidedAfterAll } from './decision-order.js';
-import { digestFiles } from './digest.js';
+import { digestFiles, type DigestCapture } from './digest.js';
 import { isFile } from './fs-utils.js';
 import { awaitingReason, quorum } from './approval-quorum.js';
 import { GATE_STAGE } from './stages.js';
@@ -117,11 +117,16 @@ export function evaluateApprovalGate(
  * Review and release approvals are bound to the code under review (worktree
  * fingerprint) plus the record files, so any later code change makes them stale.
  */
-export function codeDigest(changeDir: string, fingerprint: string | undefined, extra: string[]): string {
+export function codeDigest(changeDir: string, fingerprint: string | undefined, extra: string[],
+  capture?: DigestCapture): string | undefined {
+  if (!fingerprint) return undefined;
   const files = extra.filter((f) => isFile(path.join(changeDir, f)));
-  return `sha256:${createHash('sha256')
-    .update(fingerprint ?? 'no-git')
+  const artifactDigest = digestFiles(changeDir, files, undefined, capture);
+  const digest = `sha256:${createHash('sha256')
+    .update(fingerprint)
     .update('\0')
-    .update(digestFiles(changeDir, files))
+    .update(artifactDigest)
     .digest('hex')}`;
+  if (capture) capture.set(digest, { digest, files: capture.get(artifactDigest)!.files, fingerprint });
+  return digest;
 }

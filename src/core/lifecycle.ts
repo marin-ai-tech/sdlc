@@ -38,6 +38,7 @@ import { evaluateReleaseGate } from './release-gate.js';
 import { nextAction } from './next-action.js';
 import { markOpenRejections, openRejectionNotes } from './open-rejections.js';
 import { STAGE_TITLES, type StageId } from './stages.js';
+import type { DigestCapture } from './digest.js';
 
 export { STAGES, STAGE_TITLES, GATE_STAGE } from './stages.js';
 export type { StageId } from './stages.js';
@@ -161,6 +162,7 @@ export function gateArtifacts(schema: SchemaInfo, config: SdlcConfig): Record<'i
 }
 
 export interface EvaluateOptions {
+  capture?: DigestCapture;
   /** Skip git fingerprinting (hooks call this on every edit and must stay fast). */
   skipFingerprint?: boolean;
   /**
@@ -211,7 +213,7 @@ export function evaluateChange(
       : isGitRepo(root) ? worktreeFingerprint(root, FINGERPRINT_EXCLUDES) : undefined;
 
   // Planning gates: intent, spec, plan (planning-gates.ts).
-  const planning = evaluatePlanningGates(ref, config, state, decided, schema, mapping, artifacts, tracks);
+  const planning = evaluatePlanningGates(ref, config, state, decided, schema, mapping, artifacts, tracks, options.capture);
   gates.push(...planning.gates);
   let upstreamOpen = planning.upstreamOpen;
 
@@ -233,7 +235,7 @@ export function evaluateChange(
   // Fast readers cannot check freshness. Keep recorded approvals provisional, while still honoring current blockers.
   const trustRecorded = ref.archived || options.skipFingerprint === true;
   const digestFor = (extra: string[]): string | undefined =>
-    options.skipFingerprint ? undefined : codeDigest(ref.dir, fingerprint, extra);
+    options.skipFingerprint ? undefined : codeDigest(ref.dir, fingerprint, extra, options.capture);
 
   // Review gate: findings in review.md + human code-owner approval bound to code + review record.
   const reviewGate = evaluateReviewGate(root, ref.dir, config, state, decided.review,
@@ -246,7 +248,7 @@ export function evaluateChange(
   gates.push(releaseEval);
 
   if (!fingerprint && !options.skipFingerprint && !ref.archived) {
-    warnings.push('not a git repository: verification and review freshness cannot be checked');
+    warnings.push('worktree fingerprint unavailable: verification is not fresh and code-bound approvals have no digest');
   }
 
   const evaluated = markOpenRejections(

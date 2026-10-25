@@ -273,6 +273,8 @@ design.
 - **What is waiting for me:** `sdlc next --me` lists every gate, across the active changes, that you (your git identity,
   matched in `roles.yaml`) may take now, with the command. Without `roles.yaml` it lists every gate waiting for a
   person.
+  Use `sdlc next --me --no-branches --json` for frequent UI refreshes: it skips other-branch discovery and omits
+  `otherBranches`. Without the option, the output stays the same.
 - **What am I approving:** `sdlc approve <gate> --change <id> --preview` shows the gate's artifacts, what changed since
   the last approval, the approvals so far and needed, open findings and verification for review and release, and whether
   you may approve. It writes nothing.
@@ -280,9 +282,11 @@ design.
   gate still has that digest. If the artifacts changed after you read them, the approval is refused and nothing is
   recorded. The preview prints the gate's full `sha256:…` digest and suggests the approval with `--expect-digest`
   already filled in; `sdlc next --me --json` gives the same digest. Only the full digest is accepted.
-- **Read the digest first, then the files.** The digest proves that the version did not change after the read that gave
-  it. It does not prove that the files you opened elsewhere are those bytes. Take the digest before you read the
-  artifacts, and read them again whenever the digest changes.
+- **Read the exact approved texts:** `sdlc gate read <gate> --change <id> --json` returns `snapshot.digest` and
+  `snapshot.files`, with each file's path and normalized text from the same evaluation. Plan snapshots normalize
+  task checkboxes. Review and release snapshots also include the code fingerprint; QA includes the recorded run.
+  The command writes no decisions, observations or checkpoints, and sends no queued events. Files opened separately
+  can still differ from that snapshot; use the returned texts when presenting an approval.
 - **Versions in the JSON reads:** in `sdlc report --json` each gate has its `digest`, its `approvals` and its
   `staleApprovals`, each approval with the digest it binds. In `sdlc next --me --json` an approval carries the gate's
   `digest`. The `gate.<g>.approved` and `gate.<g>.rejected` entries of `sdlc log --json` carry the digest of the version
@@ -1100,7 +1104,8 @@ Use these tables to look up CLI commands and generated files.
 | `sdlc import bmad <path> (--change <id> \| --to-backlog) [--dry-run]` | import BMAD planning into an unapproved change, or epics/tickets (or a PRD/SPEC) into the backlog |
 | `sdlc status [--change] [--markdown] [--json]` / `sdlc next` | stages, gates, approvals, evidence, who acts next (with `--change`, a stage stepper and task bar); with no active change, the next ready backlog item |
 | `sdlc guide [topic[#section]] [--json]` | how sdlc works: short articles (in several languages) the guide workflow answers from; `denials#<rule>` explains a hook denial |
-| `sdlc next --me [--json]` / `sdlc approve <gate> --change <id> --preview` | what waits for me, with the commands; what I am about to approve (writes nothing) |
+| `sdlc next --me [--no-branches] [--json]` / `sdlc approve <gate> --change <id> --preview` | what waits for me, with the commands; what I am about to approve (writes nothing) |
+| `sdlc gate read <gate> --change <id> --json` | normalized artifact texts and their digest from one evaluation, without writes |
 | `sdlc help [topic] [--json]` | catalog of workflows and CLI commands with who runs them (agent or person) |
 | `sdlc statusline` | one-line Claude Code status (change · stage · who acts); reads JSON on stdin |
 | `sdlc layout check [--json]` / `scaffold [--dry-run] [--json]` / `adapt [--dry-run] [--json]` / `convert [--apply] [--json]` | check layout readiness, create missing documents, map existing paths, or plan and apply conversion |

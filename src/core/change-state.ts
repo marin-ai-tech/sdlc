@@ -5,6 +5,7 @@ import { SdlcError } from './errors.js';
 import { isFile } from './fs-utils.js';
 import type { HarnessStamp } from './license.js';
 import { readYamlObject, writeYaml } from './yaml-io.js';
+import { parseApprovalGates } from './approval-records.js';
 
 /**
  * Per-change lifecycle record, stored as `.sdlc.yaml` inside the OpenSpec
@@ -265,7 +266,7 @@ export function readChangeState(changeDir: string): ChangeState {
       { key: 'error.x_has_unsupported_version_x', params: { file: file, p2: String(raw.version) } }
     );
   }
-  const gates = (raw.gates && typeof raw.gates === 'object' ? raw.gates : {}) as ChangeState['gates'];
+  const gates = parseApprovalGates(raw.gates);
   const source = raw.source && typeof raw.source === 'object' ? (raw.source as Record<string, unknown>) : undefined;
   const harness = raw.harness && typeof raw.harness === 'object' ? (raw.harness as Record<string, unknown>) : undefined;
   const suggestion = raw.track_suggestion && typeof raw.track_suggestion === 'object' ? raw.track_suggestion as Record<string, unknown> : undefined;

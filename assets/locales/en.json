@@ -1,4 +1,10 @@
 {
+  "error.digestArtifactUnsafe": "Artifact {file} resolves outside its change folder; no digest can be read.",
+  "error.digestArtifactUnreadable": "Artifact {file} could not be read; no digest can be computed.",
+  "error.harnessProtocol": "Harness Runtime refused the operation: {detail}.",
+  "error.approvalSnapshotChanged": "The {gate} approval source changed while it was being checked. No approval or checkpoint was recorded; read the gate again.",
+  "cmd.gateRead": "read the normalized artifacts and gate digest from one evaluation (read-only)",
+  "option.noBranches": "skip other-branch discovery in next --me",
   "error.expectDigestChanged": "The {gate} gate changed since you read it: you expected {expected}, it is now {current}. Nothing was recorded.",
   "fix.expectDigestChanged": "Read it again with sdlc approve {gate} --change {change} --preview and run the command it suggests: it carries the current digest.",
   "error.expectDigestInvalid": "--expect-digest takes sha256: followed by 64 hexadecimal characters; got {value}.",

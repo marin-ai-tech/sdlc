@@ -1,7 +1,36 @@
 import { createHash } from 'node:crypto';
+import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { normalizeNewlines, readText } from './fs-utils.js';
+import { isWithin, normalizeNewlines, readText } from './fs-utils.js';
 import { stripProvenance } from './license.js';
+import { SdlcError } from './errors.js';
+
+export interface CapturedDigest {
+  digest: string;
+  files: Array<{ path: string; text: string }>;
+  fingerprint?: string;
+  verification?: string;
+}
+
+export type DigestCapture = Map<string, CapturedDigest>;
+
+function digestText(baseDir: string, relative: string): string {
+  const target = path.resolve(baseDir, relative);
+  if (!isWithin(baseDir, target)) {
+    throw new SdlcError('unsafe_path', { key: 'error.digestArtifactUnsafe', params: { file: relative } });
+  }
+  if (!fs.existsSync(target)) {
+    throw new SdlcError('artifact_unreadable', { key: 'error.digestArtifactUnreadable', params: { file: relative } });
+  }
+  if (!isWithin(fs.realpathSync(baseDir), fs.realpathSync(target))) {
+    throw new SdlcError('unsafe_path', { key: 'error.digestArtifactUnsafe', params: { file: relative } });
+  }
+  const text = readText(target);
+  if (text === undefined) {
+    throw new SdlcError('artifact_unreadable', { key: 'error.digestArtifactUnreadable', params: { file: relative } });
+  }
+  return text;
+}
 
 /**
  * Content digest of a set of files, used to bind a gate approval to exactly
@@ -13,19 +42,24 @@ import { stripProvenance } from './license.js';
 export function digestFiles(
   baseDir: string,
   relativePaths: string[],
-  transform?: (rel: string, content: string) => string
+  transform?: (rel: string, content: string) => string,
+  capture?: DigestCapture,
 ): string {
   const hash = createHash('sha256');
+  const files: CapturedDigest['files'] = [];
   for (const rel of [...new Set(relativePaths)].sort()) {
-    const raw = readText(path.join(baseDir, rel));
-    if (raw === undefined) continue;
+    const raw = digestText(baseDir, rel);
     const normalized = stripProvenance(normalizeNewlines(raw));
-    const content = transform ? transform(rel, normalized) : normalized;
-    hash.update(`${rel.replace(/\\/g, '/')}\0`);
-    hash.update(content.replace(/\s+$/u, ''));
+    const content = (transform ? transform(rel, normalized) : normalized).replace(/\s+$/u, '');
+    const name = rel.replace(/\\/g, '/');
+    files.push({ path: name, text: content });
+    hash.update(`${name}\0`);
+    hash.update(content);
     hash.update('\0');
   }
-  return `sha256:${hash.digest('hex')}`;
+  const digest = `sha256:${hash.digest('hex')}`;
+  capture?.set(digest, { digest, files });
+  return digest;
 }
 
 /**

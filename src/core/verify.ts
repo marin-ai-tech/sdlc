@@ -1,5 +1,6 @@
 import { spawn } from 'node:child_process';
 import * as path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import type { SdlcConfig, VerifyCommand } from './config.js';
 import {
   provenance, type ChangeState, type VerifyCommandRecord, type VerifyMcpRecord, type VerifyRecord,
@@ -9,6 +10,7 @@ import { headCommit, isDirty, worktreeFingerprint } from './git.js';
 import { stampText, stripProvenance, withProvenance, type HarnessStamp } from './license.js';
 import { renderExtras, type EvidenceExtras } from './verify-extras.js';
 import { FINGERPRINT_EXCLUDES } from './lifecycle.js';
+import { stopProcessTree } from './process-tree.js';
 
 /**
  * The playbook's feedback loop, made deterministic: run the project's own
@@ -54,22 +56,49 @@ function runCheck(root: string, check: VerifyCommand, timeoutSeconds: number, ou
       // Bound memory: keep roughly the last 2 MB, evidence only needs the tail.
       while (size > 2 * 1024 * 1024 && chunks.length > 1) size -= chunks.shift()!.length;
     };
-    const child = spawn(check.run, {
+    const windows = process.platform === 'win32';
+    const wrapper = fileURLToPath(new URL('../../assets/windows/verify-job.ps1', import.meta.url));
+    const argv = windows ? ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-File', wrapper] : [];
+    const child = spawn(windows ? 'powershell.exe' : check.run, argv, {
       cwd: root,
-      shell: true,
-      env: { ...process.env, CI: process.env.CI ?? '1', FORCE_COLOR: '0', ...check.env },
+      shell: !windows,
+      detached: process.platform !== 'win32',
+      windowsHide: true,
+      env: { ...process.env, CI: process.env.CI ?? '1', FORCE_COLOR: '0', ...check.env,
+        ...(windows ? { SDLC_VERIFY_COMMAND: check.run } : {}) },
       stdio: ['ignore', 'pipe', 'pipe'],
     });
     let timedOut = false;
+    let finished = false;
+    let stopping: Promise<void> | undefined;
+    let cleanupTimer: ReturnType<typeof setTimeout> | undefined;
+    const closePipes = () => {
+      child.stdout?.destroy();
+      child.stderr?.destroy();
+    };
     const timer = setTimeout(() => {
       timedOut = true;
-      child.kill('SIGTERM');
-      setTimeout(() => child.kill('SIGKILL'), 5000).unref();
+      cleanupTimer = setTimeout(() => {
+        child.kill('SIGKILL');
+        closePipes();
+        finish(null, 'Process tree cleanup exceeded its deadline.');
+      }, 6500);
+      stopping = child.pid ? stopProcessTree(child.pid) : Promise.resolve();
+      stopping = stopping.catch((error) => {
+        keep(Buffer.from(`\nProcess tree cleanup failed: ${error.message}\n`));
+        child.kill('SIGKILL');
+      }).finally(() => {
+        closePipes();
+        finish(null);
+      });
     }, timeoutSeconds * 1000);
     child.stdout?.on('data', keep);
     child.stderr?.on('data', keep);
     const finish = (code: number | null, errorText?: string) => {
+      if (finished) return;
+      finished = true;
       clearTimeout(timer);
+      clearTimeout(cleanupTimer);
       const output = tail(Buffer.concat(chunks).toString('utf-8') + (errorText ? `\n${errorText}` : ''), outputLines);
       resolve({
         name: check.name,
@@ -82,7 +111,10 @@ function runCheck(root: string, check: VerifyCommand, timeoutSeconds: number, ou
       });
     };
     child.on('error', (error) => finish(null, error.message));
-    child.on('close', (code) => finish(timedOut ? null : code));
+    child.on('close', async (code) => {
+      await stopping;
+      finish(timedOut ? null : code);
+    });
   });
 }
 
@@ -108,7 +140,7 @@ export async function runVerification(
   const partial = !!options.only && options.only.length > 0 && selected.length < config.verify.commands.length;
   return {
     // A partial run is evidence, never a pass for the gate.
-    status: failed || partial || selected.length === 0 ? 'failed' : 'passed',
+    status: failed || partial || selected.length === 0 || !fingerprint ? 'failed' : 'passed',
     at: new Date().toISOString(),
     ...(commit ? { commit } : {}),
     dirty,

@@ -6,6 +6,7 @@ import { harnessStamp, type HarnessStamp } from './license.js';
 import { queueEvent, type EventSummary, type QueueConfig } from '../mcp/outbox.js';
 import { agentEnvironment } from './agent-env.js';
 import { ensureLocalIgnore } from './local-ignore.js';
+import { parseLogEntry } from './log-record.js';
 
 /**
  * Append-only project log: one JSON object per line in
@@ -142,12 +143,8 @@ export function readLog(root: string): LogEntry[] {
   for (const line of text.split(/\r?\n/)) {
     if (!line.trim()) continue;
     try {
-      const parsed = JSON.parse(line) as LogEntry & { scdl?: string };
-      if (!parsed || typeof parsed.event !== 'string') continue;
-      // Entries written before the rename from scdl carry the version under `scdl`.
-      if (parsed.sdlc === undefined && typeof parsed.scdl === 'string') parsed.sdlc = parsed.scdl;
-      delete parsed.scdl;
-      entries.push(parsed);
+      const parsed = parseLogEntry(JSON.parse(line));
+      if (parsed) entries.push(parsed);
     } catch {
       // skip
     }

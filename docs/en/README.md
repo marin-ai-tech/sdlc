@@ -54,6 +54,8 @@ Follow a complete run when a topic guide is too narrow.
 
 ## 🧭 Research and design
 
+- [Harness Runtime prototype](31-harness-runtime-prototype.md) — adapter components and remaining integration work.
+
 These pages explain the foundations and the choices behind the process.
 
 - [OpenSpec analysis](01-openspec-analysis.md) — understand its internals and integrations.
