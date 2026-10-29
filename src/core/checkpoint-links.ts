@@ -37,9 +37,11 @@ export function coveredSnapshotPaths(root: string, includes: string[]): string[]
 interface Entry { mode: string; oid: string }
 
 /** Resolve links only in the immutable tree, including absolute links whose targets remain in this project. */
-export function checkpointReader(top: string, tree: string, root: string): (relative: string) => string | undefined {
+export function checkpointReader(top: string, tree: string, root: string, givenRoot: string):
+  (relative: string, filtered?: boolean) => string | undefined {
   const entries = new Map<string, Entry | undefined>();
   const blobs = new Map<string, string | undefined>();
+  const filteredBlobs = new Map<string, string | undefined>();
   const run = (args: string[]) => spawnSync('git', args,
     { cwd: top, encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 });
   const entry = (relative: string): Entry | undefined => {
@@ -57,7 +59,15 @@ export function checkpointReader(top: string, tree: string, root: string): (rela
     }
     return blobs.get(oid);
   };
-  return (relative) => {
+  const filteredBlob = (oid: string, relative: string): string | undefined => {
+    const key = `${relative}\0${oid}`;
+    if (!filteredBlobs.has(key)) {
+      const result = run(['cat-file', '--filters', `--path=${relative}`, oid]);
+      filteredBlobs.set(key, result.status === 0 ? result.stdout : undefined);
+    }
+    return filteredBlobs.get(key);
+  };
+  return (relative, filtered = false) => {
     let current = path.resolve(top, relative);
     const seen = new Set<string>();
     for (let hop = 0; hop < 40; hop++) {
@@ -72,11 +82,17 @@ export function checkpointReader(top: string, tree: string, root: string): (rela
         if (item.mode === '120000') {
           const target = blob(item.oid);
           if (target === undefined || target.includes('\0')) return undefined;
-          current = path.resolve(top, path.dirname(prefix), target, ...parts.slice(depth));
+          const mapped = path.isAbsolute(target) && isWithin(givenRoot, target)
+            ? path.join(root, path.relative(givenRoot, target)) : target;
+          current = path.resolve(top, path.dirname(prefix), mapped, ...parts.slice(depth));
+          filtered = false;
           redirected = true;
           break;
         }
-        if (depth === parts.length) return ['100644', '100755'].includes(item.mode) ? blob(item.oid) : undefined;
+        if (depth === parts.length) {
+          if (!['100644', '100755'].includes(item.mode)) return undefined;
+          return filtered ? filteredBlob(item.oid, prefix) : blob(item.oid);
+        }
         if (item.mode !== '040000') return undefined;
       }
       if (!redirected) return undefined;

@@ -5,8 +5,9 @@ import { loadProject, type ProjectContext } from '../cli/context.js';
 import { c, line, printJson, reportFailure, warn } from '../cli/output.js';
 import { emitNextHint, resolveNext } from '../cli/next-hint.js';
 import { agentEnvironment } from '../core/agent-env.js';
-import { appendHistory, readChangeState, writeChangeState, type ChangeState, type HistoryEvent } from '../core/change-state.js';
-import { listActiveChanges, resolveChange, type ChangeRef } from '../core/changes.js';
+import { appendHistory, copyKeptApprovals, readChangeState, writeChangeState,
+  type ChangeState, type HistoryEvent } from '../core/change-state.js';
+import { listActiveChanges, listChangeFolders, resolveChange, type ChangeRef } from '../core/changes.js';
 import { checkDeltaTargets, findOverlaps, readChangeDeltas } from '../core/deltas.js';
 import { SdlcError } from '../core/errors.js';
 import { formatIdentity, gitIdentity, type CommitInfo } from '../core/git.js';
@@ -36,7 +37,7 @@ export async function validateCommand(opts: { change?: string; all?: boolean; js
   try {
     const ctx = loadProject();
     const refs = opts.all || (!opts.change && listActiveChanges(ctx.paths).length !== 1)
-      ? listActiveChanges(ctx.paths)
+      ? listChangeFolders(ctx.paths)
       : [resolveChange(ctx.paths, opts.change)];
     const items = refs.map((ref) => validateOne(ctx, ref));
     const overlaps = findOverlaps(listActiveChanges(ctx.paths).map((r) => ({ id: r.id, deltas: readChangeDeltas(r.dir) })))
@@ -61,7 +62,7 @@ export async function validateCommand(opts: { change?: string; all?: boolean; js
           const tag = i.level === 'error' ? c.red(t('label.error'))
             : i.level === 'warning' ? c.yellow(t('label.warning'))
               : c.dim(t('label.info'));
-          const msg = i.textKey ? t(i.textKey) : i.message;
+          const msg = i.textKey ? t(i.textKey, i.textParams) : i.message;
           const loc = i.path ? `${i.path}${i.line ? `:${i.line}` : ''}: ` : '';
           line(`    ${tag} ${c.dim(`[${i.source}]`)} ${loc}${msg}`);
         }
@@ -139,6 +140,7 @@ export async function archiveCommand(id: string | undefined, opts: ArchiveOption
 
     const before = readChangeState(ref.dir);
     const state: ChangeState = JSON.parse(JSON.stringify(before)) as ChangeState;
+    copyKeptApprovals(before, state);
     const by = formatIdentity(gitIdentity(ctx.root)) ?? agentEnvironment();
     const event = open.length > 0 ? 'change.archived.forced' : 'change.archived';
     const detail = open.length > 0 ? `open gates: ${open.map((g) => g.id).join(', ')}; ${opts.note ?? ''}` : undefined;

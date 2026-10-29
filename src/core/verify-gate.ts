@@ -73,7 +73,8 @@ export function evaluateVerifyGate(input: VerifyGateInput): {
     info = lr('gate.verifyStale');
   } else if (verification.status === 'failed') {
     status = 'failed';
-    info = lr('gate.verifyFailed');
+    info = lr(state.verify?.reason === 'fingerprint_unavailable'
+      ? 'gate.verifyFingerprintUnavailable' : 'gate.verifyFailed');
   } else {
     status = 'pending';
     info = config.verify.commands.length === 0

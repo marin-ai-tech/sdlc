@@ -1,5 +1,5 @@
 # The wrapper joins a non-breakaway job before starting the check. The job handle is not inherited.
-# On wrapper exit (normal or Stop-Process), Windows closes its last handle and terminates every descendant.
+# On wrapper exit (normal or stopped through its handle), Windows terminates every descendant.
 $ErrorActionPreference = 'Stop'
 $taskJobSource = @'
 using System;

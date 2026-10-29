@@ -420,12 +420,17 @@ function layoutClosing(pres, def, lang) {
       x: ML + 0.7, y: y - 0.05, w: CW - 0.7, h: 0.56, fontSize: 18, color: C.out, valign: 'middle',
     });
   });
+  if (def.reproduce) commandBand(slide, def.reproduce);
+  slide.addNotes(notesFor(def, lang));
+}
+
+/** The dark band of shell commands under the points of a closing slide. */
+function commandBand(slide, commands) {
   box(slide, SHAPE.round, ML, 4.95, CW, 1.1, C.deep, { rectRadius: 0.1 });
-  const lines = def.reproduce.map((line) => cut(`$ ${line}`, fits(CW - 0.6, 13, 0.6)));
+  const lines = commands.map((line) => cut(`$ ${line}`, fits(CW - 0.6, 13, 0.6)));
   text(slide, lines.join('\n'), {
     x: ML + 0.3, y: 5.2, w: CW - 0.6, h: 0.65, fontFace: MONO, fontSize: 13, color: C.orange, valign: 'top',
   });
-  slide.addNotes(notesFor(def, lang));
 }
 
 const LAYOUTS = {

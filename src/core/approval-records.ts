@@ -40,18 +40,27 @@ export function parseApproval(value: unknown): ApprovalRecord | undefined {
 }
 
 /** Gate envelopes remain backward compatible; every approval is independently parsed. */
-export function parseApprovalGates(value: unknown): Record<string, GateState> {
+export function parseApprovalGatesWithRejected(value: unknown): {
+  gates: Record<string, GateState>;
+  rejected: Record<string, unknown[]>;
+} {
   const raw = recordObject(value);
-  if (!raw) return {};
+  if (!raw) return { gates: {}, rejected: {} };
   const gates: Record<string, GateState> = Object.create(null);
+  const rejected: Record<string, unknown[]> = Object.create(null);
   for (const [name, value] of Object.entries(raw)) {
     const gate = recordObject(value);
     if (!gate) continue;
     const approvals = Array.isArray(gate.approvals) ? gate.approvals.flatMap((entry) => {
       const parsed = parseApproval(entry);
+      if (!parsed) (rejected[name] ??= []).push(entry);
       return parsed ? [parsed] : [];
     }) : [];
     gates[name] = { ...gate, ...(gate.approvals !== undefined ? { approvals } : {}) };
   }
-  return gates;
+  return { gates, rejected };
+}
+
+export function parseApprovalGates(value: unknown): Record<string, GateState> {
+  return parseApprovalGatesWithRejected(value).gates;
 }

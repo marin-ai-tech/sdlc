@@ -3,7 +3,7 @@ import * as path from 'node:path';
 import { loadProject } from '../cli/context.js';
 import { line, printJson, reportFailure } from '../cli/output.js';
 import { readBacklog, setBacklogStatus } from '../core/backlog.js';
-import { appendHistory, readChangeState, writeChangeState } from '../core/change-state.js';
+import { appendHistory, copyKeptApprovals, readChangeState, writeChangeState } from '../core/change-state.js';
 import { resolveChange } from '../core/changes.js';
 import { SdlcError } from '../core/errors.js';
 import { formatIdentity, gitIdentity } from '../core/git.js';
@@ -20,6 +20,7 @@ export function dropCommand(id: string, opts: { note?: string; json?: boolean })
     const ref = resolveChange(ctx.paths, id);
     const before = readChangeState(ref.dir);
     const state = structuredClone(before);
+    copyKeptApprovals(before, state);
     const by = formatIdentity(gitIdentity(ctx.root));
     if (!by) throw new SdlcError('no_identity',
       { key: 'error.cannot_tell_who_is_deciding_git_user_name_user_e' });

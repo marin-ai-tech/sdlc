@@ -215,12 +215,21 @@ function prepareApproval(gateArg: string, opts: DecisionOptions): ApprovalWork {
   assertByAllowed(ctx.config.gates[gate], readRolesFile(ctx.root) !== undefined, opts.by);
   const expected = parseExpectedOption(opts.expectDigest);
   const ref = resolveChange(ctx.paths, opts.change);
-  const initialTree = gate === 'review' || gate === 'release' ? captureCheckpoint(ctx.root)?.tree : undefined;
+  const rawGate = gate === 'review' || gate === 'release';
   const capture: DigestCapture = new Map();
-  const view = evaluateChange(ctx.root, ref, ctx.config, { withQa: gate === 'qa', capture });
+  const first = evaluateChange(ctx.root, ref, ctx.config,
+    { withQa: gate === 'qa', ...(!rawGate ? { capture } : {}) });
+  if (rawGate) {
+    // The expected digest comes before the awaiting record, so a refusal records nothing; the comparison after the
+    // second evaluation below catches edits made between the two.
+    assertExpectedDigest(expected, ref.id, first.gates.find((item) => item.id === gate)!);
+    recordAwaiting(ctx.root, ctx.config, first, ctx.stamp);
+  }
+  const initialTree = rawGate ? captureCheckpoint(ctx.root)?.ordinaryTree : undefined;
+  const view = rawGate ? evaluateChange(ctx.root, ref, ctx.config, { capture }) : first;
   const evaluation = view.gates.find((item) => item.id === gate)!;
   assertExpectedDigest(expected, ref.id, evaluation);
-  recordAwaiting(ctx.root, ctx.config, view, ctx.stamp);
+  if (!rawGate) recordAwaiting(ctx.root, ctx.config, view, ctx.stamp);
   assertApprovalReady(gate, evaluation);
   const roles = readRolesFile(ctx.root);
   const state = readChangeState(ref.dir);
@@ -276,19 +285,24 @@ function assertApprovalUnchanged(work: ApprovalWork): void {
 function persistApproval(work: ApprovalWork, warnings: ValidationIssue[], checks?: ReleaseCheckRecord[]): void {
   const { ctx, ref, state, gate, identity, person, role, digest, opts, view } = work;
   assertApprovalUnchanged(work);
+  let recorded = false;
+  const writeRecord = (): void => {
+    assertApprovalUnchanged(work);
+    const current: GateState = state.gates[gate] ?? {};
+    const approvals = (current.approvals ?? []).filter((a) => !sameApprover(a, identity, person));
+    approvals.push(approvalRecord(ctx, ref, state, gate, { role, person, identity, digest, note: opts.note, checks }));
+    state.gates[gate] = { ...current, approvals };
+    const note = `role ${role}${opts.note ? `: ${opts.note}` : ''}`;
+    const detail = `${note}${warnings.length ? `; ${warnings.length} validation warning(s)` : ''}`;
+    recordChangeEvent(ctx, ref, state, `gate.${gate}.approved`, identity, detail, { digest });
+    recorded = true;
+  };
   recordCheckpoint(ctx.root, ref.id, gate, (snapshot) => {
     assertSnapshotContent(ctx.root, ref.dir, gate, snapshot, work.snapshot,
       view.tasks.file ?? 'tasks.md', work.initialTree);
     assertApprovalUnchanged(work);
-  }, work.snapshot?.files.map((file) => path.relative(ctx.root, path.join(ref.dir, file.path))));
-  assertApprovalUnchanged(work);
-  const current: GateState = state.gates[gate] ?? {};
-  const approvals = (current.approvals ?? []).filter((a) => !sameApprover(a, identity, person));
-  approvals.push(approvalRecord(ctx, ref, state, gate, { role, person, identity, digest, note: opts.note, checks }));
-  state.gates[gate] = { ...current, approvals };
-  const note = `role ${role}${opts.note ? `: ${opts.note}` : ''}`;
-  const detail = `${note}${warnings.length ? `; ${warnings.length} validation warning(s)` : ''}`;
-  recordChangeEvent(ctx, ref, state, `gate.${gate}.approved`, identity, detail, { digest });
+  }, work.snapshot?.files.map((file) => path.relative(ctx.root, path.join(ref.dir, file.path))), writeRecord);
+  if (!recorded) writeRecord();
   const stamping = tryStampArtifacts(ref.dir, approvedFiles(view, gate, ref.dir), ctx.stamp,
     () => assertApprovalUnchanged(work));
   if (stamping.error && !opts.json) warn(t('warn.approvalProvenance', { error: stamping.error }));

@@ -10,7 +10,8 @@ import { headCommit, isDirty, worktreeFingerprint } from './git.js';
 import { stampText, stripProvenance, withProvenance, type HarnessStamp } from './license.js';
 import { renderExtras, type EvidenceExtras } from './verify-extras.js';
 import { FINGERPRINT_EXCLUDES } from './lifecycle.js';
-import { stopProcessTree } from './process-tree.js';
+import { checkShell, cleanupCheckShell } from './check-shell.js';
+import { fingerprintFailureReason } from './verify-reason.js';
 
 /**
  * The playbook's feedback loop, made deterministic: run the project's own
@@ -34,6 +35,7 @@ export interface VerificationRun {
   commit?: string;
   dirty: boolean;
   fingerprint?: string;
+  reason?: 'fingerprint_unavailable';
   checks: CheckOutcome[];
   /** MCP checks the CLI called after the commands (src/mcp/checks.ts); absent when there are none. */
   mcp?: McpCheckOutcome[];
@@ -68,6 +70,7 @@ function runCheck(root: string, check: VerifyCommand, timeoutSeconds: number, ou
         ...(windows ? { SDLC_VERIFY_COMMAND: check.run } : {}) },
       stdio: ['ignore', 'pipe', 'pipe'],
     });
+    const shell = checkShell(child);
     let timedOut = false;
     let finished = false;
     let stopping: Promise<void> | undefined;
@@ -83,11 +86,8 @@ function runCheck(root: string, check: VerifyCommand, timeoutSeconds: number, ou
         closePipes();
         finish(null, 'Process tree cleanup exceeded its deadline.');
       }, 6500);
-      stopping = child.pid ? stopProcessTree(child.pid) : Promise.resolve();
-      stopping = stopping.catch((error) => {
-        keep(Buffer.from(`\nProcess tree cleanup failed: ${error.message}\n`));
-        child.kill('SIGKILL');
-      }).finally(() => {
+      stopping = child.pid ? cleanupCheckShell(shell, keep, () => child.kill('SIGKILL')) : Promise.resolve();
+      stopping = stopping.finally(() => {
         closePipes();
         finish(null);
       });
@@ -138,13 +138,17 @@ export async function runVerification(
   }
   const failed = checks.some((c) => c.required && c.exit_code !== 0);
   const partial = !!options.only && options.only.length > 0 && selected.length < config.verify.commands.length;
+  const status: VerificationRun['status'] = failed || partial || selected.length === 0 || !fingerprint
+    ? 'failed' : 'passed';
+  const reason = fingerprintFailureReason({ status, fingerprint, checks }, partial);
   return {
     // A partial run is evidence, never a pass for the gate.
-    status: failed || partial || selected.length === 0 || !fingerprint ? 'failed' : 'passed',
+    status,
     at: new Date().toISOString(),
     ...(commit ? { commit } : {}),
     dirty,
     ...(fingerprint ? { fingerprint } : {}),
+    ...(reason ? { reason } : {}),
     checks,
   };
 }
@@ -155,6 +159,7 @@ export function toVerifyRecord(run: VerificationRun): VerifyRecord {
     at: run.at,
     ...(run.commit ? { commit: run.commit } : {}),
     ...(run.fingerprint ? { fingerprint: run.fingerprint } : {}),
+    ...(run.reason ? { reason: run.reason } : {}),
     results: run.checks.map(({ output: _output, ...rest }) => rest),
     ...(run.mcp && run.mcp.length > 0 ? { mcp: run.mcp.map(({ result: _result, ...rest }) => rest) } : {}),
   };

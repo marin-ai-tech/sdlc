@@ -7,6 +7,7 @@ The topic guides explain a particular decision or tool, and the examples show ho
 
 These paths help you get oriented and make your first change.
 
+- [Why work with sdlc](32-why-sdlc.md) — what it costs to run, and what skipping the gates cost.
 - [User guide](05-guide.md) — install sdlc, follow the lifecycle and use the CLI.
 - [Handbook](handbook/README.md) — read the workflow for every role.
 - [Video course](course/README.md) — teach or learn in short lessons.

@@ -1,6 +1,6 @@
 import * as path from 'node:path';
 import { readChangeState, type ChangeState, type HistoryEvent } from './change-state.js';
-import { listActiveChanges, listArchivedChanges, type ChangeRef } from './changes.js';
+import { listChangeFolders, listArchivedChanges, type ChangeRef } from './changes.js';
 import { changeAgentCommits, type AgentCommits } from './agent-commits.js';
 import { commitsTouching, type CommitInfo } from './git.js';
 import type { ProjectPaths } from './project.js';
@@ -62,6 +62,6 @@ function activeSince(ref: ChangeRef, since: string | undefined): boolean {
 
 /** The active and archived changes; with `since`, only those with any history event in the period (B104). */
 export function changesInPeriod(paths: ProjectPaths, since?: string): ChangeRef[] {
-  const refs = [...listActiveChanges(paths), ...listArchivedChanges(paths)];
+  const refs = [...listChangeFolders(paths), ...listArchivedChanges(paths)];
   return refs.filter((ref) => activeSince(ref, since));
 }

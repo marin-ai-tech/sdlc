@@ -8,7 +8,8 @@
 import type { ChangeRef } from './changes.js';
 import type { SdlcConfig } from './config.js';
 import { gitIdentity } from './git.js';
-import { approveCli, evaluateChange, sharedFingerprint, type LifecycleView } from './lifecycle.js';
+import { approveCli, sharedFingerprint, type LifecycleView } from './lifecycle.js';
+import { evaluateEach, type ChangeEvaluationError } from './evaluate-each.js';
 import { personByEmail, readRolesFile } from './roles.js';
 
 export interface QueueItem {
@@ -30,6 +31,7 @@ export interface MyQueue {
   anyone: boolean;
   /** Why the queue is empty when the identity is no person in roles.yaml. */
   reason?: 'not_in_roles';
+  errors?: ChangeEvaluationError[];
 }
 
 export interface QueueScope {
@@ -44,13 +46,14 @@ export function myQueue(scope: QueueScope): MyQueue {
   const email = gitIdentity(scope.root).email?.toLowerCase() ?? null;
   const person = roles && email ? personByEmail(roles, email)?.id ?? null : null;
   const me = { email, person };
-  if (roles && !person) return { me, items: [], anyone: false, reason: 'not_in_roles' };
   const fingerprint = sharedFingerprint(scope.root);
-  const items = scope.refs
-    .map((ref) => evaluateChange(scope.root, ref, scope.config, { fingerprint }))
-    .flatMap((view) => waitingItem(view, person))
+  const { evaluated, errors } = evaluateEach(scope.root, scope.refs, scope.config, { fingerprint });
+  const errorField = errors.length > 0 ? { errors } : {};
+  if (roles && !person) return { me, items: [], anyone: false, reason: 'not_in_roles', ...errorField };
+  const items = evaluated
+    .flatMap(({ view }) => waitingItem(view, person))
     .sort((a, b) => (a.change < b.change ? -1 : a.change > b.change ? 1 : 0));
-  return { me, items, anyone: !roles };
+  return { me, items, anyone: !roles, ...errorField };
 }
 
 /** The change's gate when it waits for a person's approval and (with roles.yaml) that person is me. */

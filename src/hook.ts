@@ -4,7 +4,7 @@ import * as path from 'node:path';
 import { createHash } from 'node:crypto';
 import { recordAwaiting } from './core/awaiting.js';
 import { loadConfig } from './core/config.js';
-import { isFile, isWithin, toPosix } from './core/fs-utils.js';
+import { isWithin, toPosix } from './core/fs-utils.js';
 import { resolveLocale, setLocale, systemLocale, t } from './core/i18n.js';
 import { appendHookLog } from './core/log.js';
 import { evaluateToolCall, normalizeToolCall, sessionSummary, stopCheck, type Decision, type ToolCall } from './core/policy.js';
@@ -12,6 +12,9 @@ import { shellWriteDestinations } from './core/policy-shell-writes.js';
 import { findProjectRoot, projectPaths } from './core/project.js';
 import { sessionHealthLine } from './core/health/signal.js';
 import { cursorAllow, cursorDefault, cursorDeny, fromCursor, type CursorInput } from './hook-cursor.js';
+import {
+  configLoadDecision, configLoadSessionLine, configLoadStopMessage, configModeIsOff,
+} from './hook-config.js';
 
 /**
  * `sdlc hook <event> [--agent claude|opencode|cursor|codex]` - the single policy
@@ -19,9 +22,8 @@ import { cursorAllow, cursorDefault, cursorDeny, fromCursor, type CursorInput } 
  * `.cursor/hooks.json` (B80; its input and answers in hook-cursor.ts).
  *
  * Reads the tool call JSON on stdin and answers in the caller's format. It
- * fails open: a missing project, a harness that is not initialized, or any
- * internal error allows the action, because a broken guardrail must not
- * wedge every edit (`sdlc doctor` surfaces those problems instead).
+ * allows a missing project or sdlc.yaml. A config load failure denies unless
+ * its raw enforcement.mode is exactly `off`; other internal errors allow.
  * That empty answer is a decision: the OpenCode plugin and the Claude Code
  * PreToolUse command let the call through, but a hook that cannot run is
  * retried once with the same input and then blocks the call (OpenCode: spawn
@@ -197,15 +199,44 @@ interface HookProject {
   config: ReturnType<typeof loadConfig>;
 }
 
-function hookProject(input: HookInput): HookProject | undefined {
+interface HookLoadError {
+  root: string;
+  file: string;
+  loadError: unknown;
+}
+
+function hookProject(input: HookInput): HookProject | HookLoadError | undefined {
   const cwd = input.cwd ?? process.env.CLAUDE_PROJECT_DIR ?? process.cwd();
   const root = findProjectRoot(cwd);
   if (!root) return undefined;
   const paths = projectPaths(root);
-  if (!isFile(paths.sdlcConfig)) return undefined;
-  const config = loadConfig(paths.sdlcConfig);
-  applyHookLocale(config.locale);
-  return { cwd, root, paths, config };
+  try {
+    fs.readFileSync(paths.sdlcConfig, 'utf8');
+  } catch (loadError) {
+    if ((loadError as NodeJS.ErrnoException).code === 'ENOENT') return undefined;
+    return { root, file: paths.sdlcConfig, loadError };
+  }
+  try {
+    const config = loadConfig(paths.sdlcConfig);
+    applyHookLocale(config.locale);
+    return { cwd, root, paths, config };
+  } catch (loadError) {
+    return { root, file: paths.sdlcConfig, loadError };
+  }
+}
+
+function respondLoadError(event: string, agent: Agent, input: HookInput, failure: HookLoadError): void {
+  applyHookLocale(undefined);
+  if (event === 'session-start') {
+    writeContext(agent, configLoadSessionLine(failure.file, failure.loadError));
+    return;
+  }
+  if (configModeIsOff(failure.file)) return;
+  if (event === 'pre-tool') {
+    respondPreTool(agent, configLoadDecision(failure.file, failure.loadError), input.session_id, failure.root);
+  } else if (event === 'stop' && !input.stop_hook_active) {
+    writeStop(agent, configLoadStopMessage(failure.file, failure.loadError));
+  }
 }
 
 function preTool(agent: Agent, input: HookInput, project: HookProject): void {
@@ -244,6 +275,10 @@ async function dispatch(event: string, agent: Agent): Promise<void> {
   try {
     const project = hookProject(input);
     if (!project) return;
+    if ('loadError' in project) {
+      respondLoadError(event, agent, input, project);
+      return;
+    }
     if ((event as HookEvent) === 'pre-tool') preTool(agent, input, project);
     else if ((event as HookEvent) === 'session-start') sessionStart(agent, project);
     else if ((event as HookEvent) === 'stop') stop(agent, input, project);

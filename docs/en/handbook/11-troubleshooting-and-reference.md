@@ -114,7 +114,7 @@ keep both sides' gate decisions and history entries in time order, then run `sdl
 
 *Oliver (anyone working with an agent)  ·  tasklet  · needs: Claude Code with sdlc's hooks*
 
-Read a denial, find its rule, and know the right next step for each of the twelve rules.
+Read a denial, find its rule, and know the right next step for each of the thirteen rules.
 
 ### Procedure
 
@@ -154,6 +154,7 @@ Read a denial, find its rule, and know the right next step for each of the twelv
    | `release-gate` | hard | a production release command (`release.commands`) before the release approval | prepare `release.md`; the release manager runs `sdlc approve release --change <id>` |
    | `takeover` | hard | a person holds the change (`sdlc takeover`) | wait for `sdlc release-control`; read-only commands still work |
    | `mcp-stage` | process | the MCP server is not meant for the current stage (`mcp.servers.<name>.stages`) | wait for a listed stage, or a person adds the stage |
+   | `config-load` | hard | `openspec/sdlc.yaml` exists but fails to load, so no rule could be read | a person fixes the file (`sdlc doctor` names the error); only a raw `enforcement.mode: off` still allows |
 
 5. See a hard rule in action. The agent tries to lower the enforcement mode:
 
@@ -316,6 +317,8 @@ Find the symptom first, then check its cause and suggested next step.
 | The intent or spec gate refuses with `open_questions` | open questions have no recorded answer | `sdlc answer --list`, then `sdlc answer <n> --text "…"` |
 | The spec gate refuses with `debate_required` | `design.debate: true` and design.md has no full `## Debate` | the agent runs the debate in `/sdlc:spec` |
 | The verify gate cannot pass | no `verify.commands`, or a required check fails | add the commands (a person); fix the code; `sdlc verify` again |
+| Verify fails with `fingerprint_unavailable` although every check passed | no worktree fingerprint: the project is not in a git repository, or git cannot read its index | put the project in a git repository and check `git status`; `sdlc verify` again; do not change the code or the tests |
+| The agent cannot stop: "Change … cannot be evaluated" | an artifact of that change is unreadable or links outside its folder | a person inspects the change named in the message and repairs or removes the artifact; `sdlc status` shows the error |
 | Verification became stale with no code change | a new file outside `openspec/` (a report, a dashboard, an export) or a regenerated agent file | add `reports/` to `.gitignore`; write exports outside the repository; run `sdlc verify` again |
 | The review gate stays blocked | open findings at a blocking severity, or lens coverage missing | `sdlc review check --change <id>`; fix or defer (`sdlc defer add`) |
 | The release approval is refused with `release_checks_failed` | a `release.mcp` check did not agree | `sdlc release check --change <id>` shows which and why |
@@ -338,7 +341,8 @@ Find the symptom first, then check its cause and suggested next step.
 | `sdlc task export` names `executor_required`, `unknown_executor` or `executor_not_allowed` | the registry is in use: no executor named, the id is not in it, or its `max_risk`/`kinds` do not cover the change | `sdlc task executors` lists the registry; pick an allowed id or have a person extend it |
 | `sdlc task executors` or `export` names `executors_invalid` | `openspec/executors.yaml` is broken (bad id, unknown type or field, missing or bad `max_risk`, a `token_sha256` that is not 64 lowercase hex) | a person fixes the file; the message names the executor and the field |
 | `sdlc task check-result` names `missing_agent`, `unknown_executor` or `executor_not_allowed` | a commit's first `SDLC-Agent` trailer is missing, or names an executor that is not in the registry or not allowed | the executor ends commits with `SDLC-Agent: <executor>/<agent>`; a person updates the registry |
-| `sdlc task check-result` names `missing_trailer` or `forbidden_path` | a commit has no `SDLC-Change` or `SDLC-Task` trailer, or the branch touches a forbidden path | add the trailers to the commits; undo the changes to the forbidden paths |
+| `sdlc task check-result` names `missing_trailer` or `forbidden_path` | a commit has no `SDLC-Change` or `SDLC-Task` trailer, or the branch touches a forbidden path (a moved file counts under its old path too) | add the trailers to the commits; undo the changes to the forbidden paths |
+| `sdlc task check-result` or `sdlc board submit` names `diff_unavailable` | git could not list the branch's changes, for example an object is missing after a partial fetch | fetch the whole branch again, run `git fsck`, and use git 2.28 or newer |
 | `sdlc board claim` names `task_claimed`, `task_done` or `task_submitted` | a live claim holds the task, it is done, or already submitted | `sdlc board list` shows who holds it and until when |
 | `sdlc board heartbeat`, `release` or `submit` names `claim_unknown` or `claim_expired` | the claim id is wrong or ended, or the lease ran out | only a live claim heartbeats, releases or submits; claim again with `board claim` |
 | a `board` command names `board_invalid` or `board_locked` | `openspec/.sdlc/board.json` is broken, or another process holds the lock | fix the file by hand; a lock older than ~30 s is broken automatically |
@@ -349,6 +353,9 @@ Find the symptom first, then check its cause and suggested next step.
 | `pack_forbidden_command` | a check or a workflow of the pack calls a person's command (`approve`, `tests unlock`, ...) | remove that command from the pack; a pack can never approve or unlock (Lesson 3.7) |
 | A pack's lens, workflow or check is not in effect | nobody accepted the pack, or its content changed after the acceptance | a person (with `roles.yaml`, a maintainer) runs `sdlc team accept --pack <name>` |
 | A change commits with no `SDLC-Agent` trailer | a person committed, the project has its own git hook, or the tool set no marker | `sdlc doctor` (`git hook` line); [Section 10.4](10-multi-agent.md#s10-4) |
+| Every agent call is denied with `config-load`, reads included | `openspec/sdlc.yaml` fails to load, for example a `cli` value or a role name that is now refused | a person runs `sdlc doctor`, fixes the named field and runs `sdlc update` if `cli` changed |
+| Hooks still allow everything after an upgrade, with a refused `cli` such as `true sdlc` | the hook commands in the agent settings were written from the old value, and `true sdlc ...` never reaches sdlc | a person sets an accepted `cli` (`sdlc`, or `npx`, `pnpm`, `yarn`, `bunx` or `node` first) and runs `sdlc update` |
+| `--change <name>` answers that the folder was skipped | the folder name under `openspec/changes/` is not a change id, so it only adds restrictions | a person renames the folder to a lowercase change id |
 
 
 

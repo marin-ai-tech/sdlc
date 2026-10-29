@@ -10,6 +10,7 @@ import { RESERVED_SERVER, type McpServer } from '../mcp/registry.js';
  * server, servers outside the registry, a server without `stages`, and a project without an active change.
  */
 const CLAUDE_TOOL = /^mcp__(.+?)__/;
+export const INVALID_FOLDER_STAGE = '__invalid_change_folder__';
 
 /** The registry server a tool name belongs to, if any. */
 export function mcpServerOf(tool: string, servers: McpServer[]): McpServer | undefined {
@@ -29,7 +30,13 @@ export function mcpStageDecision(tool: string, config: SdlcConfig, stages: () =>
   const server = mcpServerOf(tool, config.mcp?.servers ?? []);
   if (!server || server.name === RESERVED_SERVER || server.stages.length === 0) return undefined;
   const current = [...new Set(stages())];
-  if (current.length === 0 || current.some((stage) => server.stages.includes(stage))) return undefined;
-  const params = { server: server.name, stages: server.stages.join(', '), current: current.join(', ') };
-  return { decision: mode === 'block' ? 'deny' : 'warn', rule: 'mcp-stage', reason: t('hook.mcpStage', params) };
+  if (current.length === 0 || current.some((stage) =>
+    stage !== INVALID_FOLDER_STAGE && server.stages.includes(stage))) return undefined;
+  const invalidFolder = current.includes(INVALID_FOLDER_STAGE);
+  const params = {
+    server: server.name, stages: server.stages.join(', '),
+    current: current.filter((stage) => stage !== INVALID_FOLDER_STAGE).join(', ') || t('hook.mcpStageNone'),
+  };
+  const key = invalidFolder ? 'hook.mcpStageFolders' : 'hook.mcpStage';
+  return { decision: mode === 'block' ? 'deny' : 'warn', rule: 'mcp-stage', reason: t(key, params) };
 }

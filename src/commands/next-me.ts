@@ -26,6 +26,9 @@ export async function nextMeCommand(opts: NextMeOptions): Promise<void> {
     if (opts.json) return printJson({ ...queue, items,
       ...(otherBranches ? { otherBranches } : {}), root: { path: ctx.root } });
     printQueue({ ...queue, items }, otherBranches ?? []);
+    for (const error of queue.errors ?? []) {
+      line(t('sharedView.evaluationError', { change: error.change, code: error.code }));
+    }
   } catch (error) {
     reportFailure(error, opts.json, { me: null, items: [] });
   }

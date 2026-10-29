@@ -71,6 +71,7 @@ const CONVERTED = [
   'docs/en/28-executor-swarm-example.md',
   'docs/en/29-mixed-tools-example.md',
   'docs/en/30-finishing-with-executors-example.md',
+  'docs/en/32-why-sdlc.md',
 ];
 
 const LONG_PAGE_WORDS = 800;

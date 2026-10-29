@@ -8,6 +8,7 @@ import { SdlcError } from './errors.js';
 import { AGENT_NAME } from './executors.js';
 import { git } from './git.js';
 import { evaluateChange } from './lifecycle.js';
+import { evaluateEach, type ChangeEvaluationError } from './evaluate-each.js';
 import { appendLog } from './log.js';
 import type { TaskItem } from './task-contract.js';
 import { changeTasks, exportItems } from './task-contract.js';
@@ -146,11 +147,17 @@ export function taskView(ref: ChangeRef, task: { id: string; text: string }, boa
 export function boardTasks(
   root: string, paths: ProjectPaths, config: SdlcConfig, changeId?: string,
 ): BoardTaskView[] {
+  return boardTaskListing(root, paths, config, changeId).tasks;
+}
+
+export function boardTaskListing(
+  root: string, paths: ProjectPaths, config: SdlcConfig, changeId?: string,
+): { tasks: BoardTaskView[]; errors: ChangeEvaluationError[] } {
   return withBoard(root, config, (board) => {
     const refs = changeId === undefined ? listActiveChanges(paths) : [resolveChange(paths, changeId)];
+    const { evaluated, errors } = evaluateEach(root, refs, config, { skipFingerprint: true, skipPeople: true });
     const tasks: BoardTaskView[] = [];
-    for (const ref of refs) {
-      const view = evaluateChange(root, ref, config, { skipFingerprint: true, skipPeople: true });
+    for (const { ref, view } of evaluated) {
       if (!planOpen(view)) continue;
       const state = readChangeState(ref.dir);
       for (const task of changeTasks(ref)) {
@@ -158,7 +165,7 @@ export function boardTasks(
         tasks.push(taskView(ref, task, board, state));
       }
     }
-    return tasks;
+    return { tasks, errors };
   });
 }
 

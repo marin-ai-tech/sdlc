@@ -3,7 +3,7 @@ import * as os from 'node:os';
 import * as path from 'node:path';
 import { approvalTrailer } from './approval-hygiene.js';
 import { readChangeState, type ApprovalRecord } from './change-state.js';
-import { listActiveChanges, listArchivedChanges, type ChangeRef } from './changes.js';
+import { listChangeFolders, listArchivedChanges, type ChangeRef } from './changes.js';
 import { requiredGit, trustedGit } from './history-trust.js';
 import type { ProjectPaths } from './project.js';
 import { allowedSigners, parseRolesFile, personByEmail, ROLES_PATH, type RolesFile } from './roles.js';
@@ -81,7 +81,7 @@ export function approvalSites(root: string, refs: ChangeRef[]): ApprovalSite[] {
 
 /** Active changes first, then archived ones: the order `sdlc approvals verify` reports them in. */
 export function allChanges(paths: ProjectPaths): ChangeRef[] {
-  return [...listActiveChanges(paths), ...listArchivedChanges(paths)];
+  return [...listChangeFolders(paths), ...listArchivedChanges(paths)];
 }
 
 /** B60: whether the commit the approval proposed (its trailer) is reachable; informational only. */

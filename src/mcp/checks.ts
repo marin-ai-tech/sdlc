@@ -4,6 +4,7 @@ import { t } from '../core/i18n.js';
 import { FINGERPRINT_EXCLUDES } from '../core/lifecycle.js';
 import { findSecrets } from '../core/policy-secrets.js';
 import type { McpCheckOutcome, VerificationRun } from '../core/verify.js';
+import { fingerprintFailureReason } from '../core/verify-reason.js';
 import { McpTimeout, parseAnswer, withServer, type ToolAnswer } from './client.js';
 import { expandedSecrets, type McpCheck, type McpServer } from './registry.js';
 
@@ -249,5 +250,9 @@ export function withMcpChecks(run: VerificationRun, config: SdlcConfig, mcp: Mcp
   const commandsOk = config.verify.commands.length === 0 || run.status === 'passed';
   const mcpOk = mcp.length === total && mcp.every((check) => check.ok || !check.required);
   const passed = !!run.fingerprint && commandsOk && mcpOk;
-  return { ...run, status: passed ? 'passed' : 'failed', mcp };
+  const status: VerificationRun['status'] = passed ? 'passed' : 'failed';
+  const partial = run.checks.length !== config.verify.commands.length || mcp.length !== total;
+  const reason = fingerprintFailureReason({ ...run, status, mcp }, partial);
+  const { reason: _previousReason, ...rest } = run;
+  return { ...rest, status, mcp, ...(reason ? { reason } : {}) };
 }

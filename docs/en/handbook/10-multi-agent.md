@@ -634,7 +634,8 @@ start the server — an executor token alone does not start it.
    The answer has `ok`, `commits`, `files`, `problems` and `warnings`. A commit without the trailers
    (`missing_trailer`), a task that the change does not have (`unknown_task`) or a touched forbidden path
    (`forbidden_path`) is a problem, and the command exits with code 1. A file outside the plan is only a warning
-   (`outside_plan`).
+   (`outside_plan`). A moved file counts under its old and its new path. A diff that cannot be read is the
+   problem `diff_unavailable`.
 
 4. The normal gates apply. `check-result` merges nothing and approves nothing. The branch goes on like any other
    work: verification, then Paul's review approval in his own terminal. An executor never approves a gate.

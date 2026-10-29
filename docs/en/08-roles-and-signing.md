@@ -55,8 +55,10 @@ separation:
 - **roles**: role names from the gates in `sdlc.yaml` (`approvers`, `high_risk_approvers`) and their holders.
   `maintainer` may change this file and accepts agent roles. `qa` approves the optional `qa` gate.
   A role name is a plain token: a letter, then letters, digits, `.`, `_` or `-` (`product-owner`, `tech_lead`).
-  Role names go into the approval commands sdlc suggests, so any other name is refused when the file is read, and the
-  message names the file, the field and the role.
+  Role names go into the approval commands sdlc suggests, so any other name is refused when the file is read. The
+  message names the file, the field and the role, and the fix asks to rename the role (`qa-lead`). The rule covers
+  the current `roles.yaml` only. Past versions read from git history are taken as they are, so
+  `sdlc approvals verify` and the evidence export still check approvals made under an older role name.
 - **separation** (the defaults are shown):
   - `author_cannot_approve`: gates the authors of the change's code may not approve. Authors are the commit authors and
     `Co-authored-by` trailers on the branch since the review base, counting only files outside `openspec/`.

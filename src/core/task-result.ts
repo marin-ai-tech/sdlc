@@ -1,5 +1,6 @@
 import picomatch from 'picomatch';
 import { agentEnvironment } from './agent-env.js';
+import { readChangedPaths } from './changed-paths.js';
 import { readChangeState } from './change-state.js';
 import type { ChangeRef } from './changes.js';
 import type { SdlcConfig } from './config.js';
@@ -31,7 +32,7 @@ export interface ResultCommit {
 
 export type ResultProblemCode =
   'missing_trailer' | 'unknown_task' | 'forbidden_path' | 'no_commits' |
-  'missing_agent' | 'unknown_executor' | 'executor_not_allowed' | 'wrong_executor';
+  'missing_agent' | 'unknown_executor' | 'executor_not_allowed' | 'wrong_executor' | 'diff_unavailable';
 
 export interface ResultProblem {
   code: ResultProblemCode;
@@ -100,16 +101,6 @@ function commitsOf(root: string, base: string, branch: string): ResultCommit[] {
   return commits;
 }
 
-/** The files the range changed: repo-relative, posix separators, sorted, no duplicates. */
-function changedFiles(root: string, base: string, branch: string): string[] {
-  const diff = git(root, ['diff', '--name-only', `${base}..${branch}`]);
-  if (!diff.ok || !diff.stdout) return [];
-  const files = diff.stdout.split('\n')
-    .map((file) => toPosix(file.trim()).replace(/^(?:\.\/)+/, ''))
-    .filter((file) => file !== '');
-  return [...new Set(files)].sort();
-}
-
 /** The `<executor>/<agent>` a commit's first `SDLC-Agent` trailer must carry (B116). */
 function agentOf(
   commit: ResultCommit, registry: Map<string, Executor>, state: { risk: string; kind: string },
@@ -135,7 +126,8 @@ export function checkResult(
   const branchSha = resolveRef(root, resultBranch(root, branch));
   const baseSha = base === undefined ? mergeBase(root, branchSha) : resolveRef(root, base);
   const commits = commitsOf(root, baseSha, branchSha);
-  const files = changedFiles(root, baseSha, branchSha);
+  const changed = readChangedPaths(root, baseSha, branchSha);
+  const files = changed.ok ? changed.files : [];
   const state = readChangeState(ref.dir);
   const isForbidden = picomatch(forbiddenPaths(root, config, state.tests_locked === true),
     { dot: true, nocase: true });
@@ -143,6 +135,7 @@ export function checkResult(
   const taskIds = new Set(changeTasks(ref).map((task) => task.id));
   const problems: ResultProblem[] = [];
   const warnings: ResultWarning[] = [];
+  if (!changed.ok) problems.push({ code: 'diff_unavailable' });
   if (commits.length === 0) problems.push({ code: 'no_commits' });
   for (const commit of commits) {
     if (commit.change !== ref.id || commit.task === undefined) {
@@ -160,7 +153,8 @@ export function checkResult(
     }
   }
   for (const file of files) {
-    if (isForbidden(file)) problems.push({ code: 'forbidden_path', file });
+    const legacyName = toPosix(file.trim()).replace(/^(?:\.\/)+/, '');
+    if (isForbidden(file) || isForbidden(legacyName)) problems.push({ code: 'forbidden_path', file });
     else if (!planned.some((entry) => matchesPlanFile(entry, file))) warnings.push({ code: 'outside_plan', file });
   }
   const executors = registry === undefined

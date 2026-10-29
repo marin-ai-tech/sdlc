@@ -38,6 +38,7 @@ export interface CheckpointTree extends Repo {
   /** Ordinary worktree tree, before explicitly covered ignored artifacts are included. */
   ordinaryTree: string;
   read(projectRelativePath: string): string | undefined;
+  readFiltered(projectRelativePath: string): string | undefined;
 }
 
 /** A raw snapshot, not yet a checkpoint ref or a commit. The reader always reads that immutable tree. */
@@ -47,8 +48,11 @@ export function captureCheckpoint(root: string, include: string[] = []): Checkpo
   const covered = coveredSnapshotPaths(root, include);
   const snapshot = repo && covered ? snapshotTree(repo.top, covered.map((file) => `${repo.prefix}${file}`)) : undefined;
   if (!repo || !snapshot) return undefined;
-  const read = checkpointReader(repo.top, snapshot.tree, root);
-  return { ...repo, ...snapshot, read: (rel) => read(`${repo.prefix}${rel}`) };
+  const canonicalRoot = path.resolve(repo.top, repo.prefix);
+  const read = checkpointReader(repo.top, snapshot.tree, canonicalRoot, root);
+  return { ...repo, ...snapshot,
+    read: (rel) => read(`${repo.prefix}${rel}`),
+    readFiltered: (rel) => read(`${repo.prefix}${rel}`, true) };
 }
 
 /** Files to restore from a checkpoint: repository-relative paths, and which of them the checkpoint holds. */
@@ -103,18 +107,21 @@ function commitSnapshot(top: string, tree: string, message: string): string | un
 
 /** Records the gate's checkpoint. Without a git repository, or when git fails, nothing is recorded or thrown. */
 export function recordCheckpoint(root: string, change: string, gate: string,
-  inspect?: (snapshot: CheckpointTree) => void, include: string[] = []): boolean {
+  inspect?: (snapshot: CheckpointTree) => void, include: string[] = [], beforePublish?: () => void): boolean {
+  let pending: { top: string; commit: string } | undefined;
   try {
     const snapshot = captureCheckpoint(root, include);
     if (!snapshot) return false;
     inspect?.(snapshot);
     const commit = commitSnapshot(snapshot.top, snapshot.tree, `sdlc checkpoint: ${change} ${gate}`);
     if (!commit) return false;
-    return git(snapshot.top, ['update-ref', checkpointRef(change, gate), commit]).ok;
+    pending = { top: snapshot.top, commit };
   } catch (error) {
     if (error instanceof SdlcError) throw error;
     return false;
   }
+  beforePublish?.();
+  return git(pending.top, ['update-ref', checkpointRef(change, gate), pending.commit]).ok;
 }
 
 /**

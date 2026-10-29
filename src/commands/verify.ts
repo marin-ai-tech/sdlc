@@ -179,7 +179,8 @@ export async function verifyCommand(opts: VerifyOptions): Promise<void> {
     keepForAgent(ctx.root, ref.id, run);
     const next = resolveNext(ctx, ref.id);
     if (opts.json) {
-      printJson({ change: ref.id, status: run.status, at: run.at, commit: run.commit, dirty: run.dirty, checks: run.checks,
+      printJson({ change: ref.id, status: run.status, ...(run.reason ? { reason: run.reason } : {}),
+        at: run.at, commit: run.commit, dirty: run.dirty, checks: run.checks,
         ...mcpJson(run), planDrift: { untouched: extras.untouched }, attachments: extras.attachments,
         evidence: file, harness: ctx.stamp, ...(next ? { next } : {}) });
     } else {
@@ -195,7 +196,7 @@ export async function verifyCommand(opts: VerifyOptions): Promise<void> {
       }
       line(run.status === 'passed'
         ? c.green(t('verify.passed', { file: path.relative(process.cwd(), file) }))
-        : c.red(t('verify.failed')));
+        : c.red(t(run.reason ? 'verify.fingerprintUnavailable' : 'verify.failed')));
       if (only) line(c.dim(t('verify.partial')));
       emitNextHint(ctx, ref.id);
     }

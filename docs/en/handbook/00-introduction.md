@@ -422,4 +422,5 @@ See the [sdlc glossary](../glossary.md) for the process terms used in this modul
 ## See also
 
 - [Set up a new project](01-setup-greenfield.md) — continue through the handbook.
+- [Why work with sdlc](../32-why-sdlc.md) — what it costs to run, and what skipping the gates cost.
 - [Integrations](../10-integrations.md) — see how sdlc connects to team systems.

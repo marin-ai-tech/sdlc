@@ -507,6 +507,46 @@ export const SLIDES = [
     }
   },
   {
+    "id": "why",
+    "layout": "closing",
+    "title": {
+      "en": "Why sdlc: almost nothing to run"
+    },
+    "points": {
+      "en": [
+        "Node.js, git and the agent you already use, plus one package from the GitHub release.",
+        "No server, database, container or cloud account: the state is files in git.",
+        "Simple: sdlc init sets a project up, sdlc next names the next step and who acts.",
+        "Console first: decisions in a person's terminal, --json for agents and CI."
+      ]
+    },
+    "reproduce": [
+      "npm install -g https://github.com/marin-ai-tech/sdlc/releases/latest/download/sdlc.tgz",
+      "sdlc init"
+    ],
+    "notes": {
+      "en": "There is nothing to host and nothing to sign in to. The audit, the report and the dashboard are built from the files in the repository and work offline. The same commands run on a laptop, over SSH and in a CI job."
+    }
+  },
+  {
+    "id": "cost",
+    "layout": "closing",
+    "title": {
+      "en": "What skipping the rules cost"
+    },
+    "points": {
+      "en": [
+        "One release shipped six changes in one batch, with no tests first and no review before it.",
+        "The review afterwards found 18 important findings, two of them security.",
+        "The bill: a fix right after the release and three follow-up changes.",
+        "With the gates, review finds such defects before the release, not users."
+      ]
+    },
+    "notes": {
+      "en": "A real case from one of our releases. The gates were approved after the fact, against code that had already shipped. Examples: an agent could switch off the check that blocks its stop, and a project opened through a linked folder could not approve anything. Changes made by the rules get review findings too; the difference is that they surface before the release."
+    }
+  },
+  {
     "id": "closing",
     "layout": "closing",
     "title": {

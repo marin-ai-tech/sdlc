@@ -38,6 +38,14 @@ your `openspec/` folder stays a plain OpenSpec project, and `openspec` and `/ops
   tools.
 - **Everything in git.** The backlog, approvals, evidence and an append-only log live in the repository; the audit,
   the report and an offline dashboard are built from them. No server to run.
+- **Almost nothing to deploy.** Node.js, git and the agent you already use, plus one package from the GitHub release. No database, no
+  container, no cloud account.
+- **Simple.** `sdlc init` sets a project up in one command, and `sdlc next` always names the next step and who takes
+  it.
+- **Console first.** Every decision is a command in a person's own terminal, every read has `--json` for agents and
+  CI, and it runs the same on a laptop, over SSH or in a CI job.
+
+What skipping the gates costs, from a real release: [Why work with sdlc](docs/en/32-why-sdlc.md).
 
 How other spec-driven harnesses hold the process (from our
 [review of the landscape](docs/en/03-landscape-and-reviews.md),

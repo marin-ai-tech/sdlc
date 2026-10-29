@@ -1,7 +1,7 @@
 import { loadProject } from '../cli/context.js';
 import { line, printJson, reportFailure } from '../cli/output.js';
 import {
-  boardTasks, claimTask, heartbeatClaim, releaseClaim, submitClaim,
+  boardTaskListing, claimTask, heartbeatClaim, releaseClaim, submitClaim,
 } from '../core/board.js';
 import type { BoardClaim } from '../core/board-store.js';
 import { reopenTask } from '../core/board-reopen.js';
@@ -126,16 +126,19 @@ function publicClaim(claim: BoardClaim): Record<string, unknown> {
 export function boardListCommand(opts: ListOptions): void {
   try {
     const ctx = loadProject();
-    const tasks = boardTasks(ctx.root, ctx.paths, ctx.config, opts.change);
+    const { tasks, errors } = boardTaskListing(ctx.root, ctx.paths, ctx.config, opts.change);
     const status = git(ctx.root, ['status', '--porcelain', '--', 'openspec/.sdlc/log.jsonl']);
     const uncommittedLog = status.ok && status.stdout.length > 0;
     if (opts.json) {
-      printJson({ tasks, uncommittedLog });
+      printJson({ tasks, uncommittedLog, ...(errors.length > 0 ? { errors } : {}) });
       return;
     }
     if (tasks.length === 0) {
       line(t('board.list.empty'));
       if (uncommittedLog) line(t('board.list.commitLog'));
+      for (const error of errors) {
+        line(t('sharedView.evaluationError', { change: error.change, code: error.code }));
+      }
       return;
     }
     line(t('board.list.heading'));
@@ -152,6 +155,9 @@ export function boardListCommand(opts: ListOptions): void {
       line(`  ${task.id}  ${task.status}${who}${until}${attempts}${excluded}`);
     }
     if (uncommittedLog) line(t('board.list.commitLog'));
+    for (const error of errors) {
+      line(t('sharedView.evaluationError', { change: error.change, code: error.code }));
+    }
   } catch (error) {
     reportFailure(error, opts.json);
   }

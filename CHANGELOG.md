@@ -4,6 +4,81 @@ All notable changes to sdlc. Versions follow [Semantic Versioning](https://semve
 
 ## Unreleased
 
+## 0.28.0 — 2026-10-29
+
+### Added
+- **Documentation:** [Why work with sdlc](docs/en/32-why-sdlc.md): what it costs to run, how simple the setup is,
+  the console-first design and a case of what skipping the gates cost; two deck slides say the same.
+
+### Changed
+- **Breaking:** a folder under `openspec/changes/` whose name is not a change id only adds restrictions in the hooks.
+  Its locked tests, takeover and stop reminder still apply; its approved plan, approved release and stage no longer
+  let an agent edit code, run a release command or call a stage-bound MCP server. Rename the folder to a lowercase
+  change id.
+- **Breaking:** `sdlc approvals verify`, the project audit, the evidence export and `sdlc validate --all` read every
+  change folder, including one whose name is not a change id. An unsigned approval in such a folder fails CI, and
+  `validate --all` fails until the folder is renamed.
+- **Breaking:** when `openspec/sdlc.yaml` exists but fails to load, every agent call is denied with the rule
+  `config-load` in every host, reads included. The reason names the file, the error code, the fix and `sdlc doctor`.
+  Only a raw `enforcement.mode` that reads exactly `off` still allows; `OFF`, `false` or no mode deny. An
+  `sdlc.yaml` that exists but cannot be read is treated the same way. Session start gets one line in every mode,
+  and the stop one reminder unless the mode is `off`. A project without `sdlc.yaml` is unchanged.
+- **Breaking:** the `cli` value starts with the sdlc program alone or exactly `npx`, `pnpm`, `yarn`, `bunx` or `node`,
+  and names the program once, last. Between the launcher and the program only `--no-install`, `-y`, `--yes` and
+  `--offline` (after `npx`) and `exec` (after `pnpm` or `yarn`) are allowed. `true sdlc`, `npm exec sdlc`,
+  `npx.cmd sdlc`, `npx sdlc sdlc`, `node --version sdlc`, `pnpm dlx sdlc`, `npx -p <package> sdlc` and a launcher
+  given by its path (`C:/nodejs/node ./bin/sdlc.js`) are refused; the refusal ends with "then run `sdlc update`".
+
+### Fixed
+- Hook messages and `--change` errors no longer build a command from a folder name that is not a change id. They
+  quote the name and ask a person to rename the folder; `--change` with such a name says the folder was skipped.
+- A quoted `--change` value with spaces or shell characters, or with no closing quote, is read whole, so an agent's
+  sdlc step on such a held folder is denied.
+- Past `roles.yaml` versions read from git history are no longer checked against the role-name rule, so
+  `sdlc approvals verify` and the export work after a role was renamed. The current file stays strict, and the
+  role-name and `cli` refusals carry a fix line.
+- An archived change no longer gets a `track set` suggestion, so an archived folder name never reaches a suggested
+  command.
+- `sdlc task check-result`, `sdlc board submit` (also over MCP) and the harness candidate check no longer pass a
+  branch that moves a locked test or a protected file away, edits a non-ASCII protected path, moves a submodule
+  pointer under a forbidden path while a local setting ignores submodules, or makes the diff fail. Both sides of a
+  rename are checked under their real names, and an unreadable or malformed listing is the
+  new problem `diff_unavailable` (also in the result contract). The old path of a rename may add an
+  `outside_plan` warning.
+- A verification check that times out after its shell has already exited no longer signals the old process id. On
+  POSIX the cleanup stops the process group only when it outlived the shell, and it skips descendants already gone.
+  A group frozen while the shell was still running is killed even when the shell is collected during the cleanup,
+  so the check's processes are never left stopped, and the old id is never used to find descendants. On Windows the
+  wrapper is stopped through the handle Node holds, not by id, so a reused id is never reached. When nothing was
+  signalled, the verify evidence says so.
+- An agent can no longer stop without fresh verification by making an artifact unreadable or linking it outside its
+  change: a change that cannot be evaluated blocks the stop, naming the change and the error code.
+- One change that cannot be evaluated no longer breaks `next --me`, `board list` or the statusline. It is reported
+  once with its error code, and the other changes are still shown; JSON gains `errors` only when it is not empty.
+- Approval records the parser rejects are kept unchanged instead of being erased on the next write, also across
+  `drop` and `archive`. They never count, and `sdlc doctor` names each one.
+- Checkpointed approvals work in a project opened through a junction or a symlinked root, and for artifacts with git
+  filters such as `ident`. Forged keywords and escaping paths are still refused.
+- A review or release approval no longer refuses itself when it records a policy waiver for the first time. A refused
+  approval no longer leaves the gate's checkpoint ref on an unapproved snapshot.
+- A verify run that fails only because there is no worktree fingerprint says so: JSON and the record carry
+  `reason: fingerprint_unavailable`, and the text, the verify gate, the stop-hook detail and the next hint name the
+  fingerprint instead of asking to fix the code. The run still fails.
+
+### Compatibility
+- The verify record gains an optional `reason`. Older versions keep it when they rewrite the record; records written
+  before this version have no reason and keep the generic message until the next run.
+- `next --me --json` and `board list --json` gain an optional `errors` list; healthy output is unchanged.
+- Approvals still fail closed for an LFS artifact without git-lfs or its local object and for an `ident` artifact
+  with `core.autocrlf=true` (the Git for Windows default). An artifact that links to a target outside the root as
+  given is approved without a checkpoint.
+- Hook commands written earlier from a `cli` value that is now refused, such as `true sdlc hook pre-tool` in
+  `.claude/settings.json`, `.codex/hooks.json`, `.qwen/settings.json`, `.gigacode/settings.json` or
+  `.cursor/hooks.json`, keep running after the upgrade, because they never reach sdlc. A person sets an accepted
+  `cli` in `openspec/sdlc.yaml` and runs `sdlc update`, which rewrites every hook command. Until then `sdlc doctor`
+  fails on the config.
+- No stored format changes: `.sdlc.yaml`, `sdlc.yaml`, `roles.yaml` and the log are read and written as before.
+
 ## 0.27.0 — 2026-10-25
 
 ### Added

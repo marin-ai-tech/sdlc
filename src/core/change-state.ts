@@ -5,7 +5,7 @@ import { SdlcError } from './errors.js';
 import { isFile } from './fs-utils.js';
 import type { HarnessStamp } from './license.js';
 import { readYamlObject, writeYaml } from './yaml-io.js';
-import { parseApprovalGates } from './approval-records.js';
+import { parseApprovalGatesWithRejected } from './approval-records.js';
 
 /**
  * Per-change lifecycle record, stored as `.sdlc.yaml` inside the OpenSpec
@@ -122,6 +122,7 @@ export interface VerifyRecord extends Provenance {
   at: string;
   commit?: string;
   fingerprint?: string;
+  reason?: 'fingerprint_unavailable';
   results: VerifyCommandRecord[];
   /** The MCP checks of the run; absent when the project has none. */
   mcp?: VerifyMcpRecord[];
@@ -200,6 +201,15 @@ export interface ChangeState {
   history: HistoryEvent[];
 }
 
+/** Rejected persisted entries stay outside the readable state and are used only when writing it back. */
+const keptApprovals = new WeakMap<ChangeState, Record<string, unknown[]>>();
+
+/** A transaction clone must retain the write-only entries from its source state. */
+export function copyKeptApprovals(from: ChangeState, to: ChangeState): void {
+  const rejected = keptApprovals.get(from);
+  if (rejected) keptApprovals.set(to, rejected);
+}
+
 export const STATE_FILE = '.sdlc.yaml';
 
 export function statePath(changeDir: string): string {
@@ -266,11 +276,11 @@ export function readChangeState(changeDir: string): ChangeState {
       { key: 'error.x_has_unsupported_version_x', params: { file: file, p2: String(raw.version) } }
     );
   }
-  const gates = parseApprovalGates(raw.gates);
+  const { gates, rejected } = parseApprovalGatesWithRejected(raw.gates);
   const source = raw.source && typeof raw.source === 'object' ? (raw.source as Record<string, unknown>) : undefined;
   const harness = raw.harness && typeof raw.harness === 'object' ? (raw.harness as Record<string, unknown>) : undefined;
   const suggestion = raw.track_suggestion && typeof raw.track_suggestion === 'object' ? raw.track_suggestion as Record<string, unknown> : undefined;
-  return {
+  const state: ChangeState = {
     version: raw.version === 4 ? 4 : raw.version === 3 ? 3 : raw.version === 2 ? 2 : 1,
     ...(harness && typeof harness.sdlc === 'string' && typeof harness.license === 'string'
       ? { harness: { sdlc: harness.sdlc, license: harness.license } }
@@ -302,6 +312,19 @@ export function readChangeState(changeDir: string): ChangeState {
     ...(raw.verify && typeof raw.verify === 'object' ? { verify: raw.verify as VerifyRecord } : {}),
     history: Array.isArray(raw.history) ? (raw.history as HistoryEvent[]) : [],
   };
+  keptApprovals.set(state, rejected);
+  return state;
+}
+
+function gatesForWrite(state: ChangeState): ChangeState['gates'] {
+  const rejected = keptApprovals.get(state);
+  if (!rejected || Object.keys(rejected).length === 0) return state.gates;
+  const gates = { ...state.gates } as Record<string, GateState>;
+  for (const [name, entries] of Object.entries(rejected)) {
+    const gate = gates[name] ?? {};
+    gates[name] = { ...gate, approvals: [...(gate.approvals ?? []), ...entries] } as GateState;
+  }
+  return gates as ChangeState['gates'];
 }
 
 /** The oldest record format that preserves every field in this state. */
@@ -332,7 +355,7 @@ export function writeChangeState(changeDir: string, state: ChangeState, stamp?: 
     ...(state.dropped ? { dropped: state.dropped } : {}),
     ...(state.answers && state.answers.length > 0 ? { answers: state.answers } : {}),
     ...(state.seq !== undefined ? { seq: state.seq } : {}),
-    gates: state.gates,
+    gates: gatesForWrite(state),
     ...(state.verify ? { verify: state.verify } : {}),
     history: state.history,
   };

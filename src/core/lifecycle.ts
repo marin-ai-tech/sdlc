@@ -36,6 +36,7 @@ import { evaluateVerifyGate } from './verify-gate.js';
 import { evaluateReviewGate } from './review-gate.js';
 import { evaluateReleaseGate } from './release-gate.js';
 import { nextAction } from './next-action.js';
+import { trackWarning } from './track-warning.js';
 import { markOpenRejections, openRejectionNotes } from './open-rejections.js';
 import { STAGE_TITLES, type StageId } from './stages.js';
 import type { DigestCapture } from './digest.js';
@@ -277,9 +278,7 @@ export function evaluateChange(
     testsLocked: state.tests_locked === true,
     ...(state.takeover ? { takeover: state.takeover } : {}),
     next: { actor: 'none', action: 'none', message: '' },
-    warnings: state.track_suggestion
-      ? [...warnings, `Track ${state.track_suggestion.track} suggested; confirm with \`${config.cli} track set ${state.track_suggestion.track} --change ${ref.id}\`.`]
-      : warnings,
+    warnings: [...warnings, ...[trackWarning(ref, state, config.cli)].filter((line): line is string => !!line)],
   };
   // A change a person has taken over waits for them; otherwise the next step names the people who may act.
   const held = ref.archived ? undefined : takeoverNext(state, ref.id);

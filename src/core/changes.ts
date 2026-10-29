@@ -104,6 +104,11 @@ export function resolveChange(paths: ProjectPaths, id?: string, options: { allow
     const archived = listArchivedChanges(paths).filter((c) => c.id === id || c.archivedAs === id);
     if (archived.length > 0) return archived[archived.length - 1];
   }
+  if (listChangeFolders(paths).some((change) => change.id === id)) {
+    throw new SdlcError('change_not_found',
+      { key: 'error.changeFolderSkipped', params: { id } },
+      { key: 'fix.renameChangeFolder' });
+  }
   throw new SdlcError(
       'change_not_found',
       { key: 'error.change_x_not_found', params: { id: id } },

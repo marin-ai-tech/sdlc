@@ -16,8 +16,8 @@ const TOPICS = [
   'denials', 'faq',
 ];
 const RULES = [
-  'agent-marker', 'cli-removal', 'guard-config', 'mcp-stage', 'plan-gate', 'protected-path', 'release-gate',
-  'secret-in-edit', 'separation-of-duties', 'state-integrity', 'takeover', 'tests-locked',
+  'agent-marker', 'cli-removal', 'config-load', 'guard-config', 'mcp-stage', 'plan-gate', 'protected-path',
+  'release-gate', 'secret-in-edit', 'separation-of-duties', 'state-integrity', 'takeover', 'tests-locked',
 ];
 const MAX_BYTES = 4096;
 

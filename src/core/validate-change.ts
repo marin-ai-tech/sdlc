@@ -1,6 +1,6 @@
 import * as path from 'node:path';
 import type { ProjectContext } from '../cli/context.js';
-import type { ChangeRef } from './changes.js';
+import { isValidChangeId, type ChangeRef } from './changes.js';
 import { readChangeState } from './change-state.js';
 import { checkDeltaTargets, readChangeDeltas } from './deltas.js';
 import { isDirectory, isFile } from './fs-utils.js';
@@ -16,6 +16,7 @@ export interface ValidationIssue {
   line?: number;
   message: string;
   textKey?: string;
+  textParams?: Record<string, string>;
 }
 
 interface OpenSpecValidateItem {
@@ -41,6 +42,14 @@ export function validateOne(ctx: ProjectContext, ref: ChangeRef): {
   change: string; valid: boolean; issues: ValidationIssue[];
 } {
   const issues: ValidationIssue[] = [];
+  if (!isValidChangeId(ref.id)) {
+    const key = 'validate.invalidChangeFolder';
+    issues.push({
+      source: 'sdlc', level: 'error', message: t(key, { id: ref.id }, 'en'),
+      textKey: key, textParams: { id: ref.id },
+    });
+    return { change: ref.id, valid: false, issues };
+  }
   const deltas = readChangeDeltas(ref.dir);
   const skipSpecs = readOpenSpecMetadata(ref.dir).skip_specs === true;
   if (deltas.length === 0 && !skipSpecs && needsDeltaSpecs(ctx, ref)) {

@@ -190,7 +190,12 @@ An existing active change can be attached to an open backlog item with
 `sdlc backlog link B1 --change add-export`. The item becomes in progress and archiving the change marks it done.
 An archived change id cannot be reused by `sdlc new` or `sdlc backlog start`.
 A folder under `openspec/changes/` whose name is not a change id (lowercase letters, digits and hyphens) is not listed
-as a change: `sdlc doctor` names it, and `sdlc status` and `sdlc next` warn about it. The hooks still apply to it.
+as a change: `sdlc doctor` names it, and `sdlc status` and `sdlc next` warn about it. Such a folder only adds
+restrictions. Its locked tests, takeover and stop reminder still apply, but its approved plan, its approved release
+and its stage grant nothing. Hook messages name it as a quoted string and suggest no command with it; they ask a
+person to rename it. `--change` with its name answers that the folder was skipped. `sdlc approvals verify`, the
+audit, the evidence export and `sdlc validate --all` still read it, so an unsigned approval there fails CI and
+`validate --all` fails until the folder is renamed.
 To close a mistaken change without merging its delta specs, a person runs
 `sdlc drop add-export --note "Created by mistake"`. Its linked backlog item returns to open. The archived record
 retains the drop reason, and reports and audits identify it as dropped.
@@ -275,6 +280,9 @@ design.
   person.
   Use `sdlc next --me --no-branches --json` for frequent UI refreshes: it skips other-branch discovery and omits
   `otherBranches`. Without the option, the output stays the same.
+  A change that cannot be evaluated, for example with an unreadable artifact, is reported once with its error code,
+  and the other changes are still listed. JSON adds an `errors` list only when there is one. `sdlc board list` does
+  the same, and the statusline adds a count of such changes.
 - **What am I approving:** `sdlc approve <gate> --change <id> --preview` shows the gate's artifacts, what changed since
   the last approval, the approvals so far and needed, open findings and verification for review and release, and whether
   you may approve. It writes nothing.
@@ -586,6 +594,15 @@ accept. A pack with workflows or checks must be pinned to a git commit (40 hex d
 listed under "Files that change" (`planDrift.untouched`, never a failure), has a `## Not run / limits` section,
 and links the change's `verification/` folder (screenshots and browser results).
 
+A verify run needs a worktree fingerprint, so outside a git repository it always fails. When the fingerprint is the
+only cause, JSON and the stored record carry `reason: fingerprint_unavailable`. The text, the verify gate and the next
+hint then say that the fingerprint could not be computed, instead of asking you to fix the code. Check that the
+project is in a git repository and that git works, then run `sdlc verify` again. A failing check or a partial run
+(`--only`) keeps the usual message and has no reason.
+
+An approval record that sdlc cannot parse never counts, but it stays in `.sdlc.yaml` unchanged. `sdlc doctor` names
+each one with its change, gate and position, so a person can inspect it.
+
 `gates.<gate>.auto_waive: { kinds, tracks }` waives intent, spec or plan when the kind **or** track matches.
 It is logged once as `gate.<gate>.auto_waived` and counted as a policy waiver; an agent-chosen kind does not count.
 `tracks: [lite]` waives every lite change, including features, and raises a doctor warning.
@@ -724,7 +741,11 @@ task contract says what an executor gets and what it must return.
 - `sdlc task check-result --change <id> --branch <ref> [--base <ref>] --json` checks a returned branch (the base
   defaults to the merge-base of the branch and HEAD). A commit without the trailers
   (`missing_trailer`), a task the change does not have (`unknown_task`) or a forbidden path (`forbidden_path`) is a
-  problem, and the command exits 1. Files outside the plan are a warning (`outside_plan`). With a registry every
+  problem, and the command exits 1. Files outside the plan are a warning (`outside_plan`). The files come from
+  the branch's diff without rename detection. A moved file counts under its old and its new path, so moving a
+  locked test away is a `forbidden_path`, and the old path may be an `outside_plan` warning. Paths keep their real
+  names, non-ASCII ones too. A diff that cannot be read or parsed, for example after a missing object, is the
+  problem `diff_unavailable`, never an empty change. With a registry every
   commit's first `SDLC-Agent` trailer must be `<executor>/<agent>` naming an executor the change allows:
   `missing_agent`, `unknown_executor` or `executor_not_allowed` otherwise; the result gains `executors` — the
   distinct executor ids the commits name — and each check is one `task.result_checked` log entry.
@@ -795,7 +816,8 @@ they decide no gate and approve nothing:
 - `sdlc board submit --claim <id> --branch <ref> [--base <ref>]` runs the `check-result` of above and, in
   addition, wants every commit's `SDLC-Agent` executor to be the claim's (`wrong_executor`). A pass closes the
   claim (`task.submitted` with branch and head sha, exit 0); a fail exits 1 with the problems and keeps the claim
-  held. It changes no `.sdlc.yaml` and approves nothing.
+  held. A rename, a non-ASCII path or an unreadable diff is refused the same way. It changes no `.sdlc.yaml` and
+  approves nothing.
 - `sdlc board reopen --change <id> --task <n.m> --reason <text> [--escalate] [--json]` reopens a submitted
   claim. A blank reason is refused (`reason_required`); an unknown task or one without a submitted claim is
   `unknown_task` or `task_not_submitted`. The board shows the number of earlier attempts and the last reason;
@@ -887,7 +909,7 @@ Use this example to find the settings for gates, verification, integrations, and
 ```yaml
 version: 1
 schema: sdlc                  # schema for sdlc new
-cli: sdlc                     # or "npx --no-install sdlc"; must end with the sdlc program
+cli: sdlc                     # or "npx --no-install sdlc"; see the launcher rule below
 locale: <code>                # optional: language for people (default: the system locale, else en)
 tools: [claude, opencode]   # also: cursor, codex, qwen, gigacode
 delivery: both                # both | skills | commands (sdlc init --delivery)
@@ -968,8 +990,18 @@ log:
 ```
 
 Two values go into the commands sdlc suggests, so they have a fixed shape:
-- `cli` ends with the program: `sdlc`, or a path ending in `/sdlc` or `/sdlc.js`. A launcher and its options may come
-  before it (`npx --no-install sdlc`). Words after it are refused, because they would ride along in every command.
+- `cli` ends with the program: `sdlc`, `sdlc.js`, or a path ending in `/sdlc` or `/sdlc.js`. The program appears
+  once. Words are separated by single spaces. Words after the program are refused, because they would ride along in
+  every command. The first word is the program itself, alone, or exactly `npx`, `pnpm`, `yarn`, `bunx` or `node`.
+  Only these options may stand between the launcher and the program: `--no-install`, `-y`, `--yes` and `--offline`
+  after `npx`, and `exec` after `pnpm` or `yarn`. So `npx --no-install sdlc`, `pnpm exec sdlc` and
+  `node C:/tools/sdlc.js` load. `true sdlc`, `npm exec sdlc`, `npx.cmd sdlc`, `node --version sdlc`, `pnpm dlx sdlc`
+  and a launcher given by its path, such as `C:/nodejs/node ./bin/sdlc.js`, are refused. An option that runs no
+  program would turn every hook into a silent allow. The refusal names the field and ends with "then run
+  `sdlc update`".
+- Hook commands written earlier from a value that is now refused keep running, because `true sdlc ...` never reaches
+  sdlc. Set an accepted `cli` and run `sdlc update`, which rewrites every hook command. Until then `sdlc doctor` fails
+  on the config and names the refused value.
 - Role names in `roles:`, `approvers` and `high_risk_approvers` are plain tokens. A name starts with a letter and
   goes on with letters, digits and the signs `.` `_` `-`.
 

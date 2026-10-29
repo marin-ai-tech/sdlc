@@ -1,6 +1,7 @@
 import { t } from './i18n.js';
 import { matchesPlanFile, readPlanFiles } from './plan-files.js';
 import type { Decision } from './policy.js';
+import { folderLabel } from './folder-name.js';
 
 export interface PlanGateChange {
   id: string;
@@ -28,7 +29,7 @@ export function planGateDenial(
   const path = approved ? uncoveredFile(code, changes) : code[0];
   if (path === undefined) return undefined;
   if (changes.length === 0) return soft('plan-gate', t('hook.planGateNone', { path }));
-  const pending = changes.filter((change) => !change.planApproved).map((change) => change.id);
+  const pending = changes.filter((change) => !change.planApproved).map((change) => folderLabel(change.id));
   if (!approved) {
     return soft('plan-gate', t('hook.planGatePending', { changes: pending.join(', '), path }));
   }

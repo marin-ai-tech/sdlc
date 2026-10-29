@@ -104,7 +104,9 @@ export function nextAction(
       );
     }
     const verifyKey = verify.status === 'failed'
-      ? 'next.verifyFailed'
+      ? verify.reasonKey === 'gate.verifyFingerprintUnavailable'
+        ? 'next.verifyFingerprintUnavailable'
+        : 'next.verifyFailed'
       : verify.status === 'stale'
         ? 'next.verifyStale'
         : 'next.verifyRun';

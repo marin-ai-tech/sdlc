@@ -10,6 +10,12 @@ Codex CLI, Qwen Code and GigaCode, or the OpenCode plugin. A denial names its ru
 Hook denials and warnings first append to the ignored local queue. `sdlc log` and `sdlc health` read them immediately;
 the next CLI command that writes the shared log moves them there in order.
 
+## config-load
+
+Every agent call is denied when `openspec/sdlc.yaml` cannot be loaded, unless its raw `enforcement.mode` is exactly
+`off`. A person must fix the file and can run `sdlc doctor` to see the error. If the `cli` value was refused, set an
+accepted value and run `sdlc update` to rewrite the hook commands already installed in agent settings.
+
 ## plan-gate
 
 Process rule. Code was about to be written with no approved plan. **Do:** write `plan.md` and `tasks.md` (the plan

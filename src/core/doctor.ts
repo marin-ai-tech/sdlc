@@ -18,6 +18,7 @@ import { conflictedRecords } from './record-conflicts.js';
 import { hooksDisabledFiles } from './user-guard.js';
 import { harnessVersion } from './version.js';
 import { readYamlObject } from './yaml-io.js';
+import { malformedApprovals } from './doctor-approvals.js';
 import { integrationUnknownKeys } from './config-integration-findings.js';
 import { claudeGitBash, gitBashOnPath } from './claude-git-bash.js';
 import { readManifest, sha256 } from '../integrations/manifest.js';
@@ -303,6 +304,10 @@ function changeChecks(out: Checks, root: string, paths: ProjectPaths, config: Sd
   }
   for (const ref of listActiveChanges(paths)) {
     try {
+      for (const { gate, position } of malformedApprovals(ref)) {
+        out.add(`change ${ref.id} ${gate} approval ${position}`, 'warn',
+          out.tt('doctor.malformedApproval', { change: ref.id, gate, position }));
+      }
       const view = evaluateChange(root, ref, config, { skipFingerprint: true });
       out.add(`change ${ref.id}`, 'ok', out.tt('doctor.changeStage', { stage: view.stage }));
     } catch (error) {

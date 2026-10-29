@@ -18,6 +18,8 @@ import { parseTeamConfig, type TeamConfig } from '../team/team-config.js';
 import { parseStages, type StagesConfig } from './stage-config.js';
 import { readYamlObject } from './yaml-io.js';
 import { updateYamlFile } from './yaml-update.js';
+import { assertCliValue } from './cli-value.js';
+export { assertCliValue } from './cli-value.js';
 
 export const APPROVAL_GATES = ['intent', 'spec', 'plan', 'qa', 'review', 'release'] as const;
 export type ApprovalGateId = (typeof APPROVAL_GATES)[number];
@@ -301,7 +303,7 @@ function assertRoleName(role: string, file: string, field: string): void {
   if (!isRoleName(role)) {
     throw new SdlcError('invalid_config', {
       key: 'error.roleNameNotPlain', params: { file, field, role },
-    });
+    }, { key: 'fix.roleNamePlain', params: { file } });
   }
 }
 
@@ -603,26 +605,6 @@ function serializeRework(rework: SdlcConfig['rework']): Record<string, unknown> 
   const reasons = rework.reasons.join() === DEFAULT_REWORK_REASONS.join() ? {} : { reasons: rework.reasons };
   const cycles = rework.maxCycles === DEFAULT_MAX_CYCLES ? {} : { max_cycles: rework.maxCycles };
   return Object.keys({ ...reasons, ...cycles }).length > 0 ? { rework: { ...reasons, ...cycles } } : {};
-}
-
-/**
- * How agents and hooks call the CLI, written into hook commands: letters, digits, spaces and `. _ / @ - :` only, so no
- * shell character can ride along. The colon is a Windows drive letter (`node C:/tools/sdlc.js`); paths use `/`.
- * The value ends with the program (`sdlc`, or a path to `sdlc` / `sdlc.js`): nothing may follow it, or it would ride
- * along in every suggested command (`sdlc waive --note` turned approvals into waivers). A launcher's options before
- * the program stay allowed (`npx --no-install sdlc`).
- */
-export function assertCliValue(value: string, where: string): void {
-  if (!/^[A-Za-z0-9@._/: -]+$/.test(value)) {
-    const key = 'error.x_may_only_contain_letters_digits_spaces_and';
-    throw new SdlcError('invalid_config', { key, params: { p1: where } });
-  }
-  const words = value.split(' ');
-  if (words.includes('') || !/^(?:.*\/)?sdlc(?:\.js)?$/.test(words.at(-1) ?? '')) {
-    throw new SdlcError('invalid_config', {
-      key: 'error.cliNotProgram', params: { field: where, value },
-    });
-  }
 }
 
 /** The qa gate as the defaults have it (B110): not written, so an older project's sdlc.yaml stays as it was. */

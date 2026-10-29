@@ -132,12 +132,30 @@ Mechanics:
   cannot prove artifact content. Every checkpoint attempt is followed by a digest recheck, including failures.
   The tracked task artifact uses checkbox normalization in every planning gate that covers it, including custom
   intent/spec mappings. Approval parsing validates known fields and preserves uninterpreted extensions on write.
+- **Checkpoint reads across links and filters.** The checkpoint reader checks containment against git's top level
+  plus the project's prefix, not against the root as given. A project opened through a junction or a symlinked root
+  therefore approves normally. An absolute link target written through the given root is mapped onto the same path.
+  A file matches when the evaluated text equals either its raw blob or the blob as git checks it out through its
+  filters (`git cat-file --filters`), so an `ident` keyword passes and a forged one does not. Link targets are read
+  unfiltered; when the filtered read fails, only the raw blob is compared.
+- **Approval order for review and release.** These gates first compare `--expect-digest` with a first evaluation,
+  so a refusal records nothing; then they record their own state writes (for example, a policy waiver), capture the
+  raw tree, evaluate again and bind the approval to that second evaluation, which is compared once more. Edits by
+  anyone else to the state file or the log during the approval are still refused. The gate's checkpoint ref moves
+  only after the approval record is written, so a refused approval never leaves the ref on an unapproved snapshot.
+- **Approval records the parser rejects.** A malformed entry never counts, but it is not erased: the writer keeps it
+  in a write-only side table and writes it back unchanged, including the state copies made by `drop` and `archive`.
+  `sdlc doctor` names each one with its change, gate and position.
 - **The worktree fingerprint for verify, review and release** is the git tree id of all files (tracked + untracked,
   excluding ignored files and `openspec/`). It is computed in a temporary index and does not depend on commits:
   committing verified code does not make the verification stale, while any change to the content does.
   Failed/empty index-path metadata or an unreadable index yields no fingerprint; it must not silently construct an
   unseeded tree that omits tracked ignored files. A legitimately absent index before staging and the relative
-  index-path fallback for older Git remain supported.
+  index-path fallback for older Git remain supported. A run without a fingerprint, for example outside a git
+  repository, is always failed. When the missing fingerprint is its only cause, the run carries the reason
+  `fingerprint_unavailable` (`src/core/verify-reason.ts`). The rule holds when every required check and required MCP
+  check passed, the run was not partial and at least one check ran. JSON, the stored record, the text, the verify
+  gate, the stop-hook detail and the next hint then name the fingerprint instead of asking to fix the code.
 - **Separation of duties: agents.** `approve`, `reject`, `waive`, `track set`, `tests unlock`, `archive --force`,
   `license set`, `backlog move`, `backlog drop`, `roles migrate` and the other person's commands of `HUMAN_COMMANDS`
   (4.6) refuse to run in an agent session (`CLAUDECODE=1`, `OPENCODE=1`/`AGENT=1`, `SDLC_AGENT`, `CURSOR_AGENT=1`,
@@ -204,7 +222,7 @@ One engine (`src/core/policy.ts`) and one dispatcher (`sdlc hook pre-tool | sess
 | Agent calls a registry MCP server outside its `stages` (`mcp.servers`) | process | `warn`: a reminder; `block`: deny (rule `mcp-stage`) |
 | Agent attribution in the log | audit | CLI entries in an agent session add optional `agent`; `by` remains the git identity |
 | Production release without authorization (`release.commands`) | hard | deny until there is a `release` approval or `SDLC_RELEASE_APPROVAL` |
-| Stopping without fresh verification (`verify_before_stop`) | optional | Claude Code, Codex CLI, Qwen Code, GigaCode: `Stop → decision: block`; Cursor: stop answers a `followup_message`; OpenCode: none |
+| Stopping without fresh verification (`verify_before_stop`) | optional | Claude Code, Codex CLI, Qwen Code, GigaCode: `Stop → decision: block`; Cursor: stop answers a `followup_message`; OpenCode: none. A change that cannot be evaluated (an unreadable artifact, a link out of its folder) blocks the stop with the change and the error code; a repeated stop (`stop_hook_active`) is not blocked again |
 | Session context | — | Claude Code, Codex CLI, Qwen Code, GigaCode: `SessionStart.additionalContext`; Cursor: sessionStart `additional_context`; OpenCode: `experimental.chat.system.transform` |
 
 `enforcement.mode: off | warn | block`. In `warn`, the hard rules still apply. If the CLI is absent, hooks allow the
@@ -217,7 +235,11 @@ A failed check follows each tool's hook behavior:
 - Cursor's edit and shell hooks are `failClosed`. An unavailable hook or missing CLI blocks the call.
 - Codex CLI, Qwen Code and GigaCode allow a call when a hook fails. The `sdlc` command itself answers `deny` when
   its pre-tool hook fails to load or throws. A missing CLI or timeout can still let a call through.
-- Inside the CLI, an uninitialized project or internal error still answers "allow".
+- Inside the CLI, a project without `openspec/sdlc.yaml` answers "allow". So does an internal error inside a
+  check, and `sdlc doctor` reports it.
+- A `sdlc.yaml` that exists but fails to load answers "deny" with the rule `config-load`, in every host. The reason
+  names the file, the error code, the fix and `sdlc doctor`. Only a raw `enforcement.mode` that reads exactly `off`
+  still allows. Session start gets one line; the stop gets one reminder, and none once the stop hook is active.
 
 **Claude Code:** `SessionStart`, `PreToolUse` (`Edit|Write|MultiEdit|NotebookEdit|Bash|PowerShell|mcp__.*`; PowerShell
 and MCP tools) and `Stop` are merged into `.claude/settings.json`. The response uses the
@@ -401,6 +423,13 @@ Supporting implementations include:
 Every command except `statusline`, `dashboard`, `mcp serve`, `hook` and `openspec` has `--json` diagnostics with
 `{severity, code, message, fix}`, as in OpenSpec.
 
+The shared views evaluate each change on its own (`src/core/evaluate-each.ts`):
+
+- `next --me` and `board list` report a change that cannot be evaluated once and keep showing the others; their JSON
+  gains an `errors` list, present only when it is not empty;
+- the statusline adds a count of such changes;
+- `sdlc status` keeps its own message for a broken change.
+
 Planning commands include:
 
 - `sdlc explore <slug> | list`, `sdlc track set <full|lite> --change <id>` and `sdlc defer add | list | close`;
@@ -429,7 +458,12 @@ JSON Schemas, `schemas/contracts/task.schema.json` and `schemas/contracts/result
 built and tested against them. Export reads the change: the open tasks of `tasks.md`, the plan's files, the spec
 scenarios, the verify commands, the forbidden paths and the base commit. It refuses unless the plan gate is approved
 and fresh (`plan_not_approved`). Check-result reads the commits of the returned branch, their `SDLC-Change` and
-`SDLC-Task` trailers and the files they touch, against the change's tasks, the plan and the forbidden paths. Both
+`SDLC-Task` trailers and the files they touch, against the change's tasks, the plan and the forbidden paths. The
+files come from a NUL-separated `git diff --name-status --no-renames --no-relative --ignore-submodules=none`
+listing (`src/core/changed-paths.ts`); the flags pin the local settings that change the listing, so neither
+`diff.renames`, `diff.relative`, `diff.ignoreSubmodules` nor a `.gitmodules` `ignore` entry can hide a path. A
+rename gives both paths under their real names, and a moved submodule pointer is listed at its path. A listing that
+cannot be read or parsed is the problem `diff_unavailable`, never an empty change. Both
 commands are read-only and are not in `HUMAN_COMMANDS`; merging, verification and review stay the usual steps.
 
 **The executor registry.** `openspec/executors.yaml` (`src/core/executors.ts`) is a state file a person fills:
@@ -488,7 +522,7 @@ can list the board but cannot call a write tool. No MCP tool handles dispatch or
 | State in `.sdlc.yaml`, not in `.openspec.yaml` | OpenSpec rewrites its metadata through zod and drops unknown keys | one more file in the change folder |
 | Digests instead of "approved" flags | an approval cannot "survive" an edit to the artifact | fixing a typo requires a new approval |
 | Git tree id instead of "HEAD + diff" | a commit does not make verification stale | without a complete fingerprint, verification is not fresh and code-bound approvals have no digest |
-| Hooks allow when the CLI is missing, block when a check fails | a missing installation does not paralyze work, a flaky check does not open a hole | without the CLI the rules do not apply (`doctor` catches this; Cursor's `failClosed` hooks block instead); a check that exceeds the hook timeout (30 s in Claude Code and Codex CLI) is still allowed by Claude Code, Codex CLI and Qwen Code themselves |
+| Hooks allow when the CLI, the project or `sdlc.yaml` is missing; deny with `config-load` when `sdlc.yaml` exists but cannot be read or loaded, unless its raw mode is `off`; allow on any other internal error | a missing installation does not paralyze work, and a broken or refused setting does not open a hole | an internal error inside a check still allows, and `sdlc doctor` reports it; without the CLI the rules do not apply (`doctor` catches this; Cursor's `failClosed` hooks block instead); a check that exceeds the hook timeout (30 s in Claude Code and Codex CLI) is still allowed by Claude Code, Codex CLI and Qwen Code themselves |
 | Identity = git user | zero infrastructure | a git email can be forged by a person with access to the repository; `roles.yaml` with `signing: required` and `sdlc approvals verify` in CI close this, together with branch protection (see the playbook) |
 
 ## 4.9. Limitations and what comes next
@@ -496,6 +530,12 @@ can list the board but cannot call a write tool. No MCP tool handles dispatch or
 These are current limits of the integrations and command surface.
 
 - OpenCode has no equivalent of the Stop hook; the plugin also has no `ask` decisions (only allow/deny).
+- Approvals fail closed in two checkpoint cases:
+  - an LFS artifact without git-lfs or without its local object, unless the worktree holds the pointer;
+  - an `ident` artifact with `core.autocrlf=true` (the Git for Windows default).
+- An artifact that is an absolute link to a target outside the root as given (for example git's top level reached
+  through another path while the project is opened through a junction) is approved without a checkpoint: the
+  approval is recorded and its digest binds it, but no checkpoint ref is written for that gate.
 - OpenSpec stores/multi-repository setups are not supported yet (pass-through commands work; gates are evaluated against
   the local root).
 - Continuous evals (Stage 4) and monitoring control bands (Stage 6) are described in the `archive`/`triage` workflows,

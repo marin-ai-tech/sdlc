@@ -1,6 +1,7 @@
 import * as path from 'node:path';
 import { readChangeState, type ChangeState, type TakeoverRecord } from './change-state.js';
 import { listChangeFolders } from './changes.js';
+import { folderKey, folderLabel } from './folder-name.js';
 import { toPosix } from './fs-utils.js';
 import { quotedCommand } from './human-command.js';
 import { t } from './i18n.js';
@@ -78,8 +79,11 @@ export function takeoverDenial(
     if (hit === undefined) {
       continue;
     }
-    const params = { change: change.id, by: change.takeover.by, note: change.takeover.note, path: hit };
-    const reason = t(change.files ? 'hook.takeover' : 'hook.takeoverPaused', params);
+    const params = { change: folderLabel(change.id), by: change.takeover.by, note: change.takeover.note, path: hit };
+    const key = change.files
+      ? folderKey(change.id, 'hook.takeover', 'hook.takeoverFolder')
+      : folderKey(change.id, 'hook.takeoverPaused', 'hook.takeoverPausedFolder');
+    const reason = t(key, params);
     return { decision: 'deny', rule: 'takeover', reason };
   }
   return undefined;
@@ -87,7 +91,7 @@ export function takeoverDenial(
 
 /** sdlc steps that only read, allowed on a held change. */
 const READ_ONLY_STEP = /^(?:status|next|trace|audit|help|instructions|validate|roles\s+who)$/i;
-const CHANGE_OPTION = /--change(?:=|\s+)["']?([^\s"';&|]+)/gi;
+const CHANGE_OPTION = /--change(?:=|\s+)(?:"([^"]*)(?:"|$)|'([^']*)(?:'|$)|([^\s"';&|]+))/gi;
 
 /** The subcommand of an sdlc step: two words for the command groups (`roles who`, `tests lock`). */
 function stepName(match: RegExpExecArray): string {
@@ -105,7 +109,8 @@ function writesStep(segment: string, id: string, step: RegExp): boolean {
   if (!match || READ_ONLY_STEP.test(match[1]) || READ_ONLY_STEP.test(stepName(match))) {
     return false;
   }
-  return [...segment.matchAll(CHANGE_OPTION)].some((option) => option[1].toLowerCase() === id.toLowerCase());
+  return [...segment.matchAll(CHANGE_OPTION)].some((option) =>
+    (option[1] ?? option[2] ?? option[3]).toLowerCase() === id.toLowerCase());
 }
 
 function cliDenial(change: HeldChange, command: string, step: RegExp): TakeoverDenial | undefined {
@@ -113,8 +118,9 @@ function cliDenial(change: HeldChange, command: string, step: RegExp): TakeoverD
   if (segment === undefined) {
     return undefined;
   }
-  const params = { change: change.id, by: change.takeover.by, note: change.takeover.note };
-  const reason = t('hook.takeoverCli', { ...params, command: quotedCommand(segment) });
+  const params = { change: folderLabel(change.id), by: change.takeover.by, note: change.takeover.note };
+  const key = folderKey(change.id, 'hook.takeoverCli', 'hook.takeoverCliFolder');
+  const reason = t(key, { ...params, command: quotedCommand(segment) });
   return { decision: 'deny', rule: 'takeover', reason };
 }
 

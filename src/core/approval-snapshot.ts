@@ -12,13 +12,21 @@ export function assertSnapshotContent(root: string, changeDir: string, gate: str
   if (initialTree && initialTree !== snapshot.ordinaryTree) changed(gate);
   const relative = path.relative(root, changeDir).replace(/\\/g, '/');
   for (const file of expected?.files ?? []) {
-    const raw = snapshot.read(`${relative}/${file.path}`);
+    const artifact = `${relative}/${file.path}`;
+    const raw = snapshot.read(artifact);
     if (raw === undefined) changed(gate);
-    const normalized = stripProvenance(normalizeNewlines(raw!));
-    const planning = gate === 'intent' || gate === 'spec' || gate === 'plan';
-    const text = planning && file.path === tracks ? withoutCheckboxState(normalized) : normalized;
-    if (text.trimEnd() !== file.text) changed(gate);
+    if (matches(raw!, file.path, gate, tracks, file.text)) continue;
+    const filtered = snapshot.readFiltered(artifact);
+    if (filtered !== undefined && matches(filtered, file.path, gate, tracks, file.text)) continue;
+    changed(gate);
   }
+}
+
+function matches(content: string, file: string, gate: string, tracks: string, expected: string): boolean {
+  const normalized = stripProvenance(normalizeNewlines(content));
+  const planning = gate === 'intent' || gate === 'spec' || gate === 'plan';
+  const text = planning && file === tracks ? withoutCheckboxState(normalized) : normalized;
+  return text.trimEnd() === expected;
 }
 
 function changed(gate: string): never {

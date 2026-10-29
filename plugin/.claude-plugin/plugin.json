@@ -1,6 +1,6 @@
 {
   "name": "sdlc",
-  "version": "0.27.0",
+  "version": "0.28.0",
   "description": "Human-gated SDLC for AI coding agents: workflows from intent to release, approvals only by people, verification evidence and review, built on OpenSpec. Requires the sdlc CLI from the GitHub release (https://github.com/marin-ai-tech/sdlc/releases/latest), not the unrelated npm package of that name.",
   "author": {
     "name": "marin-ai technologies",

@@ -31,7 +31,7 @@
       "type": "array",
       "items": { "type": "string" },
       "uniqueItems": true,
-      "description": "Changed files of the range: repo-relative, POSIX separators, sorted"
+      "description": "Changed files of the range, sorted: repo-relative names exactly as git stores them, both sides of a rename; empty when the problem diff_unavailable is reported"
     },
     "problems": {
       "type": "array",
@@ -40,7 +40,10 @@
         "type": "object",
         "required": ["code"],
         "properties": {
-          "code": { "enum": ["missing_trailer", "unknown_task", "forbidden_path", "no_commits", "missing_agent", "unknown_executor", "executor_not_allowed", "wrong_executor"] },
+          "code": { "enum": [
+            "missing_trailer", "unknown_task", "forbidden_path", "no_commits", "missing_agent",
+            "unknown_executor", "executor_not_allowed", "wrong_executor", "diff_unavailable"
+          ] },
           "sha": { "type": "string" },
           "file": { "type": "string" },
           "task": { "type": "string" },

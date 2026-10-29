@@ -47,6 +47,22 @@ describe('demo deck (scripts/demo)', () => {
     expect(referenced.filter((id) => !ids.has(id))).toEqual([]);
   });
 
+  it('negative: no slide names a release version, and no slide outside the demo story a backlog id', async () => {
+    const { SLIDES } = await load();
+    const text = (slide: Slide) => JSON.stringify({ ...slide, steps: undefined, more: undefined });
+    // sdlc releases are 0.x: two or three parts, with or without a v ("0.26", "v0.26.0").
+    const release = /\bv?0\.\d+(?:\.\d+)?\b/g;
+    const versions = SLIDES.flatMap((slide) => text(slide).match(release) ?? []);
+    expect(versions).toEqual([]);
+    const page = fs.readFileSync(path.join(REPO_ROOT, 'docs/en/32-why-sdlc.md'), 'utf8');
+    expect([...(page.match(release) ?? []), ...(page.match(/\b[BE]\d{1,3}\b/g) ?? [])]).toEqual([]);
+    // Slides with demo steps tell the calculator's story, whose own backlog items (B1) belong to it.
+    const outside = SLIDES.filter((slide) => !slide.steps && !slide.more);
+    expect(outside.map((slide) => slide.id)).toEqual(expect.arrayContaining(['why', 'cost', 'closing']));
+    const ids = outside.flatMap((slide) => text(slide).match(/\b[BE]\d{1,3}\b/g) ?? []);
+    expect(ids).toEqual([]);
+  });
+
   it('English slide titles fit on one line', async () => {
     const { SLIDES } = await load();
     expect(SLIDES.map((slide) => slide.title.en).filter((title) => title.length > 57)).toEqual([]);

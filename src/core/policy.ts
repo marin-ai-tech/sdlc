@@ -1,13 +1,15 @@
 import picomatch from 'picomatch';
 import type { SdlcConfig } from './config.js';
 import { readChangeState } from './change-state.js';
-import { listActiveChanges, listChangeFolders } from './changes.js';
+import { isValidChangeId, listActiveChanges, listChangeFolders } from './changes.js';
+import { folderKey, folderLabel } from './folder-name.js';
 import { harnessStamp, stampText } from './license.js';
 import { evaluateChange, sharedFingerprint, type LifecycleView } from './lifecycle.js';
 import type { ProjectPaths } from './project.js';
 import { callsHumanCommand, CLI_PREFIX, joinContinuations } from './human-command-match.js';
 import { nextBacklogItem, readBacklog } from './backlog.js';
 import { t } from './i18n.js';
+import { toDiagnostic } from './errors.js';
 import { quotedCommand } from './human-command.js';
 import { removesSdlcCli } from './policy-cli.js';
 import { clearsAgentMarker } from './policy-markers.js';
@@ -17,7 +19,7 @@ import { guardDenial, guardEditHits, shellGuardWrites } from './policy-guard.js'
 import { userGuardEditHits, userShellGuardWrites } from './user-guard.js';
 import { editWrites, type EditWrite } from './edit-texts.js';
 import { secretEditDenial, shellSecretDenial } from './policy-secrets.js';
-import { mcpStageDecision } from './policy-mcp.js';
+import { INVALID_FOLDER_STAGE, mcpStageDecision } from './policy-mcp.js';
 import { inboxSessionLines } from '../mcp/inbox.js';
 import {
   linkedStateFiles,
@@ -148,6 +150,7 @@ export interface PolicyContext {
 interface ChangeSnapshot {
   id: string;
   dir: string;
+  valid: boolean;
   planApproved: boolean;
   view?: LifecycleView;
   testsLocked: boolean;
@@ -157,16 +160,17 @@ interface ChangeSnapshot {
 function snapshots(ctx: PolicyContext, full = false): ChangeSnapshot[] {
   const fingerprint = full ? sharedFingerprint(ctx.paths.root) : undefined;
   return listChangeFolders(ctx.paths).map((ref) => {
+    const valid = isValidChangeId(ref.id);
     try {
       // The hook never needs the names of the people who may approve (roles.yaml lookups): skipPeople.
       const options = full ? { fingerprint, skipPeople: true } : { skipFingerprint: true, skipPeople: true };
       const view = evaluateChange(ctx.paths.root, ref, ctx.config, options);
-      return { id: ref.id, dir: ref.dir, planApproved: gateOk(view, 'plan'),
+      return { id: ref.id, dir: ref.dir, valid, planApproved: valid && gateOk(view, 'plan'),
         view, testsLocked: view.testsLocked, kind: view.kind };
     } catch {
       // A broken change must not wedge every edit in the repo; surface it via `sdlc doctor`.
       const state = safeState(ref.dir);
-      return { id: ref.id, dir: ref.dir, planApproved: false,
+      return { id: ref.id, dir: ref.dir, valid, planApproved: false,
         testsLocked: state?.tests_locked === true, kind: state?.kind ?? 'feature' };
     }
   });
@@ -258,7 +262,7 @@ function evaluateCommand(
 function releaseDecision(cmd: string, ctx: PolicyContext, env: NodeJS.ProcessEnv): Decision {
   const release = ctx.config.release.commands.find((p) => new RegExp(p, 'i').test(cmd));
   if (!release || env.SDLC_RELEASE_APPROVAL) return { decision: 'allow' };
-  const authorized = snapshots(ctx, true).filter((c) => gateOk(c.view, 'release'));
+  const authorized = snapshots(ctx, true).filter((c) => c.valid && gateOk(c.view, 'release'));
   if (authorized.length > 0) return { decision: 'allow' };
   return {
     decision: 'deny',
@@ -271,7 +275,8 @@ function releaseDecision(cmd: string, ctx: PolicyContext, env: NodeJS.ProcessEnv
 export function evaluateToolCall(call: ToolCall, ctx: PolicyContext): Decision {
   const decision = evaluateRules(call, ctx);
   if (decision.decision !== 'allow') return decision;
-  const stages = () => snapshots(ctx).flatMap((change) => (change.view ? [change.view.stage] : []));
+  const stages = () => snapshots(ctx).flatMap((change) =>
+    change.valid ? change.view ? [change.view.stage] : [] : [INVALID_FOLDER_STAGE]);
   return mcpStageDecision(call.tool, ctx.config, stages) ?? decision;
 }
 
@@ -342,7 +347,8 @@ function testsLockedDenial(rels: string[], changes: ChangeSnapshot[], isTest: (p
   if (testHit === undefined) return undefined;
   const locking = changes.find((c) => c.testsLocked);
   if (!locking) return undefined;
-  const reason = t('hook.testsLocked', { change: locking.id, path: testHit });
+  const key = folderKey(locking.id, 'hook.testsLocked', 'hook.testsLockedFolder');
+  const reason = t(key, { change: folderLabel(locking.id), path: testHit });
   const denial: Decision = { decision: 'deny', rule: 'tests-locked', reason };
   return denial;
 }
@@ -417,13 +423,16 @@ export function stopCheck(ctx: PolicyContext): string | undefined {
       const verify = view.gates.find((g) => g.id === 'verify');
       const planOk = gateOk(view, 'plan');
       if (planOk && view.tasks.total > 0 && view.tasks.remaining === 0 && verify && verify.status !== 'passed' && verify.required) {
-        return t('hook.verifyBeforeStop', {
-          change: view.change,
+        return t(folderKey(ref.id, 'hook.verifyBeforeStop', 'hook.verifyBeforeStopFolder'), {
+          change: folderLabel(ref.id),
           detail: verify.reason ?? verify.status,
         });
       }
-    } catch {
-      // Ignore changes that cannot be evaluated here.
+    } catch (error) {
+      return t('hook.stopEvaluationError', {
+        change: isValidChangeId(ref.id) ? JSON.stringify(ref.id) : folderLabel(ref.id),
+        code: toDiagnostic(error).code,
+      });
     }
   }
   return undefined;

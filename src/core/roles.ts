@@ -170,7 +170,7 @@ export function parseRolesFile(text: string, file = ROLES_PATH, historical = fal
   }
   return { signing: raw.signing as SigningMode, people: parsePeople(raw.people, file, historical),
     ...(raw.signing_since === undefined ? {} : { signingSince: raw.signing_since as string }),
-    roles: parseRoles(raw.roles, raw.people, file), separation: parseSeparation(raw.separation, file) };
+    roles: parseRoles(raw.roles, raw.people, file, historical), separation: parseSeparation(raw.separation, file) };
 }
 
 function parsePeople(value: unknown, file: string, historical: boolean): Person[] {
@@ -211,15 +211,15 @@ function validSigningKey(value: unknown): value is string {
     && blob.subarray(4, 4 + nameLength).toString('ascii') === algorithm;
 }
 
-function parseRoles(value: unknown, people: unknown, file: string): Record<string, string[]> {
+function parseRoles(value: unknown, people: unknown, file: string, historical: boolean): Record<string, string[]> {
   const peopleRaw = mapping(people, file, 'people');
   const rolesRaw = mapping(value, file, 'roles');
   const roles: Record<string, string[]> = {};
   for (const [role, value] of Object.entries(rolesRaw)) {
-    if (!isRoleName(role)) {
+    if (!historical && !isRoleName(role)) {
       throw new SdlcError('invalid_roles', {
         key: 'error.roleNameNotPlain', params: { file, field: 'roles', role },
-      });
+      }, { key: 'fix.roleNamePlain', params: { file } });
     }
     roles[role] = strings(value, file, `roles.${role}`);
     for (const id of roles[role]) {
