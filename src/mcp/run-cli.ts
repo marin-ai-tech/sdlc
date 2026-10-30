@@ -15,6 +15,7 @@ export interface CliRun {
   /** Why the child did not run to its end (spawn error, timeout). */
   failure?: string;
 }
+export interface CliCallerContext { origin: 'mcp'; executor?: string }
 
 /** This CLI's own entry script, so the child is the same harness version as the server. */
 export function cliEntry(): string {
@@ -26,10 +27,12 @@ export function cliEntry(): string {
  * Never a shell: every argument reaches the CLI as one word. Never in-process: commands print to stdout, which is
  * the protocol channel of the server.
  */
-export function runCli(args: string[], cwd: string, entry: string = cliEntry()): Promise<CliRun> {
+export function runCli(args: string[], cwd: string, entryOrCaller: string | CliCallerContext = cliEntry()): Promise<CliRun> {
+  const entry = typeof entryOrCaller === 'string' ? entryOrCaller : cliEntry();
+  const caller = typeof entryOrCaller === 'object' ? entryOrCaller : undefined;
   const options = {
     cwd,
-    env: process.env,
+    env: caller ? { ...process.env, SDLC_MCP_ORIGIN: '1', SDLC_MCP_EXECUTOR: caller.executor ?? '' } : process.env,
     encoding: 'utf8' as const,
     timeout: CHILD_TIMEOUT_MS,
     maxBuffer: MAX_OUTPUT_BYTES,

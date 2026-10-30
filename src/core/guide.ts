@@ -12,7 +12,7 @@ import type { Locale } from './i18n.js';
 /** The topics in the order of the index. */
 export const GUIDE_TOPICS = [
   'start', 'lifecycle', 'gates', 'roles', 'team', 'tracks', 'bugfix', 'backlog', 'rework', 'verify', 'review', 'health', 'mcp', 'config',
-  'denials', 'faq',
+  'plugins', 'denials', 'faq',
 ] as const;
 
 export interface GuideTopic {

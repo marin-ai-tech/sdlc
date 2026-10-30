@@ -11,10 +11,11 @@ import { nextBacklogItem, readBacklog } from './backlog.js';
 import { t } from './i18n.js';
 import { toDiagnostic } from './errors.js';
 import { quotedCommand } from './human-command.js';
-import { removesSdlcCli } from './policy-cli.js';
+import { pluginHumanDecision, removesSdlcCli } from './policy-cli.js';
 import { clearsAgentMarker } from './policy-markers.js';
 import { handBackLine, shellTakeoverDenial, takeoverDenial } from './takeover.js';
-import { hardLinkedStateFiles } from './policy-hardlink.js';
+import { hardLinkedStateFiles, hardLinkedFiles } from './policy-hardlink.js';
+import { pluginStateFiles } from '../plugins/activation.js';
 import { guardDenial, guardEditHits, shellGuardWrites } from './policy-guard.js';
 import { userGuardEditHits, userShellGuardWrites } from './user-guard.js';
 import { editWrites, type EditWrite } from './edit-texts.js';
@@ -25,6 +26,7 @@ import {
   linkedStateFiles,
   relToRoot,
   shellStateWrites,
+  shellWriteTargets,
   STATE_FILE,
   STATE_FILE_WRITE,
   WRITE_OPS,
@@ -195,7 +197,8 @@ function stateWriteDenial(spelled: string, ctx: PolicyContext, cwd: string): Dec
     const paths = spelled.match(new RegExp(STATE_FILE_WRITE.source, 'gi')) ?? [];
     return { decision: 'deny', rule: 'state-integrity', reason: stateReason(paths, false) };
   }
-  const hits = shellStateWrites(spelled, ctx.paths.root, cwd);
+  const hits = [...shellStateWrites(spelled, ctx.paths.root, cwd),
+    ...hardLinkedFiles(shellWriteTargets(spelled, ctx.paths.root, cwd), ctx.paths.root, ctx.paths.root, pluginStateFiles)];
   if (hits.length === 0) return undefined;
   return { decision: 'deny', rule: 'state-integrity', reason: stateReason(hits, false) };
 }
@@ -273,11 +276,15 @@ function releaseDecision(cmd: string, ctx: PolicyContext, env: NodeJS.ProcessEnv
 
 /** Every rule; a call the other rules allow may still be a registry MCP server out of stage (B43). */
 export function evaluateToolCall(call: ToolCall, ctx: PolicyContext): Decision {
-  const decision = evaluateRules(call, ctx);
-  if (decision.decision !== 'allow') return decision;
-  const stages = () => snapshots(ctx).flatMap((change) =>
-    change.valid ? change.view ? [change.view.stage] : [] : [INVALID_FOLDER_STAGE]);
-  return mcpStageDecision(call.tool, ctx.config, stages) ?? decision;
+  let decision = evaluateRules(call, ctx);
+  if (decision.decision === 'allow') {
+    const stages = () => snapshots(ctx).flatMap((change) =>
+      change.valid ? change.view ? [change.view.stage] : [] : [INVALID_FOLDER_STAGE]);
+    decision = mcpStageDecision(call.tool, ctx.config, stages) ?? decision;
+  }
+  if (decision.decision === 'deny' || ctx.config.enforcement.mode === 'off'
+    || call.kind !== 'bash' || !call.command) return decision;
+  return pluginHumanDecision(joinContinuations(call.command), ctx.paths.root, ctx.config) ?? decision;
 }
 
 function evaluateRules(call: ToolCall, ctx: PolicyContext): Decision {
@@ -301,6 +308,7 @@ function evaluateRules(call: ToolCall, ctx: PolicyContext): Decision {
     ...rels.filter((r) => STATE_FILE.test(r)),
     ...linkedStateFiles(call.files, paths.root, call.cwd),
     ...hardLinkedStateFiles(call.files, paths.root, call.cwd),
+    ...hardLinkedFiles(call.files, paths.root, call.cwd, pluginStateFiles),
   ];
   if (stateHits.length > 0) {
     return {

@@ -1,0 +1,92 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://sdlc.dev/schemas/contracts/plugin-manifest.schema.json",
+  "title": "sdlc.plugin/1 manifest",
+  "description": "Strict API 1 package declarations. The loader additionally checks semantic versions, API compatibility, current core namespace collisions, package containment, local schema references, operation links and read-only hooks before acceptance.",
+  "type": "object",
+  "required": ["format", "name", "version", "api", "entry", "initialState", "schemas", "operations", "commands", "tools", "hooks", "events"],
+  "properties": {
+    "format": { "const": "sdlc.plugin/1" },
+    "name": {
+      "allOf": [
+        { "$ref": "#/$defs/name" },
+        { "not": { "enum": [
+          "adopt", "config", "roles", "ci", "team", "backlog", "defer", "layout", "init", "update",
+          "uninstall", "new", "explore", "import", "status", "explain", "help", "guide", "next", "gate",
+          "approve", "reject", "waive", "rework", "drop", "track", "takeover", "release-control", "tests",
+          "verify", "judge", "review", "task", "board", "mcp", "context", "inbox", "report", "dashboard",
+          "log", "license", "doctor", "health", "plugin", "plugins", "trace", "hook", "openspec", "core",
+          "sdlc", "setup", "change", "summary", "statusline", "events", "triage", "release", "approvals",
+          "instructions", "validate", "archive", "audit", "changelog", "answer",
+          "deferred", "executor", "exploration", "harness", "question"
+        ] } }
+      ]
+    },
+    "version": { "type": "string", "minLength": 1, "description": "A valid semantic version, checked by the loader." },
+    "api": { "type": "string", "minLength": 1, "description": "A semantic-version range accepting API 1.0.0." },
+    "entry": { "type": "string", "pattern": "^(?:[A-Za-z0-9_.-]+/)*[A-Za-z0-9_.-]*\\.wasm$", "description": "An existing portable package-relative regular file; traversal, device names and links are refused by the loader." },
+    "initialState": { "$ref": "#/$defs/json" },
+    "schemas": {
+      "type": "object",
+      "required": ["config", "state", "facts"],
+      "properties": {
+        "config": { "$ref": "#/$defs/schema" },
+        "state": { "$ref": "#/$defs/schema" },
+        "facts": { "$ref": "#/$defs/schema" },
+        "taskExt": { "$ref": "#/$defs/schema" },
+        "bidExt": { "$ref": "#/$defs/schema" }
+      },
+      "additionalProperties": false
+    },
+    "operations": {
+      "type": "object",
+      "propertyNames": { "$ref": "#/$defs/name" },
+      "additionalProperties": {
+        "type": "object",
+        "required": ["access", "input", "output"],
+        "properties": {
+          "access": { "enum": ["read", "executor", "person"] },
+          "input": { "$ref": "#/$defs/schema" },
+          "output": { "$ref": "#/$defs/schema" }
+        },
+        "additionalProperties": false
+      }
+    },
+    "commands": { "$ref": "#/$defs/routes" },
+    "tools": { "$ref": "#/$defs/routes" },
+    "hooks": {
+      "type": "object",
+      "properties": {
+        "claim": { "$ref": "#/$defs/name" },
+        "bid": { "$ref": "#/$defs/name" },
+        "award": { "$ref": "#/$defs/name" },
+        "result_accept": { "$ref": "#/$defs/name" },
+        "file_edit": { "$ref": "#/$defs/name" },
+        "stop": { "$ref": "#/$defs/name" }
+      },
+      "additionalProperties": false
+    },
+    "events": {
+      "type": "object",
+      "propertyNames": { "type": "string", "pattern": "^[a-z][a-z0-9-]*(\\.[a-z][a-z0-9-]*)*$", "maxLength": 96 },
+      "additionalProperties": { "$ref": "#/$defs/schema" }
+    }
+  },
+  "additionalProperties": false,
+  "$defs": {
+    "name": { "type": "string", "pattern": "^[a-z][a-z0-9-]{0,23}$", "not": { "enum": ["constructor", "prototype"] } },
+    "schema": { "anyOf": [{ "type": "boolean" }, { "type": "object" }, { "type": "string" }], "description": "A JSON Schema 2020-12 value or package-local document/fragment reference. The bounded worker compiles and checks every declaration without mutation or remote loading." },
+    "routes": {
+      "type": "object",
+      "propertyNames": { "$ref": "#/$defs/name" },
+      "additionalProperties": { "$ref": "#/$defs/name" }
+    },
+    "json": {
+      "anyOf": [
+        { "type": "null" }, { "type": "boolean" }, { "type": "number" }, { "type": "string" },
+        { "type": "array", "items": { "$ref": "#/$defs/json" } },
+        { "type": "object", "propertyNames": { "not": { "enum": ["__proto__", "prototype", "constructor"] } }, "additionalProperties": { "$ref": "#/$defs/json" } }
+      ]
+    }
+  }
+}

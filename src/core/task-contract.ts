@@ -12,6 +12,8 @@ import { evaluateChange, type LifecycleView } from './lifecycle.js';
 import { appendLog } from './log.js';
 import { readPlanFiles, readPlanProof } from './plan-files.js';
 import { STATE_FILES } from './state-files.js';
+import { consumeExtensions, declareOperation } from '../plugins/evaluation.js';
+import type { Extensions } from '../plugins/api.js';
 import { parseTasks } from './tasks.js';
 import { parseRequirements, TASK_ID } from './trace.js';
 
@@ -29,6 +31,7 @@ export interface TaskCheck {
 }
 
 export interface TaskItem {
+  ext?: Extensions;
   contract: 'sdlc.task/1';
   /** `<change>#<task>` - unique across changes, since task numbers repeat. */
   id: string;
@@ -137,8 +140,9 @@ function resolveExecutor(root: string, executorId: string | undefined): Executor
  * registry, plan gate, task number, executor permission.
  */
 export function exportItems(
-  root: string, ref: ChangeRef, config: SdlcConfig, only?: string, executorId?: string,
+  root: string, ref: ChangeRef, config: SdlcConfig, only?: string, executorId?: string, extension?: Extensions,
 ): { items: TaskItem[]; executor?: Executor } {
+  declareOperation(root, config, 'export', { change: ref.id, task: only, executor: executorId, ext: extension });
   const executor = resolveExecutor(root, executorId);
   const view = evaluateChange(root, ref, config, { skipFingerprint: true, skipPeople: true });
   if (!planOpen(view)) {
@@ -174,17 +178,18 @@ export function exportItems(
     checks: config.verify.commands.map((check) => ({ name: check.name, run: check.run, required: check.required })),
     forbidden: forbiddenPaths(root, config, state.tests_locked === true),
   };
+  const ext = consumeExtensions(root, 'taskExt', extension);
   const items = tasks
     .filter((task) => !task.done && (only === undefined || task.id === only))
-    .map((task) => workItem(ref, task, shared, executor));
+    .map((task) => ({ ...workItem(ref, task, shared, executor), ...(ext === undefined ? {} : { ext }) }));
   return { items, executor };
 }
 
 /** One work item per open (unchecked) task; `only` picks a single task number. */
 export function exportTasks(
-  root: string, ref: ChangeRef, config: SdlcConfig, only?: string, executorId?: string,
+  root: string, ref: ChangeRef, config: SdlcConfig, only?: string, executorId?: string, ext?: Extensions,
 ): TaskItem[] {
-  const { items, executor } = exportItems(root, ref, config, only, executorId);
+  const { items, executor } = exportItems(root, ref, config, only, executorId, ext);
   // Each handed-out task is one log entry; a refused export logs nothing.
   const agent = agentEnvironment();
   for (const item of items) {

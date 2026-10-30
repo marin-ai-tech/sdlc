@@ -154,6 +154,7 @@ Choose a starting point that fits your work. The [full documentation index](docs
 **Research and design:**
 
 - [Architecture](docs/en/04-architecture.md) — see how the parts fit together.
+- [Runtime plugins](docs/en/33-plugins.md) — add pinned Wasm operations, own state and restrictions with explicit trust.
 - [OpenSpec analysis](docs/en/01-openspec-analysis.md) — understand the specification foundation.
 - [SDLC playbook](docs/en/02-sdlc-playbook.md) — see the process mapping.
 - [Landscape review](docs/en/03-landscape-and-reviews.md) — compare other approaches.

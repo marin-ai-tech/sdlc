@@ -130,7 +130,7 @@ describe('B151: the harness candidate check sees renames and unreadable diffs', 
       // The edit the candidate check accepts, so the move is the only defect.
       passingEdit(checkout);
     });
-    const resultSpy = vi.spyOn(taskResult, 'checkResult');
+    const resultSpy = vi.spyOn(taskResult, 'checkResultCore');
     try {
       const verdict = await host.verify('local', p.claim.item);
       const checked = resultSpy.mock.results.map((result) => result.value);
@@ -149,9 +149,9 @@ describe('B151: the harness candidate check sees renames and unreadable diffs', 
     // cannot carry a missing tree (`git bundle verify`), so the problem is injected through the real result.
     const p = project();
     const { host, validateCandidate } = await prepared(p, passingEdit);
-    const real = taskResult.checkResult;
+    const real = taskResult.checkResultCore;
     const unavailable = { code: 'diff_unavailable' } as unknown as taskResult.ResultProblem;
-    const resultSpy = vi.spyOn(taskResult, 'checkResult').mockImplementation((...args) => {
+    const resultSpy = vi.spyOn(taskResult, 'checkResultCore').mockImplementation((...args) => {
       const checked = real(...args);
       return { ...checked, ok: false, files: [], problems: [...checked.problems, unavailable] };
     });

@@ -1,5 +1,6 @@
 import * as crypto from 'node:crypto';
 import { SdlcError, toDiagnostic } from './errors.js';
+import { historicalReplay } from '../plugins/evaluation.js';
 
 export interface BoardRequest {
   key: string;
@@ -57,13 +58,14 @@ function digest(spec: RequestSpec): string {
   return crypto.createHash('sha256').update(JSON.stringify([spec.command, spec.args])).digest('hex');
 }
 
-export function replayRequest<T>(requests: BoardRequest[], spec?: RequestSpec): void {
+export function replayRequest<T>(requests: BoardRequest[], spec?: RequestSpec, root?: string): void {
   if (!spec?.key) return;
   const match = requests.find((entry) => entry.key === spec.key);
   if (!match) return;
   if (match.command !== spec.command || match.digest !== digest(spec)) {
     throw new SdlcError('request_conflict', { key: 'error.board_request_conflict' });
   }
+  if (root) historicalReplay(root);
   throw new RequestReplay((match.value ?? match.result) as T, match.exitCode);
 }
 
@@ -77,6 +79,7 @@ function publicClaim(value: Record<string, unknown>): Record<string, unknown> {
   const { id, item, executor, agent, claimedAt, expiresAt, leaseSeconds, state,
     reason, reopenedAt, escalate } = value;
   return { id, item, executor, agent, claimedAt, expiresAt, leaseSeconds, state,
+    ...(value.ext === undefined ? {} : { ext: value.ext }),
     ...(reason ? { reason, reopenedAt, escalate } : {}) };
 }
 

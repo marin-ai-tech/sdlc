@@ -13,6 +13,8 @@ import { appendLog } from './log.js';
 import { matchesPlanFile, readPlanFiles } from './plan-files.js';
 import { changeTasks, forbiddenPaths } from './task-contract.js';
 import { TRAILER } from './trace.js';
+import { consumeHook, declareOperation, immutableCandidate, restrictionsConfigured } from '../plugins/evaluation.js';
+import type { PluginAttribution } from '../plugins/hooks.js';
 
 /**
  * `sdlc task check-result` (B115): checks a branch an executor returned against the task contract - every commit
@@ -32,9 +34,11 @@ export interface ResultCommit {
 
 export type ResultProblemCode =
   'missing_trailer' | 'unknown_task' | 'forbidden_path' | 'no_commits' |
-  'missing_agent' | 'unknown_executor' | 'executor_not_allowed' | 'wrong_executor' | 'diff_unavailable';
+  'missing_agent' | 'unknown_executor' | 'executor_not_allowed' | 'wrong_executor' | 'diff_unavailable' | 'plugin_refused';
 
 export interface ResultProblem {
+  plugin?: PluginAttribution;
+  policy?: string;
   code: ResultProblemCode;
   sha?: string;
   file?: string;
@@ -119,12 +123,11 @@ function agentOf(
  * The verdict for a returned branch: problems fail it, warnings do not. `expectExecutor` (B118a, the board's
  * `submit`) makes every commit's `SDLC-Agent` trailer name that executor; a different one is `wrong_executor`.
  */
-export function checkResult(
+export function checkResultCore(
   root: string, ref: ChangeRef, config: SdlcConfig, branch: string, base?: string, expectExecutor?: string,
 ): TaskResult {
   const registry = readExecutors(root);
-  const branchSha = resolveRef(root, resultBranch(root, branch));
-  const baseSha = base === undefined ? mergeBase(root, branchSha) : resolveRef(root, base);
+  const { head: branchSha, baseSha } = resultCandidate(root, branch, base);
   const commits = commitsOf(root, baseSha, branchSha);
   const changed = readChangedPaths(root, baseSha, branchSha);
   const files = changed.ok ? changed.files : [];
@@ -163,18 +166,40 @@ export function checkResult(
         const id = commit.agent === undefined ? undefined : AGENT_TRAILER.exec(commit.agent)?.[1];
         return id === undefined ? [] : [id];
       }))].sort();
-  if (registry !== undefined) {
-    const detail = problems.length === 0
-      ? 'ok'
-      : [...new Set(problems.map((problem) => problem.code))].join(', ');
-    appendLog(root, config, {
-      event: 'task.result_checked', change: ref.id, detail,
-      ...(executors?.length === 1 ? { executor: executors[0] } : {}),
-      ...(agentEnvironment() ? { agent: agentEnvironment() } : {}),
-    });
-  }
   return {
     ok: problems.length === 0, base: baseSha, commits, files, problems, warnings,
     ...(executors ? { executors } : {}),
   };
+}
+
+function resultCandidate(root: string, branch: string, base?: string) {
+  const actual = resultBranch(root, branch);
+  return immutableCandidate(root, actual, base, () => {
+    const head = resolveRef(root, actual);
+    return { head, baseSha: base === undefined ? mergeBase(root, head) : resolveRef(root, base) };
+  });
+}
+
+/** Full supported result acceptance. Core/route prerequisites precede every plugin verdict. */
+export function checkResult(root: string, ref: ChangeRef, config: SdlcConfig, branch: string,
+  base?: string, expectExecutor?: string): TaskResult {
+  declareOperation(root, config, 'result', { change: ref.id, branch, base, executor: expectExecutor });
+  const result = checkResultCore(root, ref, config, branch, base, expectExecutor);
+  if (result.ok && restrictionsConfigured(root, config)) {
+    const candidate = resultCandidate(root, branch, base);
+    const verdict = consumeHook(root, config, 'result_accept', { change: ref.id, candidate,
+      ...(expectExecutor ? { executor: expectExecutor } : {}), result });
+    if (verdict.decision === 'deny') {
+      result.ok = false;
+      result.problems.push({ code: 'plugin_refused', sha: candidate.head,
+        ...(verdict.plugin ? { plugin: verdict.plugin } : {}), ...(verdict.policy ? { policy: verdict.policy } : {}) });
+    }
+  }
+  if (readExecutors(root) !== undefined) {
+    appendLog(root, config, { event: 'task.result_checked', change: ref.id,
+      detail: result.ok ? 'ok' : [...new Set(result.problems.map((problem) => problem.code))].join(', '),
+      ...(result.executors?.length === 1 ? { executor: result.executors[0] } : {}),
+      ...(agentEnvironment() ? { agent: agentEnvironment() } : {}) });
+  }
+  return result;
 }

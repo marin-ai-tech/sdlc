@@ -7,7 +7,8 @@
 /** Tool arguments become CLI words after type checking. */
 export interface ToolInputSchema {
   type: 'object';
-  properties: Record<string, { type: 'string' | ['string', 'number']; description: string }>;
+  properties: Record<string, { type: 'string' | ['string', 'number'] | 'object'; description: string;
+    [key: string]: unknown }>;
   required?: string[];
   additionalProperties: false;
 }
@@ -18,6 +19,16 @@ export interface ReadTool {
   inputSchema: ToolInputSchema;
   /** The CLI arguments (without `--json`) for checked tool arguments. */
   argv: (args: Record<string, string | undefined>) => string[];
+  /** Structured extensions take their own JSON boundary, never the scalar CLI word converter. */
+  extensions?: boolean;
+}
+
+function withExtensions(input: ToolInputSchema): ToolInputSchema {
+  return { ...input, properties: { ...input.properties, ext: { type: 'object',
+    description: 'Plugin-namespaced contract extensions; values preserve JSON types',
+    propertyNames: { pattern: '^[a-z][a-z0-9-]{0,23}$',
+      not: { enum: ['project', 'executor', 'origin', 'request', 'constructor', 'prototype'] } },
+    additionalProperties: true } } };
 }
 
 function schema(properties: Record<string, string>, required: string[] = []): ToolInputSchema {
@@ -44,6 +55,15 @@ function requestOption(request: string | undefined): string[] {
 const CHANGE = 'change id (defaults to the only active change)';
 
 export const READ_TOOLS: readonly ReadTool[] = [
+  {
+    name: 'task_export',
+    description: 'Export the task contract of an approved change, with optional plugin extensions.',
+    inputSchema: withExtensions(schema({ change: CHANGE, task: 'task number', executor: 'target executor id' })),
+    extensions: true,
+    argv: (a) => ['task', 'export', ...changeOption(a.change),
+      ...(a.task === undefined ? [] : ['--task', a.task]),
+      ...(a.executor === undefined ? [] : ['--executor', a.executor])],
+  },
   {
     name: 'board_list',
     description: 'List tasks on the board and their current state.',
@@ -135,8 +155,9 @@ export const WRITE_TOOLS: readonly ReadTool[] = [
   {
     name: 'board_claim',
     description: 'Claim a board task as the token executor.',
-    inputSchema: numericSchema({ change: CHANGE, task: 'task number', agent: 'agent name',
-      lease: 'lease in seconds', request: 'idempotency key' }, ['lease'], ['change', 'task', 'agent']),
+    inputSchema: withExtensions(numericSchema({ change: CHANGE, task: 'task number', agent: 'agent name',
+      lease: 'lease in seconds', request: 'idempotency key' }, ['lease'], ['change', 'task', 'agent'])),
+    extensions: true,
     argv: (a) => ['board', 'claim', '--change', a.change ?? '', '--task', a.task ?? '',
       '--agent', a.agent ?? '', ...(a.lease ? ['--lease', a.lease] : []), ...requestOption(a.request)],
   },
@@ -164,9 +185,10 @@ export const WRITE_TOOLS: readonly ReadTool[] = [
   {
     name: 'board_bid',
     description: 'Bid for an open auction as the token executor.',
-    inputSchema: numericSchema({ change: CHANGE, task: 'task number', agent: 'agent name',
+    inputSchema: withExtensions(numericSchema({ change: CHANGE, task: 'task number', agent: 'agent name',
       minutes: 'estimated minutes', cost: 'estimated cost', note: 'bid note',
-      request: 'idempotency key' }, ['minutes', 'cost'], ['change', 'task', 'agent', 'minutes']),
+      request: 'idempotency key' }, ['minutes', 'cost'], ['change', 'task', 'agent', 'minutes'])),
+    extensions: true,
     argv: (a) => ['board', 'bid', '--change', a.change ?? '', '--task', a.task ?? '',
       '--agent', a.agent ?? '', '--minutes', a.minutes ?? '',
       ...(a.cost === undefined ? [] : ['--cost', a.cost]),
@@ -194,6 +216,7 @@ export function checkArguments(tool: ReadTool, input: unknown): Record<string, s
   for (const [key, value] of Object.entries(args as Record<string, unknown>)) {
     if (!(key in known)) return `unknown argument: ${key}`;
     if (value === undefined || value === null) continue;
+    if (known[key].type === 'object') return `${key} requires structured argument validation`;
     const numeric = Array.isArray(known[key].type);
     if (typeof value !== 'string' && !(numeric && typeof value === 'number' && Number.isFinite(value))) {
       return `${key} must be ${numeric ? 'a string or number' : 'a string'}`;

@@ -2,7 +2,18 @@ import type { Executor } from '../core/executors.js';
 import { executorRefusal } from '../core/executors.js';
 import { SdlcError } from '../core/errors.js';
 import type { TaskItem } from '../core/task-contract.js';
+import type { ResultProblem } from '../core/task-result.js';
 import { HarnessRuntime, type HarnessSession } from './harness-runtime.js';
+
+export interface HarnessProblem extends Omit<ResultProblem, 'code'> {
+  code: string;
+}
+
+export interface HarnessVerification {
+  branch: string;
+  passed: boolean;
+  problems?: HarnessProblem[];
+}
 
 /** Host-side bridge: no credential, claim token or broker endpoint is serialized into an agent's task. */
 export interface HarnessHost {
@@ -11,7 +22,7 @@ export interface HarnessHost {
   /** Renew only while the runtime is active. A paused session stops renewing and its board lease expires. */
   heartbeat(): Promise<void>;
   /** Download/import into an isolated checkout; check trailers, forbidden paths, verify commands and fingerprint. */
-  verify(session: string, item: TaskItem): Promise<{ branch: string; passed: boolean }>;
+  verify(session: string, item: TaskItem): Promise<HarnessVerification>;
 }
 
 function refuse(detail: string): never {
@@ -56,12 +67,24 @@ export class HarnessAdapter {
     return this.runtime.fork(session, count, checkpoint);
   }
 
-  async candidates(sessions: string[], item: TaskItem): Promise<Array<{ session: string; branch: string }>> {
-    const passed: Array<{ session: string; branch: string }> = [];
+  async candidateReport(sessions: string[], item: TaskItem): Promise<Array<HarnessVerification & { session: string }>> {
+    const report: Array<HarnessVerification & { session: string }> = [];
     for (const session of [...new Set(sessions)]) {
-      const result = await this.host.verify(session, item);
-      if (result.passed) passed.push({ session, branch: result.branch });
+      try {
+        const result = await this.host.verify(session, item);
+        const problems = !result.passed && !result.problems?.length
+          ? [{ code: 'harness_verification_failed' }] : result.problems;
+        report.push({ session, ...result, ...(problems ? { problems } : {}) });
+      } catch (error) {
+        const code = error instanceof SdlcError ? error.code : 'harness_verification_failed';
+        report.push({ session, branch: item.result.branch, passed: false, problems: [{ code }] });
+      }
     }
-    return passed;
+    return report;
+  }
+
+  async candidates(sessions: string[], item: TaskItem): Promise<Array<{ session: string; branch: string }>> {
+    const report = await this.candidateReport(sessions, item);
+    return report.filter((result) => result.passed).map(({ session, branch }) => ({ session, branch }));
   }
 }

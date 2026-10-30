@@ -1,3 +1,10 @@
+import type { SdlcConfig } from './config.js';
+import type { Decision } from './policy.js';
+import { callsPluginHumanCommand } from './human-command-match.js';
+import { quotedCommand } from './human-command.js';
+import { t } from './i18n.js';
+import { pluginDiagnostic } from '../plugins/api.js';
+
 /**
  * The sdlc CLI is the only writer of the state files and the agent's check for human decisions; an agent that
  * uninstalls it leaves the project without both. The hook refuses `npm uninstall` of the sdlc package (rule
@@ -15,4 +22,18 @@ const NPM_REMOVE = new RegExp(String.raw`\bnpm${NPM_OPTIONS}\s+${REMOVE}\b[^;&|\
 /** True when a shell command uninstalls the sdlc CLI with npm. */
 export function removesSdlcCli(command: string): boolean {
   return NPM_REMOVE.test(command);
+}
+
+/** Check dynamic person-only commands after static core decisions; catalog faults must deny the call. */
+export function pluginHumanDecision(command: string, root: string, config: SdlcConfig): Decision | undefined {
+  try {
+    if (callsPluginHumanCommand(command, root, config)) {
+      return { decision: 'deny', rule: 'separation-of-duties',
+        reason: t('hook.separationOfDuties', { command: quotedCommand(command) }) };
+    }
+  } catch (error) {
+    const problem = pluginDiagnostic(error);
+    return { decision: 'deny', rule: 'plugin', reason: `${problem.code}: ${problem.message}` };
+  }
+  return undefined;
 }

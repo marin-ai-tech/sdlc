@@ -7,6 +7,7 @@ import { findProjectRoot, projectPaths } from '../core/project.js';
 import { runCli } from './run-cli.js';
 import { callTool, errorResult, type CliRunner, type ToolResult } from './call-tool.js';
 import { findTool, READ_TOOLS, WRITE_TOOLS, isWriteTool, type ToolInputSchema } from './tools.js';
+import { callPluginTool, pluginToolDiscovery } from '../plugins/mcp.js';
 
 /**
  * `sdlc mcp serve --project <path>` (B46): one server for several sdlc projects, started from anywhere. With one
@@ -36,7 +37,7 @@ export interface Caller {
 export interface ListedTool {
   name: string;
   description: string;
-  inputSchema: ToolInputSchema;
+  inputSchema: ToolInputSchema | Record<string, unknown>;
 }
 
 const PROJECT_ARGUMENT = 'project name: project.name in its openspec/sdlc.yaml, else its folder name';
@@ -89,11 +90,20 @@ function withProject(schema: ToolInputSchema): ToolInputSchema {
 
 /** tools/list: the B13 tools; with several projects each one also takes `project`. */
 export function listedTools(projects: readonly ServedProject[], caller: Caller = {}): ListedTool[] {
+  return listedToolResult(projects, caller).tools;
+}
+
+/** Additive MCP metadata explains omitted plugin tools without exposing project paths. */
+export function listedToolResult(projects: readonly ServedProject[], caller: Caller = {}) {
   const several = projects.length > 1;
   const tools = caller.executor ? [...READ_TOOLS, ...WRITE_TOOLS] : READ_TOOLS;
-  return tools.map(({ name, description, inputSchema }) => {
+  const core = tools.map(({ name, description, inputSchema }) => {
     return { name, description, inputSchema: several ? withProject(inputSchema) : inputSchema };
   });
+  const plugins = pluginToolDiscovery(projects, caller);
+  return { tools: [...core, ...plugins.tools], ...(plugins.diagnostics.length ? {
+    _meta: { sdlc: { diagnostics: plugins.diagnostics } },
+  } : {}) };
 }
 
 interface SplitArguments {
@@ -151,6 +161,7 @@ export async function callProjectTool(
   run: CliRunner = runCli,
   caller: Caller = {},
 ): Promise<ToolResult> {
+  if (name.includes('__')) return callPluginTool(name, input, projects, caller);
   if (isWriteTool(name) && !caller.executor) {
     return errorResult('executor_token_required', t('mcp.executorTokenRequired', {}, 'en'));
   }

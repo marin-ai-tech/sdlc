@@ -1,0 +1,155 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$defs": {
+    "empty": {
+      "type": "object",
+      "properties": {},
+      "required": [],
+      "additionalProperties": false
+    },
+    "config": {
+      "type": "object",
+      "properties": {
+        "limit": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 1000000
+        }
+      },
+      "required": [
+        "limit"
+      ],
+      "additionalProperties": false
+    },
+    "state": {
+      "type": "object",
+      "properties": {
+        "used": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1000000000
+        }
+      },
+      "required": [
+        "used"
+      ],
+      "additionalProperties": false
+    },
+    "facts": {
+      "type": "object",
+      "properties": {
+        "used": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1000000000
+        },
+        "remaining": {
+          "type": "integer",
+          "minimum": -1000000000,
+          "maximum": 1000000
+        }
+      },
+      "required": [
+        "used",
+        "remaining"
+      ],
+      "additionalProperties": false
+    },
+    "record": {
+      "type": "object",
+      "properties": {
+        "units": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 1000
+        }
+      },
+      "required": [
+        "units"
+      ],
+      "additionalProperties": false
+    },
+    "guardInput": {
+      "type": "object",
+      "properties": {
+        "hook": {
+          "enum": [
+            "claim",
+            "bid",
+            "award",
+            "result_accept",
+            "file_edit",
+            "stop"
+          ]
+        },
+        "subject": {}
+      },
+      "required": [],
+      "additionalProperties": false
+    },
+    "decision": {
+      "type": "object",
+      "properties": {
+        "decision": {
+          "enum": [
+            "pass",
+            "signal",
+            "deny"
+          ]
+        },
+        "code": {
+          "type": "string"
+        },
+        "message": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "decision"
+      ],
+      "additionalProperties": false
+    },
+    "taskExt": {
+      "type": "object",
+      "properties": {
+        "budget": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1000000000
+        }
+      },
+      "required": [
+        "budget"
+      ],
+      "additionalProperties": false
+    },
+    "bidExt": {
+      "type": "object",
+      "properties": {
+        "quote": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1000000000
+        }
+      },
+      "required": [
+        "quote"
+      ],
+      "additionalProperties": false
+    },
+    "event": {
+      "type": "object",
+      "properties": {
+        "units": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 1000
+        }
+      },
+      "required": [
+        "units"
+      ],
+      "additionalProperties": false
+    }
+  }
+}

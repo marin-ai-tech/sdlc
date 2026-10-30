@@ -4,6 +4,11 @@ import { currentLocale, t, type Locale } from '../core/i18n.js';
 import { REQUIRED_NOTICE } from '../core/license.js';
 import { findProjectRoot } from '../core/project.js';
 import { doctorFix, type DoctorFixResult } from './doctor-fix.js';
+import { loadConfig } from '../core/config.js';
+import { configured, readRegistry } from '../plugins/trust.js';
+import { invoke } from '../plugins/runtime.js';
+import { readStore } from '../plugins/store.js';
+import { fail, LIMITS, pluginDiagnostic } from '../plugins/api.js';
 
 function printChecks(checks: DoctorCheck[], loc: Locale): void {
   line(c.dim(REQUIRED_NOTICE));
@@ -35,11 +40,46 @@ function runChecks(fix: boolean | undefined, loc: Locale): { checks: DoctorCheck
   return { checks: fixes.checks, fixes };
 }
 
+/** Metadata/config/state validation is bounded and never instantiates or calls a guest. */
+async function runtimeChecks(root: string | undefined): Promise<DoctorCheck[]> {
+  if (!root) return [];
+  let config;
+  try { config = loadConfig(`${root}/openspec/sdlc.yaml`); } catch { return []; }
+  const checks: DoctorCheck[] = [];
+  const deadline = performance.now() + LIMITS.operationMs;
+  const budget = () => {
+    const left = deadline - performance.now();
+    if (left <= 0) fail('plugin_timeout', 'Plugin diagnostics deadline exceeded');
+    return left;
+  };
+  for (const [name, setting] of Object.entries(config.plugins ?? {})) {
+    if (!setting.enabled) continue;
+    try {
+      const { snapshot } = configured(root, config, name);
+      await invoke(snapshot, { preflight: true, validate: { kind: 'config', value: setting.config },
+        timeoutMs: budget() });
+      const accepted = readRegistry(root).plugins[name];
+      if (accepted) {
+        const store = readStore(root, name, accepted.stateId)!;
+        await invoke(snapshot, { preflight: true, validate: { kind: 'state', value: store.data },
+          timeoutMs: budget() });
+      }
+      checks.push({ check: `plugin runtime ${name}`, status: 'ok', message: 'Profile and declared configuration/state schemas are valid' });
+    } catch (error) {
+      const problem = pluginDiagnostic(error);
+      checks.push({ check: `plugin runtime ${name}`, status: 'error', code: problem.code, message: problem.message,
+        fix: `Inspect ${name}; a person repairs its pinned package, configuration or store.` });
+    }
+  }
+  return checks;
+}
+
 export async function doctorCommand(opts: { json?: boolean; fix?: boolean }): Promise<void> {
   try {
     // JSON payloads stay English in every locale; text uses the active locale.
     const loc: Locale = opts.json ? 'en' : currentLocale();
     const { checks, fixes } = runChecks(opts.fix, loc);
+    checks.push(...await runtimeChecks(findProjectRoot()));
     const errors = checks.filter((ch) => ch.status === 'error').length;
     const fixJson = fixes ? { fixed: fixes.fixed, manual: fixes.manual } : {};
     if (opts.json) printJson({ healthy: errors === 0, checks, ...fixJson });

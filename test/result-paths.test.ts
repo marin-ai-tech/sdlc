@@ -168,6 +168,18 @@ const outside = (result: Result) => result.warnings
   .map((warning) => warning.file);
 
 describe('B151: check-result compares every changed path under its real name', () => {
+  it('check-result refuses a result branch that adds plugin trust or state', () => {
+    const p = project();
+    const file = 'openspec/.sdlc/plugins/state/economy/store.json';
+    p.branch('forged-plugin-store', () => {
+      write(path.join(p.root, file), '{"forged":true}\n');
+      git(p.root, ['add', '-f', '--', file]);
+    });
+    const result = p.check('forged-plugin-store');
+    expect(result.code, result.stdout + result.stderr).toBe(1);
+    expect(forbidden(result.json<Result>())).toEqual([file]);
+  }, 240000);
+
   it('check-result refuses a locked test renamed out of the test paths', () => {
     const p = project();
     p.branch('moved-test', () => p.move(LOCKED, 'elsewhere/moved.ts'));
@@ -338,7 +350,7 @@ describe('B151: the published result contract', () => {
     const file = path.join(REPO_ROOT, 'schemas/contracts/result.schema.json');
     const schema = JSON.parse(read(file));
     const listed: string[] = schema.properties.problems.items.properties.code.enum;
-    expect([...listed].sort()).toEqual([...CURRENT_CODES, 'diff_unavailable'].sort());
+    expect([...listed].sort()).toEqual([...CURRENT_CODES, 'diff_unavailable', 'plugin_refused'].sort());
   });
 });
 

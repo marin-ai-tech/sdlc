@@ -30,6 +30,7 @@ import { qwenSettingsInstalled, qwenSettingsPath } from '../integrations/qwen-se
 import { qwenFolderTrusted } from './qwen-trust.js';
 import { CHAIN_LINE, CHAIN_SUFFIX, inspectGitHook } from '../integrations/git-hook.js';
 import { referencedVariables } from '../mcp/registry.js';
+import { pluginReports } from '../plugins/catalog.js';
 
 /**
  * The checks of `sdlc doctor`, as a function `sdlc health` reuses (config.doctor). Same checks in the same order,
@@ -40,6 +41,7 @@ export interface DoctorCheck {
   status: 'ok' | 'warn' | 'error';
   message: string;
   fix?: string;
+  code?: string;
 }
 
 type Translate = (key: string, params?: Record<string, string | number>) => string;
@@ -287,6 +289,11 @@ function projectConfigChecks(
     for (const key of integrationUnknownKeys(raw ?? {})) out.add(key, 'warn', `Unknown key: ${key}`);
   } catch { /* The config check already reports invalid YAML. */ }
   integrationChecks(out, root, config);
+  for (const plugin of pluginReports(root, config)) {
+    const problems = plugin.problems.map((problem) => problem.message).join('; ');
+    out.add(`plugin ${plugin.name}`, problems ? (plugin.enabled ? 'error' : 'warn') : 'ok', problems || (plugin.active ? 'Accepted and enabled' : 'Disabled'),
+      problems ? `Run sdlc plugins inspect ${plugin.name}; a person reviews settings, trust and storage.` : undefined);
+  }
   const names = config.verify.commands.map((v) => v.name).join(', ');
   const verify = config.verify.commands.length > 0 ? 'ok' : 'warn';
   const verifyMessage = verify === 'ok' ? tt('doctor.verifyNames', { names }) : tt('doctor.verifyNone');

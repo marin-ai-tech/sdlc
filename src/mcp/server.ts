@@ -8,7 +8,7 @@ import {
 } from '@modelcontextprotocol/sdk/types.js';
 import { harnessVersion } from '../core/version.js';
 import type { CliRunner } from './call-tool.js';
-import { callProjectTool, listedTools, resolveProjects, type Caller, type ServedProject } from './projects.js';
+import { callProjectTool, listedToolResult, resolveProjects, type Caller, type ServedProject } from './projects.js';
 import { listResources, readResource } from './resources.js';
 import { runCli } from './run-cli.js';
 
@@ -33,7 +33,7 @@ function log(text: string): void {
 export function createServer(projects: readonly ServedProject[], run: CliRunner = runCli, caller: Caller = {}): Server {
   const capabilities = { tools: {}, resources: {} };
   const server = new Server({ name: 'sdlc', version: harnessVersion() }, { capabilities });
-  server.setRequestHandler(ListToolsRequestSchema, async () => ({ tools: listedTools(projects, caller) }));
+  server.setRequestHandler(ListToolsRequestSchema, async () => listedToolResult(projects, caller));
   server.setRequestHandler(CallToolRequestSchema, async (request) => {
     return callProjectTool(request.params.name, request.params.arguments, projects, run, caller);
   });

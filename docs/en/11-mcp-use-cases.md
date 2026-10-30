@@ -516,3 +516,12 @@ The [glossary](glossary.md) explains [MCP](glossary.md), [executor](glossary.md)
 - [Integrations](10-integrations.md) — configure servers, checks and event receivers.
 - [Agent team](12-agent-team.md) — assign roles and stage resources.
 - [User guide](05-guide.md) — see the full change lifecycle.
+
+## Runtime plugin tools
+
+Accepted enabled plugins expose namespaced tools such as `economy__read` with `{input:{}}`. Read operations
+are available to ordinary clients; executor tools require an HTTP token bound to the selected project and
+registered executor. Mutations add a stable `request`; the executor comes from the token. Multiproject calls
+select `project`. Person-only tools are hidden and direct calls are refused, even on a person-started server.
+Revocation and catalog freshness are checked again at invocation; a stale listing does not preserve authority.
+Conflicting project catalogs cannot create ambiguous plugin tools. See [runtime plugins](33-plugins.md).

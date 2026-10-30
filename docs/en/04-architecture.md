@@ -554,3 +554,13 @@ The [glossary](glossary.md) explains OpenSpec, delta, living spec and gate. It a
 - [User guide](05-guide.md) — follow a change through the gates.
 - [Roles and signed approvals](08-roles-and-signing.md) — see how people authorize decisions.
 - [AI-ready project](07-ai-ready-project.md) — set up the project layout.
+
+## 4.10. Runtime plugin boundary
+
+Accepted `sdlc.plugin/1` packages run as bounded Wasm workers through `src/plugins/`. The guest imports only
+host-owned memory; core owns activation, authorization, validated effects, state revisions and event provenance.
+Pure hooks prepare outside board locks; core revalidates snapshots before mutation and retains all core denials.
+Own state/receipts/pending events live under guarded `openspec/.sdlc/plugins/`; the project log is a projection.
+This relies on Node/V8 and the OS, with bounded linear memory/deadlines, without an OS sandbox, total-process
+memory cap or universal power-loss durability. Runtime packages differ from editor plugin distribution.
+See [runtime plugins](33-plugins.md) for the exact ABI, limits, permissions and rollback.

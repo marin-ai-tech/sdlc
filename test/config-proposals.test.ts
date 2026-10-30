@@ -54,6 +54,21 @@ function project(roles?: string) {
 
 type P = ReturnType<typeof project>;
 
+describe('Plugin configuration proposals', () => {
+  it('preserves plugin settings and policies through a reviewed apply under the activation barrier', () => {
+    const p = project();
+    const setting = { economy: { package: 'examples/plugins/economy', digest: `sha256:${'a'.repeat(64)}`, enabled: false, config: { limit: 7 } } };
+    const policy = [{ id: 'budget', hook: 'claim', require: { fact: 'economy.remaining', op: 'gte', value: 1 }, reason: 'Budget required' }];
+    const id = propose(p, ['--set', `plugins=${JSON.stringify(setting)}`, '--set', `plugin_policies=${JSON.stringify(policy)}`, '--reason', 'Add optional economy extension']);
+    expect(p.config().plugins).toBeUndefined();
+    const applied = p.cli(['config', 'apply', id, '--json']);
+    expect(applied.code, applied.stdout + applied.stderr).toBe(0);
+    expect(p.config()).toMatchObject({ plugins: setting, plugin_policies: policy });
+    expect(fs.existsSync(path.join(p.root, 'openspec/.sdlc/plugins/activation.lock'))).toBe(false);
+    expect(fs.existsSync(path.join(p.root, 'openspec/.sdlc/plugins/registry.json'))).toBe(false);
+  });
+});
+
 function propose(p: P, args: string[], extra: NodeJS.ProcessEnv = AGENT): string {
   const r = p.cli(['config', 'propose', ...args, '--json'], extra);
   expect(r.code, r.stdout + r.stderr).toBe(0);

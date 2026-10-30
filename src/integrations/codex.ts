@@ -3,7 +3,7 @@ import type { RoleFile } from '../team/role-file.js';
 import { roleBody, subagentName } from '../team/render.js';
 import { AGENT_IDS, loadAgent, WORKFLOW_IDS } from './assets.js';
 import { renderBody } from './render.js';
-import { cliSpellings, SECOND_LAYER_COMMANDS } from './second-layer.js';
+import { cliSpellings, SECOND_LAYER_COMMANDS, secondLayerCommands } from './second-layer.js';
 import { skillFile, type SkillExtra, type SkillTarget } from './skills.js';
 import type { GeneratedFile, RenderContext, ToolAdapter } from './types.js';
 
@@ -73,9 +73,9 @@ function agentFiles(ctx: RenderContext, notice: string): GeneratedFile[] {
 }
 
 /** The words of a person's command as Codex matches them: `config.cli`'s words, then the command's. */
-export function humanCommandPatterns(cli: string): string[][] {
+export function humanCommandPatterns(cli: string, commands: readonly string[] = SECOND_LAYER_COMMANDS): string[][] {
   const prefixes = cliSpellings(cli).map((spelling) => spelling.split(/\s+/));
-  return prefixes.flatMap((prefix) => SECOND_LAYER_COMMANDS.map((command) => [...prefix, ...command.split(' ')]));
+  return prefixes.flatMap((prefix) => commands.map((command) => [...prefix, ...command.split(' ')]));
 }
 
 function prefixRule(words: string[]): string {
@@ -90,7 +90,7 @@ function prefixRule(words: string[]): string {
 
 /** `.codex/rules/sdlc.rules` (Starlark): every person's command is forbidden for the agent (most restrictive wins). */
 function rulesFile(ctx: RenderContext, notice: string): GeneratedFile {
-  const rules = humanCommandPatterns(ctx.cli).map(prefixRule);
+  const rules = humanCommandPatterns(ctx.cli, secondLayerCommands(ctx.root, ctx.config)).map(prefixRule);
   const content = [notice, "# A person's commands: Codex refuses them for the agent (sdlc, B82).", ...rules].join('\n');
   return { path: CODEX_RULES_PATH, content: `${content}\n`, tool: 'codex', kind: 'rule' };
 }

@@ -1,5 +1,7 @@
-import { runCli, type CliRun } from './run-cli.js';
+import { runCli, type CliCallerContext, type CliRun } from './run-cli.js';
 import { checkArguments, findTool, isWriteTool } from './tools.js';
+import { canonical, parseExtensions } from '../plugins/api.js';
+import { toDiagnostic } from '../core/errors.js';
 
 /**
  * One tools/call of `sdlc mcp serve` (B13) in one project: the arguments checked, the CLI command run with `--json`
@@ -13,7 +15,7 @@ export interface ToolResult {
   isError?: boolean;
 }
 
-export type CliRunner = (args: string[], cwd: string) => Promise<CliRun>;
+export type CliRunner = (args: string[], cwd: string, caller?: CliCallerContext) => Promise<CliRun>;
 
 /** A tool error in the CLI's own JSON shape, for failures that happen before or around the command. */
 export function errorResult(code: string, message: string): ToolResult {
@@ -65,9 +67,28 @@ export async function callTool(
   }
   const tool = findTool(name);
   if (!tool) return errorResult('unknown_tool', `unknown tool: ${name}`);
-  const args = checkArguments(tool, input);
+  let scalar = input;
+  let extensions: string[] = [];
+  if (tool.extensions && input !== null && typeof input === 'object' && !Array.isArray(input)) {
+    const { ext, ...rest } = input as Record<string, unknown>;
+    scalar = rest;
+    try {
+      const parsed = parseExtensions(ext);
+      if (parsed !== undefined) extensions = ['--ext-json', canonical(parsed)];
+    } catch (error) {
+      const diagnostic = toDiagnostic(error);
+      return errorResult(diagnostic.code, diagnostic.message);
+    }
+  }
+  const args = checkArguments(tool, scalar);
   if (typeof args === 'string') return errorResult('invalid_arguments', `${name}: ${args}`);
+  if (name === 'task_export' && executor !== undefined) {
+    if (args.executor !== undefined && args.executor !== executor) {
+      return errorResult('invalid_arguments', 'Task export target does not match the authenticated executor.');
+    }
+    args.executor = executor;
+  }
   const identity = isWriteTool(name) ? ['--executor', executor ?? ''] : [];
-  const argv = [...tool.argv(args), ...identity, '--json'];
-  return resultOf(await run(argv, cwd), name);
+  const argv = [...tool.argv(args), ...identity, ...extensions, '--json'];
+  return resultOf(await run(argv, cwd, { origin: 'mcp', ...(executor ? { executor } : {}) }), name);
 }

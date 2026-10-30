@@ -1,10 +1,13 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import { randomUUID } from 'node:crypto';
 import { SdlcError } from './errors.js';
 import { ensureDir, readText, writeTextAtomic } from './fs-utils.js';
 import { parseAuctions, type BoardAuction } from './board-market-state.js';
 import { parseRequests, pruneRequests, RequestReplay, type BoardRequest } from './board-requests.js';
 import { ensureLocalIgnore } from './local-ignore.js';
+import { beforeBoardCommit, boardLockWait, finalizeBoard, flushObservations, preparationBoard, publicationAllowed } from '../plugins/evaluation.js';
+import { parseExtensions, type Extensions } from '../plugins/api.js';
 
 /**
  * The board file and its lock (B118a, epic E16): `openspec/.sdlc/board.json` holds the claims the agents of the
@@ -25,6 +28,7 @@ const LOCK_RETRY_MS = 50;
 export type ClaimState = 'held' | 'released' | 'expired' | 'submitted' | 'reopened';
 
 export interface BoardClaim {
+  ext?: Extensions;
   /** The random secret the caller must pass back to heartbeat, release or submit; never in `board list`. */
   id: string;
   /** `<change>#<task>`. */
@@ -121,6 +125,8 @@ function claimOf(value: unknown): BoardClaim {
     leaseSeconds: 0,
     state: text('state') as ClaimState,
   };
+  const ext = parseExtensions(raw.ext);
+  if (ext !== undefined) claim.ext = ext;
   if (!Number.isInteger(raw.leaseSeconds) || (raw.leaseSeconds as number) < 1) {
     invalid('claims[].leaseSeconds must be a positive integer');
   }
@@ -162,27 +168,33 @@ function sleepSync(ms: number): void {
   Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
 }
 
-/** A lock older than ~30 s is a crashed holder's; broken and retried. A missing file is not stale. */
+/** Age is insufficient: only an old record whose process is provably dead may be reclaimed. */
 function staleLock(file: string): boolean {
   try {
-    return fs.statSync(file).mtimeMs < Date.now() - STALE_LOCK_MS;
+    const stat = fs.statSync(file);
+    if (stat.mtimeMs >= Date.now() - STALE_LOCK_MS || stat.size > 256) return false;
+    const pid = Number(fs.readFileSync(file, 'utf8').split(/\s/)[0]);
+    if (!Number.isSafeInteger(pid) || pid < 1) return false;
+    try { process.kill(pid, 0); return false; }
+    catch (error) { return (error as NodeJS.ErrnoException).code === 'ESRCH'; }
   } catch {
     return false;
   }
 }
 
-function acquireLock(file: string): number {
-  const deadline = Date.now() + LOCK_TIMEOUT_MS;
+function acquireLock(file: string, wait: number): { fd: number; owner: string } {
+  const deadline = performance.now() + wait;
   for (;;) {
     try {
       const fd = fs.openSync(file, 'wx');
-      fs.writeSync(fd, `${process.pid} ${new Date().toISOString()}`);
-      return fd;
+      const owner = `${process.pid} ${randomUUID()}`;
+      fs.writeSync(fd, `${owner} ${new Date().toISOString()}`);
+      return { fd, owner };
     } catch (error) {
       if ((error as NodeJS.ErrnoException).code !== 'EEXIST') throw error;
       if (staleLock(file)) {
         fs.rmSync(file, { force: true });
-      } else if (Date.now() > deadline) {
+      } else if (performance.now() >= deadline) {
         throw new SdlcError('board_locked', { key: 'error.the_board_is_locked_by_another_process' });
       }
       sleepSync(LOCK_RETRY_MS);
@@ -196,29 +208,36 @@ function acquireLock(file: string): number {
  * not applied twice. Reopen opts out on refusal so the board file stays unchanged.
  */
 export function updateBoard<T>(root: string, fn: (board: Board) => T, writeOnError = true): T {
+  const preview = preparationBoard(root);
+  if (preview) return fn(preview);
   const file = path.join(root, BOARD_PATH);
   const lock = path.join(root, BOARD_LOCK);
   ensureDir(path.dirname(file));
-  const fd = acquireLock(lock);
+  const { fd, owner } = acquireLock(lock, boardLockWait(root, LOCK_TIMEOUT_MS));
   try {
     const board = readBoard(root);
-    let completed = false;
-    let replayed = false;
-    try {
-      const result = fn(board);
-      completed = true;
-      return result;
-    } catch (error) {
-      replayed = error instanceof RequestReplay;
-      throw error;
-    } finally {
-      if (!replayed && (completed || writeOnError)) {
-        ensureLocalIgnore(root, ['board.json', 'board.lock']);
-        writeTextAtomic(file, `${JSON.stringify(board)}\n`);
+    return finalizeBoard(root, board, () => {
+      let completed = false;
+      let replayed = false;
+      try {
+        const result = fn(board);
+        completed = true;
+        return result;
+      } catch (error) {
+        const code = error && typeof error === 'object' && 'code' in error ? String(error.code) : '';
+        replayed = error instanceof RequestReplay || code.startsWith('plugin_evaluation_') || code === 'plugin_busy';
+        throw error;
+      } finally {
+        if (!replayed && (completed || writeOnError) && publicationAllowed(root)) {
+          beforeBoardCommit(root);
+          ensureLocalIgnore(root, ['board.json', 'board.lock']);
+          writeTextAtomic(file, `${JSON.stringify(board)}\n`);
+          flushObservations(root);
+        }
       }
-    }
+    });
   } finally {
     fs.closeSync(fd);
-    fs.rmSync(lock, { force: true });
+    if (readText(lock)?.startsWith(`${owner} `)) fs.rmSync(lock, { force: true });
   }
 }

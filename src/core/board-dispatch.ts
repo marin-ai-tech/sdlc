@@ -8,6 +8,7 @@ import { changeTasks, exportItems } from './task-contract.js';
 import { excludedExecutors, reopenedClaims } from './board-reopen.js';
 import { updateBoard, type Board, type BoardDispatch } from './board-store.js';
 import { refuseAuction, settleAuctions } from './board-market.js';
+import { assertHook, declareOperation, effectTime, evaluationTime } from '../plugins/evaluation.js';
 
 export function leaseSeconds(value?: string): number {
   if (value === undefined) return 900;
@@ -78,6 +79,7 @@ export function dispatchTask(
   root: string, paths: ProjectPaths, config: SdlcConfig,
   opts: { change: string; task: string; executor: string; lease?: string },
 ): BoardDispatch {
+  declareOperation(root, config, 'dispatch', opts);
   const duration = leaseSeconds(opts.lease);
   const ref = resolveChange(paths, opts.change);
   const task = changeTasks(ref).find((entry) => entry.id === opts.task);
@@ -89,11 +91,12 @@ export function dispatchTask(
     key: 'error.x_is_not_a_task_of_change_x', params: { task: opts.task, change: ref.id },
   });
   return updateBoard(root, (board) => {
-    expireHeldClaims(root, config, board, Date.now());
-    expireDispatches(root, config, board, Date.now());
-    settleAuctions(root, config, board, Date.now());
+    expireHeldClaims(root, config, board, evaluationTime(root));
+    expireDispatches(root, config, board, evaluationTime(root));
+    settleAuctions(root, config, board, evaluationTime(root));
     assertOpen(board, ref, opts.task, executor.id);
-    const now = Date.now();
+    assertHook(root, config, 'award', { mode: 'dispatch', task: items[0], executor: executor.id });
+    const now = effectTime(root);
     const dispatch = { item: `${ref.id}#${opts.task}`, change: ref.id, task: opts.task,
       executor: executor.id, dispatchedAt: new Date(now).toISOString(),
       expiresAt: new Date(now + duration * 1000).toISOString(), leaseSeconds: duration };

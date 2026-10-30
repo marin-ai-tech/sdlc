@@ -10,6 +10,9 @@ import { t } from '../core/i18n.js';
 import { appendLog } from '../core/log.js';
 import { exportTasks } from '../core/task-contract.js';
 import { checkResult, type ResultProblem, type ResultWarning, type TaskResult } from '../core/task-result.js';
+import { extensionInput, runPrepared } from '../plugins/evaluation.js';
+import { cliActor } from '../plugins/broker.js';
+import { settingsWrite } from '../plugins/activation.js';
 
 /**
  * `sdlc task export`, `sdlc task check-result` and `sdlc task executors` (B115/B116, epic E16): hand work out to
@@ -19,6 +22,7 @@ import { checkResult, type ResultProblem, type ResultWarning, type TaskResult } 
  */
 
 interface ExportOptions {
+  extJson?: string;
   change?: string;
   task?: string;
   executor?: string;
@@ -90,7 +94,8 @@ export function taskExecutorTokenCommand(id: string, opts: ExecutorsOptions): vo
       );
     }
     const ctx = loadProject();
-    const { executor, token } = issueExecutorToken(ctx.root, id);
+    const { executor, token } = settingsWrite(ctx.paths.sdlcConfig, !!ctx.config.plugins,
+      () => issueExecutorToken(ctx.root, id));
     const by = formatIdentity(gitIdentity(ctx.root));
     appendLog(ctx.root, ctx.config, { event: 'executor.token_issued', executor: executor.id, ...(by ? { by } : {}) });
     if (opts.json) {
@@ -104,11 +109,14 @@ export function taskExecutorTokenCommand(id: string, opts: ExecutorsOptions): vo
   }
 }
 
-export function taskExportCommand(opts: ExportOptions): void {
+export async function taskExportCommand(opts: ExportOptions): Promise<void> {
   try {
     const ctx = loadProject();
     const ref = resolveChange(ctx.paths, opts.change);
-    const items = exportTasks(ctx.root, ref, ctx.config, opts.task, opts.executor);
+    const ext = extensionInput(opts.extJson);
+    const items = await runPrepared(ctx.root, ctx.config, { operation: 'export', board: false,
+      args: { change: ref.id, task: opts.task, executor: opts.executor, ext }, actor: cliActor(ctx.root, opts.executor) },
+    () => exportTasks(ctx.root, ref, ctx.config, opts.task, opts.executor, ext));
     if (opts.json) {
       printJson({ items, harness: ctx.stamp });
       return;
@@ -143,11 +151,13 @@ function printCheckText(result: TaskResult): void {
   }
 }
 
-export function taskCheckResultCommand(opts: CheckOptions): void {
+export async function taskCheckResultCommand(opts: CheckOptions): Promise<void> {
   try {
     const ctx = loadProject();
     const ref = resolveChange(ctx.paths, opts.change);
-    const result = checkResult(ctx.root, ref, ctx.config, opts.branch, opts.base);
+    const result = await runPrepared(ctx.root, ctx.config, { operation: 'result', board: false,
+      args: { change: ref.id, branch: opts.branch, base: opts.base }, actor: cliActor(ctx.root) },
+    () => checkResult(ctx.root, ref, ctx.config, opts.branch, opts.base));
     if (!result.ok) process.exitCode = 1;
     if (opts.json) printJson(result);
     else printCheckText(result);

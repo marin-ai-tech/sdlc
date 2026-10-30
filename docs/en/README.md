@@ -86,3 +86,7 @@ Each tool enforces the process through its own integration:
 
 The [supported tools table](05-guide.md#supported-tools) compares each workflow call, gate mechanism,
 agent marker and main limit.
+
+## Runtime extensions
+
+- [Runtime plugins](33-plugins.md) — accepted Wasm packages, pure hooks, facts and reproducible examples.

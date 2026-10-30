@@ -1,4 +1,6 @@
 {
+  "error.pluginFailure": "Plugin operation refused: {detail}",
+  "fix.pluginFailure": "Inspect the plugin with sdlc plugins inspect; a person must repair settings, trust or storage.",
   "error.digestArtifactUnsafe": "Artifact {file} resolves outside its change folder; no digest can be read.",
   "error.digestArtifactUnreadable": "Artifact {file} could not be read; no digest can be computed.",
   "error.harnessProtocol": "Harness Runtime refused the operation: {detail}.",

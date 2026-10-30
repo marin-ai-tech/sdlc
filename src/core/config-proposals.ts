@@ -55,7 +55,7 @@ export function validateContent(text: string, target: ConfigTarget): void {
     : ['version', 'schema', 'cli', 'statusline', 'stages', 'project', 'mcp', 'events', 'issues',
       'team', 'packs', 'board', 'context', 'tools', 'delivery', 'gates', 'roles', 'verify',
       'review', 'release', 'enforcement', 'license', 'log', 'rework', 'health', 'questions',
-      'design', 'locale', 'layout'];
+      'design', 'locale', 'layout', 'plugins', 'plugin_policies'];
   for (const key of Object.keys(value)) {
     if (!keys.includes(key)) {
       throw new SdlcError('invalid_config', { key: 'config.error.unknownKey', params: { key } });

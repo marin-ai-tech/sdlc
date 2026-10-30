@@ -9,6 +9,7 @@ import { readExecutors } from './executors.js';
 import { evaluateChange } from './lifecycle.js';
 import { changeTasks, planOpen } from './task-contract.js';
 import { winner } from './board-market.js';
+import { activePlugins } from '../plugins/catalog.js';
 
 /**
  * The board as the report and the dashboard show it (B122, epic E16). It only reads: no lock, no write of
@@ -25,8 +26,12 @@ export interface BoardSnapshot {
 
 /** A copy of the board as of `now`: expired held claims and dispatches dropped, nothing written. */
 function boardAt(root: string, config: SdlcConfig, board: Board, now: number): Board {
+  let guarded = false;
+  try { guarded = activePlugins(root, config).some((plugin) => !!plugin.snapshot.manifest.hooks.award)
+    || !!config.pluginPolicies?.some((policy) => policy.hook === 'award'); }
+  catch { guarded = Object.values(config.plugins ?? {}).some((setting) => setting.enabled); }
   const live = (expiresAt: string) => Date.parse(expiresAt) > now;
-  const elapsed = board.auctions.filter((auction) => !live(auction.closesAt) && auction.bids.length);
+  const elapsed = guarded ? [] : board.auctions.filter((auction) => !live(auction.closesAt) && auction.bids.length);
   const awarded = elapsed.map((auction) => ({
     item: auction.item, change: auction.change, task: auction.task,
     executor: winner(root, auction.bids, config.board?.market.rule ?? 'fastest').executor,
@@ -37,7 +42,7 @@ function boardAt(root: string, config: SdlcConfig, board: Board, now: number): B
     ...board,
     claims: board.claims.filter((claim) => claim.state !== 'held' || live(claim.expiresAt)),
     dispatches: [...board.dispatches.filter((dispatch) => live(dispatch.expiresAt)), ...awarded],
-    auctions: board.auctions.filter((auction) => live(auction.closesAt)),
+    auctions: guarded ? board.auctions : board.auctions.filter((auction) => live(auction.closesAt)),
   };
 }
 

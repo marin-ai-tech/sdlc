@@ -1,6 +1,6 @@
 {
   "name": "sdlc",
-  "version": "0.28.0",
+  "version": "0.29.0",
   "description": "AI-native SDLC harness for Claude Code and OpenCode, built on OpenSpec",
   "keywords": [
     "sdlc",
@@ -35,6 +35,7 @@
   ],
   "scripts": {
     "compile": "tsc -p tsconfig.json",
+    "build:plugins": "node scripts/build-plugins.mjs",
     "dev": "tsc -p tsconfig.json --watch",
     "prepare": "tsc -p tsconfig.json",
     "pretest": "tsc -p tsconfig.json",
@@ -51,8 +52,10 @@
     "@fission-ai/openspec": "^1.13.2",
     "@inquirer/prompts": "^8.7.2",
     "@modelcontextprotocol/sdk": "^1.32.1",
+    "ajv": "^8.20.0",
     "commander": "^14.0.0",
     "picomatch": "^4.0.2",
+    "semver": "^7.8.5",
     "yaml": "^2.8.3"
   },
   "devDependencies": {
@@ -60,6 +63,7 @@
     "@types/picomatch": "^4.0.0",
     "pptxgenjs": "^3.12.0",
     "typescript": "^6.0.3",
-    "vitest": "^4.1.11"
+    "vitest": "^4.1.11",
+    "wabt": "^1.0.39"
   }
 }

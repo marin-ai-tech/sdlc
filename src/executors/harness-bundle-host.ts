@@ -13,8 +13,11 @@ import { isWithin } from '../core/fs-utils.js';
 import { git } from '../core/git.js';
 import { FINGERPRINT_EXCLUDES } from '../core/lifecycle.js';
 import { exportItems, type TaskItem } from '../core/task-contract.js';
-import { checkResult } from '../core/task-result.js';
-import type { HarnessHost } from './harness-adapter.js';
+import { checkResult, checkResultCore } from '../core/task-result.js';
+import { runPrepared } from '../plugins/evaluation.js';
+import { cliActor } from '../plugins/broker.js';
+import { canonical, LIMITS } from '../plugins/api.js';
+import type { HarnessHost, HarnessProblem, HarnessVerification } from './harness-adapter.js';
 import { HarnessRuntime } from './harness-runtime.js';
 import { candidatePassed, type HarnessCandidateValidator } from './harness-validation.js';
 
@@ -33,8 +36,17 @@ export interface BundleHostOptions {
   validateCandidate?: HarnessCandidateValidator;
 }
 
-function refused(detail: string): never {
-  throw new SdlcError('harness_refused', { key: 'error.harnessProtocol', params: { detail } });
+function refused(detail: string, code = 'harness_refused'): never {
+  throw new SdlcError(code, { key: 'error.harnessProtocol', params: { detail } });
+}
+
+function itemIdentity(item: TaskItem): string {
+  const { ext, ...base } = item as TaskItem & { ext?: unknown };
+  return JSON.stringify(base) + (ext === undefined ? '' : canonical(ext, LIMITS.extBytes));
+}
+
+function failed(branch: string, problems: HarnessProblem[]): HarnessVerification {
+  return { branch, passed: false, problems };
 }
 
 function requiredGit(root: string, args: string[]): string {
@@ -47,15 +59,18 @@ function requiredGit(root: string, args: string[]): string {
 export class HarnessBundleHost implements HarnessHost {
   constructor(private options: BundleHostOptions) {}
 
-  private assertSource(item: TaskItem): void {
+  private async assertSource(item: TaskItem): Promise<void> {
     const { root, ref, config, claim, tool } = this.options;
-    if (JSON.stringify(item) !== JSON.stringify(claim.item) || item.executor !== claim.claim.executor) {
+    if (itemIdentity(item) !== itemIdentity(claim.item) || item.executor !== claim.claim.executor) {
       refused('claim mismatch');
     }
     const currentClaim = readBoard(root).claims.find((entry) => entry.id === claim.claim.id);
     if (!currentClaim || currentClaim.state !== 'held' || currentClaim.executor !== item.executor
       || currentClaim.item !== item.id || Date.parse(currentClaim.expiresAt) <= Date.now()) {
       refused('claim is not active');
+    }
+    if (canonical(currentClaim.ext ?? null, LIMITS.extBytes) !== canonical(item.ext ?? null, LIMITS.extBytes)) {
+      refused('claim extension mismatch');
     }
     const dirty = requiredGit(root, ['status', '--porcelain', '--untracked-files=normal', '--', '.',
       ...OBSERVATIONS.map((file) => `:(exclude)${file}`)]);
@@ -66,7 +81,9 @@ export class HarnessBundleHost implements HarnessHost {
     const hooks = tool === 'codex' ? '.codex/hooks.json' : '.claude/settings.json';
     requiredGit(root, ['ls-files', '--error-unmatch', 'openspec/sdlc.yaml', hooks,
       `openspec/changes/${ref.id}/.sdlc.yaml`]);
-    const current = exportItems(root, ref, config, item.task.id, item.executor).items[0];
+    const current = (await runPrepared(root, config, { operation: 'export', board: false,
+      args: { change: ref.id, task: item.task.id, executor: item.executor, ext: item.ext }, actor: cliActor(root, item.executor) },
+    () => exportItems(root, ref, config, item.task.id, item.executor, item.ext))).items[0];
     if (!current || current.id !== item.id) refused('task is no longer open');
   }
 
@@ -77,7 +94,7 @@ export class HarnessBundleHost implements HarnessHost {
   }
 
   async prepare(session: string, item: TaskItem): Promise<void> {
-    this.assertSource(item);
+    await this.assertSource(item);
     const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'sdlc-harness-input-'));
     try {
       const file = path.join(directory, 'input.bundle');
@@ -117,31 +134,35 @@ export class HarnessBundleHost implements HarnessHost {
 
   async heartbeat(): Promise<void> {
     const { root, config, claim } = this.options;
-    heartbeatClaim(root, config, claim.claim.id, claim.claim.executor);
+    await runPrepared(root, config, { operation: 'heartbeat', board: true,
+      args: { claim: claim.claim.id, executor: claim.claim.executor }, actor: cliActor(root, claim.claim.executor) },
+    () => heartbeatClaim(root, config, claim.claim.id, claim.claim.executor));
   }
 
-  async verify(session: string, item: TaskItem): Promise<{ branch: string; passed: boolean }> {
-    if (!this.options.validateCandidate) refused('isolated candidate validator is required');
-    this.assertSource(item);
+  async verify(session: string, item: TaskItem): Promise<HarnessVerification> {
+    if (!this.options.validateCandidate) {
+      refused('isolated candidate validator is required', 'harness_validator_missing');
+    }
+    await this.assertSource(item);
     const { runtime, root, ref, config } = this.options;
     const branch = `refs/sdlc/harness/${randomUUID()}`;
     const made = await runtime.exec(session,
       ['git', '-C', WORKSPACE, 'bundle', 'create', '/workspace/result.bundle', item.result.branch,
         `^${item.base.commit}`]);
-    if (made.exitCode !== 0) return { branch, passed: false };
+    if (made.exitCode !== 0) return failed(branch, [{ code: 'harness_bundle_failed' }]);
     const encoded = await this.checkedExec(session, ['node', '-e', [
       "const b=require('fs').readFileSync(process.argv[1]);",
       `if(b.length>${MAX_BUNDLE})process.exit(72);`,
       "process.stdout.write(b.toString('base64'));",
     ].join(''), '/workspace/result.bundle']);
     if (encoded.length > Math.ceil(MAX_BUNDLE / 3) * 4 || !/^[A-Za-z0-9+/]*={0,2}$/.test(encoded)) {
-      refused('invalid candidate bundle');
+      refused('invalid candidate bundle', 'harness_bundle_invalid');
     }
     return this.inspectBundle(Buffer.from(encoded, 'base64'), item, branch, root, ref, config);
   }
 
   private async inspectBundle(bundle: Buffer, item: TaskItem, branch: string,
-    root: string, ref: ChangeRef, config: SdlcConfig): Promise<{ branch: string; passed: boolean }> {
+    root: string, ref: ChangeRef, config: SdlcConfig): Promise<HarnessVerification> {
     const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'sdlc-harness-result-'));
     const file = path.join(directory, 'result.bundle');
     try {
@@ -149,13 +170,22 @@ export class HarnessBundleHost implements HarnessHost {
       requiredGit(root, ['bundle', 'verify', file]);
       requiredGit(root, ['fetch', '--no-tags', '--no-write-fetch-head', file, `${item.result.branch}:${branch}`]);
       if (!git(root, ['merge-base', '--is-ancestor', item.base.commit!, branch]).ok) {
-        return { branch, passed: false };
+        return failed(branch, [{ code: 'harness_ancestry' }]);
       }
-      const checked = checkResult(root, ref, config, branch, item.base.commit, item.executor);
-      const wrongIdentity = checked.commits.some((commit) => commit.change !== item.change
-        || commit.task !== item.task.id || commit.agent !== item.result.trailers['SDLC-Agent']);
-      if (!checked.ok || wrongIdentity || (config.verify.mcp?.length ?? 0) > 0) return { branch, passed: false };
-      return { branch, passed: await this.validateBundle(directory, branch, config) };
+      const head = requiredGit(root, ['rev-parse', '--verify', `${branch}^{commit}`]);
+      const checked = checkResultCore(root, ref, config, head, item.base.commit, item.executor);
+      const identities = checked.commits.filter((commit) => commit.change !== item.change
+        || commit.task !== item.task.id || commit.agent !== item.result.trailers['SDLC-Agent'])
+        .map((commit) => ({ code: 'harness_identity', sha: commit.sha }));
+      const problems = [...checked.problems, ...identities];
+      if (problems.length) return failed(branch, problems);
+      if (!checked.ok) return failed(branch, [{ code: 'harness_core_failed' }]);
+      if ((config.verify.mcp?.length ?? 0) > 0) {
+        return failed(branch, [{ code: 'harness_verification_mcp' }]);
+      }
+      const validation = await this.validateBundle(directory, branch, config, head);
+      if (validation.length) return failed(branch, validation);
+      return this.consumeCandidate(branch, item, head);
     } finally {
       const safe = isWithin(os.tmpdir(), directory) && !fs.lstatSync(directory).isSymbolicLink()
         && fs.realpathSync(directory) === directory;
@@ -169,8 +199,21 @@ export class HarnessBundleHost implements HarnessHost {
     }
   }
 
-  private async validateBundle(directory: string, branch: string, config: SdlcConfig): Promise<boolean> {
+  /** Final plugin consumption must remain after ancestry, exact identity, core and isolated validation. */
+  private async consumeCandidate(branch: string, item: TaskItem, expectedHead: string): Promise<HarnessVerification> {
+    await this.assertSource(item);
+    const { root, ref, config } = this.options;
+    const checked = await runPrepared(root, config, { operation: 'result', board: false,
+      args: { change: ref.id, branch, base: item.base.commit, executor: item.executor }, actor: cliActor(root, item.executor) }, () => {
+      if (requiredGit(root, ['rev-parse', '--verify', `${branch}^{commit}`]) !== expectedHead) refused('validated candidate changed');
+      return checkResult(root, ref, config, branch, item.base.commit, item.executor);
+    });
+    return checked.ok ? { branch, passed: true } : failed(branch, checked.problems);
+  }
+
+  private async validateBundle(directory: string, branch: string, config: SdlcConfig, expectedHead: string): Promise<HarnessProblem[]> {
     const commit = requiredGit(this.options.root, ['rev-parse', '--verify', `${branch}^{commit}`]);
+    if (commit !== expectedHead) return [{ code: 'harness_candidate_changed' }];
     const file = path.join(directory, 'validation.bundle');
     requiredGit(this.options.root, ['bundle', 'create', file, branch]);
     const bundle = fs.readFileSync(file);
@@ -183,9 +226,10 @@ export class HarnessBundleHost implements HarnessHost {
         bundle, ref: branch, commit, verification: structuredClone(verification),
       });
     } catch {
-      refused('isolated candidate validation failed');
+      return [{ code: 'harness_validator_unavailable' }];
     }
-    return candidatePassed(evidence, commit, verification, fingerprint);
+    return candidatePassed(evidence, commit, verification, fingerprint)
+      ? [] : [{ code: 'harness_validator_failed' }];
   }
 
   private candidateFingerprint(directory: string, commit: string): string {

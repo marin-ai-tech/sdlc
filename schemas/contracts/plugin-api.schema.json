@@ -1,0 +1,69 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://sdlc.dev/schemas/contracts/plugin-api.schema.json",
+  "title": "sdlc.plugin/1 guest JSON ABI",
+  "description": "API 1 request bytes supplied to sdlc_call and response bytes returned by it. Reference #/$defs/request or #/$defs/response for one direction. Request/response are bounded to 1 MiB and JSON depth 32 by the runtime. Plugin-specific schemas further constrain input, output, config, state, facts and event data. Read and hook calls cannot persist effects.",
+  "oneOf": [{ "$ref": "#/$defs/request" }, { "$ref": "#/$defs/response" }],
+  "$defs": {
+    "name": { "type": "string", "pattern": "^[a-z][a-z0-9-]{0,23}$" },
+    "json": {
+      "anyOf": [
+        { "type": "null" }, { "type": "boolean" }, { "type": "number" }, { "type": "string" },
+        { "type": "array", "items": { "$ref": "#/$defs/json" } },
+        { "type": "object", "propertyNames": { "not": { "enum": ["__proto__", "prototype", "constructor"] } }, "additionalProperties": { "$ref": "#/$defs/json" } }
+      ]
+    },
+    "request": {
+      "type": "object",
+      "required": ["api", "operation", "input", "config", "state", "revision", "context"],
+      "properties": {
+        "api": { "const": "sdlc.plugin/1" },
+        "operation": { "$ref": "#/$defs/name" },
+        "input": { "$ref": "#/$defs/json" },
+        "config": { "$ref": "#/$defs/json" },
+        "state": { "$ref": "#/$defs/json" },
+        "revision": { "type": "integer", "minimum": 0, "maximum": 9007199254740991, "description": "Core-owned revision of the supplied plugin state snapshot." },
+        "context": { "$ref": "#/$defs/json", "description": "Core-owned sanitized invocation context, null when absent. Caller JSON cannot replace transport identity." }
+      },
+      "additionalProperties": false
+    },
+    "response": {
+      "type": "object",
+      "required": ["output"],
+      "properties": {
+        "output": { "$ref": "#/$defs/json" },
+        "facts": { "type": "object", "propertyNames": { "not": { "enum": ["__proto__", "prototype", "constructor"] } }, "additionalProperties": { "$ref": "#/$defs/json" } },
+        "state": { "$ref": "#/$defs/json" },
+        "events": {
+          "type": "array", "maxItems": 64,
+          "items": {
+            "type": "object", "required": ["name", "data"],
+            "properties": {
+              "name": { "type": "string", "pattern": "^[a-z][a-z0-9-]*(\\.[a-z][a-z0-9-]*)*$", "maxLength": 96 },
+              "data": { "$ref": "#/$defs/json", "description": "Declared event data, bounded to 64 KiB; provenance is stamped by core." }
+            },
+            "additionalProperties": false
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "hookOutput": {
+      "type": "object", "required": ["decision"],
+      "properties": {
+        "decision": { "enum": ["pass", "signal", "deny"] },
+        "code": { "type": "string", "pattern": "^[A-Za-z][A-Za-z0-9_.-]{0,63}$", "maxLength": 64 },
+        "message": { "type": "string", "maxLength": 500 }
+      },
+      "additionalProperties": false
+    },
+    "extensions": {
+      "type": "object",
+      "description": "Optional task/bid ext map, bounded to 256 KiB canonical JSON. New values require enabled accepted namespace schemas; historical data remains opaque JSON.",
+      "propertyNames": {
+        "allOf": [{ "$ref": "#/$defs/name" }, { "not": { "enum": ["prototype", "constructor", "project", "executor", "origin", "request"] } }]
+      },
+      "additionalProperties": { "$ref": "#/$defs/json" }
+    }
+  }
+}

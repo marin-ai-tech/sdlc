@@ -22,6 +22,13 @@ export function parseLogEntry(value: unknown): LogEntry | undefined {
     ['change', 'by', 'detail', 'digest', 'agent', 'task', 'executor'])) return undefined;
   if (raw.waitingFor !== undefined && !stringList(raw.waitingFor)) return undefined;
   if (raw.summary !== undefined && !validSummary(raw.summary)) return undefined;
+  if (raw.plugin !== undefined) {
+    const plugin = recordObject(raw.plugin);
+    if (!plugin || !stringFields(plugin, ['name', 'version', 'digest', 'eventId', 'request', 'transaction'])
+      || !/^[a-z][a-z0-9-]{0,23}$/.test(plugin.name as string)
+      || !(raw.event as string).startsWith(`${plugin.name}.`) || !/^sha256:[a-f0-9]{64}$/.test(plugin.digest as string)
+      || plugin.payload === undefined) return undefined;
+  }
   delete entry.scdl;
   return entry as unknown as LogEntry;
 }

@@ -10,6 +10,8 @@ import { openAuction, bidTask, awardTask, type BidOptions } from '../core/board-
 import { t } from '../core/i18n.js';
 import { git } from '../core/git.js';
 import type { ResultProblem } from '../core/task-result.js';
+import { extensionInput, runPrepared } from '../plugins/evaluation.js';
+import { cliActor } from '../plugins/broker.js';
 
 /**
  * `sdlc board *` (epic E16): list, dispatch, claim, heartbeat, release and submit tasks.
@@ -23,6 +25,7 @@ interface ListOptions {
 }
 
 interface ClaimOptions {
+  extJson?: string;
   change?: string;
   task: string;
   executor: string;
@@ -47,10 +50,11 @@ interface DispatchOptions {
   json?: boolean;
 }
 
-export function boardDispatchCommand(opts: DispatchOptions): void {
+export async function boardDispatchCommand(opts: DispatchOptions): Promise<void> {
   try {
     const ctx = loadProject();
-    const dispatch = dispatchTask(ctx.root, ctx.paths, ctx.config, opts);
+    const dispatch = await runPrepared(ctx.root, ctx.config, { operation: 'dispatch', args: opts,
+      actor: cliActor(ctx.root, opts.executor), board: true }, () => dispatchTask(ctx.root, ctx.paths, ctx.config, opts));
     if (opts.json) {
       printJson({ dispatch });
       return;
@@ -63,10 +67,11 @@ export function boardDispatchCommand(opts: DispatchOptions): void {
   }
 }
 
-export function boardAuctionCommand(opts: { change: string; task: string; window?: string; json?: boolean }): void {
+export async function boardAuctionCommand(opts: { change: string; task: string; window?: string; json?: boolean }): Promise<void> {
   try {
     const ctx = loadProject();
-    const auction = openAuction(ctx.root, ctx.paths, ctx.config, opts);
+    const auction = await runPrepared(ctx.root, ctx.config, { operation: 'auction', args: opts,
+      actor: cliActor(ctx.root), board: true }, () => openAuction(ctx.root, ctx.paths, ctx.config, opts));
     if (opts.json) printJson({ auction });
     else line(t('board.auction.done', { item: auction.item, at: auction.closesAt }));
   } catch (error) {
@@ -74,10 +79,12 @@ export function boardAuctionCommand(opts: { change: string; task: string; window
   }
 }
 
-export function boardBidCommand(opts: BidOptions & { json?: boolean }): void {
+export async function boardBidCommand(opts: BidOptions & { json?: boolean; extJson?: string }): Promise<void> {
   try {
     const ctx = loadProject();
-    const bid = bidTask(ctx.root, ctx.paths, ctx.config, opts);
+    const input = { ...opts, ...(opts.extJson === undefined ? {} : { ext: extensionInput(opts.extJson) }) };
+    const bid = await runPrepared(ctx.root, ctx.config, { operation: 'bid', args: input,
+      actor: cliActor(ctx.root, opts.executor), board: true }, () => bidTask(ctx.root, ctx.paths, ctx.config, input));
     if (opts.json) printJson({ bid });
     else line(t('board.bid.done', { executor: bid.executor, minutes: String(bid.minutes) }));
   } catch (error) {
@@ -85,10 +92,11 @@ export function boardBidCommand(opts: BidOptions & { json?: boolean }): void {
   }
 }
 
-export function boardAwardCommand(opts: { change: string; task: string; executor: string; json?: boolean }): void {
+export async function boardAwardCommand(opts: { change: string; task: string; executor: string; json?: boolean }): Promise<void> {
   try {
     const ctx = loadProject();
-    const dispatch = awardTask(ctx.root, ctx.paths, ctx.config, opts);
+    const dispatch = await runPrepared(ctx.root, ctx.config, { operation: 'award', args: opts,
+      actor: cliActor(ctx.root, opts.executor), board: true }, () => awardTask(ctx.root, ctx.paths, ctx.config, opts));
     if (opts.json) printJson({ dispatch });
     else line(t('board.award.done', { item: dispatch.item, executor: dispatch.executor }));
   } catch (error) {
@@ -119,14 +127,16 @@ function publicClaim(claim: BoardClaim): Record<string, unknown> {
     id: claim.id, item: claim.item, executor: claim.executor, agent: claim.agent,
     claimedAt: claim.claimedAt, expiresAt: claim.expiresAt, leaseSeconds: claim.leaseSeconds,
     state: claim.state,
+    ...(claim.ext === undefined ? {} : { ext: claim.ext }),
     ...(claim.reason ? { reason: claim.reason, reopenedAt: claim.reopenedAt, escalate: claim.escalate } : {}),
   };
 }
 
-export function boardListCommand(opts: ListOptions): void {
+export async function boardListCommand(opts: ListOptions): Promise<void> {
   try {
     const ctx = loadProject();
-    const { tasks, errors } = boardTaskListing(ctx.root, ctx.paths, ctx.config, opts.change);
+    const { tasks, errors } = await runPrepared(ctx.root, ctx.config, { operation: 'list', args: { change: opts.change },
+      actor: cliActor(ctx.root), board: true }, () => boardTaskListing(ctx.root, ctx.paths, ctx.config, opts.change));
     const status = git(ctx.root, ['status', '--porcelain', '--', 'openspec/.sdlc/log.jsonl']);
     const uncommittedLog = status.ok && status.stdout.length > 0;
     if (opts.json) {
@@ -163,10 +173,12 @@ export function boardListCommand(opts: ListOptions): void {
   }
 }
 
-export function boardClaimCommand(opts: ClaimOptions): void {
+export async function boardClaimCommand(opts: ClaimOptions): Promise<void> {
   try {
     const ctx = loadProject();
-    const { claim, item } = claimTask(ctx.root, ctx.paths, ctx.config, opts);
+    const input = { ...opts, ...(opts.extJson === undefined ? {} : { ext: extensionInput(opts.extJson) }) };
+    const { claim, item } = await runPrepared(ctx.root, ctx.config, { operation: 'claim', args: input,
+      actor: cliActor(ctx.root, opts.executor), board: true }, () => claimTask(ctx.root, ctx.paths, ctx.config, input));
     if (opts.json) {
       printJson({ claim: publicClaim(claim), item });
       return;
@@ -179,10 +191,12 @@ export function boardClaimCommand(opts: ClaimOptions): void {
   }
 }
 
-export function boardHeartbeatCommand(opts: ClaimIdOptions): void {
+export async function boardHeartbeatCommand(opts: ClaimIdOptions): Promise<void> {
   try {
     const ctx = loadProject();
-    const claim = heartbeatClaim(ctx.root, ctx.config, opts.claim, opts.executor, opts.request);
+    const claim = await runPrepared(ctx.root, ctx.config, { operation: 'heartbeat',
+      args: { claim: opts.claim, executor: opts.executor, request: opts.request }, actor: cliActor(ctx.root, opts.executor), board: true },
+    () => heartbeatClaim(ctx.root, ctx.config, opts.claim, opts.executor, opts.request));
     if (opts.json) {
       printJson({ claim: publicClaim(claim) });
       return;
@@ -193,10 +207,12 @@ export function boardHeartbeatCommand(opts: ClaimIdOptions): void {
   }
 }
 
-export function boardReleaseCommand(opts: ReleaseOptions): void {
+export async function boardReleaseCommand(opts: ReleaseOptions): Promise<void> {
   try {
     const ctx = loadProject();
-    const claim = releaseClaim(ctx.root, ctx.config, opts.claim, opts.note, opts.executor, opts.request);
+    const claim = await runPrepared(ctx.root, ctx.config, { operation: 'release',
+      args: { claim: opts.claim, note: opts.note, executor: opts.executor, request: opts.request }, actor: cliActor(ctx.root, opts.executor), board: true },
+    () => releaseClaim(ctx.root, ctx.config, opts.claim, opts.note, opts.executor, opts.request));
     if (opts.json) {
       printJson({ claim: publicClaim(claim) });
       return;
@@ -213,12 +229,13 @@ function problemDetail(problem: ResultProblem): string {
   return problem.executor ?? problem.sha ?? '';
 }
 
-export function boardSubmitCommand(opts: SubmitOptions): void {
+export async function boardSubmitCommand(opts: SubmitOptions): Promise<void> {
   try {
     const ctx = loadProject();
-    const { claim, result } = submitClaim(
-      ctx.root, ctx.paths, ctx.config, opts.claim, opts.branch, opts.base, opts.executor, opts.request,
-    );
+    const { claim, result } = await runPrepared(ctx.root, ctx.config, { operation: 'submit',
+      args: { claim: opts.claim, branch: opts.branch, base: opts.base, executor: opts.executor, request: opts.request },
+      actor: cliActor(ctx.root, opts.executor), board: true }, () => submitClaim(
+      ctx.root, ctx.paths, ctx.config, opts.claim, opts.branch, opts.base, opts.executor, opts.request));
     if (!result.ok) process.exitCode = 1;
     if (opts.json) {
       printJson({ claim: publicClaim(claim), result });

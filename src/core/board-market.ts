@@ -13,6 +13,8 @@ import { updateBoard, type Board, type BoardDispatch } from './board-store.js';
 import type { BoardAuction, BoardBid } from './board-market-state.js';
 import { recordFailure, recordRequest, replayRequest, validateRequest,
   RequestReplay, pruneRequests } from './board-requests.js';
+import { assertHook, consumeExtensions, consumeHook, declareOperation, effectTime, evaluationTime } from '../plugins/evaluation.js';
+import { parseExtensions, type Extensions } from '../plugins/api.js';
 
 function error(code: string, key: string): never {
   throw new SdlcError(code, { key });
@@ -51,15 +53,26 @@ export function winner(root: string, bids: BoardBid[], rule: string): BoardBid {
 
 export function settleAuctions(root: string, config: SdlcConfig, board: Board, now: number): void {
   const expired = board.auctions.filter((entry) => Date.parse(entry.closesAt) <= now);
+  const prepared = expired.map((auction) => {
+    if (!auction.bids.length) return { auction };
+    const selected = winner(root, auction.bids, config.board?.market.rule ?? 'fastest');
+    const verdict = consumeHook(root, config, 'award', { mode: 'settlement',
+      task: { id: auction.item, change: auction.change, task: auction.task }, executor: selected.executor, bid: selected });
+    return { auction, selected, verdict };
+  });
   board.auctions = board.auctions.filter((entry) => Date.parse(entry.closesAt) > now);
-  for (const auction of expired) {
-    if (!auction.bids.length) {
+  for (const { auction, selected, verdict } of prepared) {
+    if (!selected) {
       appendLog(root, config, { event: 'task.auction_expired', change: auction.change, task: auction.task });
       continue;
     }
     const rule = config.board?.market.rule ?? 'fastest';
-    const selected = winner(root, auction.bids, rule);
-    board.dispatches.push(reservation(auction, selected.executor, now));
+    if (verdict?.decision === 'deny') {
+      appendLog(root, config, { event: 'task.award_refused', change: auction.change, task: auction.task,
+        executor: selected.executor, detail: verdict.message ?? verdict.code ?? 'Plugin restriction' });
+      continue;
+    }
+    board.dispatches.push(reservation(auction, selected.executor, effectTime(root, now)));
     appendLog(root, config, { event: 'task.awarded', change: auction.change, task: auction.task,
       executor: selected.executor, detail: rule });
   }
@@ -67,7 +80,7 @@ export function settleAuctions(root: string, config: SdlcConfig, board: Board, n
 
 function updateMarket<T>(root: string, config: SdlcConfig, fn: (board: Board) => T): T {
   return updateBoard(root, (board) => {
-    const now = Date.now();
+    const now = evaluationTime(root);
     expireHeldClaims(root, config, board, now);
     expireDispatches(root, config, board, now);
     settleAuctions(root, config, board, now);
@@ -109,6 +122,7 @@ function assertFree(board: Board, item: string): void {
 
 export function openAuction(root: string, paths: ProjectPaths, config: SdlcConfig,
   opts: { change: string; task: string; window?: string }): BoardAuction {
+  declareOperation(root, config, 'auction', opts);
   const seconds = opts.window === undefined ? config.board?.market.windowSeconds ?? 300
     : /^\d+$/.test(opts.window) ? Number(opts.window) : NaN;
   if (!Number.isInteger(seconds) || seconds < 1 || seconds > 86_400) {
@@ -117,7 +131,7 @@ export function openAuction(root: string, paths: ProjectPaths, config: SdlcConfi
   const item = requireTask(root, paths, config, opts.change, opts.task);
   return updateMarket(root, config, (board) => {
     assertFree(board, item);
-    const now = Date.now();
+    const now = effectTime(root);
     const auction = { item, change: opts.change, task: opts.task,
       openedAt: new Date(now).toISOString(), closesAt: new Date(now + seconds * 1000).toISOString(), bids: [] };
     board.auctions.push(auction);
@@ -127,6 +141,7 @@ export function openAuction(root: string, paths: ProjectPaths, config: SdlcConfi
 }
 
 export interface BidOptions {
+  ext?: Extensions;
   change: string;
   task: string;
   executor: string;
@@ -150,7 +165,7 @@ function bidValues(opts: BidOptions): { minutes: number; cost?: number } {
 function placeBid(root: string, paths: ProjectPaths, config: SdlcConfig,
   board: Board, opts: BidOptions): BoardBid {
   const { minutes, cost } = bidValues(opts);
-  const now = Date.now();
+  const now = evaluationTime(root);
   expireHeldClaims(root, config, board, now);
   expireDispatches(root, config, board, now);
   settleAuctions(root, config, board, now);
@@ -162,8 +177,12 @@ function placeBid(root: string, paths: ProjectPaths, config: SdlcConfig,
   if (excludedExecutors(reopenedClaims(board, item)).includes(opts.executor)) {
     error('executor_excluded', 'error.board_bid_excluded');
   }
+  const ext = consumeExtensions(root, 'bidExt', opts.ext);
   const bid = { executor: opts.executor, agent: opts.agent, minutes,
+    ...(ext === undefined ? {} : { ext }),
     ...(cost === undefined ? {} : { cost }), at: new Date(now).toISOString() };
+  const state = readChangeState(ref.dir);
+  assertHook(root, config, 'bid', { task: { id: item, change: ref.id, task: opts.task, risk: state.risk, kind: state.kind }, bid });
   auction.bids = auction.bids.filter((entry) => entry.executor !== opts.executor);
   auction.bids.push(bid);
   const detail = `minutes ${minutes}, cost ${cost ?? 'unspecified'}`
@@ -174,13 +193,15 @@ function placeBid(root: string, paths: ProjectPaths, config: SdlcConfig,
 }
 
 export function bidTask(root: string, paths: ProjectPaths, config: SdlcConfig, opts: BidOptions): BoardBid {
+  declareOperation(root, config, 'bid', opts);
   validateRequest(opts.request);
+  const ext = parseExtensions(opts.ext);
   const spec = { key: opts.request, command: 'bid', args: [opts.change, opts.task,
-    opts.executor, opts.agent, opts.minutes, opts.cost, opts.note] };
+    opts.executor, opts.agent, opts.minutes, opts.cost, opts.note, ...(ext === undefined ? [] : [ext])] };
   try {
     return updateBoard(root, (board) => {
-      board.requests = pruneRequests(board.requests, Date.now());
-      replayRequest<BoardBid>(board.requests, spec);
+      board.requests = pruneRequests(board.requests, evaluationTime(root));
+      replayRequest<BoardBid>(board.requests, spec, root);
       try {
         const bid = placeBid(root, paths, config, board, opts);
         recordRequest(board.requests, spec, bid);
@@ -203,6 +224,7 @@ export function bidTask(root: string, paths: ProjectPaths, config: SdlcConfig, o
 
 export function awardTask(root: string, paths: ProjectPaths, config: SdlcConfig,
   opts: { change: string; task: string; executor: string }): BoardDispatch {
+  declareOperation(root, config, 'award', opts);
   const item = requireTask(root, paths, config, opts.change, opts.task, opts.executor);
   return updateMarket(root, config, (board) => {
     const auction = auctionOf(board, item);
@@ -214,10 +236,11 @@ export function awardTask(root: string, paths: ProjectPaths, config: SdlcConfig,
     if (excludedExecutors(reopenedClaims(board, item)).includes(opts.executor)) {
       error('executor_excluded', 'error.board_executor_excluded');
     }
+    assertHook(root, config, 'award', { mode: 'manual', task: { id: item, change: opts.change, task: opts.task }, executor: opts.executor });
     board.auctions = board.auctions.filter((entry) => entry.item !== item);
     board.dispatches = board.dispatches.filter((entry) => entry.item !== item);
     const next = reservation(auction ?? { item, change: opts.change, task: opts.task,
-      openedAt: '', closesAt: '', bids: [] }, opts.executor, Date.now());
+      openedAt: '', closesAt: '', bids: [] }, opts.executor, effectTime(root));
     board.dispatches.push(next);
     appendLog(root, config, { event: 'task.awarded', change: opts.change, task: opts.task,
       executor: opts.executor, detail: 'by award' });

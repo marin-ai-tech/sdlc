@@ -1,7 +1,7 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { readJson, writeJson } from './mcp-config.js';
-import { cliSpellings, SECOND_LAYER_COMMANDS } from './second-layer.js';
+import { cliSpellings, SECOND_LAYER_COMMANDS, secondLayerCommands } from './second-layer.js';
 import type { SettingsChange } from './settings.js';
 import type { ToolId } from './types.js';
 
@@ -70,14 +70,14 @@ const HUMAN = SECOND_LAYER_COMMANDS.map((command) =>
 const SDLC_CLI = String.raw`(?:[^)]*\s)?(?:[^\s()]*[/\\])?(?:sdlc|scdl)(?:\.js|\.cmd|\.ps1|\.exe)?`;
 const OUR_DENY = new RegExp(`^Bash\\(${SDLC_CLI}\\s+(?:${HUMAN.join('|')})(?:\\s+\\*)?\\)$`);
 
-export function qwenDeny(cli: string): string[] {
-  return cliSpellings(cli).flatMap((spelling) => SECOND_LAYER_COMMANDS.flatMap((command) => [
+export function qwenDeny(cli: string, commands: readonly string[] = SECOND_LAYER_COMMANDS): string[] {
+  return cliSpellings(cli).flatMap((spelling) => commands.flatMap((command) => [
     `Bash(${spelling} ${command})`,
     `Bash(${spelling} ${command} *)`,
   ]));
 }
 
-function merged(file: Json, cli: string, id: FamilyId, install: boolean): Json {
+function merged(file: Json, cli: string, id: FamilyId, install: boolean, commands: readonly string[]): Json {
   const out = { ...file };
   const hooks = hooksWithoutOurs(object(file.hooks));
   if (install) {
@@ -87,16 +87,28 @@ function merged(file: Json, cli: string, id: FamilyId, install: boolean): Json {
   }
   if (Object.keys(hooks).length > 0) out.hooks = hooks;
   else delete out.hooks;
-  mergePermissions(out, file, cli, install);
+  mergePermissions(out, file, cli, install, commands);
   return out;
 }
 
-function mergePermissions(out: Json, file: Json, cli: string, install: boolean): void {
+function mergePermissions(out: Json, file: Json, cli: string, install: boolean, commands: readonly string[]): void {
   const permissions = { ...object(file.permissions) };
+  const owned = Array.isArray(file._sdlcPluginDeny) ? [...file._sdlcPluginDeny] : [];
+  const removeOwned = (rule: string): boolean => {
+    const at = owned.indexOf(rule);
+    if (at < 0) return false;
+    owned.splice(at, 1);
+    return true;
+  };
   const deny = Array.isArray(permissions.deny)
-    ? permissions.deny.filter((rule: unknown) => typeof rule !== 'string' || !OUR_DENY.test(rule))
+    ? permissions.deny.filter((rule: unknown) => typeof rule !== 'string'
+      || (!OUR_DENY.test(rule) && !removeOwned(rule)))
     : [];
-  if (install) deny.push(...qwenDeny(cli));
+  const pluginRules = install ? qwenDeny(cli, commands.filter((command) => !SECOND_LAYER_COMMANDS.includes(command))) : [];
+  const added = pluginRules.filter((rule) => !deny.includes(rule));
+  if (install) deny.push(...qwenDeny(cli), ...added);
+  if (added.length) out._sdlcPluginDeny = added;
+  else delete out._sdlcPluginDeny;
   if (deny.length > 0) permissions.deny = deny;
   else delete permissions.deny;
   if (Object.keys(permissions).length > 0) out.permissions = permissions;
@@ -107,7 +119,7 @@ export function mergeQwenSettings(root: string, cli: string, id: FamilyId,
   install: boolean, dryRun = false): SettingsChange {
   const rel = qwenSettingsPath(id);
   const file = readJson(root, rel) ?? {};
-  const next = merged(file, cli, id, install);
+  const next = merged(file, cli, id, install, install ? secondLayerCommands(root) : []);
   if (JSON.stringify(file) === JSON.stringify(next)) return install ? 'unchanged' : 'absent';
   if (!dryRun) {
     if (Object.keys(next).length > 0) writeJson(root, rel, next);
@@ -145,7 +157,7 @@ export function qwenSettingsInstalled(root: string, id: FamilyId): boolean {
     const deny = object(file.permissions).deny;
     return cli !== '' && commandsOfEvent(hooks, 'SessionStart').includes(`${cli} hook session-start --agent ${id}`)
       && commandsOfEvent(hooks, 'Stop').includes(`${cli} hook stop --agent ${id}`)
-      && Array.isArray(deny) && qwenDeny(cli).every((rule) => deny.includes(rule));
+      && Array.isArray(deny) && qwenDeny(cli, secondLayerCommands(root)).every((rule) => deny.includes(rule));
   } catch {
     return false;
   }

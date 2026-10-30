@@ -24,8 +24,10 @@ const INTENT = [
 // requirement.
 // B117 adds `board_list` (what `sdlc board list --json` prints, read-only): a changed requirement. The board write
 // tools are listed only for an executor's token over HTTP, never over stdio.
+// Runtime plugins add task_export: a read-only task contract with typed plugin extensions.
 const READ_TOOLS = [
-  'audit', 'board_list', 'explain', 'guide', 'health', 'help', 'instructions', 'next', 'report', 'status', 'trace',
+  'audit', 'board_list', 'explain', 'guide', 'health', 'help', 'instructions', 'next', 'report', 'status',
+  'task_export', 'trace',
 ];
 
 function project() {

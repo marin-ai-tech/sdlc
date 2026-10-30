@@ -3,6 +3,14 @@
 Use this alphabetical list when a process term is unfamiliar. Each entry gives you a short meaning and a page
 where you can learn how it works in a change.
 
+## On this page
+
+- [A–D](#-ad)
+- [E–H](#-eh)
+- [I–P](#-ip)
+- [R–W](#-rw)
+- [Runtime extension terms](#runtime-extension-terms)
+
 ## 🧭 A–D
 
 - **Approval:** A person's decision to let a gate move forward. It is tied to the approved content's digest.
@@ -87,3 +95,21 @@ where you can learn how it works in a change.
   See the [user guide](05-guide.md).
 - **Waiver:** A recorded decision to skip a gate, made by a person or by configured policy where allowed.
   See [process health](13-process-health.md).
+
+## Runtime extension terms
+
+- **Runtime plugin:** A separately accepted `sdlc.plugin/1` Wasm package adding namespaced operations and pure
+  hooks. See [runtime plugins](33-plugins.md).
+- **Package acceptance:** A person's authorization bound to complete package bytes and a SHA-256 pin, distinct
+  from a lifecycle gate approval. Revocation retains own state and receipts. See [trust](33-plugins.md#operator-walkthrough).
+- **Plugin fact:** Schema-checked information attributed to a currently accepted plugin; a bounded core policy
+  may use it to add a restriction. Facts and signals never approve a gate or substitute independent proof.
+  See [facts and policies](33-plugins.md#hooks-facts-and-core-policies).
+- **Editor plugin distribution:** Generated skills and editor hooks built by `sdlc plugin build`; separate from
+  accepted runtime packages. See [runtime plugins](33-plugins.md).
+
+## See also
+
+- [Documentation index](README.md) — choose a topic or worked example.
+- [User guide](05-guide.md) — follow a change through the lifecycle.
+- [Runtime plugins](33-plugins.md) — inspect package acceptance, facts and runtime boundaries.

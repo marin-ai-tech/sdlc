@@ -101,7 +101,8 @@ function describe(command: Command, name: string): CatalogCommand {
     name,
     usage,
     description: catalog('en')[key] ?? command.description(),
-    actor: (HUMAN_COMMANDS as readonly string[]).includes(name) ? 'human' : 'any',
+    actor: (HUMAN_COMMANDS as readonly string[]).includes(name)
+      || (command as Command & { pluginAccess?: string }).pluginAccess === 'person' ? 'human' : 'any',
     example: EXAMPLES[name] ?? generatedExample(command, name),
   };
 }

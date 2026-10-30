@@ -1,4 +1,6 @@
 import { HUMAN_COMMANDS } from './human-commands.js';
+import type { SdlcConfig } from './config.js';
+import { pluginHumanCommands } from '../plugins/catalog.js';
 
 /**
  * How a shell command is recognized as a person's sdlc command (moved out of policy.ts for B18, unchanged): the hook
@@ -27,4 +29,19 @@ export function joinContinuations(command: string): string {
 export function callsHumanCommand(text: string): boolean {
   const cmd = joinContinuations(text);
   return APPROVAL_COMMAND.test(cmd) || ADOPT_APPLY_COMMAND.test(cmd) || INIT_ROLES_COMMAND.test(cmd);
+}
+
+/** Additional parsed catalog commands use the same aliases, globals and continuation handling. */
+export function callsNamedHumanCommand(text: string, names: readonly string[]): boolean {
+  if (!names.length) return false;
+  const alternatives = names.map((name) => name.split(' ')
+    .map((word) => word.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
+    .join(`${GLOBAL_OPTIONS}\\s+`)).join('|');
+  return new RegExp(`${CLI_PREFIX}\\s+(?:${alternatives})\\b`, 'i').test(joinContinuations(text));
+}
+
+/** Plugin authority is intrinsic, independently of the general approval refusal setting. */
+export function callsPluginHumanCommand(text: string, root: string, config: SdlcConfig): boolean {
+  if (callsNamedHumanCommand(text, ['plugins accept', 'plugins revoke', 'plugins recover'])) return true;
+  return callsNamedHumanCommand(text, pluginHumanCommands(root, config));
 }

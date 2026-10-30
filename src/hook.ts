@@ -12,6 +12,8 @@ import { shellWriteDestinations } from './core/policy-shell-writes.js';
 import { findProjectRoot, projectPaths } from './core/project.js';
 import { sessionHealthLine } from './core/health/signal.js';
 import { cursorAllow, cursorDefault, cursorDeny, fromCursor, type CursorInput } from './hook-cursor.js';
+import { assertHook, declareOperation, runPrepared } from './plugins/evaluation.js';
+import { pluginDiagnostic, type Json } from './plugins/api.js';
 import {
   configLoadDecision, configLoadSessionLine, configLoadStopMessage, configModeIsOff,
 } from './hook-config.js';
@@ -234,15 +236,39 @@ function respondLoadError(event: string, agent: Agent, input: HookInput, failure
   if (configModeIsOff(failure.file)) return;
   if (event === 'pre-tool') {
     respondPreTool(agent, configLoadDecision(failure.file, failure.loadError), input.session_id, failure.root);
-  } else if (event === 'stop' && !input.stop_hook_active) {
+  } else if (event === 'stop' && (!input.stop_hook_active || rawRestrictions(failure.file))) {
     writeStop(agent, configLoadStopMessage(failure.file, failure.loadError));
   }
 }
 
-function preTool(agent: Agent, input: HookInput, project: HookProject): void {
+function rawRestrictions(file: string): boolean {
+  try { return /^\s*(?:plugins|plugin_policies|['"](?:plugins|plugin_policies)['"]):/m.test(fs.readFileSync(file, 'utf8')); }
+  catch { return true; }
+}
+
+async function pluginBoundary(project: HookProject, hook: 'file_edit' | 'stop', subject: Json): Promise<void> {
+  const { root, config } = project;
+  await runPrepared(root, config, { operation: hook, args: subject, actor: { origin: 'hook' }, board: false }, () => {
+    declareOperation(root, config, hook, subject);
+    assertHook(root, config, hook, subject);
+  });
+}
+
+async function preTool(agent: Agent, input: HookInput, project: HookProject): Promise<void> {
   const { root, config } = project;
   const call = normalizeToolCall(String(input.tool_name ?? ''), input.tool_input ?? {}, project.cwd);
-  const decision = evaluateToolCall(call, { paths: project.paths, config });
+  let decision = evaluateToolCall(call, { paths: project.paths, config });
+  const targets = call.kind === 'bash' && call.command ? shellWriteDestinations(call.command, root, call.cwd) : call.files;
+  if (decision.decision !== 'deny' && config.enforcement.mode !== 'off'
+    && (call.kind === 'edit' || call.kind === 'bash' && targets.length > 0)) {
+    try {
+      await pluginBoundary(project, 'file_edit', { tool: call.tool, files: targets,
+        ...(call.command ? { command: call.command } : {}), ...(call.writes ? { writes: JSON.parse(JSON.stringify(call.writes)) as Json } : {}) });
+    } catch (error) {
+      const problem = pluginDiagnostic(error);
+      decision = { decision: 'deny', rule: 'plugin', reason: `${problem.code}: ${problem.message}` };
+    }
+  }
   const logged = !(input as { skip_log?: boolean }).skip_log;
   if (respondPreTool(agent, decision, input.session_id, root) && config.log.hookDecisions && logged) {
     appendHookLog(root, config, {
@@ -263,10 +289,15 @@ function sessionStart(agent: Agent, project: HookProject): void {
   writeContext(agent, health ? `${overview}\n${health}` : overview);
 }
 
-function stop(agent: Agent, input: HookInput, project: HookProject): void {
-  if (input.stop_hook_active) return;
-  const message = stopCheck({ paths: project.paths, config: project.config });
-  if (message) writeStop(agent, message);
+async function stop(agent: Agent, input: HookInput, project: HookProject): Promise<void> {
+  const message = input.stop_hook_active ? undefined : stopCheck({ paths: project.paths, config: project.config });
+  if (message) { writeStop(agent, message); return; }
+  if (project.config.enforcement.mode === 'off') return;
+  try { await pluginBoundary(project, 'stop', { repeated: input.stop_hook_active === true }); }
+  catch (error) {
+    const problem = pluginDiagnostic(error);
+    writeStop(agent, `${problem.code}: ${problem.message}`);
+  }
 }
 
 async function dispatch(event: string, agent: Agent): Promise<void> {
@@ -279,9 +310,9 @@ async function dispatch(event: string, agent: Agent): Promise<void> {
       respondLoadError(event, agent, input, project);
       return;
     }
-    if ((event as HookEvent) === 'pre-tool') preTool(agent, input, project);
+    if ((event as HookEvent) === 'pre-tool') await preTool(agent, input, project);
     else if ((event as HookEvent) === 'session-start') sessionStart(agent, project);
-    else if ((event as HookEvent) === 'stop') stop(agent, input, project);
+    else if ((event as HookEvent) === 'stop') await stop(agent, input, project);
   } catch (error) {
     if (process.env.SDLC_HOOK_DEBUG) {
       process.stderr.write(`sdlc hook error: ${error instanceof Error ? error.stack : String(error)}\n`);

@@ -1,4 +1,5 @@
 export const HUMAN_COMMANDS = [
+  'plugins accept', 'plugins revoke', 'plugins recover',
   'approve', 'reject', 'rework', 'waive', 'drop', 'tests unlock', 'track set',
   'config apply', 'config dismiss',
   'backlog move', 'backlog drop', 'license set', 'roles migrate', 'takeover', 'release-control',

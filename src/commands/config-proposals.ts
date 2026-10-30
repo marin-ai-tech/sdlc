@@ -1,4 +1,5 @@
 import * as fs from 'node:fs';
+import { settingsWrite } from '../plugins/activation.js';
 import { loadProject } from '../cli/context.js';
 import { line, printJson, reportFailure } from '../cli/output.js';
 import { agentEnvironment } from '../core/agent-env.js';
@@ -249,7 +250,8 @@ export function applyConfig(id: string, opts: Options): void {
       }
     }
     proposal.reviewedDiff = unifiedDiff(current, proposal.content);
-    writeTextAtomic(file, proposal.content);
+    settingsWrite(file, !!ctx.config.plugins || /^(?:plugins|['"]plugins['"]):/m.test(proposal.content),
+      () => writeTextAtomic(file, proposal.content));
     proposal.status = 'applied';
     writeProposal(ctx.root, proposal);
     appendLog(ctx.root, ctx.config, { event: 'config.applied', by: namedIdentity(ctx.root),

@@ -7,6 +7,9 @@ import { queueEvent, type EventSummary, type QueueConfig } from '../mcp/outbox.j
 import { agentEnvironment } from './agent-env.js';
 import { ensureLocalIgnore } from './local-ignore.js';
 import { parseLogEntry } from './log-record.js';
+import { appendLogRecords, logFile, withLogWriter } from './log-write.js';
+import type { Json } from '../plugins/api.js';
+import { deferObservation, isPreparation } from '../plugins/evaluation.js';
 
 /**
  * Append-only project log: one JSON object per line in
@@ -38,6 +41,7 @@ export interface LogEntry {
   task?: string;
   /** Executor id of `task.exported` / `task.result_checked` entries (B116). */
   executor?: string;
+  plugin?: { name: string; version: string; digest: string; eventId: string; request: string; transaction: string; payload: Json };
   sdlc: string;
   license: string;
 }
@@ -68,6 +72,7 @@ function logEntry(config: Pick<SdlcConfig, 'license'>, input: LogInput, stamp: H
     ...(input.summary ? { summary: input.summary } : {}),
     ...(input.task ? { task: input.task } : {}),
     ...(input.executor ? { executor: input.executor } : {}),
+    ...(input.plugin ? { plugin: input.plugin } : {}),
     sdlc: stamp.version, license: stamp.license,
   };
 }
@@ -83,13 +88,15 @@ export function appendLocalLog(
   root: string, config: Pick<SdlcConfig, 'license' | 'log'> & QueueConfig,
   input: LogInput, stamp: HarnessStamp = harnessStamp(config),
 ): void {
-  if (!config.log.enabled) return;
+  if (isPreparation(root) || !config.log.enabled) return;
+  if (deferObservation(root, () => appendLocalLog(root, config, structuredClone(input), stamp))) return;
   try {
-    const file = path.join(root, HOOK_LOG_PATH);
-    ensureDir(path.dirname(file));
-    ensureLocalIgnore(root, ['hook-log.jsonl']);
     const entry = logEntry(config, input, stamp);
-    fs.appendFileSync(file, `${JSON.stringify(entry)}\n`, 'utf-8');
+    withLogWriter(root, () => {
+      const file = logFile(root, 'hook-log.jsonl');
+      ensureLocalIgnore(root, ['hook-log.jsonl']);
+      appendLogRecords(file, [entry]);
+    });
     queueEvent(root, config, entry);
   } catch {
     // Logging cannot prevent a hook decision.
@@ -105,7 +112,9 @@ function drainHookLog(root: string, file: string): void {
     return;
   }
   try {
-    fs.appendFileSync(file, fs.readFileSync(drained));
+    const records = fs.readFileSync(drained, 'utf8').split('\n').filter((line) => line.trim())
+      .flatMap((line) => { try { const parsed = parseLogEntry(JSON.parse(line)); return parsed ? [parsed] : []; } catch { return []; } });
+    appendLogRecords(file, records);
     fs.rmSync(drained);
   } catch {
     try { fs.renameSync(drained, queue); } catch { /* keep the drain for recovery */ }
@@ -118,16 +127,19 @@ export function appendLog(
   input: LogInput,
   stamp: HarnessStamp = harnessStamp(config)
 ): void {
-  if (!config.log.enabled) return;
+  if (isPreparation(root) || !config.log.enabled) return;
+  if (deferObservation(root, () => appendLog(root, config, structuredClone(input), stamp))) return;
   const file = path.join(root, LOG_PATH);
   try {
-    ensureDir(path.dirname(file));
-    ensureHookIgnore(root);
-    const attributes = path.join(path.dirname(file), '.gitattributes');
-    if (!isFile(attributes)) fs.writeFileSync(attributes, GITATTRIBUTES, 'utf-8');
-    drainHookLog(root, file);
     const entry = logEntry(config, input, stamp);
-    fs.appendFileSync(file, `${JSON.stringify(entry)}\n`, 'utf-8');
+    withLogWriter(root, () => {
+      logFile(root, 'log.jsonl');
+      ensureHookIgnore(root);
+      const attributes = path.join(path.dirname(file), '.gitattributes');
+      if (!isFile(attributes)) fs.writeFileSync(attributes, GITATTRIBUTES, 'utf-8');
+      drainHookLog(root, file);
+      appendLogRecords(file, [entry]);
+    });
     queueEvent(root, config, entry);
   } catch {
     // The log is a record, not a gate: failing to write it never fails a command or a hook.
@@ -140,11 +152,17 @@ export function readLog(root: string): LogEntry[] {
     .filter((part): part is string => part !== undefined).join('\n');
   if (!text) return [];
   const entries: LogEntry[] = [];
+  const pluginIds = new Set<string>();
   for (const line of text.split(/\r?\n/)) {
     if (!line.trim()) continue;
     try {
       const parsed = parseLogEntry(JSON.parse(line));
-      if (parsed) entries.push(parsed);
+      if (!parsed) continue;
+      if (parsed.plugin) {
+        if (pluginIds.has(parsed.plugin.eventId)) continue;
+        pluginIds.add(parsed.plugin.eventId);
+      }
+      entries.push(parsed);
     } catch {
       // skip
     }

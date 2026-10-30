@@ -1,6 +1,8 @@
 import { SdlcError } from './errors.js';
+import { parseExtensions, type Extensions } from '../plugins/api.js';
 
 export interface BoardBid {
+  ext?: Extensions;
   executor: string;
   agent: string;
   minutes: number;
@@ -54,5 +56,6 @@ function parseBid(value: unknown): BoardBid {
   if (!Number.isInteger(bid.minutes) || (bid.minutes as number) < 1) invalid('bid minutes is invalid');
   if (bid.cost !== undefined && (typeof bid.cost !== 'number'
     || !Number.isFinite(bid.cost) || bid.cost < 0)) invalid('bid cost is invalid');
-  return bid as unknown as BoardBid;
+  const ext = parseExtensions(bid.ext);
+  return { ...bid, ...(ext === undefined ? {} : { ext }) } as unknown as BoardBid;
 }

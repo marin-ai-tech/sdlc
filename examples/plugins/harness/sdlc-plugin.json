@@ -1,0 +1,58 @@
+{
+  "format": "sdlc.plugin/1",
+  "name": "harness-meta",
+  "version": "1.0.0",
+  "api": "^1.0.0",
+  "entry": "plugin.wasm",
+  "initialState": {
+    "probes": 0
+  },
+  "schemas": {
+    "config": "schemas.json#/$defs/config",
+    "state": "schemas.json#/$defs/state",
+    "facts": "schemas.json#/$defs/facts",
+    "taskExt": "schemas.json#/$defs/taskExt",
+    "bidExt": "schemas.json#/$defs/bidExt"
+  },
+  "operations": {
+    "read": {
+      "access": "read",
+      "input": "schemas.json#/$defs/empty",
+      "output": "schemas.json#/$defs/facts"
+    },
+    "record": {
+      "access": "executor",
+      "input": "schemas.json#/$defs/record",
+      "output": "schemas.json#/$defs/facts"
+    },
+    "reset": {
+      "access": "person",
+      "input": "schemas.json#/$defs/empty",
+      "output": "schemas.json#/$defs/facts"
+    },
+    "guard": {
+      "access": "read",
+      "input": "schemas.json#/$defs/guardInput",
+      "output": "schemas.json#/$defs/decision"
+    }
+  },
+  "commands": {
+    "read": "read",
+    "record": "record",
+    "reset": "reset",
+    "guard": "guard"
+  },
+  "tools": {
+    "read": "read",
+    "record": "record",
+    "reset": "reset",
+    "guard": "guard"
+  },
+  "hooks": {
+    "result_accept": "guard"
+  },
+  "events": {
+    "probed": "schemas.json#/$defs/event",
+    "reset": "schemas.json#/$defs/state"
+  }
+}

@@ -1,10 +1,12 @@
 import { spawnSync } from 'node:child_process';
+import { randomUUID } from 'node:crypto';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { parseDocument } from 'yaml';
 import { buildProgram } from '../src/cli/index.js';
+import { capturePackage } from '../dist/plugins/package.js';
 import { BIN, git, humanEnv, initGitRepo, read, REPO_ROOT, runCli, tempDir, write } from './helpers.js';
 
 /**
@@ -485,6 +487,56 @@ describe('demo: a team builds a calculator with sdlc (every command)', { timeout
     step('drop-mistake', 'visibility', 'alice', ['drop', 'accidental-export', '--note', 'Created by mistake'],
       'Alice drops the change without merging its deltas, returning the item to open.');
     step('uninstall', 'visibility', 'alice', ['uninstall', '--dry-run'], 'Uninstall keeps every planning file.');
+  });
+
+  it('12b. Alice reviews a real runtime plugin, recovers its recorded operation and revokes trust', () => {
+    const source = 'packages/economy';
+    fs.cpSync(path.join(REPO_ROOT, 'examples/plugins/economy'), path.join(root, source), { recursive: true });
+    const snapshot = capturePackage(root, source);
+    const setting = { package: source, digest: snapshot.digest, enabled: true, config: { limit: 3 } };
+    const proposal = step('plugins-config-propose', 'plugins', 'agent', ['config', 'propose', '--set',
+      `plugins.economy=${JSON.stringify(setting)}`, '--reason', 'Demonstrate declared calculator resource units', '--json'],
+    'The agent proposes the complete local economy package pin and its demo limit.').json<{ id: string }>();
+    step('plugins-config-apply', 'plugins', 'alice', ['config', 'apply', proposal.id, '--json'],
+      'Alice, the maintainer, applies the reviewed settings proposal; execution still requires package acceptance.');
+    const listed = step('plugins-list', 'plugins', 'bob', ['plugins', 'list', '--json'],
+      'Bob lists the configured package: its digest is pinned, but it is not accepted or active yet.').json();
+    expect(listed.plugins).toMatchObject([{ name: 'economy', enabled: true, accepted: false, active: false }]);
+    const inspected = step('plugins-inspect', 'plugins', 'alice', ['plugins', 'inspect', 'economy', '--json'],
+      'Alice inspects the actual manifest, local schemas, no-WASI module and complete package digest.').json();
+    expect(inspected).toMatchObject({ name: 'economy', digest: snapshot.digest, accepted: false, active: false });
+    expect(inspected.problems).toEqual(expect.arrayContaining([expect.objectContaining({ code: 'plugin_unaccepted' })]));
+    const accepted = step('plugins-accept', 'plugins', 'alice', ['plugins', 'accept', 'economy',
+      '--expect-digest', inspected.digest, '--json'],
+    'Alice accepts exactly the inspected package digest and initializes its own state.').json();
+    expect(accepted).toMatchObject({ name: 'economy', digest: inspected.digest, status: 'accepted' });
+    const initial = step('economy-read', 'plugins', 'agent', ['economy', 'read', '--input-json', '{}', '--json'],
+      'The real Wasm guest reports zero used demo units and three remaining; this is not a financial ledger.').json();
+    expect(initial.output).toEqual({ used: 0, remaining: 3 });
+    const request = `p1.${Date.now()}.${randomUUID().replaceAll('-', '')}`;
+    const recorded = step('economy-record', 'plugins', 'agent', ['economy', 'record', '--input-json', '{"units":1}',
+      '--executor', 'calc-swarm', '--request', request, '--json'],
+    'The registered calculator executor records one declared demo unit with a stable retry identifier.').json();
+    expect(recorded.output).toEqual({ used: 1, remaining: 2 });
+    expect(recorded.request).toBe(request);
+    const recovered = step('plugins-recover', 'plugins', 'alice', ['plugins', 'recover', 'economy',
+      '--request', request, '--json'],
+    'Alice reconciles the retained request: its operation is already committed and must not execute again.').json();
+    expect(recovered).toMatchObject({ name: 'economy', revision: 1, status: 'reconciled',
+      outcome: { request, status: 'committed', transaction: recorded.transaction } });
+    const store = path.join(root, 'openspec/.sdlc/plugins/state/economy/store.json');
+    const retained = fs.readFileSync(store);
+    const revoked = step('plugins-revoke', 'plugins', 'alice', ['plugins', 'revoke', 'economy', '--json'],
+      'Alice revokes execution trust while preserving the package state, receipts and history.').json();
+    expect(revoked).toMatchObject({ name: 'economy', digest: snapshot.digest, status: 'revoked' });
+    expect(fs.readFileSync(store)).toEqual(retained);
+    const inactive = step('plugins-list-revoked', 'plugins', 'bob', ['plugins', 'list', '--json'],
+      'The package stays configured and visible after revocation, with no authority to run.').json();
+    expect(inactive.plugins).toMatchObject([{ name: 'economy', accepted: false, active: false }]);
+    const refused = step('economy-read-revoked', 'plugins', 'agent', ['economy', 'read', '--input-json', '{}', '--json'],
+      'A later guest invocation is refused until a person accepts the package again.', { expect: 1 }).json();
+    expect(refused.status[0].code).toBe('plugin_unaccepted');
+    expect(fs.readFileSync(store)).toEqual(retained);
   });
 
   it('13. every CLI command appears in the demo', () => {

@@ -20,6 +20,8 @@ import { activeDispatch, expireDispatches, expireHeldClaims, leaseSeconds, refus
 import { refuseAuction, settleAuctions } from './board-market.js';
 import { recordFailure, recordRequest, replayRequest, validateRequest, RequestReplay, type RequestSpec,
   pruneRequests } from './board-requests.js';
+import { assertHook, declareOperation, effectTime, evaluationTime } from '../plugins/evaluation.js';
+import { parseExtensions, type Extensions } from '../plugins/api.js';
 
 /**
  * The task board (B118a, epic E16): the open tasks of every active change whose plan gate is open, on which the
@@ -77,9 +79,9 @@ function withBoard<T>(root: string, config: SdlcConfig, fn: (board: Board) => T,
   validateRequest(request?.key);
   try {
     return updateBoard(root, (board) => {
-      const now = Date.now();
+      const now = evaluationTime(root);
       board.requests = pruneRequests(board.requests, now);
-      replayRequest<T>(board.requests, request);
+      replayRequest<T>(board.requests, request, root);
       expireHeldClaims(root, config, board, now);
       expireDispatches(root, config, board, now);
       settleAuctions(root, config, board, now);
@@ -153,6 +155,7 @@ export function boardTasks(
 export function boardTaskListing(
   root: string, paths: ProjectPaths, config: SdlcConfig, changeId?: string,
 ): { tasks: BoardTaskView[]; errors: ChangeEvaluationError[] } {
+  declareOperation(root, config, 'list', { change: changeId });
   return withBoard(root, config, (board) => {
     const refs = changeId === undefined ? listActiveChanges(paths) : [resolveChange(paths, changeId)];
     const { evaluated, errors } = evaluateEach(root, refs, config, { skipFingerprint: true, skipPeople: true });
@@ -199,10 +202,12 @@ function assertClaimable(board: Board, ref: ChangeRef, taskId: string, executor:
  */
 export function claimTask(
   root: string, paths: ProjectPaths, config: SdlcConfig,
-  opts: { change?: string; task: string; executor: string; agent: string; lease?: string; request?: string },
+  opts: { change?: string; task: string; executor: string; agent: string; lease?: string; request?: string; ext?: Extensions },
 ): ClaimResult {
+  declareOperation(root, config, 'claim', opts);
+  const ext = parseExtensions(opts.ext);
   const request = { key: opts.request, command: 'claim', args: [opts.change, opts.task,
-    opts.executor, opts.agent, opts.lease] };
+    opts.executor, opts.agent, opts.lease, ...(ext === undefined ? [] : [ext])] };
   return withBoard(root, config, (board) => {
     const duration = leaseSeconds(opts.lease);
     if (!AGENT_NAME.test(opts.agent)) {
@@ -210,7 +215,7 @@ export function claimTask(
     }
     const ref = resolveChange(paths, opts.change);
     const task = changeTasks(ref).find((entry) => entry.id === opts.task);
-    const { items, executor } = exportItems(root, ref, config, opts.task, opts.executor);
+    const { items, executor } = exportItems(root, ref, config, opts.task, opts.executor, ext);
     if (task !== undefined && task.done) {
       fail('task_done', 'error.task_x_of_x_is_already_done', { task: opts.task, change: ref.id });
     }
@@ -224,13 +229,15 @@ export function claimTask(
     if (attempts.length > 0) item.previousAttempts = previousAttempts(attempts);
     const claimNumber = board.claims.filter((claim) => claim.item === item.id).length + 1;
     if (claimNumber > 1) item.result.branch += `-${claimNumber}`;
-    const now = Date.now();
+    assertHook(root, config, 'claim', { task: item, executor: executor.id, agent: opts.agent, leaseSeconds: duration });
+    const now = effectTime(root);
     const created: BoardClaim = {
       id: crypto.randomBytes(16).toString('hex'),
       item: `${ref.id}#${opts.task}`, change: ref.id, task: opts.task,
       executor: executor.id, agent: opts.agent,
       claimedAt: iso(now), expiresAt: iso(now + duration * 1000), leaseSeconds: duration,
       state: 'held',
+      ...(ext === undefined ? {} : { ext }),
     };
     board.claims.push(created);
     board.dispatches = board.dispatches.filter((dispatch) => dispatch.item !== created.item);
@@ -256,9 +263,10 @@ function heldClaim(board: Board, claimId: string, executor?: string): BoardClaim
 /** A heartbeat pushes the lease end out by the claim's own `leaseSeconds`; it writes no log entry. */
 export function heartbeatClaim(root: string, config: SdlcConfig, claimId: string,
   executor?: string, requestKey?: string): BoardClaim {
+  declareOperation(root, config, 'heartbeat', { claim: claimId, executor, request: requestKey });
   return withBoard(root, config, (board) => {
     const claim = heldClaim(board, claimId, executor);
-    claim.expiresAt = iso(Date.now() + claim.leaseSeconds * 1000);
+    claim.expiresAt = iso(effectTime(root) + claim.leaseSeconds * 1000);
     return claim;
   }, { key: requestKey, command: 'heartbeat', args: [claimId, executor] });
 }
@@ -266,10 +274,11 @@ export function heartbeatClaim(root: string, config: SdlcConfig, claimId: string
 /** Release gives the task back to the open list; the note lands in the log's `detail`. */
 export function releaseClaim(root: string, config: SdlcConfig, claimId: string,
   note?: string, executor?: string, requestKey?: string): BoardClaim {
+  declareOperation(root, config, 'release', { claim: claimId, note, executor, request: requestKey });
   return withBoard(root, config, (board) => {
     const claim = heldClaim(board, claimId, executor);
     claim.state = 'released';
-    claim.releasedAt = iso(Date.now());
+    claim.releasedAt = iso(effectTime(root));
     appendLog(root, config, {
       event: 'task.released', change: claim.change, task: claim.task,
       executor: claim.executor, agent: claim.agent,
@@ -288,6 +297,7 @@ export function submitClaim(
   root: string, paths: ProjectPaths, config: SdlcConfig, claimId: string, branch: string,
   base?: string, executor?: string, requestKey?: string,
 ): SubmitResult {
+  declareOperation(root, config, 'submit', { claim: claimId, branch, base, executor, request: requestKey });
   return withBoard(root, config, (board) => {
     const claim = heldClaim(board, claimId, executor);
     const ref = resolveChange(paths, claim.change);

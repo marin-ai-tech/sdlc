@@ -2,7 +2,7 @@ import { buildProgram } from '../cli/index.js';
 import { line, printJson, reportFailure } from '../cli/output.js';
 import { helpCatalog, type CatalogCommand } from '../core/help-catalog.js';
 import { SdlcError } from '../core/errors.js';
-import { t } from '../core/i18n.js';
+import { catalog, t } from '../core/i18n.js';
 import { loadConfig, type SdlcConfig } from '../core/config.js';
 import { findProjectRoot, projectPaths } from '../core/project.js';
 import { DEFAULT_TOOLS, TOOL_IDS, type ToolId } from '../integrations/types.js';
@@ -12,7 +12,8 @@ function cmdKey(name: string): string {
 }
 
 function localizedDescription(item: CatalogCommand): string {
-  return t(cmdKey(item.name));
+  const key = cmdKey(item.name);
+  return catalog('en')[key] ? t(key) : item.description;
 }
 
 function printCommands(title: string, commands: CatalogCommand[]): void {

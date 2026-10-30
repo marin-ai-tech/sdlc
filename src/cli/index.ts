@@ -10,6 +10,8 @@ import { doctorCommand } from '../commands/doctor.js';
 import { healthCommand } from '../commands/health.js';
 import { approvalsVerify } from '../commands/approvals.js';
 import { pluginBuildCommand } from '../commands/plugin.js';
+import { pluginsCommand } from '../commands/plugins.js';
+import { registerPluginCommands } from '../plugins/cli.js';
 import { approveCommand, rejectCommand, testsCommand, waiveCommand } from '../commands/gates.js';
 import { releaseControlCommand, takeoverCommand } from '../commands/takeover.js';
 import { answerCommand } from '../commands/answer.js';
@@ -516,6 +518,7 @@ export function buildProgram(): Command {
     .option('--json', 'output JSON')
     .action((id, opts) => taskExecutorTokenCommand(id, opts));
   task.command('export').description(cmdDesc('cmd.task.export'))
+    .option('--ext-json <json>', 'namespaced task extension JSON')
     .option('--change <id>', 'change id')
     .option('--task <n.m>', 'export only this task (e.g. 1.2)')
     .option('--executor <id>', 'executor id from openspec/executors.yaml')
@@ -547,6 +550,7 @@ export function buildProgram(): Command {
     .option('--json', 'output JSON')
     .action((opts) => boardAuctionCommand(opts));
   board.command('bid').description(cmdDesc('cmd.board.bid'))
+    .option('--ext-json <json>', 'namespaced bid extension JSON')
     .requiredOption('--change <id>', 'change id')
     .requiredOption('--task <n.m>', 'task id')
     .requiredOption('--executor <id>', 'executor id')
@@ -564,6 +568,7 @@ export function buildProgram(): Command {
     .option('--json', 'output JSON')
     .action((opts) => boardAwardCommand(opts));
   board.command('claim').description(cmdDesc('cmd.board.claim'))
+    .option('--ext-json <json>', 'namespaced task extension JSON')
     .requiredOption('--change <id>', 'change id')
     .requiredOption('--task <n.m>', 'task id to claim (e.g. 1.2)')
     .requiredOption('--executor <id>', 'executor id from openspec/executors.yaml')
@@ -754,6 +759,22 @@ export function buildProgram(): Command {
       process.exitCode = result.exitCode ?? 1;
     });
 
+  const plugins = program.command('plugins').description('Inspect and manage trusted runtime plugins');
+  plugins.command('list').description('List configured runtime plugins, activation status and diagnostic problems.')
+    .option('--json', 'output JSON').action((opts) => pluginsCommand('list', undefined, opts));
+  const pluginActions = {
+    inspect: 'Inspect a runtime plugin package, trust status and configuration problems.',
+    accept: 'Accept a reviewed plugin package digest and initialize or retain its state.',
+    revoke: 'Revoke plugin execution trust while retaining its state and history.',
+    recover: 'Recover inactive plugin writers and reconcile interrupted request outcomes.',
+  };
+  for (const [action, description] of Object.entries(pluginActions)) {
+    plugins.command(`${action} <name>`).description(description).option('--json', 'output JSON')
+      .option('--expect-digest <digest>', 'accept only the reviewed complete SHA-256 package digest')
+      .option('--request <id>', 'reconcile a stable mutating request id during recovery')
+      .action((name, opts) => pluginsCommand(action, name, opts));
+  }
+  registerPluginCommands(program);
   withLocaleOption(program);
   localizeDescriptions(program);
   return program;

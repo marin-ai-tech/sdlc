@@ -19,6 +19,9 @@ import { parseStages, type StagesConfig } from './stage-config.js';
 import { readYamlObject } from './yaml-io.js';
 import { updateYamlFile } from './yaml-update.js';
 import { assertCliValue } from './cli-value.js';
+import { parsePlugins, parsePluginPolicies, type PluginPolicy } from '../plugins/config.js';
+import type { PluginSetting } from '../plugins/api.js';
+import { settingsWrite } from '../plugins/activation.js';
 export { assertCliValue } from './cli-value.js';
 
 export const APPROVAL_GATES = ['intent', 'spec', 'plan', 'qa', 'review', 'release'] as const;
@@ -76,6 +79,8 @@ export interface VerifyCommand {
 }
 
 export interface SdlcConfig {
+  plugins?: Record<string, PluginSetting>;
+  pluginPolicies?: PluginPolicy[];
   board?: { market: MarketConfig };
   version: 1;
   /** OpenSpec schema used for new changes created by `sdlc new`. */
@@ -338,6 +343,10 @@ function asString(value: unknown, where: string): string | undefined {
  */
 export function parseConfig(raw: Raw, file = 'openspec/sdlc.yaml'): SdlcConfig {
   const config = defaultConfig();
+  const plugins = parsePlugins(raw.plugins);
+  if (plugins) config.plugins = plugins;
+  const pluginPolicies = parsePluginPolicies(raw.plugin_policies);
+  if (pluginPolicies) config.pluginPolicies = pluginPolicies;
   const market = parseMarket(raw.board);
   if (market) config.board = { market };
   const where = (key: string) => `${file}: ${key}`;
@@ -678,6 +687,8 @@ export function serializeConfig(config: SdlcConfig): Record<string, unknown> {
       ...(config.license.licensee ? { licensee: config.license.licensee } : {}),
     },
     log: { enabled: config.log.enabled, hook_decisions: config.log.hookDecisions },
+    ...(config.plugins ? { plugins: config.plugins } : {}),
+    ...(config.pluginPolicies ? { plugin_policies: config.pluginPolicies } : {}),
     ...(Object.keys(config.layout).length ? { layout: config.layout } : {}),
     ...serializeRework(config.rework),
     ...serializeHealth(config.health),
@@ -703,5 +714,6 @@ export function saveConfig(file: string, config: SdlcConfig): void {
   } catch {
     previous = {};
   }
-  updateYamlFile(file, previous, serializeConfig(config), CONFIG_HEADER);
+  settingsWrite(file, !!(config.plugins || previous.plugins),
+    () => updateYamlFile(file, previous, serializeConfig(config), CONFIG_HEADER));
 }

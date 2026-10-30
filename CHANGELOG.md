@@ -2,7 +2,40 @@
 
 All notable changes to sdlc. Versions follow [Semantic Versioning](https://semver.org/); while the major version is 0, a minor version may change behavior.
 
-## Unreleased
+## 0.29.0 — 2026-10-30
+
+### Added
+- **Runtime plugins** ([guide](docs/en/33-plugins.md)): local `sdlc.plugin/1` packages compiled to WebAssembly
+  without WASI or host functions. A plugin can add namespaced commands (`sdlc <plugin> <operation>`), MCP tools
+  (`<plugin>__<tool>`), hooks that only restrict or signal, facts for fact policies, its own state and events, and
+  typed `ext.<plugin>` data on task contracts, claims and bids. Core restrictions always run first; a plugin never
+  approves a gate or downgrades a core denial.
+- A plugin is enabled under `plugins:` in `openspec/sdlc.yaml` with the full digest of its package, through the
+  guarded `sdlc config propose` / `sdlc config apply`. `sdlc plugins list` and `sdlc plugins inspect` report its
+  status; `sdlc plugins accept --expect-digest`, `sdlc plugins revoke` and `sdlc plugins recover` are a person's
+  commands and are refused to agents and over MCP. A changed package byte needs a new pin and a new acceptance.
+- Mutating plugin operations are transactional: a request id makes a retry replay the committed result, and plugin
+  events are projected into the project log once. `sdlc doctor` reports plugin profile, configuration and state
+  problems.
+- Two runnable example packages, `examples/plugins/economy` and `examples/plugins/harness`, with their WebAssembly
+  text source and a reproducible build (`npm run build:plugins`).
+- JSON Schemas `schemas/contracts/plugin-manifest.schema.json` and `plugin-api.schema.json`; `task.schema.json`
+  gains the optional `ext` object and `result.schema.json` the `plugin_refused` problem with the refusing plugin's
+  name, version and digest.
+- MCP: the read tool `task_export` returns a task contract; `board_claim` and `board_bid` accept `ext`. These are
+  listed for every client, including projects without plugins.
+
+### Changed
+- Project log appends go through a writer lock (`openspec/.sdlc/log.lock`, git-ignored) and are flushed and read
+  back before they count as written.
+- A board lock is broken only when its owner process is gone, not only because it is older than about 30 seconds.
+- Harness candidates run the core result check through the shared check; some refusals now use the codes
+  `harness_validator_missing` and `harness_bundle_invalid` instead of `harness_refused`.
+
+### Known limits
+- A process killed while holding `openspec/.sdlc/log.lock` stops project log writes, and an empty
+  `openspec/.sdlc/board.lock` left by a crash, or one naming a process id that was reused, blocks board writes.
+  When no sdlc command is running, a person deletes the leftover lock file. A fix is planned for 0.29.1.
 
 ## 0.28.0 — 2026-10-29
 

@@ -101,3 +101,10 @@ Local contract tests do not prove a real provider workflow. Acceptance needs an 
 an isolated credential-free validator and a test repository. Run a real task, pause it through its lease, fork the warm
 checkpoint, and verify a returned branch with the ordinary review process. Inspect the sandbox for credential
 exposure and record the independent evidence before enabling production use.
+
+## Runtime plugin demonstration
+
+The [harness runtime plugin example](../../examples/plugins/harness/README.md) exercises the accepted Wasm
+ABI, own state/events and a pure result hook. Its declared probe counts are signals, not independent proof.
+It neither runs this prototype's provider adapters nor completes economic accounting, a self-improving harness or live provider integration.
+See [runtime plugins](33-plugins.md) for the separate runtime package mechanism and its guarantees.

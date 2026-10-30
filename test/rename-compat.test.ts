@@ -7,6 +7,8 @@ import { defaultConfig } from '../src/core/config.js';
 import { evaluateToolCall, normalizeToolCall } from '../src/core/policy.js';
 import { projectPaths } from '../src/core/project.js';
 import { LOG_PATH, readLog } from '../src/core/log.js';
+import { callsPluginHumanCommand } from '../dist/core/human-command-match.js';
+import { pluginProject } from './fixtures/plugin-project.js';
 import { git, humanEnv, initGitRepo, read, REPO_ROOT, runCli, tempDir, write } from './helpers.js';
 
 const INTENT = '# Intent: x\n\nAuthor: Pat. Status: draft. Source: idea\n\n## Problem\nP.\n\n## Proposed outcome\nO.\n\n## Affected users and systems\nAll.\n\n## Constraints\nNone\n\n## Success measures\nM.\n\n## Out of scope\nNone\n\n## Open questions\nNone\n';
@@ -32,6 +34,14 @@ function legacyProject() {
 }
 
 describe('projects written before the rename from scdl', () => {
+  it('the legacy Windows command alias cannot bypass a plugin person-only command', async () => {
+    const p = await pluginProject({ output: 1 });
+    expect(callsPluginHumanCommand('SCDL.CMD --locale en economy configure', p.root, p.config)).toBe(true);
+    const store = JSON.parse(read(path.join(p.root, 'openspec/.sdlc/plugins/state/economy/store.json')));
+    expect(store.revision).toBe(0);
+    expect(store.data).toEqual({});
+  });
+
   it('the fixture really is in the old format', () => {
     const { root, dir } = legacyProject();
     expect(read(path.join(dir, '.sdlc.yaml'))).toMatch(/\bscdl:/);
