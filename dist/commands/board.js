@@ -1,0 +1,217 @@
+import { loadProject } from '../cli/context.js';
+import { line, printJson, reportFailure } from '../cli/output.js';
+import { boardTaskListing, claimTask, heartbeatClaim, releaseClaim, submitClaim, } from '../core/board.js';
+import { reopenTask } from '../core/board-reopen.js';
+import { dispatchTask } from '../core/board-dispatch.js';
+import { openAuction, bidTask, awardTask } from '../core/board-market.js';
+import { t } from '../core/i18n.js';
+import { git } from '../core/git.js';
+import { extensionInput, runPrepared } from '../plugins/evaluation.js';
+import { cliActor } from '../plugins/broker.js';
+export async function boardDispatchCommand(opts) {
+    try {
+        const ctx = loadProject();
+        const dispatch = await runPrepared(ctx.root, ctx.config, { operation: 'dispatch', args: opts,
+            actor: cliActor(ctx.root, opts.executor), board: true }, () => dispatchTask(ctx.root, ctx.paths, ctx.config, opts));
+        if (opts.json) {
+            printJson({ dispatch });
+            return;
+        }
+        line(t('board.dispatch.done', {
+            item: dispatch.item, executor: dispatch.executor, at: dispatch.expiresAt,
+        }));
+    }
+    catch (error) {
+        reportFailure(error, opts.json);
+    }
+}
+export async function boardAuctionCommand(opts) {
+    try {
+        const ctx = loadProject();
+        const auction = await runPrepared(ctx.root, ctx.config, { operation: 'auction', args: opts,
+            actor: cliActor(ctx.root), board: true }, () => openAuction(ctx.root, ctx.paths, ctx.config, opts));
+        if (opts.json)
+            printJson({ auction });
+        else
+            line(t('board.auction.done', { item: auction.item, at: auction.closesAt }));
+    }
+    catch (error) {
+        reportFailure(error, opts.json);
+    }
+}
+export async function boardBidCommand(opts) {
+    try {
+        const ctx = loadProject();
+        const input = { ...opts, ...(opts.extJson === undefined ? {} : { ext: extensionInput(opts.extJson) }) };
+        const bid = await runPrepared(ctx.root, ctx.config, { operation: 'bid', args: input,
+            actor: cliActor(ctx.root, opts.executor), board: true }, () => bidTask(ctx.root, ctx.paths, ctx.config, input));
+        if (opts.json)
+            printJson({ bid });
+        else
+            line(t('board.bid.done', { executor: bid.executor, minutes: String(bid.minutes) }));
+    }
+    catch (error) {
+        reportFailure(error, opts.json);
+    }
+}
+export async function boardAwardCommand(opts) {
+    try {
+        const ctx = loadProject();
+        const dispatch = await runPrepared(ctx.root, ctx.config, { operation: 'award', args: opts,
+            actor: cliActor(ctx.root, opts.executor), board: true }, () => awardTask(ctx.root, ctx.paths, ctx.config, opts));
+        if (opts.json)
+            printJson({ dispatch });
+        else
+            line(t('board.award.done', { item: dispatch.item, executor: dispatch.executor }));
+    }
+    catch (error) {
+        reportFailure(error, opts.json);
+    }
+}
+/** The claim as the JSON output shows it: everything but the internal change/task duplication. */
+function publicClaim(claim) {
+    return {
+        id: claim.id, item: claim.item, executor: claim.executor, agent: claim.agent,
+        claimedAt: claim.claimedAt, expiresAt: claim.expiresAt, leaseSeconds: claim.leaseSeconds,
+        state: claim.state,
+        ...(claim.ext === undefined ? {} : { ext: claim.ext }),
+        ...(claim.reason ? { reason: claim.reason, reopenedAt: claim.reopenedAt, escalate: claim.escalate } : {}),
+    };
+}
+export async function boardListCommand(opts) {
+    try {
+        const ctx = loadProject();
+        const { tasks, errors } = await runPrepared(ctx.root, ctx.config, { operation: 'list', args: { change: opts.change },
+            actor: cliActor(ctx.root), board: true }, () => boardTaskListing(ctx.root, ctx.paths, ctx.config, opts.change));
+        const status = git(ctx.root, ['status', '--porcelain', '--', 'openspec/.sdlc/log.jsonl']);
+        const uncommittedLog = status.ok && status.stdout.length > 0;
+        if (opts.json) {
+            printJson({ tasks, uncommittedLog, ...(errors.length > 0 ? { errors } : {}) });
+            return;
+        }
+        if (tasks.length === 0) {
+            line(t('board.list.empty'));
+            if (uncommittedLog)
+                line(t('board.list.commitLog'));
+            for (const error of errors) {
+                line(t('sharedView.evaluationError', { change: error.change, code: error.code }));
+            }
+            return;
+        }
+        line(t('board.list.heading'));
+        for (const task of tasks) {
+            const who = task.executor === undefined ? ''
+                : `  ${task.executor}${task.agent === undefined ? '' : `/${task.agent}`}`;
+            const until = task.expiresAt === undefined ? '' : `  ${t('board.list.until', { at: task.expiresAt })}`;
+            const attempts = task.attempts === undefined ? '' : `  ${t('board.list.attempts', {
+                count: String(task.attempts), reason: task.lastReason ?? '',
+            })}`;
+            const excluded = task.excluded === undefined ? '' : `  ${t('board.list.excluded', {
+                executors: task.excluded.join(', '),
+            })}`;
+            line(`  ${task.id}  ${task.status}${who}${until}${attempts}${excluded}`);
+        }
+        if (uncommittedLog)
+            line(t('board.list.commitLog'));
+        for (const error of errors) {
+            line(t('sharedView.evaluationError', { change: error.change, code: error.code }));
+        }
+    }
+    catch (error) {
+        reportFailure(error, opts.json);
+    }
+}
+export async function boardClaimCommand(opts) {
+    try {
+        const ctx = loadProject();
+        const input = { ...opts, ...(opts.extJson === undefined ? {} : { ext: extensionInput(opts.extJson) }) };
+        const { claim, item } = await runPrepared(ctx.root, ctx.config, { operation: 'claim', args: input,
+            actor: cliActor(ctx.root, opts.executor), board: true }, () => claimTask(ctx.root, ctx.paths, ctx.config, input));
+        if (opts.json) {
+            printJson({ claim: publicClaim(claim), item });
+            return;
+        }
+        line(t('board.claim.done', {
+            item: claim.item, executor: claim.executor, agent: claim.agent, at: claim.expiresAt,
+        }));
+    }
+    catch (error) {
+        reportFailure(error, opts.json);
+    }
+}
+export async function boardHeartbeatCommand(opts) {
+    try {
+        const ctx = loadProject();
+        const claim = await runPrepared(ctx.root, ctx.config, { operation: 'heartbeat',
+            args: { claim: opts.claim, executor: opts.executor, request: opts.request }, actor: cliActor(ctx.root, opts.executor), board: true }, () => heartbeatClaim(ctx.root, ctx.config, opts.claim, opts.executor, opts.request));
+        if (opts.json) {
+            printJson({ claim: publicClaim(claim) });
+            return;
+        }
+        line(t('board.heartbeat.done', { item: claim.item, at: claim.expiresAt }));
+    }
+    catch (error) {
+        reportFailure(error, opts.json);
+    }
+}
+export async function boardReleaseCommand(opts) {
+    try {
+        const ctx = loadProject();
+        const claim = await runPrepared(ctx.root, ctx.config, { operation: 'release',
+            args: { claim: opts.claim, note: opts.note, executor: opts.executor, request: opts.request }, actor: cliActor(ctx.root, opts.executor), board: true }, () => releaseClaim(ctx.root, ctx.config, opts.claim, opts.note, opts.executor, opts.request));
+        if (opts.json) {
+            printJson({ claim: publicClaim(claim) });
+            return;
+        }
+        line(t('board.release.done', { item: claim.item }));
+    }
+    catch (error) {
+        reportFailure(error, opts.json);
+    }
+}
+function problemDetail(problem) {
+    if (problem.file !== undefined)
+        return problem.file;
+    if (problem.task !== undefined)
+        return `${problem.sha?.slice(0, 10)} ${problem.task}`;
+    return problem.executor ?? problem.sha ?? '';
+}
+export async function boardSubmitCommand(opts) {
+    try {
+        const ctx = loadProject();
+        const { claim, result } = await runPrepared(ctx.root, ctx.config, { operation: 'submit',
+            args: { claim: opts.claim, branch: opts.branch, base: opts.base, executor: opts.executor, request: opts.request },
+            actor: cliActor(ctx.root, opts.executor), board: true }, () => submitClaim(ctx.root, ctx.paths, ctx.config, opts.claim, opts.branch, opts.base, opts.executor, opts.request));
+        if (!result.ok)
+            process.exitCode = 1;
+        if (opts.json) {
+            printJson({ claim: publicClaim(claim), result });
+            return;
+        }
+        if (result.ok) {
+            line(t('board.submit.done', { item: claim.item, branch: claim.branch ?? opts.branch }));
+            return;
+        }
+        line(t('task.check.problems', { count: result.problems.length }));
+        for (const problem of result.problems) {
+            line(`  ${t('task.issue', { code: problem.code, detail: problemDetail(problem) })}`);
+        }
+    }
+    catch (error) {
+        reportFailure(error, opts.json);
+    }
+}
+export function boardReopenCommand(opts) {
+    try {
+        const ctx = loadProject();
+        const claim = reopenTask(ctx.root, ctx.paths, ctx.config, opts);
+        if (opts.json) {
+            printJson({ claim: publicClaim(claim) });
+            return;
+        }
+        line(t('board.reopen.done', { item: claim.item, reason: claim.reason ?? '' }));
+    }
+    catch (error) {
+        reportFailure(error, opts.json);
+    }
+}
