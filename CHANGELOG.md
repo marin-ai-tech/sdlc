@@ -66,6 +66,10 @@ reliable verification on Windows and POSIX.
   all sdlc writers of a checkout before upgrading it.
 
 ### Known limits
+- Some file paths written with Windows separators (`\`) are not yet seen by the protected-path, locked-test,
+  plan-gate, `openspec/` write and launcher checks, as they were in 0.29.0; state files, the guard's configuration
+  and changes a person holds are protected for both separators. A recursive copy spelled with `\` after another copy
+  whose source cannot be read statically may not be refused. Both are fixed in 0.30.1.
 - Where the operating system gives no process birth identity (for example macOS), and for locks written by
   0.29.0, a lock naming a live process id, even one reused by another program, stays protected. Stop all sdlc
   writers of the checkout, then follow `sdlc doctor`.

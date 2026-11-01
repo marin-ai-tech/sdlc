@@ -95,7 +95,8 @@ sdlc team sync
 wrote drafts of the built-in roles into `docs/agents/drafts/`: analyst, architect, developer, tester, reviewer. Linda
 asked Claude Code (the `sdlc-team` workflow) to adapt the tester and the reviewer to this project: tests on
 `node:test`, data in localStorage, `REVIEW.md` as the policy, locked tests left alone. The agent gave her the commands.
-When an agent ran one of them itself:
+When an agent ran one of them itself, it was refused. With hooks on, the hook refuses it first as
+`[sdlc:separation-of-duties]`; where no hook catches it, the CLI refuses it by the agent's marker:
 
 ```text
 error: `sdlc team accept` records a human decision and cannot run inside an agent session (claude-code).

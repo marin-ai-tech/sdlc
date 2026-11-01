@@ -151,6 +151,7 @@ a ready commit message whose trailer ties the commit to the approval:
 
 ```text
 ✓ intent gate: Peter Owen <peter@todo.example> approved as product-owner (b67577ae40d5)
+Suggested commit message (its trailer ties the commit to this approval):
   $ git commit -m "chore(trim-todo-titles): approve the intent gate" -m "SDLC-Approval: trim-todo-titles:intent:b67577ae40d5"
 ```
 
@@ -253,7 +254,7 @@ git push origin main v1.1.0
 SDLC metrics across 2 change(s) (2 archived)
   median hours: intent→spec 0.2 · spec→plan 0.2 · plan→verified 0.1 · verified→review 0.1 · total 0.7
   verification first-pass rate: 1; rejections 0; waivers 0 (+0 by policy)
-  people's participation (2 changes), planned / actual: gate decisions 12; approvals 12 / 14
+  people's participation (2 changes), planned / actual: gate decisions 12; approvals 12 / 14; …
 ```
 
 There were 14 approvals instead of 12 because two needed repeating:

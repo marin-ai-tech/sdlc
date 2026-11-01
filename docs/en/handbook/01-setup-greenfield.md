@@ -41,7 +41,7 @@ developers.
    To pin a version for the whole team, use the versioned file instead:
 
    ```bash
-   npm install -g https://github.com/marin-ai-tech/sdlc/releases/download/v0.14.4/sdlc-0.14.4.tgz
+   npm install -g https://github.com/marin-ai-tech/sdlc/releases/download/v0.30.0/sdlc-0.30.0.tgz
    ```
 
 3. Check the version:
@@ -51,7 +51,7 @@ developers.
    ```
 
    ```text
-   0.14.4
+   0.30.0
    ```
 
 4. Understand who needs the CLI:
@@ -112,12 +112,14 @@ flowchart LR
    | "Initialize a git repository here?" (only in an empty folder without git) | yes, if he skipped `git init` |
    | "Which coding tools?" (claude, opencode, cursor, codex, qwen, gigacode) | Claude Code only |
    | "Install …?" for a missing OpenSpec CLI or codegraph, then whether to index with codegraph | his choice |
+   | "Install OpenCode? (npm install -g opencode-ai@1)" (only when OpenCode is chosen and missing; default no; an installed OpenCode of another major is never replaced) | not asked: he chose Claude Code only |
    | Enforcement mode: off, warn, block | block ([lesson 1.5](#s1-5) explains why) |
    | "Install the Claude Code status line?" (only when Claude Code is chosen) | yes |
    | "Also install OpenSpec /opsx workflows?" | no |
    | "Artifact language (empty = OpenSpec default)?" | empty |
    | "Create a starter openspec/roles.yaml?" | no: he writes the team's file in [lesson 1.3](#s1-3) |
    | "Register sdlc as an MCP server for the chosen tools …?" | yes |
+   | "Use the solo execution profile (one execution role at a time)?" (default no) | no: tasklet has a team |
 
    In an empty folder the wizard also makes the project AI-ready at once: it creates the agent documents
    (`AGENTS.md`, `CLAUDE.md`, `docs/…`).
@@ -138,6 +140,7 @@ flowchart LR
    | `--layout scaffold` | create the AI-ready documents (`scaffold`, `adapt`, `worktree` or `none`) |
 
    Other flags: `--opsx`, `--delivery skills|commands|both`, `--no-hooks`, `--language`,
+   `--team-mode solo|team` (the execution profile), `--roles` (a starter `roles.yaml`, people only),
    `--cli "npx --no-install sdlc"` for a project-local install, `--force`, `--json`.
 
 4. Read the output. Real output in an empty `tasklet` folder:
@@ -149,7 +152,7 @@ flowchart LR
      verify.commands is empty - add your build/test/lint commands to openspec/sdlc.yaml
      review policy: created REVIEW.md
      tools: Claude Code
-     sdlc 0.14.4, license: community (PolyForm-Noncommercial-1.0.0 + sdlc-Additional-Permissions-1.0)
+     sdlc 0.30.0, license: community (PolyForm-Noncommercial-1.0.0 + sdlc-Additional-Permissions-1.0)
      git hook .git/hooks/prepare-commit-msg: installed (commits made in agent sessions get an SDLC-Agent trailer)
    warning: community license, but the project declares no OSI-approved license. …
      files: 49 created, 0 updated, 0 unchanged, 0 removed
@@ -176,7 +179,8 @@ flowchart LR
 - Run `init` yourself. In an agent session, `sdlc init` refuses any choice that weakens the guard, for example a
   lower mode: "This setup would weaken the sdlc guard and cannot run inside an agent session (claude-code): --mode:
   warn -> off." (`sdlc guide denials#guard-config`).
-- Init with flags does not create `roles.yaml`. That is the next lesson.
+- Init creates a starter `roles.yaml` only with `--roles` or a yes to the wizard's question. An agent session is
+  refused `--roles`. The team's own file is the next lesson.
 
 
 <a id="s1-3"></a>
@@ -315,7 +319,7 @@ share the process. `sdlc doctor` lists ignored paths and the exception lines to 
    | `openspec/.sdlc/log.jsonl` | the project log; `.gitattributes` there sets `merge=union`, so branches merge |
    | `openspec/.sdlc/hook-log.jsonl` | ignored local queue for hook decisions; the next CLI log write moves them to the project log |
    | `openspec/.sdlc/manifest.json` | checksums of the generated files, so `sdlc update` never overwrites your edits |
-   | `.claude/skills/sdlc-*/`, `.claude/commands/sdlc/` | the 18 workflows (`/sdlc:intent`, `/sdlc:next`, …) |
+   | `.claude/skills/sdlc-*/`, `.claude/commands/sdlc/` | the 19 workflows (`/sdlc:intent`, `/sdlc:next`, …) |
    | `.claude/agents/sdlc-*.md` | subagents: verifier, reviewer, researcher, simplifier, health, advocate |
    | `.claude/settings.json` | the hooks (the guard) and the status line |
    | `.mcp.json` | the `sdlc` MCP server; the team's servers come in Chapter 2 |
@@ -393,7 +397,7 @@ share the process. `sdlc doctor` lists ignored paths and the exception lines to 
 
    ```text
    ✓ node             Node.js 24.21.0
-   ✓ harness          sdlc 0.14.4
+   ✓ harness          sdlc 0.30.0
    ✓ openspec         OpenSpec 1.13.2 (bundled)
    ✓ openspec cli     1.13.2
    ✓ codegraph        1.6.1 - not indexed (codegraph init --yes)
@@ -501,7 +505,7 @@ A changed target makes the proposal stale; weakening warnings require `--yes` af
    ```
 
    ```text
-   ✓ sdlc 0.14.4, license: commercial (sdlc-Commercial, agreement NWL-2026-014, licensee Northwind Labs)
+   ✓ sdlc 0.30.0, license: commercial (sdlc-Commercial, agreement NWL-2026-014, licensee Northwind Labs)
      recorded in openspec/sdlc.yaml and openspec/.sdlc/log.jsonl; 43 generated file(s) updated
    ```
 
@@ -574,7 +578,7 @@ and regenerate the files without losing local edits.
    ```
 
    ```text
-   Would update SDLC harness files in C:\work\tasklet (sdlc 0.14.4, license: …)
+   Would update SDLC harness files in C:\work\tasklet (sdlc 0.30.0, license: …)
      files: 0 created, 0 updated, 48 unchanged, 0 removed
    warning: kept .claude/commands/sdlc/status.md (edited locally; run with --force to overwrite)
    ```

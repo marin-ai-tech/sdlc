@@ -65,10 +65,13 @@ sdlc init --mcp            # or answer "yes" to the MCP question in the init wiz
 Other servers in those files are kept. `sdlc update` keeps the entry; `sdlc uninstall` removes only the `sdlc` entry.
 With `cli: npx --no-install sdlc`, the command becomes `npx` and the arguments `--no-install sdlc mcp serve`.
 
-Any other MCP client starts the same command over stdio in the project folder. The tools:
+Any other MCP client starts the same command over stdio in the project folder. The read tools, listed for every
+caller:
 
 | Tool | Arguments | Answers what this prints |
 |---|---|---|
+| `task_export` | `change?`, `task?`, `executor?`, `ext?` | `sdlc task export [--change] [--task] [--executor] --json` |
+| `board_list` | `change?` | `sdlc board list [--change] --json` |
 | `status` | `change?` | `sdlc status [--change] --json` |
 | `next` | `change?` | `sdlc next [--change] --json` |
 | `instructions` | `artifact`, `change` | `sdlc instructions <artifact> --change <id> --json` |
@@ -76,16 +79,22 @@ Any other MCP client starts the same command over stdio in the project folder. T
 | `audit` | `change?` | `sdlc audit [--change] --json` |
 | `help` | `topic?` | `sdlc help [topic] --json` |
 | `guide` | `topic?` | `sdlc guide [topic] --json` |
-| `explain` | `change` | `sdlc explain --change <id> --json` |
+| `explain` | `change?` | `sdlc explain [--change] --json` |
 | `health` | `since?`, `days?` | `sdlc health [--since] [--days] --json` |
 | `report` | `since?`, `change?` | `sdlc report [--since] [--change] --format json` |
 
-Each tool runs the CLI command as a separate process and returns its JSON both as structured content and as text. A
-failed command becomes a tool error carrying the CLI's error code. An argument that the CLI would read as an option
-(one starting with `-`) is refused.
+An HTTP executor token (see 11.1) adds five board write tools: `board_claim`, `board_heartbeat`, `board_release`,
+`board_submit` and `board_bid`. Accepted runtime plugins add their tools as `<plugin>__<tool>`
+([plugins](33-plugins.md)).
 
-*Why it is safe.* The server only reads. `status` and `next` may record that a gate started waiting for a person, the
-same as the CLI does. The decision commands are not tools at all.
+`task_export` and the board tools call sdlc's services in-process with the authenticated caller; the other read tools
+run the CLI command as a separate process. Each returns its JSON both as structured content and as text. A failed
+command becomes a tool error carrying the CLI's error code. An argument that the CLI would read as an option (one
+starting with `-`) is refused.
+
+*Why it is safe.* Stdio and server-token clients only read. `status` and `next` may record that a gate started
+waiting for a person, the same as the CLI does. Only an executor token writes, and only board state through the five
+board tools. The decision commands are not tools at all.
 
 ### Remote clients over HTTP
 
@@ -103,7 +112,7 @@ sdlc mcp serve --http 127.0.0.1:8765     # prints http://127.0.0.1:8765/mcp on s
 - A request without `Authorization: Bearer <token>`, or with another token, gets 401 and reaches no tool.
 - A browser `Origin` of another host or port is refused with 403, against DNS rebinding. A client that sends no
   `Origin` passes.
-- Only `/mcp` is served (404 otherwise), and a request body is at most 1 MB.
+- Only `/mcp` is served (404 otherwise), and a request body is at most 1 MiB.
 - The server speaks plain HTTP. Between machines, keep it on a private network or behind a TLS proxy.
 
 A client names the URL and the header, for example in `.mcp.json`:
@@ -113,7 +122,8 @@ A client names the URL and the header, for example in `.mcp.json`:
   "headers": { "Authorization": "Bearer ${SDLC_MCP_TOKEN}" } } } }
 ```
 
-Over HTTP, too, the server only reads, and no decision is a tool.
+Over HTTP the server-token client only reads; an executor token can also write board state through the board tools.
+No decision is a tool.
 
 ## 10.2. The team's MCP servers, described once
 
@@ -554,8 +564,8 @@ These limits help you decide how much to trust an integration.
   same command) can slip past them. A computed path is much rarer in an agent's command than a literal one.
 - **`mcp check`'s warning about file access is a guess from tool names.** A server that writes files under another
   name is not flagged. Review a server before adding it to the registry.
-- **The MCP server's tools start the CLI anew for each call.** That keeps it simple and identical to the CLI, at a
-  cost of about half a second per call.
+- **Most MCP read tools start the CLI anew for each call.** That keeps them identical to the CLI, at a cost of about
+  half a second per call; `task_export` and the board tools call sdlc's services in-process.
 
 > [!TIP]
 > Run `sdlc mcp check --args` before relying on a team's server tools.

@@ -41,19 +41,24 @@ export function checkShell(child: ChildProcess): CheckShell {
 
 const noSignalNote = "Process tree cleanup sent no signal: the check's shell had already exited.";
 
-function noteIfNoSignal(shell: CheckShell, signalled: unknown, keep: (chunk: Buffer) => void): void {
-  if (signalled === false && shell.exited()) keep(Buffer.from(`\n${noSignalNote}\n`));
+async function noteIfNoSignal(shell: CheckShell, signalled: unknown, keep: (chunk: Buffer) => void,
+  noteApplies: () => boolean | Promise<boolean>): Promise<void> {
+  if (signalled === false && shell.exited() && await noteApplies()) keep(Buffer.from(`\n${noSignalNote}\n`));
 }
 
+/**
+ * Stops the check's process tree. `noteApplies` says, once cleanup ended, whether a cleanup that sent no signal is
+ * worth reporting: after a timeout, a cancellation or with the output still held open, not after a normal exit.
+ */
 export async function cleanupCheckShell(shell: CheckShell, keep: (chunk: Buffer) => void,
-  onFailure: () => void): Promise<void> {
+  onFailure: () => void, noteApplies: () => boolean | Promise<boolean> = () => true): Promise<void> {
   try {
     const result = await stopProcessTree(shell.pid, shell);
-    noteIfNoSignal(shell, result?.signalled, keep);
+    await noteIfNoSignal(shell, result?.signalled, keep, noteApplies);
   } catch (error) {
     const failure = error as Error & { signalled?: boolean };
     keep(Buffer.from(`\nProcess tree cleanup failed: ${failure.message}\n`));
-    noteIfNoSignal(shell, failure.signalled, keep);
+    await noteIfNoSignal(shell, failure.signalled, keep, noteApplies);
     onFailure();
   }
 }

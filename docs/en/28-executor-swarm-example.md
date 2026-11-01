@@ -143,7 +143,8 @@ sort-todos-alphabetically#1.1  open  1 prior attempt(s); last reason: the test s
 ```
 
 `qwen-board` could not claim it again (`executor_excluded`). `market-b` claimed it, and its work item carried
-`previousAttempts` with the branch and the reason. Its test failed for the right reason
+`previousAttempts` with the branch and the reason. As the second claim of the task, it named the branch
+`sdlc/sort-todos-alphabetically/1.1-2`. Its test failed for the right reason
 (`sortTodosByTitle is not a function`), and its result passed the check.
 
 ## 28.6. Back to the gates
@@ -151,7 +152,7 @@ sort-todos-alphabetically#1.1  open  1 prior attempt(s); last reason: the test s
 David merged the result branch into the change branch. Nothing on the board decides a gate:
 
 ```bash
-sdlc task check-result --change sort-todos-alphabetically --branch origin/sdlc/sort-todos-alphabetically/1.1
+sdlc task check-result --change sort-todos-alphabetically --branch origin/sdlc/sort-todos-alphabetically/1.1-2
 sdlc tests lock --change sort-todos-alphabetically
 npm test                                   # 3 failures: sortTodosByTitle is not a function — the plan's red step
 sdlc trace sort-todos-alphabetically       # task 1.1 with commit a92f3ac

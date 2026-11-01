@@ -61,6 +61,17 @@ it warns with the server and variable names, never the value.
 On Windows with Claude Code selected, `sdlc doctor` also checks whether Claude Code can find Git Bash. If it cannot,
 the `claude hooks` check explains the blocked tool calls and how to set `CLAUDE_CODE_GIT_BASH_PATH`.
 
+`sdlc doctor` also reports:
+
+- stuck writers of the project log, the board and each plugin's store, with their owner process and whether it is
+  alive;
+- pending plugin events: their count, size and the oldest one;
+- approval records it cannot parse, with their change and gate;
+- an `openspec/sdlc.yaml` that exists but cannot be read, as an error rather than the defaults.
+
+For a stuck board it shows `sdlc board recover --expect-owner <digest>`, and for a plugin `sdlc plugins recover`.
+Both are a person's commands.
+
 `sdlc doctor --fix` repairs only what sdlc owns:
 
 - missing generated files;
@@ -94,9 +105,12 @@ You choose:
 
 - tools and enforcement mode;
 - the status line and /opsx workflows;
-- language and roles.
+- language and roles;
+- MCP registration and the solo or team execution profile.
 
-The wizard also offers to install the OpenSpec CLI and codegraph when they are missing.
+The wizard also offers to install the OpenSpec CLI and codegraph when they are missing. When OpenCode is selected and
+missing, it offers to install OpenCode 1 (default no) and never replaces another installed major. Only the tools in
+your final selection are set up: a detected `CLAUDE.md` or `AGENTS.md` does not add its tool to an explicit choice.
 Scripts, `--json`, non-terminals and agent sessions never prompt.
 
 `sdlc init --roles` creates the starter `openspec/roles.yaml` using the current git identity for
@@ -142,6 +156,8 @@ Use these flags to choose how init integrates with your tools:
 | `--statusline` | Install the Claude Code status line. |
 | `--mcp` | Register the sdlc MCP server for the chosen tools. See [integrations](10-integrations.md#101-another-ai-system-reads-the-process). |
 | `--tools all` or `--tools none` | Choose every supported tool or none. |
+| `--team-mode solo|team` | Execution profile. Solo installs five `sdlc-role-*` skills and names the active role in each workflow; roles are guidance only, approvals and `roles.yaml` are unchanged. |
+| `--roles` | Create a starter `roles.yaml` (refused in an agent session). |
 
 For a local CLI, install with
 `npm i -D https://github.com/marin-ai-tech/sdlc/releases/latest/download/sdlc.tgz`.
@@ -273,7 +289,7 @@ design.
   the agent answers for your project with the guide workflow (`/sdlc:guide`, `/sdlc-guide`, `$sdlc-guide` in Codex, or
   just ask). The material ships with sdlc in English and other languages, so it matches the installed version.
   `sdlc guide` lists the topics (start, lifecycle, gates, roles, team, tracks, bugfix, backlog, rework, verify, review,
-  health, mcp, config, denials, faq), and `sdlc guide <topic>` prints one. Every hook denial ends with the section that
+  health, mcp, config, plugins, denials, faq), and `sdlc guide <topic>` prints one. Every hook denial ends with the section that
   explains it, for example `sdlc guide denials#plan-gate`. The sdlc MCP server offers the same as its `guide` tool.
 - **What is waiting for me:** `sdlc next --me` lists every gate, across the active changes, that you (your git identity,
   matched in `roles.yaml`) may take now, with the command. Without `roles.yaml` it lists every gate waiting for a
@@ -340,8 +356,8 @@ Use these commands to manage the backlog:
 
 | Command | What it does |
 |---|---|
-| `sdlc backlog epic add <title> [--goal]` | Add an epic. |
-| `sdlc backlog epic edit <E-id> [--title --goal --clear-goal]` | Change its title or goal, never its order. |
+| `sdlc backlog epic add <title> [--goal] [--granularity package\|feature\|small]` | Add an epic, with the owner's chosen size. |
+| `sdlc backlog epic edit <E-id> [--title --goal --clear-goal --granularity]` | Change its title, goal or remembered size, never its order. |
 | `sdlc backlog add <title> [--epic --kind --risk --outcome --accept --depends --source-type --source-ref --allow-duplicate]` | Add an item. |
 | `sdlc backlog list [--epic --status --ready]` | List items. |
 | `sdlc backlog next` | Show the next ready item. |
@@ -614,8 +630,10 @@ hint then say that the fingerprint could not be computed, instead of asking you 
 project is in a git repository and that git works, then run `sdlc verify` again. A failing check or a partial run
 (`--only`) keeps the usual message and has no reason.
 
-An approval record that sdlc cannot parse never counts, but it stays in `.sdlc.yaml` unchanged. `sdlc doctor` names
-each one with its change, gate and position, so a person can inspect it.
+An approval record that sdlc cannot parse never counts, but it stays in `.sdlc.yaml` unchanged, byte for byte, through
+unrelated writes, drop and archive. A decision on that gate is refused with `malformed_gate` before anything is
+written. `sdlc doctor` names each one with its change, gate and position, so a person can restore it from trusted
+history.
 
 `gates.<gate>.auto_waive: { kinds, tracks }` waives intent, spec or plan when the kind **or** track matches.
 It is logged once as `gate.<gate>.auto_waived` and counted as a policy waiver; an agent-chosen kind does not count.
@@ -802,8 +820,9 @@ reserves one open task for an executor. The lease defaults to 900 seconds (range
 `dispatched`, its executor and `expiresAt`. Only that executor can claim before expiry; expiry returns the task
 to the pool and logs `task.dispatch_expired` once. Dispatch logs `task.dispatched`.
 
-Over HTTP, an executor token exposes `board_list`, `board_claim`, `board_heartbeat`, `board_release` and
-`board_submit`. The server token and stdio expose only `board_list`. The executor comes from the token, and
+Every caller, stdio included, gets the read tools `board_list` and `task_export`. Over HTTP, an executor token adds
+`board_claim`, `board_heartbeat`, `board_release`, `board_submit` and `board_bid`; accepted plugins add their
+`<plugin>__<tool>` tools. The executor comes from the token, and
 claim management checks that the claim belongs to it. A foreign claim id is `claim_unknown`. Calls are scoped
 to the token's project. No MCP tool dispatches or makes a gate decision.
 
@@ -844,8 +863,11 @@ they decide no gate and approve nothing:
 
 There is no expiry timer: board lease commands first drop held claims whose lease ran out and log one
 `task.lease_expired` per dropped claim — exactly once per claim. Writes are exclusive across processes:
-`openspec/.sdlc/board.lock` (also a state file) serializes them, so two agents cannot claim the same task. A
-broken `board.json` is `board_invalid`, never silently reset. Who splits the work, retries or races executors
+`openspec/.sdlc/board.lock` (also a state file) serializes them, so two agents cannot claim the same task. A lock left
+by a dead or provably different process is reclaimed by the next writer, an abandoned partial lock after 120 seconds;
+a live or unverifiable owner is never taken over by age. `sdlc doctor` names a stuck lock, and a person runs
+`sdlc board recover --expect-owner sha256:<64-hex>` (refused to agents and over MCP). A broken `board.json` is
+`board_invalid`, never silently reset. Who splits the work, retries or races executors
 stays outside sdlc.
 
 When unticked tasks already have commits in HEAD with matching `SDLC-Change` and `SDLC-Task` trailers,
@@ -1144,6 +1166,10 @@ Use these tables to look up CLI commands and generated files.
 | `sdlc explore <slug> \| list` | create or list optional research notes before intent |
 | `sdlc track set <full\|lite> --change <id> [--note <text>]` | human confirmation of the suggested track before plan approval |
 | `sdlc defer add \| list \| close` | manage the deferred-work registry |
+| `sdlc drop <id> --note <t>` | drop a change that will not be finished (human-only) |
+| `sdlc config propose \| show \| apply \| dismiss` | propose a settings or roles change for a person; `apply` and `dismiss` are human-only |
+| `sdlc board list \| dispatch \| claim \| heartbeat \| release \| submit \| auction \| bid \| award \| reopen \| recover` | the task board for executors; `recover --expect-owner <digest>` is a person's recovery of a stopped board writer |
+| `sdlc plugins list \| inspect \| accept \| revoke \| recover` / `sdlc <plugin> <operation>` | runtime plugins ([plugins](33-plugins.md)); accept, revoke and recover are human-only |
 | `sdlc backlog add \| epic add \| epic edit \| list \| next \| edit \| start \| move \| drop \| done` | manage planned changes in `openspec/backlog.md` (order = priority; `move`/`drop` are human-only) |
 | `sdlc backlog import --issues [--json]` | add one backlog item per open GitHub issue that is not linked yet (`issues` in `sdlc.yaml`) |
 | `sdlc triage intake [--json]` | add one alert (JSON on stdin) as a backlog item; the same alert again adds nothing |
@@ -1209,9 +1235,9 @@ Cursor, Codex CLI, Qwen Code and GigaCode get the same workflows and subagents i
 hooks and rules: see [Cursor](15-cursor.md), [Codex CLI](16-codex.md) and
 [Qwen Code and GigaCode](17-qwen-gigacode.md).
 
-The workflows are 18 short skills:
+The workflows are 19 short skills (with `team.mode: solo`, init adds the five `sdlc-role-*` role skills):
 
-- `help`, `guide`, `next`, `status`, `health`, `adopt`;
+- `config`, `help`, `guide`, `next`, `status`, `health`, `adopt`;
 - `team`, `backlog`, `explore`, `intent`, `spec`, `plan`;
 - `build`, `verify`, `review`, `release`, `archive`, `triage`.
 

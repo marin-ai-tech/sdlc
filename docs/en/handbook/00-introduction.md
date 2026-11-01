@@ -180,12 +180,15 @@ agent tries to take a person's decision, and where a person runs their commands.
 
    ```text
    Approval preview: gate intent of change add-due-dates (pending)
+   Digest: sha256:ca24099d2dc42bd70af6c484b19d758a733e98bc84fd4485a55a23008514fc1f
    Artifacts:
      intent  intent.md
    Changed since the last approval: nothing
    Approvals: 0 of 1
+   Required roles: product-owner
+   Still missing: product-owner
    You may approve it:
-   $ sdlc approve intent --change add-due-dates
+   $ sdlc approve intent --change add-due-dates --expect-digest sha256:ca24099d2dc42bd70af6c484b19d758a733e98bc84fd4485a55a23008514fc1f
    ```
 
 5. Megan reads `intent.md`, then approves:

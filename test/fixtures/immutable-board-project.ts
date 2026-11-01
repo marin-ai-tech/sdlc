@@ -20,12 +20,20 @@ function refuse(detail: string): never {
   throw new Error(`Unsafe immutable board fixture: ${detail}`);
 }
 
+/**
+ * The canonical spelling of a real path. The native call resolves 8.3 short names and letter case, as Git does
+ * (a GitHub Windows runner's TEMP is `C:\Users\RUNNER~1\...`); `fs.realpathSync` keeps the spelling it was given.
+ */
+function canonical(file: string): string {
+  return fs.realpathSync.native(file);
+}
+
 function physicalRoot(root: string): string {
   const owned = process.env.SDLC_TEST_TMP;
   if (!owned) return refuse('owned temporary root is unavailable');
   if (fs.lstatSync(root).isSymbolicLink()) return refuse('root indirection is not physical');
-  const actual = fs.realpathSync(root);
-  const owner = fs.realpathSync(owned);
+  const actual = canonical(root);
+  const owner = canonical(owned);
   if (actual === owner || !isWithin(owner, actual)) return refuse('seed leaves its owned temporary root');
   const metadata = fs.lstatSync(path.join(actual, '.git'));
   if (!metadata.isDirectory() || metadata.isSymbolicLink()) return refuse('Git metadata must be physical');
@@ -41,8 +49,8 @@ function localGit(root: string): void {
   });
   if (result.status !== 0) return refuse('Git root could not be inspected');
   const [top, common] = result.stdout.trim().split(/\r?\n/);
-  if (!top || !common || fs.realpathSync(top) !== root
-    || fs.realpathSync(path.resolve(root, common)) !== fs.realpathSync(path.join(root, '.git'))) {
+  if (!top || !common || canonical(top) !== canonical(root)
+    || canonical(path.resolve(root, common)) !== canonical(path.join(root, '.git'))) {
     refuse('Git root or common-dir indirection');
   }
 }

@@ -37,7 +37,7 @@ import { clearedAgentMarkers } from './policy-markers.js';
 import { shellWords } from './shell-words.js';
 import { shellCliProblem } from './shell-cli.js';
 import { launcherDecision } from './launcher-targets.js';
-import { stateCopyDecision } from './state-copy.js';
+import { copyDecision, firstDecision, pathSpellings } from './policy-spellings.js';
 
 /**
  * Deterministic guardrails behind the advisory skills - the playbook's
@@ -222,10 +222,10 @@ function evaluateCommand(
     };
   }
   if (removesSdlcCli(cmd)) return { decision: 'deny', rule: 'cli-removal', reason: t('hook.cliRemoval') };
-  const spelled = cmd;
-  const stateDenial = stateWriteDenial(spelled, ctx, cwd);
+  const spellings = pathSpellings(cmd);
+  const stateDenial = firstDecision(spellings, (spelled) => stateWriteDenial(spelled, ctx, cwd));
   if (stateDenial) return stateDenial;
-  const copy = stateCopyDecision(command, ctx.paths.root, cwd);
+  const copy = copyDecision(command, ctx.paths.root, cwd);
   if (copy) return copy;
   const execution = shellCliProblem(command);
   if (execution) return { decision: 'deny', rule: 'shell-parse', reason: execution };
@@ -234,17 +234,17 @@ function evaluateCommand(
   // The guard's own configuration (B41): the files that switch the rules on; also the user-level ones (B42).
   // The review policy may live where `review.policy` says (B75).
   const policy = [ctx.config.review.policy];
-  const guardHits = [
+  const guardHits = [...new Set(spellings.flatMap((spelled) => [
     ...shellGuardWrites(spelled, ctx.paths.root, cwd, policy),
     ...userShellGuardWrites(spelled, cwd, env),
-  ];
+  ]))];
   const guard = guardDenial(guardHits);
   if (guard) return guard;
   // A key or token the command writes (B16): a shell write has no reliable target, so no exemption applies.
   const secret = shellSecretDenial(cmd);
   if (secret) return secret;
   // A change a person holds: no shell writes to its paths, no sdlc steps on it but the read-only ones.
-  const held = shellTakeoverDenial(ctx.paths, spelled, cwd, CLI_PREFIX);
+  const held = firstDecision(spellings, (spelled) => shellTakeoverDenial(ctx.paths, spelled, cwd, CLI_PREFIX));
   if (held) return held;
   // 0.14.0 (B82): the files a command writes count for tests-locked and the plan gate, like an edit's.
   const written = shellWriteDestinations(cmd, ctx.paths.root, cwd);

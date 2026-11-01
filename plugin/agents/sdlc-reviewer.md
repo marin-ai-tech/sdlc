@@ -17,7 +17,7 @@ You review a change you did not write. You report findings; you never edit files
    - **verification-gaps**: behaviour tests and evidence do not prove
 4. Return findings in this exact format, most severe first:
    ```
-   ### F<n> [important|nit|pre-existing][bugs|security|compliance] <one-line title>
+   ### F<n> [important|nit|pre-existing][<pass-or-lens>] <one-line title>
    - **Where**: <path>:<line>
    - **Detail**: <what is wrong and why it matters>
    - **Fix**: <the concrete fix>

@@ -76,7 +76,7 @@ These files hold project configuration, change records and generated state.
 | File | Owner | Contents |
 |---|---|---|
 | `openspec/config.yaml` | OpenSpec | default schema, `context`, `rules`; the harness respects them and passes them into the instructions |
-| `openspec/sdlc.yaml` | harness | gates (with `min_approvals`, `auto_waive`), `rework.reasons` and `max_cycles`, roles, verification commands, review policy, release commands, enforcement, `questions`, `design` (debate lens), `health` thresholds, `cli`, `tools` (claude, opencode, cursor, codex, qwen, gigacode), `issues` and `context.sources` |
+| `openspec/sdlc.yaml` | harness | gates (with `min_approvals`, `auto_waive`), `rework.reasons` and `max_cycles`, roles, verification commands, review policy, release commands, enforcement, `questions`, `design` (debate lens), `health` thresholds, `cli`, `tools` (claude, opencode, cursor, codex, qwen, gigacode), `issues`, `context.sources`, `mcp`, `events`, `stages`, `board.market`, `team.mode`, `plugins` and `plugin_policies` |
 | `openspec/explorations/<slug>.md` | agent + people | optional research and pressure test before intent; a change cites it with `--source-type exploration --source-ref openspec/explorations/<slug>.md` |
 | `openspec/deferred-work.md` | team | registry of deferred decisions and findings (`D<n>`) |
 | `openspec/roles.yaml` | people (maintainers) | optional: people (emails, SSH signing keys, chat handles per channel), roles, separation rules, signing mode; agents cannot edit it |
@@ -91,6 +91,9 @@ These files hold project configuration, change records and generated state.
 | `…/release.md` | agent | changelog, rollout per environment, control bands, rollback |
 | `openspec/.sdlc/manifest.json` | harness | sha256 of the generated files (edits by people are not overwritten), the sdlc version and the license they were created under |
 | `openspec/.sdlc/log.jsonl` | **CLI only** | project log: setup, gate decisions, verify runs, archives, license changes, hook denials; each line has `sdlc` (the version) and `license` |
+| `openspec/.sdlc/log.lock`, `board.lock` and their `.writers` folders | **CLI only** | writer locks and the shared ownership fence; kept out of Git through `.git/info/exclude` |
+| `openspec/.sdlc/plugins/` | **CLI only** | runtime plugin registry, acceptance records, per-plugin stores, receipts and pending events ([plugins](33-plugins.md)) |
+| `openspec/.sdlc/board.json`, `openspec/executors.yaml`, `openspec/.sdlc/team.json` | **CLI only** (the registry: a person) | the task board, the executor registry and the agent team record |
 | `docs/context/<name>.md` | people; `sdlc context pull` for `context.sources` | context packs with a header (owner, source, updated, fresh_days, stages); in git and reviewed like any file |
 | `.git/sdlc/outbox/` | **CLI only** | events waiting for delivery, never committed; also the comment and the close of a linked GitHub issue |
 | `REVIEW.md` | team | review policy (created once) |
@@ -271,13 +274,14 @@ OpenCode has no Stop hook, so `verify_before_stop` does not apply there.
 ### MCP in both directions
 
 - **Server** (`sdlc mcp serve`, `src/mcp/server.ts`; tools in `src/mcp/tools.ts`): low-level SDK `Server`.
-  Read tools include `status`, `next`, `instructions`, `trace`, `audit`, `help`, `guide`, `explain`, `health`,
-  `report` and `board_list`. An HTTP executor token also exposes board claim, heartbeat, release and submit.
-  Each runs the CLI with `--json` in a child process. No decision is a tool.
+  The read tools are `task_export`, `board_list`, `status`, `next`, `instructions`, `trace`, `audit`, `help`,
+  `guide`, `explain`, `health` and `report`. An HTTP executor token adds board claim, heartbeat, release, submit
+  and bid; accepted plugins add `<plugin>__<tool>`. Board and export tools call services in-process; the other read
+  tools run the CLI with `--json` in a child process. No decision is a tool.
 - **HTTP transport** (`sdlc mcp serve --http <host:port>`, `src/mcp/http.ts`): the same server and tools over MCP
   Streamable HTTP at `/mcp`. Each request passes four checks before it reaches MCP: the path (only `/mcp`, else 404),
   the bearer token (else 401), the `Origin` header against the listen host and port, against DNS rebinding (else 403),
-  and the body size (at most 1 MB, else 413). The bearer token is the server token from `SDLC_MCP_TOKEN` (an exact
+  and the body size (at most 1 MiB, else 413). The bearer token is the server token from `SDLC_MCP_TOKEN` (an exact
   match), or an executor's token: its SHA-256, compared in constant time, must equal a `token_sha256` of a served
   project's `openspec/executors.yaml`, read on every request — a reissued token or a removed executor stops working at
   once, a broken registry fails closed for executor tokens only. An authorized request's executor identity
@@ -358,10 +362,16 @@ PreToolUse has no matcher. Codex uses Claude Code's payload and answer formats; 
 MCP servers are `[mcp_servers.<name>]` tables in `.codex/config.toml`. `src/integrations/codex-toml.ts` merges
 tables and only replaces or removes those sdlc wrote. `CODEX_CI=1` or `CODEX_SESSION_ID` marks the agent's shell.
 
-`src/core/policy-shell-writes.ts` sends shell writes through the plan gate and locked-test rules. It covers
-redirections, `tee`/`cp`/`mv`/`install` and these PowerShell commands:
+`src/core/policy-shell-writes.ts` sends shell writes through the plan gate and locked-test rules. It covers:
 
-- `Set-Content`, `Add-Content`, `Clear-Content`, `Out-File`, `New-Item`, `Copy-Item`, `Move-Item`.
+- redirections and `tee`/`cp`/`mv`/`install`;
+- PowerShell `Set-Content`, `Add-Content`, `Clear-Content`, `Out-File`, `New-Item`, `Copy-Item`, `Move-Item`,
+  `Rename-Item` and `[IO.File]::WriteAll*`;
+- their aliases `sc`, `ni`, `cpi`, `mi`, `copy` and `move`;
+- commands inside `Start-Process` and `Invoke-Expression`.
+
+`src/core/policy-shell-tools.ts` adds `git checkout`/`restore`/`mv`/`apply`, `patch`, downloads to a file
+(`curl -o`, `wget -O`) and inline `node`/`python`/`perl` code, within the bounds stated there.
 
 See [16. Codex CLI](16-codex.md).
 
@@ -378,10 +388,13 @@ The SessionStart, PreToolUse (without a matcher) and Stop hooks call `sdlc hook 
 `run_shell_command`, `write_file` and `edit` payloads and read its answers. `QWEN_CODE=1` marks the agent's shell.
 GigaCode is experimental and checked against its formats only. See [17. Qwen Code and GigaCode](17-qwen-gigacode.md).
 
-The eighteen workflows are:
+The nineteen workflows are:
 
-- `help`, `guide`, `next`, `status`, `health`, `adopt`, `team`, `backlog`, `explore`;
+- `config`, `help`, `guide`, `next`, `status`, `health`, `adopt`, `team`, `backlog`, `explore`;
 - `intent`, `spec`, `plan`, `build`, `verify`, `review`, `release`, `archive`, `triage`.
+
+With `team.mode: solo`, init also installs five execution-role guidance skills (`src/team/solo.ts`): the analyst,
+architect, developer, tester and reviewer `sdlc-role-*` skills.
 
 Their bodies are short (3–5 KB versus 10–22 KB in OpenSpec). The agent gets state, templates and instructions from
 the CLI at run time (`sdlc status/next/instructions --json`).
@@ -398,9 +411,10 @@ the exact command.
 `HUMAN_COMMANDS` (`src/core/human-commands.ts`, read by `src/core/help-catalog.ts`) drives `sdlc help` (actor: human)
 and hook denials. It includes:
 
-- `approve`, `reject`, `rework`, `waive`, `tests unlock`, `track set`;
+- `approve`, `reject`, `rework`, `waive`, `drop`, `tests unlock`, `track set`;
+- `config apply`, `config dismiss`, `board recover`, `plugins accept`, `plugins revoke`, `plugins recover`;
 - `backlog move`, `backlog drop`, `license set`, `roles migrate`, `takeover`, `release-control`;
-- `uninstall`, `team accept`, `answer`, `ci init`.
+- `uninstall`, `team accept`, `answer`, `ci init`, `task executors token`.
 
 ## 4.7. CLI commands
 
@@ -500,7 +514,7 @@ elapsed awards without changing the file or log. HTTP `board_bid` derives the ex
 `src/core/board.ts` holds the rules. `src/core/board-store.ts` holds the file and lock;
 `src/commands/board.ts` holds the CLI. The board includes open tasks of active changes whose plan gate is open.
 It uses the same `planOpen` rule as export and stores them in `openspec/.sdlc/board.json` with
-`{version: 1, claims, dispatches}`. A broken file is `board_invalid` and is never reset.
+`{version: 1, claims, dispatches, auctions, requests}`. A broken file is `board_invalid` and is never reset.
 Writes use `openspec/.sdlc/board.lock` and exclusive creation, with a shared ownership fence for acquisition
 and recovery. Writers record a PID, nonce and operating-system process birth identity when available.
 Only proven dead/different instances are reclaimed; a partial publication requires 120 seconds and the fence.
@@ -510,7 +524,8 @@ headroom. `doctor` reports the complete ownership digest; a person may run
 confirmed quiescence and manual recovery, never a forced automated takeover. Read-only listings project an
 atomic board snapshot without taking the writer lock or settling stored decisions.
 Both files are state files under `STATE_FILES`, the `policy-shell` regexes and `hook.boardIntegrity`. They are
-git-ignored by `openspec/.sdlc/.gitignore`. A claim holds a lease (default 900 s, at
+kept out of Git through the repository's local exclude file (`.git/info/exclude`), together with `log.lock`,
+unless `openspec/.sdlc/.gitignore` already lists them. A claim holds a lease (default 900 s, at
 most a day) that `heartbeat` renews and `release` ends; `submit` runs `checkResult` and wants every commit's
 `SDLC-Agent` executor to be the claim's (`wrong_executor`, added to `result.schema.json`). Expiry is computed on
 read — no timer: lease commands drop held claims whose lease passed and log one `task.lease_expired` each;

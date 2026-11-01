@@ -81,6 +81,9 @@ workflow in it.
    `--tools all` sets up every tool; `--tools none` sets up none (for example when the Claude Code plugin is
    installed for the whole organization). Without `--tools`, sdlc uses the tools it detects, else `claude,opencode`.
    For a project that already has sdlc, change the set with `sdlc update --tools claude,cursor,codex`.
+   sdlc installs OpenCode only with your consent: when OpenCode is chosen and missing, the wizard offers
+   `npm install -g opencode-ai@1` (default no) and runs it only after a yes. An installed OpenCode of another
+   major is never replaced. Init with flags only reports whether OpenCode is present.
 
 3. See where each tool's files live:
 
@@ -665,6 +668,7 @@ start the server — an executor token alone does not start it.
    | `checks` | the verify checks, for example `npm test` |
    | `forbidden` | the paths the executor must not touch, for example `openspec/roles.yaml` and the protected paths |
    | `result` | the branch `sdlc/<change>/<task>` and the trailers `SDLC-Change` and `SDLC-Task` |
+   | `ext` (optional) | plugin-namespaced extensions: JSON under a plugin's key, accepted only for enabled plugins; omitted when unused |
 
    Work is handed out only while the plan gate is approved and fresh. Before the approval, or after `plan.md` changed,
    the command refuses with `plan_not_approved`. A task that the change does not have gives `unknown_task`. The

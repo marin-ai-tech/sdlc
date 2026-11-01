@@ -31,7 +31,8 @@ sdlc doctor
 | The sdlc MCP server | `.cursor/mcp.json` (with `--mcp`) |
 | Hooks | `.cursor/hooks.json`: sessionStart, preToolUse, beforeShellExecution, stop |
 
-Every generated file is in the manifest. `sdlc update` refreshes them, and `sdlc uninstall` removes them.
+Generated files are recorded in the manifest; sdlc's entries in `.cursor/hooks.json` and `.cursor/mcp.json` are
+merged into those shared files. `sdlc update` refreshes them, and `sdlc uninstall` removes them.
 Your own entries in `.cursor/hooks.json` stay in place when sdlc replaces or removes its entries.
 
 ## 🛡️ Understand the guardrails
@@ -49,7 +50,8 @@ Cursor's hooks hold the gates where Cursor allows them. This table shows each ru
 | `sdlc approve` refuses inside the agent session | `CURSOR_AGENT=1` in the agent's terminal |
 
 The edit hook is `failClosed`: Cursor blocks an edit if the hook cannot run. When sdlc has nothing to say, it returns
-an explicit `allow`. This includes a non-sdlc project or an internal error.
+an explicit `allow`. This includes a non-sdlc project or an internal error. An `openspec/sdlc.yaml` that exists but
+cannot be read makes the hook deny every call until it is fixed, unless its `enforcement.mode` is `off`.
 
 ## 💡 Try common workflows
 

@@ -99,7 +99,7 @@ flowchart LR
    ```json
    {"chat":"tasklet-team","event":{"id":"7db8a1d5f45a4b0d3220a23d","project":"tasklet",
     "event":"gate.intent.awaiting","change":"add-due-dates","gate":"intent","at":"2026-10-09T21:01:48.218Z",
-    "sdlc":"0.14.4","waitingFor":["megan"]}}
+    "sdlc":"0.30.0","waitingFor":["megan"]}}
    ```
 
    `waitingFor` holds the people from `roles.yaml` who may take the gate, so the bot can mention Megan. A decision
@@ -222,10 +222,13 @@ flowchart LR
 
    ```text
    Approval preview: gate intent of change add-due-dates (pending)
+   Digest: sha256:c958a9c935c0786a901478ab3ab18eee34edcb88fa02cbd97b8685868f3f5d4a
    Artifacts:
      intent  intent.md
    Changed since the last approval: nothing
    Approvals: 0 of 1
+   Required roles: product-owner
+   Still missing: product-owner
    You may not approve it now:
      - The intent gate cannot be approved yet: 1 open question(s) in intent.md have no recorded answer.
    ```
@@ -380,14 +383,17 @@ spec gate.
 
    ```text
    Approval preview: gate spec of change add-due-dates (pending)
+   Digest: sha256:254381749a183bae30ed996c9065c73ce746ec7585281e3ddea1d4836e69a0ea
    Artifacts:
      proposal  proposal.md
      specs  specs/tasks/spec.md
      design  design.md
    Changed since the last approval: nothing
    Approvals: 0 of 1
+   Required roles: product-owner
+   Still missing: product-owner
    You may approve it:
-   $ sdlc approve spec --change add-due-dates
+   $ sdlc approve spec --change add-due-dates --expect-digest sha256:254381749a183bae30ed996c9065c73ce746ec7585281e3ddea1d4836e69a0ea
    ```
 
    ```bash
@@ -497,13 +503,16 @@ edit, including shell writes.
 
    ```text
    Approval preview: gate plan of change add-due-dates (pending)
+   Digest: sha256:7e6e2e22d5f077e41fce3fa349b4972da093a2e6a31c981d859545fdb42c8272
    Artifacts:
      plan  plan.md
      tasks  tasks.md
    Changed since the last approval: nothing
    Approvals: 0 of 1
+   Required roles: engineer
+   Still missing: engineer
    You may approve it:
-   $ sdlc approve plan --change add-due-dates
+   $ sdlc approve plan --change add-due-dates --expect-digest sha256:7e6e2e22d5f077e41fce3fa349b4972da093a2e6a31c981d859545fdb42c8272
    ```
 
 4. Ethan reads the plan against the spec and finds a hole: there is no way to **remove** a due date once it is set.
@@ -620,14 +629,17 @@ edit, including shell writes.
 
    ```text
    Approval preview: gate spec of change add-due-dates (rejected)
+   Digest: sha256:5bbfb701caa0f03ee0251f7435f1a4275ad8e9bdd15bc5a8445fd7e4ef824348
    Artifacts:
      proposal  proposal.md
      specs  specs/tasks/spec.md
      design  design.md
    Changed since the last approval: proposal.md, specs/tasks/spec.md
    Approvals: 0 of 1
+   Required roles: product-owner
+   Still missing: product-owner
    You may approve it:
-   $ sdlc approve spec --change add-due-dates
+   $ sdlc approve spec --change add-due-dates --expect-digest sha256:5bbfb701caa0f03ee0251f7435f1a4275ad8e9bdd15bc5a8445fd7e4ef824348
    ```
 
    ```bash
@@ -1057,14 +1069,17 @@ addresses his note, and Paul approves.
 
    ```text
    Approval preview: gate review of change add-due-dates (pending)
+   Digest: sha256:5723124fa5cc1169b77d8a59c4e648fd23bcd96a3ab62a9e3c8c18bb475f4dda
    Artifacts:
      review  review.md
    Changed since the last approval: nothing
    Approvals: 0 of 1
+   Required roles: code-owner
+   Still missing: code-owner
    Open blocking findings: 0
    Verification: passed 2026-10-09T21:03:10.898Z, matches the current code
    You may approve it:
-   $ sdlc approve review --change add-due-dates
+   $ sdlc approve review --change add-due-dates --expect-digest sha256:5723124fa5cc1169b77d8a59c4e648fd23bcd96a3ab62a9e3c8c18bb475f4dda
    ```
 
 7. Paul reads the diff and `review.md`. The code is fine, but the README says nothing about due dates. He rejects
@@ -1237,15 +1252,18 @@ approval waits for the release checks in GitHub.
 
    ```text
    Approval preview: gate release of change add-due-dates (pending)
+   Digest: sha256:cd6018fe3d9b1595589c780d812828a306d48d9603c2f0ac16532fe06e28ac02
    Artifacts:
      review  review.md
      release  release.md
    Changed since the last approval: nothing
    Approvals: 0 of 1
+   Required roles: release-manager
+   Still missing: release-manager
    Open blocking findings: 0
    Verification: passed 2026-10-09T21:03:29.540Z, matches the current code
    You may approve it:
-   $ sdlc approve release --change add-due-dates
+   $ sdlc approve release --change add-due-dates --expect-digest sha256:cd6018fe3d9b1595589c780d812828a306d48d9603c2f0ac16532fe06e28ac02
    ```
 
 6. She reads `release.md`, especially the rollback, and approves. sdlc runs the release checks again at this moment;

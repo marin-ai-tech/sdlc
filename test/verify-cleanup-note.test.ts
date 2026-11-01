@@ -125,6 +125,54 @@ describe('B133: verification reports a cleanup that sent no signal', () => {
     expect(cleanupShell()?.exited?.()).toBe(false);
   });
 
+  it('adds no line after a normal POSIX exit whose output closed while cleanup ran', async () => {
+    Object.defineProperty(process, 'platform', { ...platform, value: 'linux' });
+    vi.mocked(stopProcessTree).mockImplementation(() =>
+      new Promise((resolve) => setTimeout(() => resolve({ signalled: false } as never), 50)));
+    const child = fakeChild();
+    vi.mocked(spawn).mockReturnValue(child as never);
+    const config = defaultConfig();
+    config.verify.commands = [{ name: 'ok', run: 'echo 42', required: true }];
+    config.verify.timeoutSeconds = 1;
+    let result: Run | undefined;
+    const pending = runVerification('/unused', config).then((value) => { result = value; });
+    await vi.advanceTimersByTimeAsync(100);
+    child.stdout.write('42\n');
+    child.exitCode = 0;
+    child.emit('exit', 0, null);
+    child.stdout.end();
+    child.stderr.end();
+    child.emit('close', 0, null);
+    await vi.advanceTimersByTimeAsync(8000);
+    await pending;
+    expect(result!.checks[0].output).not.toContain('sent no signal');
+    expect(result!.checks[0].output.trim()).toBe('42');
+    expectObservedExit(result!);
+  });
+
+  it.each([[100, 0], [300, 1]])('after an immediate cleanup, output closing at %i ms gives %i no-signal line(s)',
+    async (closeAt, lines) => {
+      Object.defineProperty(process, 'platform', { ...platform, value: 'linux' });
+      vi.mocked(stopProcessTree).mockResolvedValue({ signalled: false } as never);
+      const child = fakeChild();
+      vi.mocked(spawn).mockReturnValue(child as never);
+      const config = defaultConfig();
+      config.verify.commands = [{ name: 'ok', run: 'echo 42', required: true }];
+      config.verify.timeoutSeconds = 1;
+      let result: Run | undefined;
+      const pending = runVerification('/unused', config).then((value) => { result = value; });
+      await vi.advanceTimersByTimeAsync(10);
+      child.exitCode = 0;
+      child.emit('exit', 0, null);
+      await vi.advanceTimersByTimeAsync(closeAt);
+      child.emit('close', 0, null);
+      await vi.advanceTimersByTimeAsync(8000);
+      await pending;
+      expect(occurrences(result!.checks[0].output, note)).toBe(lines);
+      expectObservedExit(result!);
+      expect(child.listenerCount('close')).toBe(1);
+    });
+
   it('adds no line when the shell exited and cleanup killed the remaining group', async () => {
     Object.defineProperty(process, 'platform', { ...platform, value: 'linux' });
     vi.mocked(stopProcessTree).mockResolvedValue({ signalled: true } as never);

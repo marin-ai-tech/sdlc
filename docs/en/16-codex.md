@@ -32,7 +32,9 @@ sdlc doctor
 | A person's commands refused | `.codex/rules/sdlc.rules`: one `forbidden` rule per command |
 | The sdlc MCP server and the team's servers | `[mcp_servers.<name>]` in `.codex/config.toml` |
 
-Every generated file is recorded in the manifest. `sdlc update` refreshes them, and `sdlc uninstall` removes them.
+Generated files are recorded in the manifest; sdlc's entries in `.codex/hooks.json` and `.codex/config.toml` are
+merged into those shared files and recognised by their `sdlc` command. `sdlc update` refreshes them, and
+`sdlc uninstall` removes them.
 Your own entries in `.codex/hooks.json` stay in place. The same applies to your `[mcp_servers.*]` tables in
 `.codex/config.toml`; sdlc replaces or removes only its own entries.
 
@@ -103,9 +105,11 @@ These limits tell you when a hook or command rule may not hold. Check them befor
   agent's shell by its marker.
 - **A hook that cannot run:** Codex lets a call through after a non-zero exit (including exit 2), a crash,
   bad JSON or a timeout. Only a JSON `deny` blocks. This behaviour was checked live on Windows, where Codex runs
-  hooks through Windows PowerShell. If sdlc's pre-tool hook fails to load or throws, the sdlc command answers
-  `deny` itself. The call stays blocked until `sdlc doctor` is clean. Two cases still let it through: `sdlc` is
-  missing from Codex's shell PATH, or the hook exceeds its 30-second timeout. `sdlc doctor` checks the PATH.
+  hooks through Windows PowerShell. If sdlc's pre-tool hook cannot load or crashes, the sdlc command answers
+  `deny` itself, and an `openspec/sdlc.yaml` that exists but cannot be read makes it deny every call unless its
+  `enforcement.mode` is `off`. Other cases end with no answer, so Codex lets the call through: an error that sdlc
+  catches while it evaluates the call, tool input that is not JSON, `sdlc` missing from Codex's shell PATH, or a
+  hook that exceeds its 30-second timeout. `sdlc doctor` checks the PATH.
 - **Shell writes** are read from the command text: redirections, `tee`, `cp`, `mv`, `install`, `sed -i`,
   `perl -i`, `touch`, `truncate`, `dd of=`, PowerShell's `Set-Content`, `Add-Content`, `Clear-Content`,
   `Out-File`, `Tee-Object`, `New-Item`, `Copy-Item`, `Move-Item`, `Rename-Item` and the .NET `File` writers, inside
@@ -117,7 +121,9 @@ These limits tell you when a hook or command rule may not hold. Check them befor
   before release.
 - **The command rules** match the command's first words: your `cli` setting (`npx --no-install sdlc approve`),
   and with the plain `sdlc` also its older alias and the Windows `.cmd` shims; they also refuse
-  `sdlc adopt --apply`. Another spelling is caught by the hook and the CLI, not by the rules.
+  `sdlc adopt --apply`, `sdlc init --roles` and the person-only commands of enabled plugins. `sdlc plugins accept`
+  and `revoke` refresh these rules without touching your own entries. Another spelling is caught by the hook and the
+  CLI, not by the rules.
 
 ## 📚 Terms
 

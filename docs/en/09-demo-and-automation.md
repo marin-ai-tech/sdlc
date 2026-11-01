@@ -46,6 +46,10 @@ The scenario includes these parts:
   `approvals verify` and archive.
 - **Other flows:** a bug fix with locked tests, a rejected idea, a waiver, deferred work and backlog closure,
   and a BMAD import.
+- **Board:** dispatch, claim, auction, submit, and a person's `board recover` after `doctor` names a stuck lock
+  (the agent's attempt is refused).
+- **Packs and plugins:** a team pack accepted by a person, and the economy example plugin enabled through
+  `config propose`/`apply` and accepted by a person.
 - **Visibility:** `status`, `report`, `dashboard`, `audit`, `log`, `statusline`, the session hook, the plugin
   and `uninstall`.
 
@@ -63,7 +67,7 @@ node scripts/demo/build-deck.mjs --transcript docs/demo/calculator-transcript.en
 
 `SDLC_DEMO_PEOPLE` selects the team's surnames for the deck. `npm run demo:deck` runs the scenario once per language.
 The slide steps and words are in `scripts/demo/deck-content.mjs`. `scripts/demo/build-deck.mjs` renders them with
-pptxgenjs. The 20-slide English deck is `docs/demo/sdlc-calculator-demo.en.pptx`, built from
+pptxgenjs. The 23-slide English deck is `docs/demo/sdlc-calculator-demo.en.pptx`, built from
 `docs/demo/calculator-transcript.en.json`.
 
 ## 🔁 Keep the dashboard current

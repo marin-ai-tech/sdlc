@@ -187,7 +187,7 @@ history:
 | approvals | 30 | approvals 30 |
 | waivers | 1 | waivers 1 |
 | archives | 5 | 5 archived |
-| commits | 111 | Agent commits 0/111 |
+| commits | 111 | Agent commits 0 of 108 (the audit counts the commits in its period) |
 
 ## 21.8. Lessons for a team
 

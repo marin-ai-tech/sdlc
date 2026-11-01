@@ -319,7 +319,7 @@ waits per gate, reworks, people's participation and the agents' share of commits
    Real output (the license note at the end of the first and last lines is cut here):
 
    ```text
-   SDLC metrics across 2 change(s) (1 archived) · sdlc 0.14.4, ...
+   SDLC metrics across 2 change(s) (1 archived) · sdlc 0.30.0, ...
      median hours: intent→spec 0 · spec→plan 0 · plan→verified 0 · verified→review 0 · total 0
      verification first-pass rate: 1; rejections 0; waivers 0 (+0 by policy)
      agent commits: 11 of 17 (SDLC-Agent trailer)
@@ -791,6 +791,8 @@ report.
 
    | Tool | Arguments | Answers like |
    |---|---|---|
+   | `task_export` | `change`, `task`, `executor`, `ext`, `project` | `sdlc task export --json` |
+   | `board_list` | `change`, `project` | `sdlc board list --json` |
    | `status` | `change`, `project` | `sdlc status --json`; without `project`, for all projects |
    | `next` | `change`, `project` | `sdlc next --json` |
    | `instructions` | `artifact`, `change`, `project` | `sdlc instructions <artifact> --json` |
@@ -828,7 +830,7 @@ report.
 
    The process state lives in each repository, so a central job never needs anyone's laptop.
 
-5. A central dashboard over HTTP. The same read-only tools are served over MCP Streamable HTTP at
+5. A central dashboard over HTTP. The same tools are served over MCP Streamable HTTP at
    `/mcp`, so a client on another machine can reach them. A bearer token is always required, also on localhost. It
    comes only from the environment variable `SDLC_MCP_TOKEN` (at least 16 characters), never from a flag:
 
@@ -847,12 +849,14 @@ report.
    ```
 
    A request without the token, or with another one, gets 401. A request whose `Origin` header names another host
-   gets 403. Only `/mcp` is served (other paths get 404), and a request body may be up to 1 MB. The tools stay
-   read-only: there is still no decision over MCP.
+   gets 403. Only `/mcp` is served (other paths get 404), and a request body may be up to 1 MB. With the server
+   token the tools stay read-only. Only an executor's token from `openspec/executors.yaml` adds the five board
+   tools (`board_claim`, `board_heartbeat`, `board_release`, `board_submit`, `board_bid`). There is still no
+   decision over MCP.
 
 ### You are done when
 
-- Claude Desktop lists the `sdlc` server with ten tools.
+- Claude Desktop lists the `sdlc` server with twelve tools (more when accepted plugins add tools).
 - With `--http`, a request without the token gets 401.
 - A question about both projects gets an answer that names each project.
 

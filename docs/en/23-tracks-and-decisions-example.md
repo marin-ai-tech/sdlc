@@ -147,7 +147,7 @@ with `sdlc backlog start B8 --change b8-corrupt-storage`. Peter rejected a spec 
 first run would have created `todos-corrupt`) and approved the fixed one:
 
 ```text
-✓ spec gate: Peter Owen approved as product-owner
+✓ spec gate: Peter Owen <peter@todo.example> approved as product-owner (…)
   still needed: tech-lead
 ```
 

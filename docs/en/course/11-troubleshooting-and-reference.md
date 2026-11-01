@@ -44,7 +44,7 @@ keep both sides' gate decisions and history entries in time order, then run `sdl
 
    ```text
    ✓ node             Node.js 24.21.0
-   ✓ harness          sdlc 0.14.4
+   ✓ harness          sdlc 0.30.0
    ✓ openspec         OpenSpec 1.13.2 (bundled)
    ✓ sdlc.yaml        enforcement block, tools claude, cursor, codex, qwen
    ✓ generated files  159 tracked, 0 missing, 0 edited locally
@@ -70,12 +70,16 @@ keep both sides' gate decisions and history entries in time order, then run `sdl
    | `openspec` | the bundled OpenSpec runs, version 1.13.2 or newer | reinstall sdlc, or `npm install -g @fission-ai/openspec` |
    | `openspec cli`, `codegraph` | optional tools on PATH; whether codegraph indexed the project | optional |
    | `project` | an `openspec/` folder here or above | `sdlc init` |
-   | `sdlc.yaml` | `openspec/sdlc.yaml` exists; enforcement mode and tools | `sdlc init` |
+   | `sdlc.yaml` | `openspec/sdlc.yaml` exists; enforcement mode and tools. A file that exists but cannot be read (`config_read`) or parsed is an error | `sdlc init`; a person restores read access or fixes the file |
    | `openspec config` | `openspec/config.yaml` and its default schema | — |
    | `sdlc schema` | `openspec/schemas/sdlc` installed and valid | `sdlc update` |
    | `generated files` | files tracked, missing, edited locally, made by an older sdlc | `sdlc update` (`--force` restores edited files) |
    | `license` | the project's license and the sdlc license it uses | a person records it with `sdlc license set` |
    | `project log` | entries in `openspec/.sdlc/log.jsonl`, or the log is off | `log.enabled` in `sdlc.yaml` |
+   | `project log storage` (error) | `openspec/` or `openspec/.sdlc/` is a link or not a folder, so the log cannot be written | keep the log bytes and restore a plain `openspec/.sdlc` folder |
+   | `log writer`, `board writer` (only while a lock file exists) | the owner of `openspec/.sdlc/log.lock` or `board.lock`: its PID, its state (dead, live, unknown or partial) and its digest; age alone never authorizes removal | keep a live or unknown owner; for a dead or partial one stop competing writers, then a person runs `sdlc board recover --expect-owner <digest>` for the board (a partial record needs 120 s) |
+   | `plugin <name> writer` | the same for the store lock of a runtime plugin (and the plugins' `activation` and `recovery` locks) | as for the log and board writers |
+   | `plugin <name> pending events` | plugin events not yet written to the project log: how many, their size and the oldest | restore project logging, then retry or run `sdlc plugins recover <name>`; never delete pending events |
    | `approval signing` | the `signing` mode of `roles.yaml` | — |
    | `claude hooks` | sdlc's hooks in `.claude/settings.json` | `sdlc update` |
    | `hooks disabled` | `disableAllHooks: true` in a Claude Code settings file | a person removes it |
@@ -85,6 +89,7 @@ keep both sides' gate decisions and history entries in time order, then run `sdl
    | `verify commands` | `verify.commands` exist ("none configured - the verify gate cannot pass") | add build, test and lint commands |
    | `review policy` | `REVIEW.md` (or `review.policy`) exists | `sdlc init` creates a starter |
    | `change <id>` | each active change can be read; its stage | — |
+   | `change <id> <gate> <shape>`, `change <id> <gate> approval <n>` | a malformed decision value or approval entry in the change's `.sdlc.yaml`; it supplies no authority | inspect it and restore a valid record a person reviewed from a trusted backup; nothing is repaired automatically |
    | `git` | a git repository, and `user.email` set (needed to record approvals) | `git init`; `git config user.email you@example.com` |
    | `git hook` | the `prepare-commit-msg` hook: current, chained, the project's own, missing, outdated, or a shared hooks folder | `sdlc update`, or add the one chain line to your hook |
 
@@ -119,7 +124,7 @@ keep both sides' gate decisions and history entries in time order, then run `sdl
 
 **Role:** Oliver (anyone working with an agent)   **Project:** tasklet   **You need:** Claude Code with sdlc's hooks
 
-**Goal.** Read a denial, find its rule, and know the right next step for each of the thirteen rules.
+**Goal.** Read a denial, find its rule, and know the right next step for each rule.
 
 ### Steps
 
@@ -160,6 +165,10 @@ keep both sides' gate decisions and history entries in time order, then run `sdl
    | `takeover` | hard | a person holds the change (`sdlc takeover`) | wait for `sdlc release-control`; read-only commands still work |
    | `mcp-stage` | process | the MCP server is not meant for the current stage (`mcp.servers.<name>.stages`) | wait for a listed stage, or a person adds the stage |
    | `config-load` | hard | `openspec/sdlc.yaml` exists but fails to load, so no rule could be read | a person fixes the file (`sdlc doctor` names the error); only a raw `enforcement.mode: off` still allows |
+   | `shell-parse` | hard | the shell command cannot be read safely (an unterminated quote, too deep nesting, a command over the size limit, an sdlc operation that cannot be resolved without running the command) | write the command plainly with literal words, or split it into simpler commands |
+   | `plugin` | hard | an accepted runtime plugin's hook or command catalog refused the call or failed while checking it; a plugin only adds restrictions | read the reason; a person checks `sdlc plugins inspect <name>` and `sdlc doctor` |
+   | `living-specs` | process | a write to the living specs under `openspec/specs/`; only `sdlc archive` merges them | write the delta spec at `openspec/changes/<id>/specs/<capability>/spec.md` |
+   | `change-not-created` | process | the change folder has neither `.sdlc.yaml` nor `.openspec.yaml` (also `openspec new change`) | create the change with `sdlc new <id>` or `sdlc backlog start B<n> --change <id>` |
 
 5. See a hard rule in action. The agent tries to lower the enforcement mode:
 
@@ -256,12 +265,15 @@ flowchart LR
 
    ```text
    Approval preview: gate intent of change fix-empty-title (stale)
+   Digest: sha256:8121ebcdedf1b6136b384ebfe03e05196434753e3d1bef163f4989e750cc6498
    Artifacts:
      intent  intent.md
    Changed since the last approval: intent.md
    Approvals: 0 of 1
+   Required roles: product-owner
+   Still missing: product-owner
    You may approve it:
-   $ sdlc approve intent --change fix-empty-title
+   $ sdlc approve intent --change fix-empty-title --expect-digest sha256:8121ebcdedf1b6136b384ebfe03e05196434753e3d1bef163f4989e750cc6498
    ```
 
 4. A rework. A person sent a gate back (`sdlc rework <gate> --reason ... --note ...`). The gate counts as rejected
@@ -361,7 +373,7 @@ Find the symptom first, then check its cause and suggested next step.
 | `sdlc task check-result` or `sdlc board submit` names `diff_unavailable` | git could not list the branch's changes, for example an object is missing after a partial fetch | fetch the whole branch again, run `git fsck`, and use git 2.28 or newer |
 | `sdlc board claim` names `task_claimed`, `task_done` or `task_submitted` | a live claim holds the task, it is done, or already submitted | `sdlc board list` shows who holds it and until when |
 | `sdlc board heartbeat`, `release` or `submit` names `claim_unknown` or `claim_expired` | the claim id is wrong or ended, or the lease ran out | only a live claim heartbeats, releases or submits; claim again with `board claim` |
-| a `board` command names `board_invalid` or `board_locked` | `openspec/.sdlc/board.json` is broken, or another process holds the lock | fix the file by hand; a lock older than ~30 s is broken automatically |
+| a `board` command names `board_invalid` or `board_locked` | `openspec/.sdlc/board.json` is broken, or another process holds the lock | fix the file by hand. A lock whose owner process is gone (or provably a different process) is reclaimed by the next writer, a partial one after 120 s. A live or unknown owner is never taken over: run `sdlc doctor`, then a person runs `sdlc board recover --expect-owner sha256:<64-hex>` with the digest it prints |
 | `sdlc approve` says "cannot be approved yet: waiting for the judge" | the gate has a judge (`gates.<g>.judge`) and no passing verdict for the current artifacts | the agent runs `sdlc judge --gate <g> --change <id>` and reworks until the verdict passes (Lesson 5.11) |
 | `sdlc judge` says "The judge answer was not a verdict" (`judge_invalid_answer`) | the judge printed no JSON verdict `{ pass, route, rework }` | fix the judge (the team's command or tool), then run `sdlc judge` again; nothing was recorded |
 | `sdlc next` hands the gate to a person: "the author-critic loop stopped" | the judge rejected the artifacts `max_loops` times | the person reads the judge's notes and decides: approve, reject or `sdlc rework` |
@@ -548,7 +560,7 @@ Claude Code spelling; in Cursor, OpenCode, Qwen Code and GigaCode use `/sdlc-<na
 | `sdlc team accept --pack <name>` **(person)**, `sdlc ci init --provider github` **(person)** | |
 | `sdlc license set community` or `commercial --agreement <id> --licensee "<name>"` **(person)** | |
 | `sdlc uninstall --dry-run`, `sdlc uninstall` **(person)** | |
-| edits `openspec/sdlc.yaml` and `openspec/roles.yaml` by hand (the agent cannot) | |
+| `sdlc config propose --set <key=value> --reason "…"` (or the agent's proposal), then `sdlc config apply <id>` **(person)** for `openspec/sdlc.yaml` and `openspec/roles.yaml` | `/sdlc:config` |
 
 ### Laura — engineering manager
 
@@ -653,6 +665,15 @@ commands also take `--json` and, with several active changes, `--change <id>`.
 | `sdlc update [--tools …] [--force]` | anyone | regenerate the schema, skills, commands, agents, hooks and plugin after an upgrade |
 | `sdlc uninstall [--dry-run]` | a person | remove the generated agent files and hooks; `openspec/` and the planning data stay |
 | `sdlc doctor [--fix]` | anyone | check the installation and name a fix for each problem (Lesson 11.1) |
+| `sdlc config propose --set <key=value> [--target sdlc\|roles] --reason "…"` | anyone | store a validated proposal to change `openspec/sdlc.yaml` or `roles.yaml` (`--file <path>` for a whole file) |
+| `sdlc config show [id]` | anyone | show the configuration proposals and their diffs |
+| `sdlc config apply <id>` | a person | apply a configuration proposal |
+| `sdlc config dismiss <id> --note "…"` | a person | dismiss a configuration proposal |
+| `sdlc plugins list` | anyone | list the configured runtime plugins, their activation status and problems |
+| `sdlc plugins inspect <name>` | anyone | inspect a runtime plugin package, its trust status and configuration problems |
+| `sdlc plugins accept <name>` | a person | accept a reviewed plugin package digest and initialize or keep its state |
+| `sdlc plugins revoke <name>` | a person | revoke a plugin's execution trust; its state and history stay |
+| `sdlc plugins recover <name>` | a person | recover inactive plugin writers and reconcile interrupted requests |
 | `sdlc adopt` | anyone | analyze an existing project and draft the sdlc settings |
 | `sdlc adopt --apply` | a person | apply the adoption draft: merge the settings, write `roles.yaml` if it does not exist |
 | `sdlc layout check` | anyone | check the project layout (the documents agents read) |
@@ -683,13 +704,14 @@ commands also take `--json` and, with several active changes, `--change <id>`.
 
 | Command | Who | What it does |
 |---|---|---|
-| `sdlc backlog epic add "<title>" [--goal "…"]` | anyone | add an epic (`E<n>`) |
-| `sdlc backlog epic edit E<n>` | anyone | change the title or the goal of an epic |
+| `sdlc backlog epic add "<title>" [--goal "…"] [--granularity package\|feature\|small]` | anyone | add an epic (`E<n>`); the granularity is the size of the items it splits into |
+| `sdlc backlog epic edit E<n> [--granularity package\|feature\|small]` | anyone | change the title, the goal or the granularity of an epic |
 | `sdlc backlog add "<title>"` | anyone | add a backlog item (`B<n>`) |
 | `sdlc backlog edit B<n>` | anyone | refine an item: title, outcome, acceptance criteria, dependencies, kind, risk |
 | `sdlc backlog list` | anyone | list the backlog items in order |
 | `sdlc backlog next` | anyone | show the next ready item |
 | `sdlc backlog start B<n>` | anyone | start an item as a change |
+| `sdlc backlog link B<n> --change <id>` | anyone | link an existing change to a backlog item |
 | `sdlc backlog move B<n> --top` | a person | reorder an item (with `roles.yaml`, the product owner) |
 | `sdlc backlog drop B<n> --note "…"` | a person | drop an item (with `roles.yaml`, the product owner) |
 | `sdlc backlog done B<n>` | anyone | mark an item done |
@@ -712,6 +734,7 @@ commands also take `--json` and, with several active changes, `--change <id>`.
 | `sdlc next [--change <id>] [--me]` | anyone | the next action and who performs it; `--me` lists what waits for you |
 | `sdlc instructions <artifact>` | anyone | the instructions for an artifact (intent, proposal, specs, design, plan, tasks, apply, verification, review, release) |
 | `sdlc validate` | anyone | OpenSpec and harness checks; errors fail, warnings are reported; overlaps between changes |
+| `sdlc gate read <gate> [--change <id>]` | anyone | the normalized artifacts and the gate digest from one evaluation (read-only) |
 | `sdlc judge --gate <gate> --change <id>` | anyone | run the gate's judge and record its verdict (Lesson 5.11) |
 | `sdlc answer <n> --change <id> --text "…"` | a person | answer an open question of an intent, proposal or design |
 | `sdlc approve <gate> --change <id> [--preview] [--expect-digest <digest>]` | a person | approve a gate, bound to the current content; with `--expect-digest`, only while the gate still has that digest |
@@ -738,7 +761,9 @@ commands also take `--json` and, with several active changes, `--change <id>`.
 | `sdlc board release --claim <id>` | the claim holder | give the task back |
 | `sdlc board submit --claim <id> --branch <ref>` | the claim holder | check and submit the result branch |
 | `sdlc board reopen` | anyone | reopen a submitted result; escalation excludes its executor |
+| `sdlc board recover --expect-owner <sha256>` | a person | recover a stopped board writer after checking its complete ownership digest (`sdlc doctor` prints it) |
 | `sdlc archive <id>` | anyone | check every required gate, then merge the delta specs into the living specs |
+| `sdlc drop <change> --note "…"` | a person | drop an active change without merging its specs |
 
 ### Reports and audit (read-only)
 
@@ -787,6 +812,7 @@ in Codex `$sdlc-<name>`. A workflow runs as the agent, so it never approves.
 | `/sdlc:health` | explain the health findings and draft improvements as backlog items |
 | `/sdlc:adopt` | prepare an existing project for agents |
 | `/sdlc:team` | set up the agent team: role drafts for a person to accept |
+| `/sdlc:config` | propose a settings or roles change for a person to review and apply |
 | `/sdlc:backlog` | see the backlog, decompose an epic, bring an item to ready and start it |
 | `/sdlc:explore` | research an idea before intent |
 | `/sdlc:intent` | capture an idea as `intent.md` (stage 1, Plan) |

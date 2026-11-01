@@ -101,7 +101,7 @@ never evidence.
    - **Result**: PASSED (1/1 required checks)
    - **Run at**: 2026-10-09T20:29:00.389Z
    - **Commit**: 891963f701d6
-   - **Harness**: sdlc 0.14.4, license: community (...)
+   - **Harness**: sdlc 0.30.0, license: community (...)
 
    | Check | Command | Result | Duration |
    |---|---|---|---|
@@ -614,14 +614,17 @@ cannot approve.
 
    ```text
    Approval preview: gate review of change add-due-dates (pending)
+   Digest: sha256:3fc4c928a38e249308a9748773ff27399eaa186f6b1fcbea6ccccd2a0eddee89
    Artifacts:
      review  review.md
    Changed since the last approval: nothing
    Approvals: 0 of 1
+   Required roles: code-owner
+   Still missing: code-owner
    Open blocking findings: 0
    Verification: passed 2026-10-09T20:31:52.306Z, matches the current code
    You may approve it:
-   $ sdlc approve review --change add-due-dates
+   $ sdlc approve review --change add-due-dates --expect-digest sha256:3fc4c928a38e249308a9748773ff27399eaa186f6b1fcbea6ccccd2a0eddee89
    ```
 
 4. Paul reads the diff (`git diff main...HEAD`) and `review.md`, then approves:

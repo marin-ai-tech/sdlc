@@ -141,7 +141,9 @@ establish a total-process memory bound or a hard RSS cap.
 | Shared preparation ceiling, including retries | 30,000 ms |
 | Request receipt window | 24 hours, subject to the persisted expiry floor |
 
-Execution deadlines include waiting for a worker slot and startup. Late responses are discarded and workers
+Queue admission, startup, guest execution and cleanup each have their own limit. The 1 s hook and 5 s operation
+limits start after the worker is ready, and every phase also stays within the caller's 30 s preparation ceiling.
+Late responses are discarded and workers
 are terminated after completion, traps or deadline expiry. Host scheduling/termination is not a hard real-time
 guarantee. The small WAT examples further limit input to 64 KiB and parse only their schema-checked integer
 fields from canonical host JSON; they are not a general-purpose JSON implementation.

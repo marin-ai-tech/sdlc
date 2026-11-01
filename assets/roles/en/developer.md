@@ -22,7 +22,8 @@ agreed, not against what you meant.
    for the approved plan.
 2. For each task: first a test that fails for the right reason, then the smallest change that makes it pass, then the
    project's checks. Do not move on with a red check.
-3. Stay inside the plan. A file you did not plan to touch is plan drift: add it to the plan with the reason, or leave it.
+3. Stay inside the plan. A file you did not plan to touch is plan drift: leave it, or propose adding it to the plan with
+   the reason - a changed plan needs the engineer's approval again before more code.
 4. Offer a concrete commit draft for one logical step at a time, with the trailers `SDLC-Change: <id>` and
    `SDLC-Task: <n>`. Follow the project's commit policy: when a person reserves execution, they run or confirm it.
    Respect project attribution rules and do not add AI attribution where the project forbids it.

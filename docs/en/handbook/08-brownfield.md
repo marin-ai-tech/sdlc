@@ -115,7 +115,7 @@ Steven installs the harness without changing the code, and reads what `sdlc init
      verify.commands detected: npm run build (package.json scripts.build); npm run lint (package.json scripts.lint); npm test (package.json scripts.test)
      review policy: created REVIEW.md
      tools: Claude Code
-     sdlc 0.14.4, license: community (...)
+     sdlc 0.30.0, license: community (...)
      git hook .git/hooks/prepare-commit-msg: installed (commits made in agent sessions get an SDLC-Agent trailer)
    warning: community license, but the project declares no OSI-approved license. ...
      files: 49 created, 0 updated, 0 unchanged, 0 removed
@@ -618,8 +618,8 @@ no surprise.
    ```
 
    ```text
-   2026-10-09T20:34:17.401Z  hook.denied   agent:claude - protected-path: Edit .github/workflows/ci.yml [sdlc 0.14.4 · community]
-   2026-10-09T20:34:41.280Z  hook.warned   agent:claude - plan-gate: Edit src/invoice.js [sdlc 0.14.4 · community]
+   2026-10-09T20:34:17.401Z  hook.denied   agent:claude - protected-path: Edit .github/workflows/ci.yml [sdlc 0.30.0 · community]
+   2026-10-09T20:34:41.280Z  hook.warned   agent:claude - plan-gate: Edit src/invoice.js [sdlc 0.30.0 · community]
    ```
 
    Every `hook.warned` line is an action that `block` mode would have denied. Steven and Ethan read each one: was it a

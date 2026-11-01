@@ -31,13 +31,15 @@ sdlc doctor
 |---|---|---|
 | Workflows as skills | `.qwen/skills/sdlc-<workflow>/SKILL.md` | `.gigacode/skills/sdlc-<workflow>/SKILL.md` |
 | Thin commands | `.qwen/commands/sdlc-<workflow>.md` | `.gigacode/commands/sdlc-<workflow>.md` |
-| Subagents (read-only roles cannot write files) | `.qwen/agents/sdlc-<agent>.md` | `.gigacode/agents/sdlc-<agent>.md` |
+| Subagents (read-only roles lose `write_file` and `edit`; shell writes are still checked by the hooks) | `.qwen/agents/sdlc-<agent>.md` | `.gigacode/agents/sdlc-<agent>.md` |
 | Hooks: SessionStart, PreToolUse, Stop | `hooks` in `.qwen/settings.json` | `hooks` in `.gigacode/settings.json` |
 | A person's commands refused | `permissions.deny` in the same file | the same |
 | The sdlc MCP server and the team's servers | `mcpServers` in the same file | the same |
 
-Every generated file is recorded in the manifest. `sdlc update` refreshes them, and `sdlc uninstall` removes them.
-Your hooks, deny entries and MCP servers in `settings.json` stay in place when sdlc updates its entries.
+Generated files are recorded in the manifest; sdlc's entries in `settings.json` are merged into that shared file.
+`sdlc update` refreshes them, and `sdlc uninstall` removes them. Your hooks, deny entries and MCP servers in
+`settings.json` stay in place when sdlc updates its entries; `sdlc plugins accept` and `revoke` refresh sdlc's
+deny entries for plugin person-only commands.
 
 > [!IMPORTANT]
 > If you enable `security.folderTrust.enabled`, trust the project folder or an ancestor before relying on hooks.
@@ -99,9 +101,11 @@ behaviour, but has not been checked against a live GigaCode installation.
 - **Folder trust.** With folder trust enabled, untrusted folders ignore the project's settings, including hooks and
   `permissions.deny`. The CLI's own refusal still applies in agent shells carrying `QWEN_CODE=1`.
 - **A hook that cannot run.** Qwen Code lets the call through when a hook fails, times out or answers bad JSON.
-  When sdlc's pre-tool hook fails to load or throws, the sdlc command answers a JSON `deny` itself, so the call is
-  blocked. `sdlc` missing from the PATH of the tool's shell (`sdlc doctor` checks it) and a timeout still let the
-  call through.
+  When sdlc's pre-tool hook cannot load or crashes, the sdlc command answers a JSON `deny` itself, so the call is
+  blocked; an `openspec/sdlc.yaml` that exists but cannot be read makes it deny every call unless its
+  `enforcement.mode` is `off`. An error that sdlc catches while it evaluates the call, tool input that is not JSON,
+  `sdlc` missing from the PATH of the tool's shell (`sdlc doctor` checks it) and a timeout end with no answer and let
+  the call through.
 - **The GigaCode marker.** GigaCode's own session variable is not documented. Its shell carries `QWEN_CODE=1`.
   With `gigacode` but not `qwen` in `tools`, the git hook writes `SDLC-Agent: gigacode`. With both tools it writes
   `SDLC-Agent: qwen`; set `SDLC_AGENT=gigacode` in GigaCode's environment to tell them apart. Run `sdlc update` after

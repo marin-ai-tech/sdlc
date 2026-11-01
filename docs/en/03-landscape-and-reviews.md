@@ -134,7 +134,7 @@ BMAD informs these sdlc features:
 These findings guide the harness design:
 
 - Drive OpenSpec through its JSON contract without rewriting the merge. Pin OpenSpec to version 1.13.2 or later.
-- Check delta targets before the merge: MODIFIED/REMOVED/RENAMED targets must exist. ADDED must not collide with an
+- Check delta targets before the merge: MODIFIED and RENAMED targets must exist (a missing REMOVED target is a warning). ADDED must not collide with an
   existing requirement.
 - Show requirement overlaps and base drift after approval for parallel changes.
 - Check plan against diff, scenarios against evidence and verification freshness.

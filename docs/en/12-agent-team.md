@@ -41,8 +41,14 @@ Solo mode installs five discoverable bundled skills: `sdlc-role-analyst`, `sdlc-
 When Claude Code and OpenCode are both selected, OpenCode reads the Claude skill copy. User-edited generated
 skills are preserved under the usual manifest rules.
 
-Each workflow names one active execution role: analyst for intent/spec, developer for plan/build, tester for
-verify and reviewer for review. Announce a deliberate switch to architect for architectural work. The `next`
+Each workflow names one active execution role:
+
+- analyst: explore, intent, spec, backlog, archive and triage;
+- developer: plan, build and release;
+- tester: verify; reviewer: review;
+- architect: team and adopt.
+
+Announce a deliberate switch to architect for architectural work. The `next`
 hint carries the role as guidance, never as permission to approve, change protected state or commit against
 project policy. Editable answer and commit drafts retain literal arguments and required change/task trailers;
 where a person reserves commit execution, that person runs or confirms the displayed commands.

@@ -215,7 +215,7 @@ SDLC metrics across 3 change(s) (3 archived)
   verification first-pass rate: 1; rejections 9; waivers 0 (+0 by policy)
   agent commits: 0 of 69 (SDLC-Agent trailer)
   agent log events: 41 of 94
-  people's participation (3 changes), planned / actual: gate decisions 18; approvals 18 / 20
+  people's participation (3 changes), planned / actual: gate decisions 18; approvals 18 / 20; …
 ```
 
 Nine rejections were on substance: the edit intent, the list spec, plan three times and qa four times. People made

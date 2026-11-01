@@ -56,8 +56,22 @@ Hard rule. The file configures the guard itself: `openspec/sdlc.yaml`, `.claude/
 `.codex/rules/sdlc.rules`, `.qwen/settings.json`, `.gigacode/settings.json`, the manifest, the user's agent settings
 (Cursor's user-level hooks `~/.cursor/hooks.json` among them), the accepted team roles in `docs/agents/`, the files
 sdlc generates for the agents (`sdlc-*` subagents, workflow skills and commands), the review policy (`REVIEW.md` or
-`review.policy`), the sdlc schema and `openspec/config.yaml`.
+`review.policy`), the sdlc schema, `openspec/config.yaml` and the configured launcher (`package.json` `scripts.sdlc`
+or the shim the `cli:` setting runs).
 **Do:** ask a person to make the change; `sdlc update` restores generated files.
+
+## shell-parse
+
+Hard rule. The shell command could not be read safely: an unterminated quote, too deep nesting, a command over the
+size or word limit, Unicode whitespace inside a recognized command, or an sdlc operation and its target that cannot be
+resolved without running the command. **Do:** write the command plainly - literal words, no command substitution or
+computed sdlc words - or split it into simpler commands.
+
+## plugin
+
+Hard rule. An accepted runtime plugin's hook or command catalog refused the call or failed while checking it; the
+reason carries the plugin's code. A plugin can only add a restriction, never lift a core one. **Do:** read the
+reason; a person checks `sdlc plugins inspect <name>` and `sdlc doctor`, and see `sdlc guide plugins`.
 
 ## separation-of-duties
 

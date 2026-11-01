@@ -173,11 +173,15 @@ is not ready.
    > /sdlc:backlog Shared task lists: a list owner shares a list with teammates
 
    The agent reads the code and the specs first (`sdlc openspec list --specs`). It proposes items small enough for one
-   change each, every one with a title, an outcome, at least one criterion and its dependencies. It asks Megan to
-   confirm with a choice: all, a subset, or revise. Only after her answer does it run, for example:
+   change each, every one with a title, an outcome, at least one criterion and its dependencies. It sizes them to the
+   epic's granularity (`package`, `feature` or `small`) from `sdlc backlog list --json`. An explicit choice is kept
+   with `--granularity` on `sdlc backlog epic add` or `epic edit`, so the agent does not ask the sizing question
+   again. It asks Megan to confirm with a choice: all, a subset, or revise. Only after her answer does it run, for
+   example:
 
    ```bash
-   sdlc backlog epic add "Shared task lists" --goal "Teams plan together in one list instead of copying tasks"
+   sdlc backlog epic add "Shared task lists" --goal "Teams plan together in one list instead of copying tasks" \
+     --granularity feature
    sdlc backlog add "Share a list with a teammate" --epic E2 --outcome "..." --accept "..."
    ```
 

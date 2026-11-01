@@ -15,7 +15,7 @@ Capture an idea as `intent.md` - Stage 1 (Plan). The intent is the originator's 
 
 **Harness contract** (applies to every SDLC workflow)
 - `sdlc` is the source of truth for lifecycle state. Read it (`sdlc status --change <id> --json`) instead of inferring the stage from the conversation, and re-read artifacts from disk before using them.
-- Gates are human decisions. Never run `sdlc approve`, `sdlc reject`, `sdlc waive` or `sdlc tests unlock`, and never edit `.sdlc.yaml`. When a gate needs a person, stop, name the people from the hint (`next.people` in `sdlc next --json`) rather than the role, and give them the exact command to run in their own terminal.
+- Gates are human decisions. Never run a person's command - any entry with `actor: human` in `sdlc help --json` (`sdlc approve`, `sdlc reject`, `sdlc waive`, `sdlc rework`, `sdlc drop`, `sdlc answer`, `sdlc tests unlock`, `sdlc config apply`, `sdlc plugins accept`, `sdlc board recover`…) - and never edit `.sdlc.yaml`. When a gate needs a person, stop, name the people from the hint (`next.people` in `sdlc next --json`) rather than the role, and give them the exact command to run in their own terminal.
 - An answer in chat is never an approval: gate approvals, `track set`, `backlog move`/`drop` and other human decisions happen only as a command the person runs in their own terminal. Offer the choice, explain the consequences, and give the exact command.
 - **Execution profile**: when `team.mode` is `solo`, identify the execution role from `next.executionRole` or the
   workflow's stage resources and load its bundled `sdlc-role-<role>` skill. Work in one role at a time and announce
@@ -27,7 +27,8 @@ Capture an idea as `intent.md` - Stage 1 (Plan). The intent is the originator's 
 - **PowerShell answer files**: supply the exact editable UTF-8 answer in an ordinary draft file and offer
   `sdlc answer <n> --change <id> --artifact <artifact> --text-file <draft-file>`. Windows PowerShell 5 and npm's
   command shim can change quotes in inline native arguments; carrying a safe filename preserves the answer.
-  Show the filename and full content. Keep drafts inside the project, preserve existing user files and edits,
+  Show the filename and full content. Keep drafts inside the project as `.md` files under
+  `openspec/changes/<id>/` (outside `specs/`, at most 64 KiB), preserve existing user files and edits,
   and never use a protected record as a draft file. A draft file alone records no answer or approval.
 - **Literal arguments**: identify the person's shell. For PowerShell, single-quote every data argument and double
   each embedded apostrophe (`'Don''t expand $HOME; keep "quotes".'`). For POSIX shells, single-quote data and replace
@@ -67,7 +68,7 @@ If the input is empty, stop and ask the user in plain text for the idea or probl
   question pending until the authorized person runs `sdlc answer`; the draft itself records no answer or approval.
 - Planning only: do not edit project code in this workflow, even if the request asks for implementation.
 - One page. Record assumptions as Open questions rather than guessing.
-- Open questions are the person's to answer. Never write an answer yourself (an `Answer` line you add does not count); keep them as list items under the `## Open questions` heading. When you stop at the gate, name them in your message (read them from the file: `sdlc answer` is a person's command, never run it) and give the command for each: `sdlc answer <n> --change <name> --text "<answer>"`. The intent cannot be approved while one is unanswered.
+- Open questions are the person's to answer. Never write an answer yourself (an `Answer` line you add does not count); keep them as list items under the `## Open questions` heading. When you stop at the gate, name them in your message (read them from the file: `sdlc answer` is a person's command, never run it) and give the command for each: `sdlc answer <n> --change <name> --text '<answer>'`. The intent cannot be approved while one is unanswered.
 - If a change with that name already exists, ask whether to continue it or start a new one.
 
 <!--

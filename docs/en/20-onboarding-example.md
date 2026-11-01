@@ -107,7 +107,7 @@ sdlc backlog add "Task title at most 200 characters" --epic E1 --risk low \
   --accept "A title of exactly 200 characters is kept unchanged"
 ```
 
-`sdlc next` for Evan: `Start backlog item B4 — sdlc backlog start B4`. Evan's agent started the item with
+`sdlc next` for Evan: `B4: Start backlog item B4: …` with the command `$ sdlc backlog start B4` on the next line. Evan's agent started the item with
 `/sdlc-next` on the branch `feat/b4-length`; the change got the id `200`. From then on `sdlc explain` named, at every
 step, the stage, the open gate, who it waits for (by name from `roles.yaml`) and the command for that person.
 

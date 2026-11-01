@@ -1,6 +1,6 @@
 # OpenSpec gaps and upstream proposals
 
-Use this page to decide where an OpenSpec gap belongs. sdlc keeps OpenSpec as a pinned, unmodified dependency. It
+Use this page to decide where an OpenSpec gap belongs. sdlc keeps OpenSpec as an unmodified dependency on a tested version range. It
 handles process gaps around OpenSpec and sends core bugs upstream.
 
 Compatibility matters because OpenSpec changes quickly. A fork would need to keep up with its merge fixes.
@@ -86,7 +86,7 @@ These areas remain OpenSpec choices or separate product work.
 
 Follow these steps when considering an upstream change:
 
-1. Keep OpenSpec pinned (`^1.13.2`) and run the harness e2e tests (`npm test`) on every new version before upgrading.
+1. Keep OpenSpec at `^1.13.2` (the lockfile fixes the exact version) and run the harness e2e tests (`npm test`) on every new version before upgrading.
 2. Send the first three core gaps upstream as issues with a reproduction. Drafts can use this document and the tests
    `test/deltas-config.test.ts` and `test/integrations.test.ts`.
 3. When OpenSpec fixes a core gap, remove the corresponding safeguard if it duplicates the core check.

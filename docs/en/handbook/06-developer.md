@@ -63,7 +63,7 @@ what happened overnight. He turns on the status line.
    `tasklet` copy (the license text is shortened):
 
    ```text
-   SDLC harness (sdlc 0.14.4, license: community (...)): active changes in openspec/changes (run `sdlc status` for details).
+   SDLC harness (sdlc 0.30.0, license: community (...)): active changes in openspec/changes (run `sdlc status` for details).
    - fix-due-today: stage build; next (agent): Implement the approved plan: 3 of 3 task(s) remain.
    fix-due-today was handed back by Oliver <oliver@northwind.example>: Comparison fixed in src/tasks.js; run verify
    - inbox: add-due-dates, check ci-green: ok (once read: `sdlc inbox done 20261009T203152306Z-ci-green-26d8f8`)
@@ -355,7 +355,8 @@ Oliver knows the rules that deny in every mode, what each protects, and what to 
 
 ### Pitfalls
 
-- Hard rules deny in `warn` mode too. Only `plan-gate` and `mcp-stage` are process rules.
+- Hard rules deny in `warn` mode too. Only `plan-gate`, `mcp-stage`, `living-specs` and `change-not-created` are
+  process rules.
 - The secret patterns are fixed prefixes. A secret in an unusual format is not caught; keep a secret scanner in CI.
 - The `state-integrity` reason names `openspec/roles.yaml` and explains that only a person may change it.
 - A team member who wants to "just switch the hook off" is asking to change `enforcement.mode` in

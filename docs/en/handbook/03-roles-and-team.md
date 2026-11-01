@@ -257,14 +257,17 @@ they are about to approve before they approve it.
 
    ```text
    Approval preview: gate review of change add-due-dates (pending)
+   Digest: sha256:2bcdf7e424b84bc5164d500a53ae6a29460a5a1ee01f913d8b9c480cd579058f
    Artifacts:
      review  review.md
    Changed since the last approval: nothing
    Approvals: 0 of 1
+   Required roles: code-owner
+   Still missing: code-owner
    Open blocking findings: 0
    Verification: passed 2026-10-09T21:03:10.898Z, matches the current code
    You may approve it:
-   $ sdlc approve review --change add-due-dates
+   $ sdlc approve review --change add-due-dates --expect-digest sha256:2bcdf7e424b84bc5164d500a53ae6a29460a5a1ee01f913d8b9c480cd579058f
    ```
 
    When a gate has been approved before and the content changed since, the line "Changed since the last approval"
@@ -430,6 +433,8 @@ Give the project five role agents that know its rules. Accept them as a person:
    stages, tools, read-only or not) and a body that says how the role works. sdlc turns an **accepted** role into a
    subagent of Claude Code (`.claude/agents/sdlc-<role>.md`) and adds two blocks to it: where the role writes, and
    the facts of this project (verify commands, protected paths, people from `roles.yaml`, documents).
+   With `--team-mode solo`, init also installs five `sdlc-role-*` guidance skills, one per built-in role; these
+   roles grant no approval authority.
 
    | Role | Stages | Writes |
    |---|---|---|

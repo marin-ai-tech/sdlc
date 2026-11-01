@@ -26,10 +26,16 @@ In `openspec/sdlc.yaml` a project can name services that sdlc then contacts. By 
   project, the change id, the gate, the decision and the ids of the people from `roles.yaml`. Chat handles go only
   to a receiver set up with `chat`; the note of a rejection only to a receiver with `include_note: true`.
 - MCP servers that `sdlc context pull` reads.
-- Extension pack sources (git repositories or npm packages) that `sdlc team sync` fetches.
+- Extension pack sources (git repositories or npm packages) that `sdlc team sync` fetches, and the team registry.
+- A gate's judge tool, which receives the texts of the gate's artifacts.
+- MCP servers named in `verify.mcp` and release checks, and the GitHub issues server (`issues`), which receives
+  the import query and the archive comment.
 
-`sdlc mcp serve` serves the project's state to tools on your machine; with `--http` it listens on the network only
-when a person starts it, with a token.
+`sdlc task check-result` fetches the result branch from your `origin`. With a person's yes, the setup wizard installs
+missing tools from the npm registry.
+
+`sdlc mcp serve` serves the project's state to tools on your machine; it listens on the network only when started
+with `--http` and an `SDLC_MCP_TOKEN` of at least 16 characters.
 
 Each of these services handles the data under its own terms.
 

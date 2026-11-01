@@ -26,7 +26,7 @@ Implement the approved plan - Stage 3 (Build). Every step checks its own work be
    - run the most targeted check first (the test for this behavior), then the group's checks
    - fix the code until the checks pass - never skip, weaken or delete a test to get green
    - mark `- [ ]` -> `- [x]` only when the task's behavior is fully implemented and its check passed
-   - when the implementation departs from plan.md, update plan.md in the same commit
+   - when the implementation must depart from plan.md, stop and propose the plan.md change: a changed plan.md makes the plan approval stale, and the hook blocks code until the engineer approves the plan again; after approval only tick tasks.md boxes
    - end each commit message with the trailers `SDLC-Change: <id>` and `SDLC-Task: <n.m>` (the task number from tasks.md), so `sdlc trace <id>` links the task to its commit
    - present the literal `git add -- <paths>` and `git commit -F <message-file>` draft for that checkpoint, following
      the contract's quoting and project commit policy; a reserved commit waits for the person to run or confirm it

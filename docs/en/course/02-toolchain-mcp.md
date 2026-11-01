@@ -606,7 +606,7 @@ when a wait is overdue, without anyone asking `sdlc next`.
      "change": "add-due-dates",
      "gate": "intent",
      "at": "2026-10-09T20:26:09.312Z",
-     "sdlc": "0.14.4",
+     "sdlc": "0.30.0",
      "waitingFor": ["megan"]
    }
    ```
@@ -737,7 +737,7 @@ data. The assistant can read, but it cannot decide anything.
 ### Steps
 
 1. Explain the server. `sdlc mcp serve` speaks MCP over stdio by default. `sdlc init --mcp` registered it for the
-   project's tools in lesson 1.2. `sdlc mcp serve --http <host:port>` serves the same read-only tools
+   project's tools in lesson 1.2. `sdlc mcp serve --http <host:port>` serves the same tools
    over MCP Streamable HTTP at `/mcp` for a remote client. A bearer token is always required, also on localhost:
    set `SDLC_MCP_TOKEN` in the environment (at least 16 characters; never a flag). Without it the server does not
    start (`token_required`); a bad or missing token gets 401. Port `0` picks a free port; the URL is printed on
@@ -745,6 +745,8 @@ data. The assistant can read, but it cannot decide anything.
 
    | Tool | Answers like |
    |---|---|
+   | `task_export` | `sdlc task export --change <id> --json` |
+   | `board_list` | `sdlc board list --json` |
    | `status` | `sdlc status --json` |
    | `next` | `sdlc next --json` |
    | `instructions` | `sdlc instructions <artifact> --change <id> --json` |
@@ -756,14 +758,19 @@ data. The assistant can read, but it cannot decide anything.
    | `report` | `sdlc report --format json` |
    | `explain` | `sdlc explain --json` |
 
+   Stdio clients and the server token only read. Over HTTP, a client that presents an executor's token from
+   `openspec/executors.yaml` also gets the board tools `board_claim`, `board_heartbeat`, `board_release`,
+   `board_submit` and `board_bid`. Accepted plugins add their own tools, named `<plugin>__<tool>`. No decision is
+   a tool.
+
    Read-only resources: `sdlc://context/<file>`, `sdlc://spec/<capability>`, `sdlc://change/<id>/<artifact>` and
    `sdlc://doc/<path>`. State, configuration, the log and the inbox are never offered.
 
 2. Show a real connection. A small script lists the tools and calls `next` in `tasklet`:
 
    ```text
-   [sdlc mcp] serving C:\work\tasklet over stdio (version 0.14.4)
-   status, next, instructions, trace, audit, help, guide
+   [sdlc mcp] serving C:\work\tasklet over stdio (version 0.30.0)
+   task_export, board_list, status, next, instructions, trace, audit, help, guide, explain, health, report
    {"change":"add-due-dates","stage":"plan","stageTitle":"Plan (intent)","track":"full","next":{"actor":"human", …
    "message":"Megan (product-owner) must review and approve the intent gate (intent)." …
    ```

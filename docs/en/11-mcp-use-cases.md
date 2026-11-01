@@ -482,8 +482,8 @@ gates:
 - Delivery takes at most 5 seconds and never fails a command. An event that could not be sent waits in
   `.git/sdlc/outbox/` (never committed) and goes with the next command or `sdlc events flush`, which a CI job or a
   scheduler can run. `sdlc events list` shows what waits.
-- An event never carries an email, the text of a command, its output or a note. Hook decisions are sent only when a
-  pattern names them.
+- An event never carries an email, the text of a command or its output. A rejection or rework note is sent only to a
+  receiver with `include_note: true`. Hook decisions are sent only when a pattern names them.
 
 ### A ready message
 
@@ -502,7 +502,7 @@ events:
 
 - The text names the project, the change, the gate and the people by their names from `roles.yaml`, in the locale of
   the command.
-- It never carries an email, a note, a command or its output.
+- It never carries an email, a command or its output; a note is added only for a receiver with `include_note: true`.
 - sdlc builds the text when the event is queued, so an event that waits in the outbox reads the same when it is sent.
 
 ### Chat handles, the daily summary and issues

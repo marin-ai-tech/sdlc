@@ -25,6 +25,7 @@ class CheckLifecycle {
   private timedOut = false;
   private cancelled?: 'SIGINT' | 'SIGTERM';
   private cleanupFailed = false;
+  private outputClosed = false;
   private knownExit: number | null | undefined;
   private timer?: ReturnType<typeof setTimeout>;
   private cleanupTimer?: ReturnType<typeof setTimeout>;
@@ -81,6 +82,7 @@ class CheckLifecycle {
   }
 
   private closed(): void {
+    this.outputClosed = true;
     if (this.finished || this.stopping || !this.ready || this.knownExit === undefined) return;
     this.finish(this.knownExit);
   }
@@ -110,11 +112,31 @@ class CheckLifecycle {
       this.cleanupFailed = true;
       this.killHandle();
     };
+    const noteApplies = async () => {
+      if (this.timedOut || this.cancelled !== undefined || failureCode !== undefined) return true;
+      await this.outputCloses(PIPE_DRAIN_MS);
+      return !this.outputClosed;
+    };
     const cleanup = this.shell?.pid
-      ? cleanupCheckShell(this.shell, (chunk) => this.keep(chunk), onFailure) : Promise.resolve();
+      ? cleanupCheckShell(this.shell, (chunk) => this.keep(chunk), onFailure, noteApplies) : Promise.resolve();
     this.stopping = cleanup.finally(() => {
       this.closePipes();
       this.finish(failureCode ?? this.resultCode());
+    });
+  }
+
+  /** Resolves when the check's output has closed, or after `ms` at the latest. */
+  private outputCloses(ms: number): Promise<void> {
+    const child = this.prepared?.child;
+    if (this.outputClosed || !child) return Promise.resolve();
+    return new Promise((resolve) => {
+      const done = () => {
+        clearTimeout(timer);
+        child.off('close', done);
+        resolve();
+      };
+      const timer = setTimeout(done, ms);
+      child.once('close', done);
     });
   }
 
