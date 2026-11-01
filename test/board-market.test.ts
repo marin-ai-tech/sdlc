@@ -105,6 +105,20 @@ async function untilClosed(opened: CliResult): Promise<void> {
 }
 const events = (p: ReturnType<typeof project>, name: string) => p.log().filter((e) => e.event === name);
 
+function persisted(p: ReturnType<typeof project>) {
+  return ['board.json', 'log.jsonl'].map(file => fs.readFileSync(path.join(p.root, 'openspec/.sdlc', file)));
+}
+
+function assertFastestAwardOnce(p: ReturnType<typeof project>, claimed: CliResult) {
+  const awarded = events(p, 'task.awarded');
+  expect(awarded).toHaveLength(1);
+  expect(awarded[0]).toMatchObject({ task: '1.2', executor: 'swarm-b' });
+  expect(awarded[0].detail).toContain('fastest');
+  const claim = claimed.json<{ claim: { id: string } }>().claim;
+  expect(p.board(['heartbeat', '--claim', claim.id]).code).toBe(0);
+  expect(events(p, 'task.awarded')).toEqual(awarded);
+}
+
 describe('B119: an auction for a task', () => {
   it('bids are shown; when the window ends the fastest bid wins and the task is reserved for it', async () => {
     const p = project();
@@ -119,15 +133,17 @@ describe('B119: an auction for a task', () => {
     expect(code(p.board(['claim', '--change', 'add-farewell', '--task', '1.2', '--executor', 'swarm-a',
       '--agent', 'coder-1']))).toBe('task_auction');
     await untilClosed(opened);
+    const before = persisted(p);
     expect(p.status()).toMatchObject({ status: 'dispatched', executor: 'swarm-b' });
+    expect(p.status()).toMatchObject({ status: 'dispatched', executor: 'swarm-b' });
+    expect(persisted(p)).toEqual(before);
+    expect(events(p, 'task.awarded')).toEqual([]);
     expect(events(p, 'task.auction_opened')).toHaveLength(1);
     expect(events(p, 'task.bid').map((e) => e.executor)).toEqual(['swarm-a', 'swarm-b']);
-    const awarded = events(p, 'task.awarded');
-    expect(awarded).toHaveLength(1);
-    expect(awarded[0]).toMatchObject({ task: '1.2', executor: 'swarm-b' });
-    expect(awarded[0].detail).toContain('fastest');
-    expect(p.board(['claim', '--change', 'add-farewell', '--task', '1.2', '--executor', 'swarm-b',
-      '--agent', 'coder-9']).code).toBe(0);
+    const claimed = p.board(['claim', '--change', 'add-farewell', '--task', '1.2', '--executor', 'swarm-b',
+      '--agent', 'coder-9']);
+    expect(claimed.code).toBe(0);
+    assertFastestAwardOnce(p, claimed);
   }, 240000);
 
   it('a new bid of the same executor replaces its old one', () => {
@@ -138,25 +154,26 @@ describe('B119: an auction for a task', () => {
     expect(p.status()?.bids?.map((b) => [b.executor, b.minutes])).toEqual([['swarm-a', 10]]);
   }, 240000);
 
-  it('the rule in sdlc.yaml: cheapest picks the least cost, first the earliest bid', async () => {
-    const cheap = project({ rule: 'cheapest' });
-    const cheapOpened = cheap.auction(['--window', WINDOW]);
-    expect(cheapOpened.code).toBe(0);
-    expect(cheap.bid('swarm-a', '30', ['--cost', '5']).code).toBe(0);
-    expect(cheap.bid('swarm-b', '20', ['--cost', '9']).code).toBe(0);
-    await untilClosed(cheapOpened);
-    const first = project({ rule: 'first' });
-    const firstOpened = first.auction(['--window', WINDOW]);
-    expect(firstOpened.code).toBe(0);
-    expect(first.bid('swarm-a', '30').code).toBe(0);
-    expect(first.bid('swarm-b', '20').code).toBe(0);
-    await untilClosed(firstOpened);
-    expect(cheap.status()).toMatchObject({ status: 'dispatched', executor: 'swarm-a' });
-    expect(first.status()).toMatchObject({ status: 'dispatched', executor: 'swarm-a' });
+  it.each(['cheapest', 'first'])('the rule in sdlc.yaml: %s picks its own winner', async rule => {
+    const p = project({ rule });
+    const opened = p.auction(['--window', WINDOW]);
+    expect(opened.code).toBe(0);
+    expect(p.bid('swarm-a', '30', rule === 'cheapest' ? ['--cost', '5'] : []).code).toBe(0);
+    expect(p.bid('swarm-b', '20', rule === 'cheapest' ? ['--cost', '9'] : []).code).toBe(0);
+    await untilClosed(opened);
+    expect(p.status()).toMatchObject({ status: 'dispatched', executor: 'swarm-a' });
   }, 240000);
 
-  it('a person awards at once, and may reassign after an automatic award', async () => {
+  it.each(['early', 'reassign'])('a person awards: %s', async mode => {
     const p = project();
+    if (mode === 'early') {
+      expect(p.auction().code).toBe(0);
+      expect(p.bid('swarm-a', '30').code).toBe(0);
+      expect(p.award('swarm-b').code).toBe(0);
+      expect(p.status()).toMatchObject({ status: 'dispatched', executor: 'swarm-b' });
+      expect(events(p, 'task.awarded')).toHaveLength(1);
+      return;
+    }
     const opened = p.auction(['--window', WINDOW]);
     expect(opened.code).toBe(0);
     expect(p.bid('swarm-a', '30').code).toBe(0);
@@ -166,20 +183,25 @@ describe('B119: an auction for a task', () => {
     const reassigned = p.award('swarm-a');
     expect(reassigned.code, reassigned.stdout + reassigned.stderr).toBe(0);
     expect(p.status()).toMatchObject({ status: 'dispatched', executor: 'swarm-a' });
-    const early = project();
-    expect(early.auction().code).toBe(0);
-    expect(early.bid('swarm-a', '30').code).toBe(0);
-    expect(early.award('swarm-b').code).toBe(0);
-    expect(early.status()).toMatchObject({ status: 'dispatched', executor: 'swarm-b' });
-    expect(events(early, 'task.awarded')).toHaveLength(1);
   }, 240000);
 
   it('an auction without bids closes and the task is open again, once logged', async () => {
     const p = project();
     expect(p.auction(['--window', '1']).code).toBe(0);
     await pause(1800);
+    const before = persisted(p);
     expect(p.status()?.status).toBe('open');
     expect(p.status()?.status).toBe('open');
+    expect(persisted(p)).toEqual(before);
+    expect(events(p, 'task.auction_expired')).toEqual([]);
+    expect(events(p, 'task.awarded')).toEqual([]);
+    const claimed = p.board(['claim', '--change', 'add-farewell', '--task', '1.2', '--executor', 'swarm-a',
+      '--agent', 'coder-1']);
+    expect(claimed.code).toBe(0);
+    expect(events(p, 'task.auction_expired')).toHaveLength(1);
+    expect(events(p, 'task.awarded')).toEqual([]);
+    const claim = claimed.json<{ claim: { id: string } }>().claim;
+    expect(p.board(['heartbeat', '--claim', claim.id]).code).toBe(0);
     expect(events(p, 'task.auction_expired')).toHaveLength(1);
     expect(events(p, 'task.awarded')).toEqual([]);
   }, 240000);

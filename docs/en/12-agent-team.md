@@ -30,6 +30,23 @@ flowchart LR
 
 ## 12.1. What a role is
 
+For a solo project, explicitly choose `sdlc init --team-mode solo`. The wizard also offers this execution profile.
+`team.mode: solo|team` is additive: leaving it absent preserves the existing team behavior. It changes execution
+guidance only; `openspec/roles.yaml`, human membership, signing, approval separation and registry acceptance stay
+under their existing rules.
+
+Solo mode installs five discoverable bundled skills: `sdlc-role-analyst`, `sdlc-role-architect`,
+`sdlc-role-developer`, `sdlc-role-tester` and `sdlc-role-reviewer`. They use the selected tool's normal skill folder:
+`.claude/skills`, `.opencode/skills`, `.cursor/skills`, `.agents/skills`, `.qwen/skills` or `.gigacode/skills`.
+When Claude Code and OpenCode are both selected, OpenCode reads the Claude skill copy. User-edited generated
+skills are preserved under the usual manifest rules.
+
+Each workflow names one active execution role: analyst for intent/spec, developer for plan/build, tester for
+verify and reviewer for review. Announce a deliberate switch to architect for architectural work. The `next`
+hint carries the role as guidance, never as permission to approve, change protected state or commit against
+project policy. Editable answer and commit drafts retain literal arguments and required change/task trailers;
+where a person reserves commit execution, that person runs or confirms the displayed commands.
+
 A role lives in `docs/agents/<role>.md`. The built-in roles are:
 
 - analyst;

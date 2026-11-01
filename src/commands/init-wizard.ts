@@ -26,8 +26,9 @@
  *   the defaults (or all found and indexed) nothing extra is asked.
  *   In setup.ts the installs run after the settings are written, through `deps.installer` (default
  *   defaultInstaller): each chosen install, then codegraphIndexCommand(tools) in the root when `index` is chosen. A failed
- *   command prints a warning with the command to run by hand; init still succeeds. Non-interactive runs never
- *   probe or install. `InitDeps` gains `probe?: Probe` and `installer?: Installer`.
+ *   command prints a warning with the command to run by hand; init still succeeds. Selected OpenCode is probed
+ *   after the final tool choice, offered at major 1 with default no, and its version or next step is printed.
+ *   Non-interactive people get presence guidance only; agent sessions never probe and neither mode installs.
  * - AI-ready layout (src/commands/init-layout.ts): with `defaults.folder`, right after the welcome an empty folder
  *   is offered `git init` (only without git) and gets the layout scaffolded; an existing one sees the diagnosis
  *   and chooses worktree | adapt | none (worktree asks for the folder). Without it nothing changes.
@@ -39,6 +40,7 @@ import type { EnforcementMode } from '../core/config.js';
 import type { FolderDescription } from '../core/init-layout.js';
 import {
   detectDependencies,
+  selectedDependencies,
   installCommand,
   type DependencyId,
   type DependencyStatus,
@@ -53,6 +55,7 @@ import { DEFAULT_TOOLS, TOOL_IDS, type ToolId } from '../integrations/types.js';
 import type { InitOptions } from './setup.js';
 import { t } from '../core/i18n.js';
 import { askLayoutChoices, layoutSummaryLines, type LayoutChoices } from './init-layout.js';
+import type { ExecutionMode } from '../team/team-config.js';
 
 export interface InitChoices extends Partial<LayoutChoices> {
   tools: ToolId[];
@@ -68,6 +71,7 @@ export interface InitChoices extends Partial<LayoutChoices> {
   index: boolean;
   /** Register `sdlc mcp serve` (B13); absent when the question was not asked. */
   mcp?: boolean;
+  teamMode?: ExecutionMode;
 }
 
 /** Where the questions come from; the default implementation uses @inquirer/prompts. */
@@ -102,6 +106,9 @@ export interface InitDefaults {
   folder?: FolderDescription;
   /** Current `mcp.serve` (default no); absent = no MCP question. */
   mcp?: boolean;
+  teamMode?: ExecutionMode;
+  detected?: ToolId[];
+  selectedDependencies?: (tools: ToolId[]) => DependencyStatus[];
 }
 
 function modeChoiceList(): Array<{ value: EnforcementMode; name: string }> {
@@ -146,13 +153,14 @@ export function shouldPrompt(opts: InitOptions, io: TerminalState): boolean {
   if (opts.layout !== undefined || opts.worktree !== undefined || opts.gitInit) return false;
   if (opts.mcp) return false;
   if (opts.roles) return false;
+  if (opts.teamMode !== undefined) return false;
   return true;
 }
 
 function toolChoices(defaults: InitDefaults): Array<{ value: ToolId; name: string; checked: boolean }> {
   return TOOL_IDS.map((id) => ({
     value: id,
-    name: ADAPTERS[id].name,
+    name: defaults.detected?.includes(id) ? t('init.detectedTool', { name: ADAPTERS[id].name }) : ADAPTERS[id].name,
     checked: defaults.tools.includes(id),
   }));
 }
@@ -184,6 +192,7 @@ function formatSummary(choices: InitChoices): string {
     t('init.summary.install', { value: install }),
     t('init.summary.index', { value: yn(choices.index) }),
     ...(choices.mcp === undefined ? [] : [t('init.summary.mcp', { value: yn(choices.mcp) })]),
+    ...(choices.teamMode === undefined ? [] : [t('init.summary.teamMode', { value: choices.teamMode })]),
     ...layoutSummaryLines(choices),
   ].join('\n');
 }
@@ -197,15 +206,20 @@ async function askMcp(prompter: Prompter, defaults: InitDefaults): Promise<{ mcp
 async function askDependencyChoices(
   prompter: Prompter,
   defaults: InitDefaults,
+  tools: ToolId[],
 ): Promise<{ install: DependencyId[]; index: boolean }> {
   const install: DependencyId[] = [];
   let index = false;
-  const deps = defaults.dependencies;
-  if (!deps) return { install, index };
+  const deps = [...(defaults.dependencies ?? []), ...(defaults.selectedDependencies?.(tools) ?? [])]
+    .filter((dep) => dep.id !== 'opencode' || tools.includes('opencode'));
   for (const dep of deps) {
-    if (dep.found) continue;
+    if (dep.found) {
+      if (dep.id === 'opencode') prompter.say(dependencyMessage(dep));
+      continue;
+    }
+    if (dep.id === 'opencode') prompter.say(dependencyMessage(dep));
     const message = t('init.installDep', { name: dep.name, command: dep.install.join(' ') });
-    if (await prompter.confirm(message, true)) install.push(dep.id);
+    if (await prompter.confirm(message, dep.id !== 'opencode')) install.push(dep.id);
   }
   const codegraph = deps.find((d) => d.id === 'codegraph');
   const hasCodegraph = Boolean(codegraph?.found) || install.includes('codegraph');
@@ -216,6 +230,18 @@ async function askDependencyChoices(
   return { install, index };
 }
 
+export function dependencyMessage(dep: DependencyStatus): string {
+  return dep.found
+    ? t('init.depFound', { name: dep.name, version: dep.version ?? 'unknown' })
+    : t('init.depMissing', { name: dep.name, command: dep.install.join(' ') });
+}
+
+async function askTeamMode(prompter: Prompter, defaults: InitDefaults): Promise<{ teamMode?: ExecutionMode }> {
+  if (defaults.teamMode === undefined) return {};
+  const solo = await prompter.confirm(t('init.soloProfile'), defaults.teamMode === 'solo');
+  return { teamMode: solo ? 'solo' : 'team' };
+}
+
 export async function askInitChoices(
   prompter: Prompter,
   defaults: InitDefaults
@@ -224,7 +250,7 @@ export async function askInitChoices(
     prompter.say(welcomeText());
     const layout = defaults.folder ? await askLayoutChoices(prompter, defaults.folder) : {};
     const tools = await prompter.checkbox(t('init.tools'), toolChoices(defaults));
-    const depChoices = await askDependencyChoices(prompter, defaults);
+    const depChoices = await askDependencyChoices(prompter, defaults, tools);
     const mode = await prompter.select(t('init.mode'), modeChoices(defaults), defaults.mode);
     let statusline = false;
     if (tools.includes('claude')) {
@@ -247,6 +273,7 @@ export async function askInitChoices(
       index: depChoices.index,
       ...layout,
       ...(await askMcp(prompter, defaults)),
+      ...(await askTeamMode(prompter, defaults)),
     };
     prompter.say(formatSummary(choices));
     const ok = await prompter.confirm(t('init.write'), true);
@@ -270,6 +297,7 @@ export function initDefaults(root: string, detected: ToolId[], probe?: Probe): I
       opsx: false,
       language: '',
       mcp: config.mcp?.serve ?? false,
+      teamMode: config.team?.mode ?? 'team',
     };
   } else {
     base = {
@@ -279,9 +307,14 @@ export function initDefaults(root: string, detected: ToolId[], probe?: Probe): I
       opsx: false,
       language: '',
       mcp: false,
+      teamMode: 'team',
     };
   }
-  if (probe) base.dependencies = detectDependencies(root, probe);
+  base.detected = detected;
+  if (probe) {
+    base.dependencies = detectDependencies(root, probe);
+    base.selectedDependencies = (tools) => selectedDependencies(root, tools, probe);
+  }
   return base;
 }
 

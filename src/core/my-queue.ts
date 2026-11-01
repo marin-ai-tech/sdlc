@@ -11,6 +11,7 @@ import { gitIdentity } from './git.js';
 import { approveCli, sharedFingerprint, type LifecycleView } from './lifecycle.js';
 import { evaluateEach, type ChangeEvaluationError } from './evaluate-each.js';
 import { personByEmail, readRolesFile } from './roles.js';
+import { withCliPrefix } from './suggested-command.js';
 
 export interface QueueItem {
   change: string;
@@ -51,7 +52,8 @@ export function myQueue(scope: QueueScope): MyQueue {
   const errorField = errors.length > 0 ? { errors } : {};
   if (roles && !person) return { me, items: [], anyone: false, reason: 'not_in_roles', ...errorField };
   const items = evaluated
-    .flatMap(({ view }) => waitingItem(view, person))
+    .flatMap(({ view }) => waitingItem(view, person).map(item => ({ ...item,
+      cli: withCliPrefix(item.cli, scope.config.cli) })))
     .sort((a, b) => (a.change < b.change ? -1 : a.change > b.change ? 1 : 0));
   return { me, items, anyone: !roles, ...errorField };
 }

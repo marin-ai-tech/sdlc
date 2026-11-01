@@ -29,10 +29,9 @@ export function cliEntry(): string {
  */
 export function runCli(args: string[], cwd: string, entryOrCaller: string | CliCallerContext = cliEntry()): Promise<CliRun> {
   const entry = typeof entryOrCaller === 'string' ? entryOrCaller : cliEntry();
-  const caller = typeof entryOrCaller === 'object' ? entryOrCaller : undefined;
   const options = {
     cwd,
-    env: caller ? { ...process.env, SDLC_MCP_ORIGIN: '1', SDLC_MCP_EXECUTOR: caller.executor ?? '' } : process.env,
+    env: process.env,
     encoding: 'utf8' as const,
     timeout: CHILD_TIMEOUT_MS,
     maxBuffer: MAX_OUTPUT_BYTES,

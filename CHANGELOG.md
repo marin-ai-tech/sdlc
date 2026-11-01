@@ -2,6 +2,78 @@
 
 All notable changes to sdlc. Versions follow [Semantic Versioning](https://semver.org/); while the major version is 0, a minor version may change behavior.
 
+## 0.30.0 — 2026-11-01
+
+Field feedback and hardening: recovery after crashes, stricter enforcement of shell commands, clearer setup, and
+reliable verification on Windows and POSIX.
+
+### Added
+- `sdlc board recover --expect-owner sha256:<64-hex>`: a person recovers a board writer that has stopped, after checking
+  the complete ownership digest that `sdlc doctor` reports. Refused to agents and over MCP.
+- `sdlc init --team-mode solo|team` (also offered by the wizard): the solo profile installs five execution-role
+  skills (`sdlc-role-analyst`, `-architect`, `-developer`, `-tester`, `-reviewer`) and names the active role in each
+  workflow. Roles are guidance only; signing roles, approval separation and `roles.yaml` are unchanged. Without
+  `team.mode` the existing behaviour stays.
+- Epic size is remembered: `sdlc backlog epic add|edit --granularity package|feature|small`; the backlog workflow
+  reuses the owner's choice instead of asking again.
+- `sdlc init` offers to install OpenCode 1 when it is selected and missing, only after a yes; another installed
+  OpenCode major is reported and never replaced.
+- `sdlc doctor` names stuck log, board and plugin locks with their owner, pending plugin events (count, bytes,
+  oldest), and malformed persisted decisions with their change, gate and position.
+- When a step needs a person's answer or commit, the agent prints an editable literal draft the person runs; the
+  agent never submits it.
+- CI runs the full suite on native Windows (Node 24) next to Linux (Node 20, 22, 24).
+
+### Changed
+- **Crash recovery.** Log, board and plugin writers record a process-instance identity. A lock left by a dead or
+  provably different process is reclaimed by the next writer; an abandoned partial lock after 120 seconds. A lock
+  held by a live or unknown owner is never taken over by age. This resolves the 0.29.0 known limit on Linux and
+  Windows.
+- The local hook-log queue keeps lines it cannot parse byte-for-byte; a failed log append leaves a diagnostic and
+  never changes the hook's decision.
+- **Shell enforcement.** Hooks read the settings of the project that actually contains the edited path, protect
+  the configured launcher, and interpret shell words (quoting, wrappers, interpreters, copies of protected state,
+  parent-relative paths) within stated bounds. Quoted attempts at person-only commands are refused.
+- **Approvals.** Malformed persisted decisions keep their original bytes through unrelated writes, drop and
+  archive; a decision on a malformed gate is refused before any state, log or checkpoint change. Approval digests
+  survive Git filters and CRLF conversion. A replacement signature explains what it replaced. Text gate snapshots
+  are framed, show terminal control characters and print the fingerprint and verification identities.
+- One configured CLI prefix (`cli:` in `openspec/sdlc.yaml`) is used in every hint, preview and personal queue.
+- `sdlc init` sets up only the tools in the final selection: a detected `CLAUDE.md` or `AGENTS.md` no longer adds
+  its tool to an explicit choice. Generated plugin rules for Codex and Qwen are refreshed after `plugins accept`
+  or `revoke`, without touching user-owned entries.
+- **Verification.** On Windows, PowerShell is resolved to an absolute path and wrapper start-up has its own
+  30-second bound before the command timeout starts; start-up failures are named and never pass. On POSIX,
+  `SIGINT` and `SIGTERM` reach the owned process group, cancellation stops the remaining checks, and a shell's own
+  exit code is kept when a background process still holds the output.
+- **Plugins.** Queue, start-up, guest execution and cleanup have separate time limits, so worker start-up no
+  longer eats the 1-second hook budget. Receipts keep only the reply; older receipts stay readable. Pending events
+  are bounded at 1024 records or 1 MiB and refuse with `plugin_backpressure` before any change. On POSIX a commit
+  also flushes its directory. Guests see only their own `ext` namespace.
+- **MCP.** Caller identity comes from the actual token and served project; environment variables cannot set it.
+- Harness: credential preflight before any provider call, realistic client deadlines, and failures of one
+  candidate or validator no longer discard the others.
+
+### Compatibility
+- Callers that relied on an environment-only MCP identity, or on quoting a person-only command past the hook, are
+  now refused.
+- An `openspec/sdlc.yaml` that exists but cannot be read now fails the commands that load it, and `sdlc doctor`
+  reports an error; before, the defaults were used. Only a missing file keeps the defaults.
+- `sdlc task check-result` reads both sides of a rename and matches forbidden paths relative to the project in a
+  nested project, so a result that moves a locked test or protected file out of place is now refused.
+- Text gate snapshots gain framing and identity lines; tools should read `--json`, whose fields are unchanged.
+- Locks written by 0.29.0 are read as legacy owners and protected while a process with their PID is alive. Stop
+  all sdlc writers of a checkout before upgrading it.
+
+### Known limits
+- Where the operating system gives no process birth identity (for example macOS), and for locks written by
+  0.29.0, a lock naming a live process id, even one reused by another program, stays protected. Stop all sdlc
+  writers of the checkout, then follow `sdlc doctor`.
+- A POSIX process that detached and was reparented outside the owned process group before cleanup may survive
+  verification cleanup; an unhandled `SIGKILL` of sdlc has no cleanup guarantee.
+- Live use of the Harness Runtime against a provider is not yet accepted: it needs owner access, a region, a
+  price and credentials.
+
 ## 0.29.0 — 2026-10-30
 
 ### Added

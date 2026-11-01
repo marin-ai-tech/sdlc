@@ -35,6 +35,21 @@ sdlc verify --check --change add-export   # spec scenarios with no behavioural e
 Fix the code, not the test, and run `sdlc verify` again. A required failing check fails the gate. In a bug fix the tests
 are locked (`sdlc guide bugfix`).
 
+## Process requirements and cancellation
+
+Windows checks require Windows PowerShell with `Add-Type` and permission to create a kill-on-close Job Object.
+The harness resolves PowerShell to an absolute path. Wrapper initialization has a separate 30000 ms bound;
+the command timeout starts after the wrapper starts the real command. Startup failures identify missing
+PowerShell, execution policy, Constrained Language or Add-Type/job failure; an unrun command cannot pass.
+
+POSIX cleanup requires `ps -A -o pid=,ppid=,pgid=`. Handled `SIGINT` and `SIGTERM` are forwarded to the owned
+process group, followed by bounded cleanup; cancellation does not start later checks. Known frozen descendants
+are killed or resumed. A known shell exit retains its own code after bounded process and pipe cleanup, so
+lingering pipes alone never create a timeout. A required cleanup failure still fails verification.
+
+An already detached POSIX descendant reparented outside the owned group before cleanup may survive.
+Reparenting-proof containment and protection against an unhandled `SIGKILL` are not provided.
+
 ## No checks configured
 
 `sdlc verify` refuses. Add the project's build, test and lint commands under `verify.commands` in

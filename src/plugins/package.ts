@@ -81,7 +81,7 @@ export function capturePackage(root: string, source: string): PackageSnapshot {
   if (JSON.stringify(names) !== JSON.stringify(inventory(dir))) fail('plugin_changed', 'Package inventory changed');
   const raw = files.get('sdlc-plugin.json');
   if (!raw) fail('plugin_manifest', 'Package has no sdlc-plugin.json');
-  const manifest = parseManifest(parseJson(raw, LIMITS.manifestBytes));
+  const manifest = parseManifest(parseJson(raw, LIMITS.manifestBytes, LIMITS.depth + 8));
   if (!safeRelative(manifest.entry) || !files.has(manifest.entry)) fail('plugin_manifest', 'Missing Wasm entry');
   if (files.get(manifest.entry)!.length > LIMITS.moduleBytes) fail('plugin_limit', 'Wasm module is too large');
   const records = names.map((name) => ({ path: name, size: files.get(name)!.length, sha256: hash(files.get(name)!) }));

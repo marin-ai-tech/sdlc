@@ -1,25 +1,21 @@
 import * as fs from 'node:fs';
-import { object, text, fail } from './api.js';
-import { readStored, storagePath, withActivation, withPluginLock } from './activation.js';
+import { fail } from './api.js';
+import { storagePath, withActivation, withPluginLock } from './activation.js';
 import { assertPluginHuman, readRegistry } from './trust.js';
 import { pluginName } from './manifest.js';
 import { readStore, requestTime, requestTimestamp, withStore, type PluginStore } from './store.js';
 import { recoverLogWriter } from '../core/log-write.js';
 import { withRecoveryEntry } from './recovery-lock.js';
+import { recoverWriterLock } from '../core/writer-lock.js';
 
 function releaseDead(root: string, relative: string): void {
-  const lock = readStored(root, relative);
-  if (lock === undefined) return;
-  const value = object(lock, 'writer lock');
-  if (!Number.isSafeInteger(value.pid) || (value.pid as number) < 1) fail('plugin_store', 'Malformed writer owner');
-  const nonce = text(value.nonce, 'lock nonce');
-  try { process.kill(value.pid as number, 0); fail('plugin_busy', 'Writer is still active'); }
+  try { recoverWriterLock(storagePath(root, relative, true)); }
   catch (error) {
-    if ((error as NodeJS.ErrnoException).code !== 'ESRCH') throw error;
+    if (error && typeof error === 'object' && 'code' in error && error.code === 'writer_locked') {
+      fail('plugin_busy', 'Writer ownership is protected; run doctor before recovery');
+    }
+    throw error;
   }
-  const current = object(readStored(root, relative), 'writer lock');
-  if (current.pid !== value.pid || current.nonce !== nonce) fail('plugin_busy', 'Lock owner changed');
-  fs.unlinkSync(storagePath(root, relative));
 }
 
 function temporaryFiles(root: string, name: string) {

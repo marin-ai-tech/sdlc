@@ -4,9 +4,23 @@ $ErrorActionPreference = 'Stop'
 $taskJobSource = @'
 using System;
 using System.ComponentModel;
+using System.Diagnostics;
 using System.Runtime.InteropServices;
+using System.Threading.Tasks;
 
 public static class SDLCVerifyJob {
+    static Task output;
+    static Task error;
+
+    public static void Drain(Process command) {
+        output = command.StandardOutput.BaseStream.CopyToAsync(Console.OpenStandardOutput());
+        error = command.StandardError.BaseStream.CopyToAsync(Console.OpenStandardError());
+    }
+
+    public static void Flush() {
+        Task.WaitAll(new Task[] { output, error }, 250);
+    }
+
     [StructLayout(LayoutKind.Sequential)]
     struct Limits {
         public long ProcessTime, JobTime;
@@ -54,11 +68,40 @@ public static class SDLCVerifyJob {
 '@
 
 try {
+    $taskReadyFile = $env:SDLC_VERIFY_READY_FILE
+    $taskReadyNonce = $env:SDLC_VERIFY_READY_NONCE
+    Remove-Item -LiteralPath Env:SDLC_VERIFY_READY_FILE -ErrorAction SilentlyContinue
+    Remove-Item -LiteralPath Env:SDLC_VERIFY_READY_NONCE -ErrorAction SilentlyContinue
     Add-Type -TypeDefinition $taskJobSource
     [SDLCVerifyJob]::Attach()
-    & $env:ComSpec /d /s /c $env:SDLC_VERIFY_COMMAND
-    exit $LASTEXITCODE
+    $taskStart = New-Object System.Diagnostics.ProcessStartInfo
+    $taskStart.FileName = Join-Path $env:SystemRoot 'System32\cmd.exe'
+    $taskStart.Arguments = '/d /s /c "' + $env:SDLC_VERIFY_COMMAND + '"'
+    $taskStart.UseShellExecute = $false
+    $taskStart.CreateNoWindow = $true
+    $taskStart.RedirectStandardInput = $true
+    $taskStart.RedirectStandardOutput = $true
+    $taskStart.RedirectStandardError = $true
+    $taskStart.WorkingDirectory = (Get-Location).ProviderPath
+    $taskCommand = New-Object System.Diagnostics.Process
+    $taskCommand.StartInfo = $taskStart
+    if (-not $taskCommand.Start()) {
+        throw 'The verification command could not start.'
+    }
+    $taskCommand.StandardInput.Close()
+    [SDLCVerifyJob]::Drain($taskCommand)
+    if ($taskReadyFile -and $taskReadyNonce) {
+        $taskReady = @{ version = 1; nonce = $taskReadyNonce; wrapper = $PID; started = $true }
+        $taskReadyText = ConvertTo-Json -InputObject $taskReady -Compress
+        $taskUtf8 = New-Object System.Text.UTF8Encoding($false)
+        [System.IO.File]::WriteAllText($taskReadyFile + '.tmp', $taskReadyText, $taskUtf8)
+        [System.IO.File]::Move($taskReadyFile + '.tmp', $taskReadyFile)
+    }
+    $taskCommand.WaitForExit()
+    [SDLCVerifyJob]::Flush()
+    exit $taskCommand.ExitCode
 } catch {
     [Console]::Error.WriteLine('The verification process job could not run.')
+    [Console]::Error.WriteLine('Windows verification startup: ' + $_.Exception.Message)
     exit 1
 }

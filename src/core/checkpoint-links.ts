@@ -38,7 +38,7 @@ interface Entry { mode: string; oid: string }
 
 /** Resolve links only in the immutable tree, including absolute links whose targets remain in this project. */
 export function checkpointReader(top: string, tree: string, root: string, givenRoot: string):
-  (relative: string, filtered?: boolean) => string | undefined {
+  (relative: string, filtered?: boolean | 'converted') => string | undefined {
   const entries = new Map<string, Entry | undefined>();
   const blobs = new Map<string, string | undefined>();
   const filteredBlobs = new Map<string, string | undefined>();
@@ -67,7 +67,7 @@ export function checkpointReader(top: string, tree: string, root: string, givenR
     }
     return filteredBlobs.get(key);
   };
-  return (relative, filtered = false) => {
+  return (relative, filtered: boolean | 'converted' = false) => {
     let current = path.resolve(top, relative);
     const seen = new Set<string>();
     for (let hop = 0; hop < 40; hop++) {
@@ -91,6 +91,7 @@ export function checkpointReader(top: string, tree: string, root: string, givenR
         }
         if (depth === parts.length) {
           if (!['100644', '100755'].includes(item.mode)) return undefined;
+          if (filtered === 'converted') return convertedIdent(top, item.oid, prefix, blob(item.oid));
           return filtered ? filteredBlob(item.oid, prefix) : blob(item.oid);
         }
         if (item.mode !== '040000') return undefined;
@@ -99,4 +100,18 @@ export function checkpointReader(top: string, tree: string, root: string, givenR
     }
     return undefined;
   };
+}
+
+/** Reapply Git's actual CRLF clean conversion before ident expansion, retaining the immutable raw tree. */
+function convertedIdent(top: string, oid: string, relative: string, content: string | undefined): string | undefined {
+  if (content === undefined) return undefined;
+  const run = (args: string[], input?: string) => spawnSync('git', args,
+    { cwd: top, encoding: 'utf8', input, maxBuffer: 64 * 1024 * 1024 });
+  const autocrlf = run(['config', '--bool', 'core.autocrlf']);
+  const ident = run(['check-attr', '-z', 'ident', '--', relative]);
+  if (autocrlf.stdout.trim() !== 'true' || ident.stdout.split('\0')[2] !== 'set') return undefined;
+  const cleaned = run(['hash-object', '-w', `--path=${relative}`, '--stdin'], content);
+  if (cleaned.status !== 0 || cleaned.stdout.trim() === oid) return undefined;
+  const filtered = run(['cat-file', '--filters', `--path=${relative}`, cleaned.stdout.trim()]);
+  return filtered.status === 0 ? filtered.stdout : undefined;
 }

@@ -185,7 +185,7 @@ export async function verifyCommand(opts: VerifyOptions): Promise<void> {
         evidence: file, harness: ctx.stamp, ...(next ? { next } : {}) });
     } else {
       for (const check of run.checks) {
-        const ok = check.exit_code === 0;
+        const ok = check.exit_code === 0 && !check.cleanup_failed && !check.cancelled;
         const timeout = check.timed_out ? c.red(t('verify.timedOut')) : '';
         line(`${ok ? c.green('✓') : c.red('✗')} ${check.name} ${c.dim(`(${(check.duration_ms / 1000).toFixed(1)}s)`)}${timeout}`);
         if (!ok && check.output) line(c.dim(check.output.split('\n').map((l) => `    ${l}`).join('\n')));

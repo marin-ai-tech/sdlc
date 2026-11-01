@@ -4,6 +4,17 @@ import { isFile } from './fs-utils.js';
 import { parseApproval } from './approval-records.js';
 import { recordObject } from './record-values.js';
 import { readYamlObject } from './yaml-io.js';
+import { malformedGateShape } from './opaque-decisions.js';
+
+export function malformedDecisionShapes(ref: ChangeRef) {
+  const file = statePath(ref.dir);
+  if (!isFile(file)) return [];
+  const gates = recordObject(readYamlObject(file)?.gates) ?? {};
+  return Object.entries(gates).flatMap(([gate, value]) => {
+    const shape = malformedGateShape(value);
+    return shape ? [{ change: ref.id, gate, shape }] : [];
+  });
+}
 
 export interface MalformedApproval {
   change: string;

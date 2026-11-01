@@ -1,6 +1,6 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { beforeAll, describe, expect, it } from 'vitest';
+import { beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { stringify, parse } from 'yaml';
 import { claimTask } from '../dist/core/board.js';
 import { bidTask } from '../dist/core/board-market.js';
@@ -208,16 +208,28 @@ describe('Extension transports through real CLI and core storage', () => {
     expect(JSON.stringify(stored.requests)).not.toContain('"ext"');
   });
 
-  it('keeps independently declared bidExt out of a winning task contract', () => {
-    const p = fixture();
-    p.auction();
-    p.ok(p.bid(BID_EXT));
-    p.ok(['board', 'award', '--change', CHANGE, '--task', '1.2', '--executor', 'mesh-a']);
-    const awarded = p.ok(p.claim(undefined, 'transport:claim:awarded', 'mesh-a', '1.2'));
-    expect(awarded.item).not.toHaveProperty('ext');
-    expect(awarded.claim).not.toHaveProperty('ext');
-    const explicit = p.ok(p.claim(TASK_EXT, 'transport:claim:explicit'));
-    expect(explicit.item.ext).toEqual(TASK_EXT);
+  describe('an independently extended winning bid', () => {
+    let p: ReturnType<typeof fixture>;
+    beforeEach(function openAuctionAndPlaceBid({ task }) {
+      const started = performance.now();
+      p = fixture();
+      p.auction();
+      p.ok(p.bid(BID_EXT));
+      task.meta.winningBidPreparationMs = performance.now() - started;
+    });
+    beforeEach(function awardWinningBid({ task }) {
+      const started = performance.now();
+      p.ok(['board', 'award', '--change', CHANGE, '--task', '1.2', '--executor', 'mesh-a']);
+      task.meta.winningBidAwardMs = performance.now() - started;
+    });
+
+    it('keeps independently declared bidExt out of a winning task contract', () => {
+      const awarded = p.ok(p.claim(undefined, 'transport:claim:awarded', 'mesh-a', '1.2'));
+      expect(awarded.item).not.toHaveProperty('ext');
+      expect(awarded.claim).not.toHaveProperty('ext');
+      const explicit = p.ok(p.claim(TASK_EXT, 'transport:claim:explicit'));
+      expect(explicit.item.ext).toEqual(TASK_EXT);
+    });
   });
 });
 

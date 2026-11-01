@@ -527,6 +527,20 @@ Traceability and audit](14-traceability.md).
 An unignored folder inside the project changes the working tree. `sdlc audit --export` warns that active changes'
 verification becomes stale. Run `sdlc verify` again.
 
+### Verification process requirements
+
+Windows checks need Windows PowerShell, `Add-Type` and permission to create a kill-on-close Job Object.
+PowerShell is resolved absolutely. Initialization has a separate 30000 ms startup bound; the command's timeout
+starts when the wrapper starts the actual command. Missing PowerShell, blocked execution policy, Constrained
+Language and Add-Type/job failures are diagnosed; an unrun command never passes.
+
+POSIX cleanup needs `ps -A -o pid=,ppid=,pgid=`. Handled `SIGINT` and `SIGTERM` reach only the owned group,
+then bounded cleanup kills or resumes known frozen descendants and cancellation stops the remaining checks.
+A known shell exit keeps its own code after bounded process and pipe cleanup. Lingering pipes alone are not
+a timeout; failure to clean up a required check still fails verification. The accepted limit remains explicit:
+an already detached, reparented POSIX orphan outside the owned group may survive; unhandled `SIGKILL` has no
+cleanup guarantee.
+
 ### Open questions answered by a person
 
 Open questions under `## Open questions` in intent.md, proposal.md or design.md need a person's answer before the intent

@@ -1,5 +1,5 @@
 import { spawnSync } from 'node:child_process';
-import { randomUUID } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
@@ -173,6 +173,31 @@ describe('demo: a team builds a calculator with sdlc (every command)', { timeout
     commit('alice', 'Install sdlc and the AI-ready layout');
   });
 
+  it('1b. Alice recovers only the inspected stopped board writer', () => {
+    const lock = path.join(root, 'openspec/.sdlc/board.lock');
+    const module = new URL('../dist/core/writer-lock.js', import.meta.url).href;
+    const stopped = spawnSync(process.execPath, ['--input-type=module', '-e',
+      `import { acquireWriterLock } from ${JSON.stringify(module)};
+       acquireWriterLock(${JSON.stringify(lock)}, 1000); process.exit(0);`],
+    { cwd: root, encoding: 'utf8', timeout: 30000, windowsHide: true });
+    expect(stopped.status, stopped.stdout + stopped.stderr).toBe(0);
+    const ownerBytes = fs.readFileSync(lock);
+    const owner = `sha256:${createHash('sha256').update(ownerBytes).digest('hex')}`;
+    const diagnostic = step('board-writer-doctor', 'board recovery', 'alice', ['doctor', '--json'],
+      'The test harness stops a real writer without releasing its lock; Alice inspects the recoverable owner.').json();
+    expect(JSON.stringify(diagnostic)).toContain(owner);
+    const denied = step('board-recover-agent-denied', 'board recovery', 'agent',
+      ['board', 'recover', '--expect-owner', owner, '--json'],
+      'An agent cannot perform operator recovery, even with the exact inspected digest.', { expect: 1 }).json();
+    expect(denied.status[0].code).toBe('agent_cannot_recover_board');
+    expect(fs.readFileSync(lock)).toEqual(ownerBytes);
+    const recovered = step('board-recover', 'board recovery', 'alice',
+      ['board', 'recover', '--expect-owner', owner, '--json'],
+      'Alice recovers that stopped owner; a live or changed owner would remain protected.').json();
+    expect(recovered).toEqual({ recovered: true, owner });
+    expect(fs.existsSync(lock)).toBe(false);
+  });
+
   it('2. roles: who may approve what, in a file versioned in git', () => {
     write(path.join(root, 'openspec/roles.yaml'), [
       'version: 1', 'signing: warn', 'people:',
@@ -233,7 +258,7 @@ describe('demo: a team builds a calculator with sdlc (every command)', { timeout
     step('release-control', 'change', 'alice', ['release-control', '--change', 'basic-arithmetic', '--note', 'Cashiers agreed on the four operations; carry on'], 'Alice hands it back with a note the agent sees.');
   });
 
-  it('6. intent → spec → plan, each approved by the right person', () => {
+  it('6.1 intent, approved by the product owner', () => {
     write(path.join(change('basic-arithmetic'), 'intent.md'), INTENT);
     const snapshot = step('gate-read', 'gates', 'agent',
       ['gate', 'read', 'intent', '--change', 'basic-arithmetic', '--json'],
@@ -245,6 +270,9 @@ describe('demo: a team builds a calculator with sdlc (every command)', { timeout
     // 0.11.4 (B62): the intent has an open question; Alice answers it herself before she approves.
     step('answer', 'gates', 'alice', ['answer', '1', '--change', 'basic-arithmetic', '--text', 'No: the receipt shows the total only'], 'Alice answers the open question of the intent herself: the agent cannot.');
     step('approve-intent', 'gates', 'alice', ['approve', 'intent', '--change', 'basic-arithmetic'], 'Alice approves the intent.');
+  });
+
+  it('6.2 spec, validated and approved by the product owner', () => {
     for (const [f, text] of [['proposal.md', PROPOSAL], ['specs/calculator/spec.md', SPEC_WITHOUT_SCENARIO], ['design.md', DESIGN]]) write(path.join(change('basic-arithmetic'), f), text);
     const bad = step('validate-bad', 'openspec', 'agent', ['validate', '--change', 'basic-arithmetic'], 'The first draft has a requirement without a scenario: strict validation refuses it.', { expect: 1 });
     expect(bad.stdout + bad.stderr).toMatch(/scenario/i);
@@ -253,10 +281,16 @@ describe('demo: a team builds a calculator with sdlc (every command)', { timeout
     step('os-schema', 'openspec', 'bob', ['openspec', 'schema', 'validate', 'sdlc'], 'The sdlc schema is a standard OpenSpec schema.');
     step('approve-spec', 'gates', 'alice', ['approve', 'spec', '--change', 'basic-arithmetic'], 'Alice approves the spec.');
     commit('alice', 'Intent and spec for basic arithmetic');
+  });
+
+  it('6.3 plan, approved by the engineer', () => {
     write(path.join(change('basic-arithmetic'), 'plan.md'), PLAN);
     write(path.join(change('basic-arithmetic'), 'tasks.md'), TASKS);
     step('approve-plan', 'gates', 'bob', ['approve', 'plan', '--change', 'basic-arithmetic'], 'Bob, the engineer, approves the plan.');
     commit('bob', 'Plan for basic arithmetic'); // each approver commits their own approval
+  });
+
+  it('6.4 rework, judged spec and renewed plan approvals', () => {
     step('rework', 'gates', 'alice', ['rework', 'spec', '--change', 'basic-arithmetic', '--reason', 'missing-requirement', '--note', 'Say what 10 / 0 shows on the till'], 'Alice sends the change back to the spec with a reason; the plan approval stops counting.');
     // 0.11.2 (B56): the rework is answered by a change; re-approving the same spec would need a note.
     const division = '\n## Division by zero\n\nThe till shows "Error" for 10 / 0.\n';

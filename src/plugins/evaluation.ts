@@ -39,10 +39,15 @@ const BOARD_OPERATIONS = new Set(['list', 'claim', 'heartbeat', 'release', 'subm
 const NESTED: Record<string, readonly string[]> = { claim: ['export'], dispatch: ['export'], submit: ['result'] };
 
 function coreJson(value: unknown): Json {
-  try { return json(JSON.parse(JSON.stringify(value ?? null))); }
+  try { return json(JSON.parse(JSON.stringify(value ?? null)), LIMITS.jsonBytes, LIMITS.depth + 8); }
   catch { return fail('plugin_evaluation_context', 'Operation arguments must be bounded JSON'); }
 }
-function callKey(operation: string, args: unknown): string { return hash(canonical({ operation, args: coreJson(args) })); }
+function configText(config: SdlcConfig): string {
+  return canonical(serializeConfig(config), LIMITS.packageBytes, LIMITS.depth + 8);
+}
+function callKey(operation: string, args: unknown): string {
+  return hash(canonical({ operation, args: coreJson(args) }, LIMITS.jsonBytes, LIMITS.depth + 8));
+}
 function current(root: string): Scope | undefined {
   const scope = scopeStorage.getStore();
   if (scope && scope.root !== fs.realpathSync(root)) fail('plugin_evaluation_context', 'Evaluation belongs to another project');
@@ -66,12 +71,13 @@ export function declareOperation(root: string, config: SdlcConfig, operation: st
     return;
   }
   const key = callKey(operation, args);
-  if (canonical(serializeConfig(config), LIMITS.packageBytes) !== scope.configSemantic) {
+  if (configText(config) !== scope.configSemantic) {
     fail('plugin_evaluation_stale', 'Core caller configuration changed');
   }
   if (scope.mode === 'final' && scope.used && !scope.finalizing) fail('plugin_evaluation_context', 'Finalization has ended');
   if (!scope.entered) {
-    if (scope.binding.operation !== operation || scope.args !== canonical(coreJson(args))) {
+    if (scope.binding.operation !== operation
+      || scope.args !== canonical(coreJson(args), LIMITS.jsonBytes, LIMITS.depth + 8)) {
       fail('plugin_evaluation_context', 'Evaluation operation or arguments differ');
     }
     scope.entered = true;
@@ -108,7 +114,7 @@ export function effectTime(root: string, fallback = Date.now()): number {
 }
 export function boardLockWait(root: string, fallback: number): number {
   const scope = current(root);
-  return scope ? Math.max(0, Math.min(50, scope.deadline - performance.now())) : fallback;
+  return scope ? Math.max(0, Math.min(fallback, scope.deadline - performance.now())) : fallback;
 }
 export function preparationBoard(root: string): Board | undefined {
   const scope = current(root);
@@ -208,7 +214,7 @@ function validateCurrent(scope: Scope, board?: Board, recheck = false): void {
   if (scope.used && !recheck || !scope.entered) fail('plugin_evaluation_context', 'Evaluation is missing or already consumed');
   if (performance.now() >= scope.deadline) fail('plugin_timeout', 'Operation preparation deadline exceeded');
   if (fingerprint(scope.root) !== scope.fingerprint) fail('plugin_evaluation_stale', 'Core operation inputs changed');
-  if (canonical(serializeConfig(scope.callerConfig), LIMITS.packageBytes) !== scope.configSemantic) {
+  if (configText(scope.callerConfig) !== scope.configSemantic) {
     fail('plugin_evaluation_stale', 'Core caller configuration changed');
   }
   if (board && hash(JSON.stringify(board)) !== scope.boardDigest) fail('plugin_evaluation_stale', 'Board snapshot changed');
@@ -257,7 +263,7 @@ function resetProbe(scope: Scope, initial: Board): void {
   scope.board = structuredClone(initial); scope.neededHooks.clear(); scope.neededExtensions.clear();
 }
 export async function prepareEvaluation(root: string, config: SdlcConfig, binding: OperationBinding, work: () => unknown,
-  deadline = performance.now() + LIMITS.operationMs): Promise<EvaluationContext | undefined> {
+  deadline = performance.now() + LIMITS.preparationMs): Promise<EvaluationContext | undefined> {
   root = fs.realpathSync(root);
   const supplied = config;
   config = projectConfig(root, config);
@@ -265,14 +271,14 @@ export async function prepareEvaluation(root: string, config: SdlcConfig, bindin
   const extended = raw && typeof raw === 'object' && !Array.isArray(raw) && raw.ext !== undefined;
   const enabled = (value: SdlcConfig) => Object.values(value.plugins ?? {}).some((setting) => setting.enabled) || !!value.pluginPolicies?.length;
   if (!enabled(supplied) && !enabled(config) && !extended) return undefined;
-  if (canonical(serializeConfig(supplied), LIMITS.packageBytes) !== canonical(serializeConfig(config), LIMITS.packageBytes)) {
+  if (configText(supplied) !== configText(config)) {
     fail('plugin_evaluation_stale', 'Caller configuration differs from the current core settings');
   }
   if (binding.board !== BOARD_OPERATIONS.has(binding.operation)) fail('plugin_evaluation_context', 'Wrong mutation boundary');
   const initial = readBoard(root);
-  const scope: Scope = { root, callerConfig: supplied, configSemantic: canonical(serializeConfig(config), LIMITS.packageBytes),
+  const scope: Scope = { root, callerConfig: supplied, configSemantic: configText(config),
     binding: { ...binding, args: raw, actor: coreJson(binding.actor) as unknown as Actor },
-    args: canonical(raw), plugins: [], fingerprint: fingerprint(root), board: structuredClone(initial),
+    args: canonical(raw, LIMITS.jsonBytes, LIMITS.depth + 8), plugins: [], fingerprint: fingerprint(root), board: structuredClone(initial),
     boardDigest: hash(JSON.stringify(initial)), now: Date.now(), deadline, mode: 'probe', used: false,
     entered: false, attempted: false, finalizing: false, replay: false, calls: new Set(), neededHooks: new Map(),
     verdicts: new Map(), neededExtensions: new Map(), extensions: new Set(), candidates: new Map(),
@@ -329,13 +335,14 @@ export function executePrepared<T>(token: EvaluationContext | undefined, work: (
   });
 }
 export async function runPrepared<T>(root: string, config: SdlcConfig, binding: OperationBinding, work: () => T): Promise<T> {
-  const deadline = performance.now() + LIMITS.operationMs;
+  const deadline = performance.now() + LIMITS.preparationMs;
   for (let attempt = 0; attempt < 3; attempt++) {
     try { return executePrepared(await prepareEvaluation(root, config, binding, work, deadline), work); }
     catch (error) {
       const code = error && typeof error === 'object' && 'code' in error ? error.code : '';
       if (!['plugin_evaluation_stale', 'plugin_busy', 'board_locked'].includes(String(code)) || attempt === 2
         || performance.now() >= deadline) throw error;
+      await new Promise(resolve => setTimeout(resolve, Math.min(50 * 2 ** attempt, deadline - performance.now())));
     }
   }
   return fail('plugin_evaluation_stale', 'Preparation retry limit exceeded');

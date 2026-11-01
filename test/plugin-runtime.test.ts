@@ -13,6 +13,52 @@ async function run(output: unknown = { output: 42 }, options: GuestOptions = {},
 }
 
 describe('Native Wasm boundary', () => {
+  it('accepts native manifest initialState32 and refuses initialState33 at its independent leaf guard', async () => {
+    const nested = (depth: number): unknown => depth === 0 ? 1 : { value: nested(depth - 1) };
+    const root = tempDir('sdlc-plugin-initial-depth-');
+    const p = await packageFiles(root, { output: 42 }, { initialState: nested(32) });
+    let snapshot: ReturnType<typeof capturePackage> | undefined;
+    expect(() => {
+      snapshot = capturePackage(root, p.source);
+    }).not.toThrow();
+    expect(snapshot!.manifest.initialState).toEqual(nested(32));
+    await expect(invoke(snapshot!, { preflight: true })).resolves.toBeNull();
+    const other = tempDir('sdlc-plugin-initial-too-deep-');
+    const q = await packageFiles(other, { output: 42 }, { initialState: nested(33) });
+    expect(() => capturePackage(other, q.source)).toThrowError(expect.objectContaining({ code: 'plugin_invalid' }));
+    expect(fs.existsSync(path.join(root, 'openspec/.sdlc/plugins'))).toBe(false);
+  });
+
+  it.each([
+    { alloc: '(loop $again (br $again)) (i32.const 4096)' },
+    { call: '(loop $again (br $again)) (i64.const 0)' },
+  ])('bounds real allocator/operation loops in the hook execution phase: %j', async (options) => {
+    const root = tempDir('sdlc-plugin-hook-loop-');
+    const p = await packageFiles(root, { output: 1 }, {}, options);
+    const started = performance.now();
+    await expect(invoke(capturePackage(root, p.source), {
+      operation: 'read', input: {}, config: {}, state: {}, hook: true,
+    })).rejects.toMatchObject({ code: 'plugin_timeout', message: expect.stringMatching(/execution/) });
+    expect(performance.now() - started).toBeLessThan(13000);
+    expect(fs.existsSync(path.join(root, 'openspec/.sdlc/plugins'))).toBe(false);
+  }, 15000);
+
+  it('keeps depth32 guest leaves valid without spending their budget on host request/reply wrappers', async () => {
+    const nested = (depth: number): unknown => depth === 0 ? 1 : { value: nested(depth - 1) };
+    const root = tempDir('sdlc-plugin-depth-');
+    const p = await packageFiles(root, { output: nested(32) });
+    const snapshot = capturePackage(root, p.source);
+    const input = nested(32) as import('../dist/plugins/api.js').Json;
+    await expect(invoke(snapshot, { operation: 'read', input, config: {}, state: {} }))
+      .resolves.toEqual({ output: nested(32) });
+    await expect(invoke(snapshot, { operation: 'read', input: nested(33) as typeof input, config: {}, state: {} }))
+      .rejects.toMatchObject({ code: 'plugin_invalid' });
+    const q = await packageFiles(tempDir('sdlc-plugin-depth-reply-'), { output: nested(33) });
+    await expect(invoke(capturePackage(path.dirname(path.dirname(q.dir)), q.source), {
+      operation: 'read', input: {}, config: {}, state: {},
+    })).rejects.toMatchObject({ code: 'plugin_invalid' });
+  });
+
   it('executes the real no-WASI ABI', async () => {
     expect(await run()).toEqual({ output: 42 });
   });

@@ -1,14 +1,16 @@
 import { SdlcError } from './errors.js';
 import { oneLine, readBacklog, save, type BacklogEpic } from './backlog.js';
+import { parseEpicGranularity } from './backlog-granularity.js';
 
 export interface EpicEditInput {
   title?: string;
   goal?: string;
   clearGoal?: boolean;
+  granularity?: string;
 }
 
 function validateEpicEdit(input: EpicEditInput): void {
-  if (input.title === undefined && input.goal === undefined && !input.clearGoal) {
+  if (input.title === undefined && input.goal === undefined && !input.clearGoal && input.granularity === undefined) {
     throw new SdlcError('invalid_option', { key: 'error.backlog_edit_requires_field' });
   }
   if (input.goal !== undefined && input.clearGoal) {
@@ -20,6 +22,7 @@ function validateEpicEdit(input: EpicEditInput): void {
   if (input.goal !== undefined) {
     oneLine(input.goal, 'goal');
   }
+  parseEpicGranularity(input.granularity);
 }
 
 /** Changes an epic's title or goal; items, their order and the order of epics stay as they are. */
@@ -30,6 +33,7 @@ export function editEpic(root: string, id: string, input: EpicEditInput): Backlo
     throw new SdlcError('unknown_epic', { key: 'error.unknown_epic_x', params: { id } });
   }
   validateEpicEdit(input);
+  if (input.granularity !== undefined) epic.granularity = parseEpicGranularity(input.granularity);
   epic.title = input.title ?? epic.title;
   if (input.clearGoal) {
     delete epic.goal;

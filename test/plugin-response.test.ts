@@ -35,14 +35,14 @@ function durableBytes(root: string) {
 /** The real worker runs a valid guest; only the message delivered to the parent is replaced. */
 function tamperChannel(replace: (message: { ok: boolean; result?: unknown }) => unknown): unknown[] {
   const actual: unknown[] = [];
-  const once = Worker.prototype.once;
-  vi.spyOn(Worker.prototype, 'once').mockImplementation(function (this: Worker, event, listener) {
-    if (event !== 'message') return once.call(this, event, listener);
-    return once.call(this, event, (message: { ok: boolean; result?: unknown }) => {
-      if (!message.ok) return listener(message);
-      actual.push(message.result);
-      listener(replace(message));
-    });
+  const emit = Worker.prototype.emit;
+  vi.spyOn(Worker.prototype, 'emit').mockImplementation(function (this: Worker, event, ...args) {
+    const message = args[0];
+    if (event !== 'message' || !message || message.phase !== 'result' || message.ok !== true) {
+      return emit.call(this, event, ...args);
+    }
+    actual.push(message.result);
+    return emit.call(this, event, replace(message));
   });
   return actual;
 }
@@ -107,12 +107,14 @@ describe('parent response contract before mutable commit', () => {
 
 describe('parent pure-call and validation-only response modes', () => {
   it.each([
-    { name: 'null', value: null }, { name: 'array', value: [] }, { name: 'missing flag', value: {} },
-    { name: 'string success flag', value: { ok: 'true', result: { output: 7 } } },
-    { name: 'numeric success flag', value: { ok: 1, result: { output: 7 } } },
-    { name: 'failure with a result', value: { ok: false, result: { output: 7 } } },
-    { name: 'missing result', value: { ok: true } },
-    { name: 'forged success code', value: { ok: true, result: { output: 7 }, code: 'forged' } },
+    { name: 'null', value: null }, { name: 'array', value: [] }, { name: 'missing flag', value: { phase: 'result' } },
+    { name: 'missing phase', value: { ok: true, result: { output: 7 } } },
+    { name: 'unknown phase', value: { phase: 'other', ok: true, result: { output: 7 } } },
+    { name: 'string success flag', value: { phase: 'result', ok: 'true', result: { output: 7 } } },
+    { name: 'numeric success flag', value: { phase: 'result', ok: 1, result: { output: 7 } } },
+    { name: 'failure with a result', value: { phase: 'result', ok: false, result: { output: 7 } } },
+    { name: 'missing result', value: { phase: 'result', ok: true } },
+    { name: 'forged success code', value: { phase: 'result', ok: true, result: { output: 7 }, code: 'forged' } },
   ])('refuses malformed worker transport $name', async ({ value }) => {
     const p = await pureSnapshot();
     const actual = tamperChannel(() => value);

@@ -4,6 +4,7 @@ import type { Caller, ServedProject } from '../mcp/projects.js';
 import { fail, keys, object, parsePluginInput, pluginDiagnostic } from './api.js';
 import { callPlugin } from './broker.js';
 import { compatibleDescriptor, pluginTools, type PluginDescriptor } from './catalog.js';
+import { nestSchemaReferences } from './schema-anchors.js';
 
 export interface ListedPluginTool { name: string; description: string; inputSchema: Record<string, unknown> }
 export interface PluginToolDiagnostic { code: string; tool?: string; message: string }
@@ -44,14 +45,9 @@ function permitted(descriptor: PluginDescriptor, project: ServedProject, caller:
 }
 
 function inputSchema(descriptor: PluginDescriptor, several: boolean): Record<string, unknown> {
-  const nest = (value: unknown): unknown => {
-    if (Array.isArray(value)) return value.map(nest);
-    if (!value || typeof value !== 'object') return value;
-    return Object.fromEntries(Object.entries(value).map(([key, item]) => [key,
-      key === '$ref' && typeof item === 'string' && item.startsWith('#')
-        ? `#/properties/input${item.slice(1)}` : nest(item)]));
+  const properties: Record<string, unknown> = {
+    input: nestSchemaReferences(descriptor.inputSchema, '/properties/input'),
   };
-  const properties: Record<string, unknown> = { input: nest(descriptor.inputSchema) };
   const required = ['input'];
   if (descriptor.access !== 'read') {
     properties.request = { type: 'string', description: 'Stable p1.<unix-ms>.<32hex> request identifier' };

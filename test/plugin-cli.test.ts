@@ -7,6 +7,10 @@ import { Command } from 'commander';
 import { registerPluginCommands } from '../dist/plugins/cli.js';
 import { pluginHumanCommands } from '../dist/plugins/catalog.js';
 import { callsNamedHumanCommand, callsPluginHumanCommand } from '../dist/core/human-command-match.js';
+import { shellWords } from '../dist/core/shell-words.js';
+import { defaultConfig } from '../dist/core/config.js';
+import { evaluateToolCall, normalizeToolCall } from '../dist/core/policy.js';
+import { projectPaths } from '../dist/core/project.js';
 import { helpCatalog } from '../dist/core/help-catalog.js';
 import { buildProgram } from '../dist/cli/index.js';
 import { codexAdapter } from '../dist/integrations/codex.js';
@@ -14,6 +18,128 @@ import { renderContext } from '../dist/integrations/install.js';
 import { mergeQwenSettings } from '../dist/integrations/qwen-settings.js';
 import { pluginProject, pluginRequest } from './fixtures/plugin-project.js';
 import { humanEnv, tempDir } from './helpers.js';
+
+const packageInfo = JSON.parse(fs.readFileSync(new URL('../package.json', import.meta.url), 'utf8'));
+const supportedAlias = Object.keys(packageInfo.bin).find(name => name !== packageInfo.name);
+if (!supportedAlias) throw new Error('The package must retain a supported compatibility command alias.');
+
+function staticShellDecision(command: string) {
+  const root = tempDir('sdlc-quoted-dynamic-');
+  const config = defaultConfig();
+  config.enforcement.mode = 'block';
+  config.enforcement.requireApprovedPlan = false;
+  return evaluateToolCall(normalizeToolCall('Bash', { command }, root), { paths: projectPaths(root), config });
+}
+
+describe('Static plugin command continuation boundaries', () => {
+  it.each([
+    { label: 'PowerShell LF', command: 'sdlc.ps1 --locale=en economy `\n configure',
+      words: ['sdlc.ps1', '--locale=en', 'economy', 'configure'] },
+    { label: 'PowerShell CRLF', command: 'sdlc.cmd --locale en economy `\r\n configure',
+      words: ['sdlc.cmd', '--locale', 'en', 'economy', 'configure'] },
+    { label: 'POSIX LF', command: 'node sdlc.js economy \\\n configure',
+      words: ['node', 'sdlc.js', 'economy', 'configure'] },
+    { label: 'POSIX CRLF', command: `npx --no-install ${supportedAlias} economy \\\r\n configure`,
+      words: ['npx', '--no-install', supportedAlias, 'economy', 'configure'] },
+    { label: 'repeated standalone joins', command: 'sdlc economy `\n \\\n configure',
+      words: ['sdlc', 'economy', 'configure'] },
+    { label: 'ambiguous paired midword backticks', command: 'sdlc eco`\nnomy con`\nfigure',
+      words: ['sdlc', 'economy', 'configure'], dynamic: true },
+    { label: 'ambiguous quoted PowerShell CRLF', command: 'sdlc "eco`\r\nnomy" "con`\r\nfigure"',
+      words: ['sdlc', 'economy', 'configure'], dynamic: true },
+  ])('decodes $label without synthetic arguments', ({ command, words, dynamic }) => {
+    const parsed = shellWords(command);
+    expect(parsed.problem).toBeUndefined();
+    expect(parsed.commands[0].words.map(word => word.value)).toEqual(words);
+    expect(parsed.commands[0].words.some(word => word.dynamic)).toBe(dynamic ?? false);
+    expect(parsed.commands[0].raw).toBe(command);
+    expect(callsNamedHumanCommand(command, ['economy configure'])).toBe(true);
+  });
+
+  it('a standalone continuation without any command creates no word or command', () => {
+    expect(shellWords('`\r\n \\\n').commands).toEqual([]);
+  });
+
+  it('denies paired POSIX command substitution when its backticks adjoin newlines', () => {
+    const root = tempDir('sdlc-paired-substitution-');
+    const config = defaultConfig();
+    config.enforcement.mode = 'block';
+    config.enforcement.requireApprovedPlan = false;
+    const command = "sdlc `\nprintf 'approve plan --change x'`\n";
+    expect(evaluateToolCall(normalizeToolCall('Bash', { command }, root),
+      { paths: projectPaths(root), config })).toMatchObject({ decision: 'deny', rule: 'shell-parse' });
+  });
+
+  it.each([
+    { label: 'inline POSIX substitution', quoted: '"ap`printf prov`e"', decoded: 'apprintf prove' },
+    { label: 'LF POSIX substitution', quoted: '"ap`\nprintf prov`e"', decoded: 'apprintf prove' },
+    { label: 'CMD percent expansion', quoted: '"ap%E20_QUOTED_PROBE%e"', decoded: 'ap%E20_QUOTED_PROBE%e' },
+  ])('denies double-quoted $label without expanding argv', ({ quoted, decoded }) => {
+    const command = `sdlc ${quoted} plan --change x`;
+    const parsed = shellWords(command);
+    expect(parsed.problem).toBeUndefined();
+    expect(parsed.commands[0].words.map(word => word.value)).toEqual(['sdlc', decoded, 'plan', '--change', 'x']);
+    const word = parsed.commands[0].words[1];
+    expect(command.slice(word.start, word.end)).toBe(quoted);
+    expect(parsed.commands[0].raw).toBe(command);
+    expect.soft(word.dynamic).toBe(true);
+    expect(staticShellDecision(command)).toMatchObject({ decision: 'deny', rule: 'shell-parse' });
+  });
+
+  it.each([
+    { label: 'LF person decision', command: 'sdlc "ap`\nprove" plan --change x',
+      words: ['sdlc', 'approve', 'plan', '--change', 'x'], rule: 'separation-of-duties' },
+    { label: 'CRLF person decision', command: 'sdlc "ap`\r\nprove" plan --change x',
+      words: ['sdlc', 'approve', 'plan', '--change', 'x'], rule: 'separation-of-duties' },
+    { label: 'LF read', command: 'sdlc "sta`\ntus" --change x', words: ['sdlc', 'status', '--change', 'x'] },
+    { label: 'CRLF read', command: 'sdlc "sta`\r\ntus" --change x', words: ['sdlc', 'status', '--change', 'x'] },
+    { label: 'LF help', command: 'sdlc "ap`\nprove" plan --help', words: ['sdlc', 'approve', 'plan', '--help'] },
+    { label: 'CRLF help', command: 'sdlc "ap`\r\nprove" plan --help', words: ['sdlc', 'approve', 'plan', '--help'] },
+  ])('keeps an unpaired quoted PowerShell $label static', ({ command, words, rule }) => {
+    const parsed = shellWords(command);
+    expect(parsed.problem).toBeUndefined();
+    expect(parsed.commands[0].words.map(word => word.value)).toEqual(words);
+    expect(parsed.commands[0].words.some(word => word.dynamic)).toBe(false);
+    expect(parsed.commands[0].raw).toBe(command);
+    expect(staticShellDecision(command)).toEqual(rule
+      ? expect.objectContaining({ decision: 'deny', rule }) : { decision: 'allow' });
+  });
+
+  it.each(['ap`printf prov`e', 'ap%E20_QUOTED_PROBE%e'])('keeps single-quoted data literal: %s', literal => {
+    const command = `printf '%s' '${literal}'`;
+    const parsed = shellWords(command);
+    expect(parsed.problem).toBeUndefined();
+    expect(parsed.commands[0].words.map(word => word.value)).toEqual(['printf', '%s', literal]);
+    expect(parsed.commands[0].words.some(word => word.dynamic)).toBe(false);
+    expect(parsed.commands[0].raw).toBe(command);
+    expect(staticShellDecision(command)).toEqual({ decision: 'allow' });
+  });
+
+  it('retains Windows literal path values and spans before a physical newline', () => {
+    const command = 'Copy-Item C:\\work\\\r\nnext';
+    const parsed = shellWords(command);
+    const file = parsed.commands[0].words[1];
+    expect(file.value).toBe('C:\\work\\');
+    expect(command.slice(file.start, file.end)).toBe('C:\\work\\');
+    expect(parsed.commands[1].words[0].value).toBe('next');
+  });
+
+  it.each([
+    'sdlc economy `\n read',
+    'sdlc economy `\n configure --help',
+    'echo "sdlc economy configure"',
+    "printf '%s' 'sdlc economy configure'",
+  ])('keeps read/help/quoted-data control: %s', command => {
+    expect(callsNamedHumanCommand(command, ['economy configure'])).toBe(false);
+  });
+
+  it.each(['""', "''"])('retains an explicit empty quoted argument %s', quoted => {
+    const command = `sdlc economy ${quoted} configure`;
+    expect(shellWords(command).commands[0].words.map(word => word.value))
+      .toEqual(['sdlc', 'economy', '', 'configure']);
+    expect(callsNamedHumanCommand(command, ['economy configure'])).toBe(false);
+  });
+});
 
 function dynamicCli(root: string, args: string[], agent = false) {
   const module = new URL('../dist/plugins/cli.js', import.meta.url).href;

@@ -31,7 +31,7 @@ describe('Authoritative own-state store', () => {
     const events = [{ id: 'event-1', record: { event: 'economy.sampled' } }];
     const next = commitStore(root, state, id, { b: 2, a: 1 }, result, events);
     expect(next).toMatchObject({ revision: 1, data: { counter: 1 }, pending: events });
-    expect(receipt(next, id, { a: 1, b: 2 })?.result).toEqual(result);
+    expect(receipt(next, id, { a: 1, b: 2 })?.result).toEqual({ output: 'ok' });
     expect(commitStore(root, state, id, { a: 1, b: 2 }, result, events).revision).toBe(1);
     expect(() => receipt(next, id, { a: 2 })).toThrow(/changed/);
     expect(() => commitStore(root, state, request(), {}, result, [])).toThrow(/changed/);

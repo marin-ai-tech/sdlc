@@ -51,10 +51,13 @@ describe('Plugin faults preserve real pre-tool guard decisions', () => {
           expect(answer.permissionDecisionReason).toContain(`[sdlc:${baseline.rule}]`);
         }
       }
-      const fault = preTool(p, 'Bash', { command: 'echo harmless' });
-      expect(fault.permissionDecision).toBe('deny');
-      expect(fault.permissionDecisionReason).toContain('[sdlc:plugin]');
-      expect(fault.permissionDecisionReason).not.toContain(p.root);
+      // Explicitly changes the former blanket catalog-fault refusal for harmless shell work.
+      for (const command of ['echo harmless', 'git status']) {
+        const harmless = runCli(['hook', 'pre-tool'], p.root, humanEnv(tempDir()),
+          JSON.stringify({ cwd: p.root, tool_name: 'Bash', tool_input: { command }, skip_log: true }));
+        expect(harmless.code).toBe(0);
+        expect(harmless.stdout).toBe('');
+      }
       expect(protectedFiles.map((file) => fs.existsSync(file) ? fs.readFileSync(file) : undefined)).toEqual(before);
     });
 
@@ -85,4 +88,25 @@ describe('Plugin faults preserve real pre-tool guard decisions', () => {
       }
       expect(fs.readFileSync(store)).toEqual(before);
     });
+});
+
+describe('Repeated stop only escapes availability faults', () => {
+  it.each(['missing-package', 'malformed-response', 'required-fact', 'real-denial'] as const)
+    ('handles %s without losing restrictions', async (kind) => {
+    const response = kind === 'malformed-response' ? { output: { decision: 'invalid' } }
+      : { output: { decision: kind === 'real-denial' ? 'deny' : 'pass', code: 'not_ready' } };
+    const p = await pluginProject(response, { hooks: { stop: 'read' } });
+    if (kind === 'missing-package') (p.raw.plugins as any).economy.package = 'missing-package';
+    if (kind === 'required-fact') {
+      (p.raw as any).plugin_policies = [{ id: 'stop-ready', hook: 'stop',
+        require: { fact: 'economy.ready', op: 'eq', value: true }, reason: 'Ready fact is required' }];
+    }
+    configure(p, 'block');
+    const result = runCli(['hook', 'stop'], p.root, humanEnv(tempDir()),
+      JSON.stringify({ cwd: p.root, stop_hook_active: true }));
+    expect(result.code).toBe(0);
+    if (kind === 'missing-package') expect(result.stdout).toBe('');
+    else expect(result.json()).toMatchObject({ decision: 'block' });
+    if (kind === 'required-fact') expect(result.stdout).toContain('plugin_fact_missing');
+  });
 });

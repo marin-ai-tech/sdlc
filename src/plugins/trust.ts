@@ -3,7 +3,7 @@ import { agentEnvironment } from '../core/agent-env.js';
 import { loadConfig, type SdlcConfig } from '../core/config.js';
 import { assertDecisionRole } from '../core/decision-role.js';
 import { formatIdentity, gitIdentity } from '../core/git.js';
-import { canonical, fail, keys, object, text, type PackageSnapshot, type PluginSetting } from './api.js';
+import { LIMITS, canonical, fail, keys, object, text, type PackageSnapshot, type PluginSetting } from './api.js';
 import { atomicStored, readStored, withActivation } from './activation.js';
 import { pluginName } from './manifest.js';
 import { capturePackage, hash } from './package.js';
@@ -70,7 +70,8 @@ export function activePlugin(root: string, config: SdlcConfig, name: string): Ac
   const store = readStore(root, name, accepted.stateId)!;
   const configDigest = hash(fs.readFileSync(`${root}/openspec/sdlc.yaml`));
   return { snapshot, setting, accepted, store,
-    configDigest, key: hash(canonical({ setting, accepted, revision: store.revision, configDigest })) };
+    configDigest, key: hash(canonical({ setting, accepted, revision: store.revision, configDigest },
+      LIMITS.jsonBytes, LIMITS.depth + 8)) };
 }
 
 export function currentActive(root: string, previous: ActivePlugin): ActivePlugin {
@@ -98,7 +99,9 @@ export async function acceptPlugin(root: string, config: SdlcConfig, name: strin
   }
   return withActivation(root, () => {
     const fresh = configured(root, loadConfig(`${root}/openspec/sdlc.yaml`), name);
-    if (fresh.snapshot.digest !== snapshot.digest || canonical(fresh.setting) !== canonical(setting)) {
+    if (fresh.snapshot.digest !== snapshot.digest
+      || canonical(fresh.setting, LIMITS.jsonBytes, LIMITS.depth + 8)
+        !== canonical(setting, LIMITS.jsonBytes, LIMITS.depth + 8)) {
       fail('plugin_changed', 'Plugin changed during acceptance');
     }
     const registry = readRegistry(root);

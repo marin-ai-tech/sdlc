@@ -1,7 +1,7 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { beforeAll, afterEach, describe, expect, it, vi } from 'vitest';
-import { claimTask, boardTasks, submitClaim } from '../dist/core/board.js';
+import { claimTask, boardTasks, heartbeatClaim, submitClaim } from '../dist/core/board.js';
 import { openAuction, bidTask, awardTask } from '../dist/core/board-market.js';
 import { dispatchTask } from '../dist/core/board-dispatch.js';
 import { boardSnapshot } from '../dist/core/board-view.js';
@@ -46,21 +46,36 @@ async function at<T>(now: number, action: () => Promise<T>): Promise<T> {
 }
 
 async function list(p: PluginBoard) {
-  return p.prepared('list', { change: BOARD_CHANGE },
-    () => boardTasks(p.root, p.paths, p.config(), BOARD_CHANGE));
+  return boardTasks(p.root, p.paths, p.config(), BOARD_CHANGE);
+}
+
+/** A real mutation on another task settles elapsed awards without creating a new reservation. */
+async function settlementHeartbeat(p: PluginBoard) {
+  const opts = { ...claimOptions('1.4'), lease: '7200' };
+  const held = await p.prepared('claim', opts, () => claimTask(p.root, p.paths, p.config(), opts));
+  const args = { claim: held.claim.id, executor: 'mesh-a' };
+  const work = () => heartbeatClaim(p.root, p.config(), args.claim, args.executor);
+  const binding = { operation: 'heartbeat', args, actor: { origin: 'cli' as const, executor: 'mesh-a' }, board: true };
+  return { work, binding, run: () => p.prepared('heartbeat', args, work) };
 }
 
 describe('Elapsed award acceptance and read-only pending projections', () => {
   it('consumes a denied selected winner exactly once, with no reservation, fallback or award event', async () => {
     const p = pluginBoard(base);
+    const mutation = await settlementHeartbeat(p);
     await p.guard(deny, { award: 'read' });
     const elapsed = await auction(p);
     const calls = vi.spyOn(runtime, 'invoke');
+    const pending = p.bytes();
     await at(elapsed, () => list(p));
+    expect(calls).not.toHaveBeenCalled();
+    expect(p.bytes()).toEqual(pending);
+    await at(elapsed, mutation.run);
     expect(calls).toHaveBeenCalledTimes(1);
     expect(p.board().auctions).toEqual([]);
     expect(p.board().dispatches).toEqual([]);
-    expect(p.board().claims).toEqual([]);
+    expect(p.board().claims.map(({ id, task, state }) => [id, task, state]))
+      .toEqual([[mutation.binding.args.claim, '1.4', 'held']]);
     expect(p.events().filter((e) => e.event === 'task.award_refused'))
       .toMatchObject([{ task: '1.2', executor: 'mesh-a' }]);
     expect(p.events().filter((e) => e.event === 'task.awarded')).toEqual([]);
@@ -94,10 +109,11 @@ describe('Elapsed award acceptance and read-only pending projections', () => {
 
   it('leaves the complete board and event bytes intact when an elapsed award guest times out', async () => {
     const p = pluginBoard(base);
+    const mutation = await settlementHeartbeat(p);
     await p.guard(pass, { award: 'read' }, loop);
     const elapsed = await auction(p);
     const before = p.bytes();
-    await expect(at(elapsed, () => list(p))).rejects.toMatchObject({ code: 'plugin_timeout' });
+    await expect(at(elapsed, mutation.run)).rejects.toMatchObject({ code: 'plugin_timeout' });
     expect(p.bytes()).toEqual(before);
     expect(p.board().auctions).toHaveLength(1);
     expect(p.board().dispatches).toEqual([]);
@@ -106,13 +122,11 @@ describe('Elapsed award acceptance and read-only pending projections', () => {
 
   it('rejects a stale authentic context before consuming the elapsed auction or writing observations', async () => {
     const p = pluginBoard(base);
+    const { binding, work } = await settlementHeartbeat(p);
     await p.guard(pass, { award: 'read' });
     const elapsed = await auction(p);
     await at(elapsed, async () => {
-      const work = () => boardTasks(p.root, p.paths, p.config(), BOARD_CHANGE);
-      const token = await prepareEvaluation(p.root, p.config(), {
-        operation: 'list', args: { change: BOARD_CHANGE }, actor: { origin: 'cli', executor: 'mesh-a' }, board: true,
-      }, work);
+      const token = await prepareEvaluation(p.root, p.config(), binding, work);
       expect(token).toBeDefined();
       fs.appendFileSync(path.join(p.root, 'openspec/changes', BOARD_CHANGE, 'plan.md'), '\nChanged after preparation.\n');
       const before = p.bytes();
@@ -126,13 +140,11 @@ describe('Elapsed award acceptance and read-only pending projections', () => {
 
   it('honors revocation committed after preparation and before elapsed-award consumption', async () => {
     const p = pluginBoard(base);
+    const { binding, work } = await settlementHeartbeat(p);
     await p.guard(pass, { award: 'read' });
     const elapsed = await auction(p);
     await at(elapsed, async () => {
-      const work = () => boardTasks(p.root, p.paths, p.config(), BOARD_CHANGE);
-      const token = await prepareEvaluation(p.root, p.config(), {
-        operation: 'list', args: { change: BOARD_CHANGE }, actor: { origin: 'cli', executor: 'mesh-a' }, board: true,
-      }, work);
+      const token = await prepareEvaluation(p.root, p.config(), binding, work);
       p.ok(['plugins', 'revoke', 'economy']);
       const before = p.bytes();
       const calls = vi.spyOn(runtime, 'invoke');
@@ -146,12 +158,10 @@ describe('Elapsed award acceptance and read-only pending projections', () => {
 
   it('refuses a pre-expiry context once clock eligibility changes without invoking the newly due guest', async () => {
     const p = pluginBoard(base);
+    const { binding, work } = await settlementHeartbeat(p);
     await p.guard(pass, { award: 'read' }, loop);
     const elapsed = await auction(p);
-    const work = () => boardTasks(p.root, p.paths, p.config(), BOARD_CHANGE);
-    const token = await prepareEvaluation(p.root, p.config(), {
-      operation: 'list', args: { change: BOARD_CHANGE }, actor: { origin: 'cli', executor: 'mesh-a' }, board: true,
-    }, work);
+    const token = await prepareEvaluation(p.root, p.config(), binding, work);
     const before = p.bytes();
     const calls = vi.spyOn(runtime, 'invoke');
     await at(elapsed, async () => {
@@ -181,10 +191,8 @@ describe('Historical replay and authentic operation contexts', () => {
 
   it('refuses forged, wrong-operation and reused contexts without additional board changes', async () => {
     const p = pluginBoard(base);
+    const { binding, work } = await settlementHeartbeat(p);
     await p.guard(pass, { claim: 'read' });
-    const work = () => boardTasks(p.root, p.paths, p.config(), BOARD_CHANGE);
-    const binding = { operation: 'list', args: { change: BOARD_CHANGE },
-      actor: { origin: 'cli' as const, executor: 'mesh-a' }, board: true };
     const forged = {} as Parameters<typeof executePrepared>[0];
     const before = p.bytes();
     expect(() => executePrepared(forged, work)).toThrow(expect.objectContaining({ code: 'plugin_evaluation_context' }));

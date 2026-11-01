@@ -91,12 +91,18 @@ describe('full lifecycle e2e (0.3.0)', () => {
     expect(cli(['status', '--change', 'add-farewell', '--json']).json().change.warnings.join('\n')).not.toMatch(/track set/);
   });
 
-  it('5. intent → spec → plan with human approvals', () => {
+  it('5a. intent approval by a person', () => {
     write(path.join(change('add-farewell'), 'intent.md'), FILES['intent.md']);
     expect(cli(['approve', 'intent', '--change', 'add-farewell']).code).toBe(0);
+  });
+
+  it('5b. spec validation and approval by a person', () => {
     for (const f of ['proposal.md', 'specs/greeting/spec.md', 'design.md']) write(path.join(change('add-farewell'), f), FILES[f]);
     expect(cli(['validate', '--change', 'add-farewell', '--json']).code).toBe(0);
     expect(cli(['approve', 'spec', '--change', 'add-farewell']).code).toBe(0);
+  });
+
+  it('5c. plan approval prevents a later track downgrade', () => {
     for (const f of ['plan.md', 'tasks.md']) write(path.join(change('add-farewell'), f), FILES[f]);
     expect(cli(['approve', 'plan', '--change', 'add-farewell']).code).toBe(0);
     expect(cli(['track', 'set', 'lite', '--change', 'add-farewell', '--json']).json().status[0].code).toBe('plan_already_approved');

@@ -1,6 +1,6 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it } from 'vitest';
 import { parse } from 'yaml';
 import { git, humanEnv, initGitRepo, read, runCli, tempDir } from './helpers.js';
 
@@ -22,8 +22,15 @@ const events = (root: string) => read(path.join(root, 'openspec/.sdlc/log.jsonl'
 const AGENT = { CLAUDECODE: '1' };
 
 describe('backlog → change → archive', () => {
+  let prepared: ReturnType<typeof project>;
+  beforeEach(function scaffoldBacklog({ task }) {
+    const started = performance.now();
+    prepared = project();
+    task.meta.backlogScaffoldMs = performance.now() - started;
+  });
+
   it('start creates the change from the item: kind, risk, source, a draft intent, the item goes in progress', () => {
-    const { root, cli, change } = project();
+    const { root, cli, change } = prepared;
     const r = cli(['backlog', 'start', 'B1', '--change', 'show-claim-stage', '--json'], AGENT);
     expect(r.code, r.stderr + r.stdout).toBe(0);
     expect(r.json()).toMatchObject({ item: { id: 'B1', status: 'in-progress', change: 'show-claim-stage' }, change: { id: 'show-claim-stage', kind: 'bugfix', risk: 'low' } });
@@ -41,12 +48,12 @@ describe('backlog → change → archive', () => {
   });
 
   it('without --change the change id is derived from the title', () => {
-    const { cli } = project();
+    const { cli } = prepared;
     expect(cli(['backlog', 'start', 'B1', '--json']).json().change.id).toBe('show-claim-stage');
   });
 
   it('negative: an item that is not ready (missing outcome/acceptance or open dependencies) cannot start', () => {
-    const { cli, change } = project();
+    const { cli, change } = prepared;
     const blocked = cli(['backlog', 'start', 'B2', '--json']);
     expect(blocked.code).toBe(1);
     expect(blocked.json().status[0].code).toBe('backlog_item_not_ready');
@@ -58,37 +65,60 @@ describe('backlog → change → archive', () => {
   });
 
   it('negative: an item already in progress cannot start twice', () => {
-    const { cli } = project();
+    const { cli } = prepared;
     cli(['backlog', 'start', 'B1', '--json']);
     expect(cli(['backlog', 'start', 'B1', '--change', 'other', '--json']).json().status[0].code).toBe('invalid_transition');
   });
 
-  it('archiving the change closes the item (and a deferred item it came from); the dependant becomes ready', () => {
-    const { root, cli } = project();
-    cli(['defer', 'add', 'Rate-limit export', '--why', 'pilot', '--json']);
-    cli(['backlog', 'add', 'Rate-limit export', '--outcome', 'export is rate limited', '--accept', '429 above 100 rps', '--source-type', 'deferred', '--source-ref', 'D1', '--json']);
-    cli(['backlog', 'start', 'B1', '--json']);
-    cli(['backlog', 'start', 'B4', '--json']);
-    for (const id of ['show-claim-stage', 'rate-limit-export']) {
-      const r = cli(['archive', id, '--yes', '--force', '--note', 'test shortcut', '--json']);
-      expect(r.code, r.stdout + r.stderr).toBe(0);
-    }
-    const list = cli(['backlog', 'list', '--json']).json();
-    expect(list.items.find((i: { id: string }) => i.id === 'B1')).toMatchObject({ status: 'done' });
-    expect(list.items.find((i: { id: string }) => i.id === 'B4')).toMatchObject({ status: 'done' });
-    expect(list.items.find((i: { id: string }) => i.id === 'B2')).toMatchObject({ status: 'open', ready: true });
-    expect(cli(['defer', 'list', '--json']).json().items[0]).toMatchObject({ id: 'D1', status: 'done' });
-    expect(events(root)).toContain('backlog.done');
+  describe('archive propagation', () => {
+    beforeEach(function prepareDeferredSource({ task }) {
+      const started = performance.now();
+      const { cli } = prepared;
+      cli(['defer', 'add', 'Rate-limit export', '--why', 'pilot', '--json']);
+      cli(['backlog', 'add', 'Rate-limit export', '--outcome', 'export is rate limited', '--accept',
+        '429 above 100 rps', '--source-type', 'deferred', '--source-ref', 'D1', '--json']);
+      task.meta.archiveSourcePreparationMs = performance.now() - started;
+    });
+    beforeEach(function startLinkedChanges({ task }) {
+      const started = performance.now();
+      prepared.cli(['backlog', 'start', 'B1', '--json']);
+      prepared.cli(['backlog', 'start', 'B4', '--json']);
+      task.meta.linkedChangePreparationMs = performance.now() - started;
+    });
+
+    it('archiving the change closes the item (and a deferred item it came from); the dependant becomes ready', () => {
+      const { root, cli } = prepared;
+      for (const id of ['show-claim-stage', 'rate-limit-export']) {
+        const r = cli(['archive', id, '--yes', '--force', '--note', 'test shortcut', '--json']);
+        expect(r.code, r.stdout + r.stderr).toBe(0);
+      }
+      const list = cli(['backlog', 'list', '--json']).json();
+      expect(list.items.find((i: { id: string }) => i.id === 'B1')).toMatchObject({ status: 'done' });
+      expect(list.items.find((i: { id: string }) => i.id === 'B4')).toMatchObject({ status: 'done' });
+      expect(list.items.find((i: { id: string }) => i.id === 'B2')).toMatchObject({ status: 'open', ready: true });
+      expect(cli(['defer', 'list', '--json']).json().items[0]).toMatchObject({ id: 'D1', status: 'done' });
+      expect(events(root)).toContain('backlog.done');
+    });
   });
 });
 
 describe('sdlc next and the report with a backlog', () => {
-  it('with no active change, next proposes the first ready item instead of failing', () => {
-    const { cli } = project();
-    const r = cli(['next', '--json']);
-    expect(r.code, r.stdout).toBe(0);
-    expect(r.json()).toMatchObject({ change: null, next: { actor: 'agent', action: 'start-backlog-item', item: 'B1', cli: 'sdlc backlog start B1' } });
-    expect(cli(['next']).stdout).toMatch(/B1[\s\S]*sdlc backlog start B1/);
+  describe('a ready backlog', () => {
+    let prepared: ReturnType<typeof project>;
+    beforeEach(function scaffoldReadyBacklog({ task }) {
+      const started = performance.now();
+      prepared = project();
+      task.meta.backlogScaffoldMs = performance.now() - started;
+    });
+
+    it('with no active change, next proposes the first ready item instead of failing', () => {
+      const { cli } = prepared;
+      const r = cli(['next', '--json']);
+      expect(r.code, r.stdout).toBe(0);
+      expect(r.json()).toMatchObject({ change: null, next: { actor: 'agent', action: 'start-backlog-item',
+        item: 'B1', cli: 'sdlc backlog start B1' } });
+      expect(cli(['next']).stdout).toMatch(/B1[\s\S]*sdlc backlog start B1/);
+    });
   });
 
   it('negative: with no change and nothing ready, next still reports that there is no active change', () => {
@@ -103,18 +133,32 @@ describe('sdlc next and the report with a backlog', () => {
     expect(r.json().status[0].code).toBe('no_active_changes');
   });
 
-  it('report and dashboard show epic progress and what is next', () => {
-    const { cli } = project();
-    cli(['backlog', 'start', 'B1', '--json']);
-    const model = cli(['report', '--json']).json();
-    expect(model.backlog.epics[0]).toMatchObject({ id: 'E1', title: 'Claims self-service', total: 2, inProgress: 1, open: 1 });
-    expect(model.backlog.counts).toMatchObject({ open: 2, 'in-progress': 1, done: 0, dropped: 0 });
-    expect(model.backlog.next.map((i: { id: string }) => i.id)).toEqual([]);
-    expect(model.backlog.blocked.map((i: { id: string }) => i.id)).toEqual(['B2']);
-    expect(cli(['report', '--format', 'md']).stdout).toMatch(/## Backlog[\s\S]*Claims self-service/);
-    const html = cli(['dashboard']).stdout;
-    const start = html.indexOf('<h2 id="backlog"');
-    expect(start).toBeGreaterThan(-1);
-    expect(html.slice(start, html.indexOf('</section>', start))).toContain('Claims self-service');
+  describe('backlog reporting', () => {
+    let prepared: ReturnType<typeof project>;
+    beforeEach(function scaffoldReportBacklog({ task }) {
+      const started = performance.now();
+      prepared = project();
+      task.meta.backlogScaffoldMs = performance.now() - started;
+    });
+    beforeEach(function startReportedChange({ task }) {
+      const started = performance.now();
+      prepared.cli(['backlog', 'start', 'B1', '--json']);
+      task.meta.reportPreparationMs = performance.now() - started;
+    });
+
+    it('report and dashboard show epic progress and what is next', () => {
+      const { cli } = prepared;
+      const model = cli(['report', '--json']).json();
+      expect(model.backlog.epics[0]).toMatchObject({ id: 'E1', title: 'Claims self-service',
+        total: 2, inProgress: 1, open: 1 });
+      expect(model.backlog.counts).toMatchObject({ open: 2, 'in-progress': 1, done: 0, dropped: 0 });
+      expect(model.backlog.next.map((i: { id: string }) => i.id)).toEqual([]);
+      expect(model.backlog.blocked.map((i: { id: string }) => i.id)).toEqual(['B2']);
+      expect(cli(['report', '--format', 'md']).stdout).toMatch(/## Backlog[\s\S]*Claims self-service/);
+      const html = cli(['dashboard']).stdout;
+      const start = html.indexOf('<h2 id="backlog"');
+      expect(start).toBeGreaterThan(-1);
+      expect(html.slice(start, html.indexOf('</section>', start))).toContain('Claims self-service');
+    });
   });
 });

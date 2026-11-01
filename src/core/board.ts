@@ -14,7 +14,8 @@ import type { TaskItem } from './task-contract.js';
 import { changeTasks, exportItems } from './task-contract.js';
 import { planOpen } from './task-contract.js';
 import { checkResult, type TaskResult } from './task-result.js';
-import { updateBoard, type Board, type BoardClaim } from './board-store.js';
+import { updateBoard, readBoard, type Board, type BoardClaim } from './board-store.js';
+import { boardAt } from './board-projection.js';
 import { excludedExecutors, previousAttempts, reopenedClaims } from './board-reopen.js';
 import { activeDispatch, expireDispatches, expireHeldClaims, leaseSeconds, refuseDispatch } from './board-dispatch.js';
 import { refuseAuction, settleAuctions } from './board-market.js';
@@ -155,21 +156,19 @@ export function boardTasks(
 export function boardTaskListing(
   root: string, paths: ProjectPaths, config: SdlcConfig, changeId?: string,
 ): { tasks: BoardTaskView[]; errors: ChangeEvaluationError[] } {
-  declareOperation(root, config, 'list', { change: changeId });
-  return withBoard(root, config, (board) => {
-    const refs = changeId === undefined ? listActiveChanges(paths) : [resolveChange(paths, changeId)];
-    const { evaluated, errors } = evaluateEach(root, refs, config, { skipFingerprint: true, skipPeople: true });
-    const tasks: BoardTaskView[] = [];
-    for (const { ref, view } of evaluated) {
-      if (!planOpen(view)) continue;
-      const state = readChangeState(ref.dir);
-      for (const task of changeTasks(ref)) {
-        if (task.done) continue;
-        tasks.push(taskView(ref, task, board, state));
-      }
+  const board = boardAt(root, config, readBoard(root), evaluationTime(root));
+  const refs = changeId === undefined ? listActiveChanges(paths) : [resolveChange(paths, changeId)];
+  const { evaluated, errors } = evaluateEach(root, refs, config, { skipFingerprint: true, skipPeople: true });
+  const tasks: BoardTaskView[] = [];
+  for (const { ref, view } of evaluated) {
+    if (!planOpen(view)) continue;
+    const state = readChangeState(ref.dir);
+    for (const task of changeTasks(ref)) {
+      if (task.done) continue;
+      tasks.push(taskView(ref, task, board, state));
     }
-    return { tasks, errors };
-  });
+  }
+  return { tasks, errors };
 }
 
 /** The task one claim holds: `<change>#<task>`; a held claim blocks, a submitted one is terminal. */

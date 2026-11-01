@@ -1,7 +1,8 @@
 import { runCli, type CliCallerContext, type CliRun } from './run-cli.js';
 import { checkArguments, findTool, isWriteTool } from './tools.js';
-import { canonical, parseExtensions } from '../plugins/api.js';
+import { LIMITS, canonical, parseExtensions, type Extensions } from '../plugins/api.js';
 import { toDiagnostic } from '../core/errors.js';
+import { callDirectTool, DIRECT_TOOLS } from './direct-tools.js';
 
 /**
  * One tools/call of `sdlc mcp serve` (B13) in one project: the arguments checked, the CLI command run with `--json`
@@ -69,12 +70,14 @@ export async function callTool(
   if (!tool) return errorResult('unknown_tool', `unknown tool: ${name}`);
   let scalar = input;
   let extensions: string[] = [];
+  let parsedExtensions: Extensions | undefined;
   if (tool.extensions && input !== null && typeof input === 'object' && !Array.isArray(input)) {
     const { ext, ...rest } = input as Record<string, unknown>;
     scalar = rest;
     try {
       const parsed = parseExtensions(ext);
-      if (parsed !== undefined) extensions = ['--ext-json', canonical(parsed)];
+      parsedExtensions = parsed;
+      if (parsed !== undefined) extensions = ['--ext-json', canonical(parsed, LIMITS.extBytes, LIMITS.depth + 1)];
     } catch (error) {
       const diagnostic = toDiagnostic(error);
       return errorResult(diagnostic.code, diagnostic.message);
@@ -82,6 +85,9 @@ export async function callTool(
   }
   const args = checkArguments(tool, scalar);
   if (typeof args === 'string') return errorResult('invalid_arguments', `${name}: ${args}`);
+  if (name === 'task_export' && args.executor !== undefined && executor === undefined) {
+    return errorResult('executor_token_required', 'Task export attribution requires an executor token.');
+  }
   if (name === 'task_export' && executor !== undefined) {
     if (args.executor !== undefined && args.executor !== executor) {
       return errorResult('invalid_arguments', 'Task export target does not match the authenticated executor.');
@@ -90,5 +96,16 @@ export async function callTool(
   }
   const identity = isWriteTool(name) ? ['--executor', executor ?? ''] : [];
   const argv = [...tool.argv(args), ...identity, ...extensions, '--json'];
+  if (run === runCli && DIRECT_TOOLS.has(name)) {
+    try {
+      const result = await callDirectTool(name, args, cwd, executor, parsedExtensions);
+      const failed = result.result && typeof result.result === 'object' && 'ok' in result.result
+        && result.result.ok === false;
+      return resultOf({ code: failed ? 1 : 0, stdout: JSON.stringify(result), stderr: '' }, name);
+    } catch (error) {
+      const diagnostic = toDiagnostic(error);
+      return errorResult(diagnostic.code, diagnostic.message);
+    }
+  }
   return resultOf(await run(argv, cwd, { origin: 'mcp', ...(executor ? { executor } : {}) }), name);
 }

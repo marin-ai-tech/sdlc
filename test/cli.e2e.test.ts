@@ -87,12 +87,18 @@ describe('sdlc CLI end to end (with the bundled OpenSpec)', () => {
     expect(r.json().status[0].code).toBe('agent_cannot_approve');
   });
 
-  it('walks intent -> spec -> plan with human approvals', () => {
+  it('walks intent -> spec -> plan with human approvals: intent approval', () => {
     expect(cli(['approve', 'intent', '--change', 'add-farewell']).code).toBe(0);
+  });
+
+  it('walks intent -> spec -> plan with human approvals: spec approval', () => {
     for (const f of ['proposal.md', 'specs/greeting/spec.md', 'design.md']) write(path.join(changeDir(), f), FILES[f]);
     const v = cli(['validate', '--change', 'add-farewell', '--json']);
     expect(v.code, v.stdout).toBe(0);
     expect(cli(['approve', 'spec', '--change', 'add-farewell']).code).toBe(0);
+  });
+
+  it('walks intent -> spec -> plan with human approvals: plan approval', () => {
     for (const f of ['plan.md', 'tasks.md']) write(path.join(changeDir(), f), FILES[f]);
     const blocked = cli(['approve', 'review', '--change', 'add-farewell', '--json']);
     expect(blocked.json().status[0].code).toBe('gate_blocked');

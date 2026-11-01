@@ -28,6 +28,9 @@ Write the requirements and design spec - Stage 2 (Design): `proposal.md`, delta 
 7. **Stop at the gate.** Summarize: capabilities touched, requirements added/modified/removed, open concerns and who owns each. Then give the product owner the approval command: `sdlc approve spec --change <id>` (for `risk: high` a tech lead also runs `sdlc approve spec --change <id> --as tech-lead`). Planning continues with {{cmd:plan}} only after approval.
 
 **Guardrails**
+- In solo mode, use the analyst role for this workflow. Announce a deliberate switch to the architect skill when
+  working on the architecture decision, and return to analyst for requirements; only one role is active at a time.
+- Show editable answer drafts for open questions using the contract's literal commands; do not submit them.
 - Planning only: no code edits.
 - Ask about ambiguity that changes scope, externally visible behavior, compatibility or acceptance criteria; record minor assumptions in the artifacts.
 - Specs describe behavior; implementation detail goes to design.md and plan.md.

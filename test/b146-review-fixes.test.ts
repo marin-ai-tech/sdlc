@@ -17,7 +17,7 @@ import { git, humanEnv, initGitRepo, read, runCli, tempDir, write } from './help
  *   refused and never becomes a hook command.
  * - F2: session start names a config that fails to load even when its raw mode is `off`.
  * - F3: an sdlc.yaml that exists but cannot be read denies like one that fails to parse.
- * - F4: an unterminated quoted `--change` on a held change is denied (cmd.exe passes it to the CLI).
+ * - F4: malformed quoted `--change` inputs are denied by the static parser before takeover checks.
  * - F6: the quoted and `=` forms of `--change`, a planned-file takeover in a folder with shell syntax, and validate
  *   on a skipped folder whose other checks would pass.
  * - F8: the validate text names the folder, not `{id}`. F9: the MCP-stage reason with no valid stage reads.
@@ -243,11 +243,14 @@ describe('F3: an sdlc.yaml that cannot be read denies', () => {
 });
 
 describe('F4 and F6: the takeover step rule reads every quoted form of --change', () => {
-  it('An unterminated quoted --change on a held change is denied', () => {
+  it('An unterminated quoted --change is denied before takeover or read-only exceptions', () => {
     const p = heldDemo();
-    const out = shell(p, 'sdlc verify --change "demo');
-    expect(out.decision, out.stdout).toBe('deny');
-    expect(out.reason).toContain('[sdlc:takeover]');
+    for (const command of ['sdlc verify --change "demo', 'sdlc status --change "demo']) {
+      const out = shell(p, command);
+      expect(out.decision, command + out.stdout).toBe('deny');
+      expect(out.reason).toContain('[sdlc:shell-parse]');
+      expect(out.reason).toContain('Unterminated shell quote.');
+    }
   }, TIMEOUT);
 
   it('Single-quoted, double-quoted and = forms on a held change are denied', () => {
@@ -261,7 +264,7 @@ describe('F4 and F6: the takeover step rule reads every quoted form of --change'
   it('negative: Another change and a read-only step stay allowed', () => {
     const p = heldDemo();
     for (const command of ["sdlc verify --change 'demo2'", "sdlc status --change 'demo'",
-      'sdlc status --change "demo']) {
+      'sdlc status --change "demo"']) {
       expect(shell(p, command).decision, command).toBe('none');
     }
   }, TIMEOUT);

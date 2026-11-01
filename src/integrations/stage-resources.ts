@@ -1,6 +1,7 @@
 import type { SdlcConfig } from '../core/config.js';
 import type { StageConfigId } from '../core/stage-config.js';
 import type { RoleFile } from '../team/role-file.js';
+import { roleForWorkflow, type ExecutionRole } from '../team/solo.js';
 
 /**
  * Stage resources in the generated workflows (B14, B97). A workflow of a stage ends with the skills, subagents and MCP
@@ -24,6 +25,10 @@ const WORKFLOW_STAGE: Record<string, StageConfigId> = {
   triage: 'maintain',
 };
 
+const ROLE_STAGE: Record<ExecutionRole, StageConfigId> = {
+  analyst: 'plan', architect: 'design', developer: 'build', tester: 'test', reviewer: 'deploy',
+};
+
 export interface StageResources {
   stage: StageConfigId;
   skills: string[];
@@ -32,6 +37,7 @@ export interface StageResources {
   servers: string[];
   /** The build workflow's default simplifier step (B109). */
   simplify: boolean;
+  executionRole?: ExecutionRole;
 }
 
 /** The subagent the build workflow runs after the last task (B109). */
@@ -56,18 +62,19 @@ export function stageResources(
   workflow: string,
   team: readonly RoleFile[] = []
 ): StageResources | undefined {
-  const stage = WORKFLOW_STAGE[workflow];
+  const executionRole = roleForWorkflow(config, workflow);
+  const stage = WORKFLOW_STAGE[workflow] ?? (executionRole ? ROLE_STAGE[executionRole] : undefined);
   if (!stage) return undefined;
   const own = config.stages[stage];
   const servers = (config.mcp?.servers ?? [])
     .filter((s) => s.agents && s.stages.includes(stage))
     .map((s) => s.name);
-  const skills = own?.skills ?? [];
+  const skills = [...(own?.skills ?? []), ...(executionRole ? [`sdlc-role-${executionRole}`] : [])];
   const simplify = simplifies(config, workflow);
   const configured = [...(own?.agents ?? []), ...(simplify ? [SIMPLIFIER] : [])];
   const agents = stageAgents(configured, stage, team);
   if (skills.length + agents.length + servers.length === 0) return undefined;
-  return { stage, skills, agents, servers, simplify };
+  return { stage, skills, agents, servers, simplify, ...(executionRole ? { executionRole } : {}) };
 }
 
 /** `allowed-tools` of a Claude Code skill or command: the CLI, then the stage's MCP tools. */
@@ -84,6 +91,10 @@ function list(values: string[]): string {
 export function stageSection(resources: StageResources | undefined): string {
   if (!resources) return '';
   const lines = ['', `## Stage resources (${resources.stage})`, ''];
+  if (resources.executionRole) {
+    lines.push(`- Active execution role: ${resources.executionRole}. Follow its bundled skill for this workflow.`);
+    lines.push('- The execution role is guidance; human authority and project commit rules still apply.');
+  }
   if (resources.skills.length > 0) lines.push(`- Skills for this stage: ${list(resources.skills)}.`);
   if (resources.agents.length > 0) lines.push(`- Subagents for this stage: ${list(resources.agents)}.`);
   if (resources.simplify) lines.push(SIMPLIFY_STEP);

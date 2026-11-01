@@ -16,6 +16,12 @@ Work with the backlog (`openspec/backlog.md`): the ordered list of planned chang
 - Never edit `openspec/backlog.md` directly: the hook denies it. Every change goes through `sdlc backlog add`, `sdlc backlog epic add` and `sdlc backlog edit`.
 - Order and removal are a person's decision. When an item should move or go, give the person the exact command to run in their own terminal (`sdlc backlog move B<n> --top`, `--before B<m>`, `--epic E<n>`, or `sdlc backlog drop B<n> --note "<reason>"`), explain why, and do not run it yourself.
 - An item is ready when it has an outcome, at least one acceptance criterion and every dependency done.
+- **Owner granularity**: read the epic's `granularity` in `sdlc backlog list --json` before proposing a split.
+  Reuse an already explicit owner choice from the epic or the current request; do not ask the same sizing question
+  again. Persist it with `sdlc backlog epic edit E<n> --granularity <package|feature|small>` (or the same flag on
+  `epic add`). `package` keeps the coordinated work together, `feature` groups coherent outcomes, and `small`
+  proposes smaller independently checkable changes. When there is no explicit choice, show the proposed size and
+  split for confirmation before adding items. Preserve existing priorities and items.
 
 **Steps**
 

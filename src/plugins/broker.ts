@@ -4,7 +4,7 @@ import { agentEnvironment } from '../core/agent-env.js';
 import { loadConfig, type SdlcConfig } from '../core/config.js';
 import { readExecutors } from '../core/executors.js';
 import { formatIdentity, gitIdentity } from '../core/git.js';
-import { canonical, fail, json, keys, object, parsePluginInput, type Actor, type Json } from './api.js';
+import { LIMITS, canonical, fail, json, keys, object, parsePluginInput, type Actor, type Json } from './api.js';
 import { withActivation } from './activation.js';
 import { pluginEvents, projectEvents } from './events.js';
 import { activePlugin, currentActive, type ActivePlugin } from './trust.js';
@@ -25,8 +25,6 @@ function authorize(root: string, active: ActivePlugin, operation: string, actor:
 }
 
 export function cliActor(root: string, executor?: string): Actor {
-  if (process.env.SDLC_MCP_ORIGIN === '1') return { origin: 'mcp',
-    ...(process.env.SDLC_MCP_EXECUTOR ? { executor: process.env.SDLC_MCP_EXECUTOR } : {}) };
   const person = !agentEnvironment() ? formatIdentity(gitIdentity(root)) : undefined;
   return { origin: 'cli', ...(person ? { person } : {}), ...(executor ? { executor } : {}) };
 }
@@ -49,7 +47,8 @@ function projectedReply(root: string, config: SdlcConfig, name: string, stateId:
 export async function callPlugin(root: string, config: SdlcConfig, name: string, operation: string,
   input: Json, actor: Actor, request?: string) {
   const currentConfig = loadConfig(`${root}/openspec/sdlc.yaml`);
-  if (canonical(config.plugins?.[name] ?? null) !== canonical(currentConfig.plugins?.[name] ?? null)) {
+  if (canonical(config.plugins?.[name] ?? null, LIMITS.jsonBytes, LIMITS.depth + 8)
+    !== canonical(currentConfig.plugins?.[name] ?? null, LIMITS.jsonBytes, LIMITS.depth + 8)) {
     fail('plugin_evaluation_stale', 'Plugin descriptor configuration changed before invocation');
   }
   config = currentConfig;
@@ -64,7 +63,8 @@ export async function callPlugin(root: string, config: SdlcConfig, name: string,
       fail('plugin_evaluation_stale', 'Executor registry changed during invocation');
     }
   };
-  const args = json({ operation, input, actor, digest: active.snapshot.digest, config: active.setting.config });
+  const args = json({ operation, input, actor, digest: active.snapshot.digest, config: active.setting.config },
+    LIMITS.jsonBytes, LIMITS.depth + 8);
   if (access !== 'read') {
     if (!request) fail('plugin_request', 'A stable request id is required for mutating operations');
     const saved = receipt(active.store, request, args);
@@ -73,7 +73,9 @@ export async function callPlugin(root: string, config: SdlcConfig, name: string,
         reauthorize();
         const current = activePlugin(root, loadConfig(`${root}/openspec/sdlc.yaml`), name);
         if (current.store.stateId !== active.store.stateId || current.snapshot.digest !== active.snapshot.digest
-          || canonical(current.setting) !== canonical(active.setting) || current.configDigest !== active.configDigest) {
+          || canonical(current.setting, LIMITS.jsonBytes, LIMITS.depth + 8)
+            !== canonical(active.setting, LIMITS.jsonBytes, LIMITS.depth + 8)
+          || current.configDigest !== active.configDigest) {
           fail('plugin_evaluation_stale', 'Plugin activation changed');
         }
         return receipt(current.store, request!, args)!;
@@ -84,7 +86,7 @@ export async function callPlugin(root: string, config: SdlcConfig, name: string,
   const response = (await invoke(active.snapshot, { operation, input, state: active.store.data, revision: active.store.revision,
     config: active.setting.config, context: json({ actor }) }))!;
   if (access === 'read') {
-    withActivation(root, () => currentActive(root, active));
+    currentActive(root, active);
     return reply(name, response);
   }
   const tx = randomUUID();

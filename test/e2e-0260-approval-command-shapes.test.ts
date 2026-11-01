@@ -149,9 +149,8 @@ describe('suggested-commands: the cli setting ends with the program', () => {
       p.setConfig((config) => { config.cli = value; });
       const [item] = p.must(['next', '--me', '--json']).json<Json>().items as Json[];
       expect(item.cli.startsWith(`${value} approve intent --change demo`), item.cli).toBe(true);
-      // The JSON reads that do not apply the setting keep `sdlc`, as before this change.
-      expect(p.must(['report', '--json', '--change', 'demo']).json<Json>().changes[0].next.cli)
-        .toMatch(/^sdlc approve intent --change demo/);
+      const reportCli = p.must(['report', '--json', '--change', 'demo']).json<Json>().changes[0].next.cli;
+      expect(reportCli.startsWith(`${value} approve intent --change demo`), reportCli).toBe(true);
     }
   }, 240000);
 });

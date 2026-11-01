@@ -43,11 +43,13 @@ export interface CliResult {
 }
 
 export function runCli(args: string[], cwd: string, env: NodeJS.ProcessEnv, input?: string): CliResult {
-  const r = spawnSync(process.execPath, [BIN, ...args], { cwd, env, encoding: 'utf-8', input, maxBuffer: 32 * 1024 * 1024 });
+  const r = spawnSync(process.execPath, [BIN, ...args], {
+    cwd, env, encoding: 'utf-8', input, maxBuffer: 32 * 1024 * 1024, timeout: 120000, killSignal: 'SIGKILL',
+  });
   return {
     code: r.status,
     stdout: r.stdout ?? '',
-    stderr: r.stderr ?? '',
+    stderr: `${r.stderr ?? ''}${r.error ? `\n${r.error.message}` : ''}`,
     json<T>() {
       return JSON.parse(r.stdout) as T;
     },
@@ -61,8 +63,8 @@ export function runCli(args: string[], cwd: string, env: NodeJS.ProcessEnv, inpu
 export function git(cwd: string, args: string[]): void {
   const env: NodeJS.ProcessEnv = { ...process.env };
   for (const key of AGENT_VARS) delete env[key];
-  const r = spawnSync('git', args, { cwd, encoding: 'utf-8', env });
-  if (r.status !== 0) throw new Error(`git ${args.join(' ')} failed: ${r.stderr}`);
+  const r = spawnSync('git', args, { cwd, encoding: 'utf-8', env, timeout: 120000, killSignal: 'SIGKILL' });
+  if (r.status !== 0) throw new Error(`git ${args.join(' ')} failed: ${r.stderr || r.error?.message || r.status}`);
 }
 
 export function initGitRepo(dir: string): void {

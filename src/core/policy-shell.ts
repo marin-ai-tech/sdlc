@@ -3,8 +3,13 @@ import * as path from 'node:path';
 import picomatch from 'picomatch';
 import { isWithin, toPosix, listFilesRecursive } from './fs-utils.js';
 import { INBOX_DIR } from '../mcp/inbox.js';
-import { scanShell } from './policy-shell-scanner.js';
-import { STATE_FILES } from './state-files.js';
+import { decodedShellWords, shellWords, type ShellCommand, type ShellContext } from './shell-words.js';
+import { shellBody, MAX_SHELL_BODY_DEPTH } from './shell-cli.js';
+import { shellWriteDestinationPaths } from './policy-shell-writes.js';
+import { nodeTargets, pythonTargets, perlTargets } from './policy-shell-tools.js';
+import { STATE_FILES, WRITER_COORDINATION_DIRS, writerCoordinationFiles } from './state-files.js';
+import { copyOperands } from './copy-operands.js';
+import { programLocation } from './shell-program.js';
 
 /**
  * Which state files a tool call writes, beyond the path text `policy.ts` matches (rule `state-integrity`):
@@ -37,6 +42,7 @@ export const STATE_FILE_WRITE =
 export const STATE_FILE = new RegExp(
   '(^|/)\\.sdlc\\.yaml$|^openspec/\\.sdlc/(?:hook-)?log\\.jsonl$|' +
     '^openspec/\\.sdlc/(?:log\\.lock|team\\.json|board\\.json|board\\.lock)$' +
+    '|^openspec/\\.sdlc/(?:log|board)\\.lock\\.writers(?:/.*)?$' +
     '|^openspec/\\.sdlc/plugins(?:/.*)?$|^openspec/\\.sdlc/inbox/[^/]+$|^openspec/(?:roles\\.yaml|executors\\.yaml|backlog\\.md)$',
   'i'
 );
@@ -163,26 +169,7 @@ export interface DirState {
 
 /** Splits at shell operators outside quotes and PowerShell here-strings. */
 export function simpleCommands(command: string): string[] {
-  const out: string[] = [];
-  let start = 0;
-  scanShell(command, (ch, i, quoted) => {
-    if (quoted || i < start) {
-      return;
-    }
-    if (ch === '>' && command[i - 1] === '&') {
-      return;
-    }
-    if (!/[;&|{}\r\n]/.test(ch)) {
-      return;
-    }
-    if (ch === '&' && (command[i - 1] === '>' || command[i + 1] === '>' || command[i + 1] === '{')) {
-      return;
-    }
-    out.push(command.slice(start, i));
-    start = i + (command[i + 1] === ch && /[&|]/.test(ch) ? 2 : 1);
-  });
-  out.push(command.slice(start));
-  return out;
+  return shellWords(command).commands.map((part) => part.raw);
 }
 
 /**
@@ -190,12 +177,11 @@ export function simpleCommands(command: string): string[] {
  * arguments (`[IO.Directory]::Delete('dir', $true)`) are words of their own.
  */
 function words(segment: string): string[] {
-  return segment.replace(/\*>>?/g, '>')
-    .split(/[\s(),]+|[<>]+/)
-    .map((word) => word.replace(/['"]/g, ''))
-    .map((word) => word.replace(/^\(+|\)+$/g, ''))
-    .map((word) => word.replace(/^-{0,2}[A-Za-z_][\w-]*=/, ''))
-    .filter((word) => word !== '');
+  const native = decodedShellWords(segment, true).filter((word) => !word.operator);
+  return decodedShellWords(segment).filter((word) => !word.operator)
+    .flatMap((word, index) => native[index]?.value !== word.value ? [word, native[index]] : [word])
+    .filter((word) => word !== undefined)
+    .map((word) => word.value.replace(/^-{0,2}[A-Za-z_][\w-]*=/, ''));
 }
 
 /** A word as an absolute path from the current directory, or undefined when it cannot be told. */
@@ -254,7 +240,8 @@ function stateCandidates(root: string, glob: string, folders: boolean): string[]
   if (literal === 'openspec' || literal.startsWith('openspec/')) dirs.add(literal);
   const pluginFiles = listFilesRecursive(path.join(root, 'openspec/.sdlc/plugins'))
     .map((name) => `openspec/.sdlc/plugins/${name}`);
-  const files = [...FIXED_STATE_FILES, ...[...dirs].map((dir) => `${dir}/.sdlc.yaml`), ...inboxFiles(root), ...pluginFiles];
+  const files = [...FIXED_STATE_FILES, ...[...dirs].map((dir) => `${dir}/.sdlc.yaml`), ...inboxFiles(root),
+    ...pluginFiles, ...WRITER_COORDINATION_DIRS, ...writerCoordinationFiles(root)];
   if (!folders) return files;
   return [...files, 'openspec', 'openspec/changes', 'openspec/.sdlc', INBOX_DIR, ...dirs];
 }
@@ -291,6 +278,9 @@ export interface WriteSegment {
   text: string;
   dir: string | undefined;
   words: string[];
+  folders?: boolean;
+  /** Explicit projected destinations do not depend on a second raw-text writer classification. */
+  destinations?: string[];
 }
 
 /** `git -C <dir> …`: the paths after it are relative to that directory; the option itself names no target. */
@@ -311,19 +301,70 @@ function gitDir(dir: string | undefined, list: string[]): { dir: string | undefi
 
 /** The simple commands of a shell command that write, following `cd`/`pushd`/`popd` and `git -C`. */
 export function writeSegments(command: string, cwd: string): WriteSegment[] {
-  const state: DirState = { dir: path.resolve(cwd), stack: [] };
+  return scopedWriteSegments(command, { dir: path.resolve(cwd), stack: [] }, 0, {});
+}
+
+function redirectTargets(command: ShellCommand): string[] {
+  return command.words.filter((_word, index) => command.words[index - 1]?.operator
+    && command.words[index - 1].value === '>').map((word) => word.value);
+}
+
+function scopedWriteSegments(input: string, state: DirState, depth: number, context: ShellContext): WriteSegment[] {
   const out: WriteSegment[] = [];
-  for (const segment of simpleCommands(command)) {
-    const list = words(segment);
+  const parsed = shellWords(input, context.dialect === 'cmd' ? true : undefined, context);
+  for (const part of parsed.commands) {
+    const redirects = redirectTargets(part);
+    if (redirects.length) out.push({ text: part.raw, dir: state.dir, words: ['', ...redirects], folders: false,
+      destinations: redirects.flatMap(file => absolute(state.dir, file) ?? []) });
+    const execution = programLocation(part.words.filter(word => !word.operator).map(word => word.value), state.dir);
+    const body = shellBody(part, context);
+    if (body) {
+      if (depth < MAX_SHELL_BODY_DEPTH) out.push(...scopedWriteSegments(
+        body.input, { dir: execution.dir, stack: [] }, depth + 1, body.context,
+      ));
+      continue;
+    }
+    const list = words(part.raw);
     if (list.length === 0) continue;
     if (DIR_COMMAND.test(list[0]) || POP_COMMAND.test(list[0])) {
       moveTo(state, list[0], list.slice(1));
       continue;
     }
-    if (!WRITE_OPS.test(segment)) continue;
-    out.push({ text: segment, ...gitDir(state.dir, list) });
+    const write = projectedWrite(part, list, state.dir, context);
+    if (write) out.push(write);
   }
   return out;
+}
+
+function projectedWrite(
+  command: ShellCommand, list: string[], dir: string | undefined, context: ShellContext,
+): WriteSegment | undefined {
+  const copy = copyOperands(command, context);
+  const argv = command.words.filter(word => !word.operator).map(word => word.value);
+  const execution = programLocation(argv, dir);
+  if (execution.at < 0) return undefined;
+  if (copy?.recursive) {
+    const destinations = copy.destinations.flatMap(file => absolute(execution.dir, file) ?? []);
+    return { text: command.raw, dir, words: [copy.program, ...destinations], destinations, folders: true };
+  }
+  const at = execution.at;
+  const name = path.posix.basename(argv[at]?.replace(/\\/g, '/') ?? '').replace(/\.exe$/i, '');
+  if (/^(?:node|python[\d.]*|py|perl)$/i.test(name)) {
+    const args = argv.slice(at + 1);
+    const files = /^node/i.test(name) ? nodeTargets(args, true)
+      : /^perl/i.test(name) ? [...perlTargets(args), ...shellWriteDestinationPaths(command.raw, dir ?? '')]
+        : pythonTargets(args, true);
+    const targets = files
+      .map(file => absolute(execution.dir, file)).filter((file): file is string => file !== undefined);
+    return targets.length ? { text: command.raw, dir, words: [argv[at], ...targets],
+      destinations: targets, folders: true } : undefined;
+  }
+  if (/^(?:grep|rg|sed|awk|gawk)$/i.test(name)) {
+    const targets = shellWriteDestinationPaths(command.raw, dir ?? '');
+    return targets.length ? { text: command.raw, dir, words: [list[0], ...targets] } : undefined;
+  }
+  return WRITE_OPS.test(command.raw)
+    ? { text: command.raw, ...gitDir(execution.dir, at > 0 ? argv.slice(at) : list) } : undefined;
 }
 
 /**
@@ -341,7 +382,7 @@ export function shellStateWrites(command: string, root: string, cwd: string): st
 export function shellWrites(command: string, root: string, cwd: string, set: ProtectedSet): string[] {
   const hits: string[] = [];
   for (const segment of writeSegments(command, cwd)) {
-    const folders = FOLDER_OPS.test(segment.text);
+    const folders = segment.folders ?? FOLDER_OPS.test(segment.text);
     for (const word of segment.words) {
       const hit = wordHit(root, segment.dir, word, folders, set);
       if (hit !== undefined) hits.push(hit);
@@ -354,8 +395,9 @@ const REDIRECT_TARGET = /\d*>>?\s*(?:"([^"]+)"|'([^']+)'|([^\s;&|<>()]+))/g;
 
 /** The words a write segment writes to: redirection targets, and every argument of a writing command. */
 function segmentTargets(segment: WriteSegment): string[] {
+  if (segment.destinations) return segment.destinations;
   const targets = [...segment.text.matchAll(REDIRECT_TARGET)].map((m) => m[1] ?? m[2] ?? m[3]);
-  if (FOLDER_OPS.test(segment.text)) targets.push(...segment.words.slice(1));
+  if (segment.folders ?? FOLDER_OPS.test(segment.text)) targets.push(...segment.words.slice(1));
   return targets;
 }
 

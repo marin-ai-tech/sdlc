@@ -1,3 +1,5 @@
+import * as fs from 'node:fs';
+import * as path from 'node:path';
 import { loadProject, recordChangeEvent, type ProjectContext } from '../cli/context.js';
 import { resolveNext } from '../cli/next-hint.js';
 import { c, line, printJson, reportFailure } from '../cli/output.js';
@@ -9,7 +11,7 @@ import { readChangeState } from '../core/change-state.js';
 import { resolveChange, type ChangeRef } from '../core/changes.js';
 import { nextSeq } from '../core/decision-order.js';
 import { SdlcError } from '../core/errors.js';
-import { readText, writeTextAtomic } from '../core/fs-utils.js';
+import { isWithin, readText, writeTextAtomic } from '../core/fs-utils.js';
 import { t } from '../core/i18n.js';
 import { answerLine, withAnswer, type OpenQuestion } from '../core/open-questions.js';
 import { readRolesFile } from '../core/roles.js';
@@ -25,6 +27,7 @@ export interface AnswerOptions {
   change?: string;
   artifact?: string;
   text?: string;
+  textFile?: string;
   list?: boolean;
   json?: boolean;
 }
@@ -37,7 +40,7 @@ export async function answerCommand(n: string | undefined, opts: AnswerOptions):
     const ctx = loadProject();
     assertHuman(ctx.config, 'answer');
     const artifact = parseArtifact(opts.artifact) ?? 'intent';
-    const text = answerText(opts.text);
+    const text = answerText(answerInput(ctx.root, opts));
     const ref = resolveChange(ctx.paths, opts.change);
     const question = pickQuestion(ref, artifact, n);
     const record = recordAnswer(ctx, ref, artifact, question, text);
@@ -63,6 +66,45 @@ function answerText(value: string | undefined): string {
   if (text === '') throw invalidOption('error.answer_text_required');
   // An answer must not hide the questions after it inside an HTML comment.
   return text.replace(/<!--/g, '&lt;!--').replace(/-->/g, '--&gt;');
+}
+
+const MAX_ANSWER_BYTES = 64 * 1024;
+
+function answerInput(root: string, opts: AnswerOptions): string | undefined {
+  if (opts.textFile === undefined) return opts.text;
+  if (opts.text !== undefined) throw invalidOption('error.answer_source_conflict');
+  const target = path.resolve(root, opts.textFile);
+  if (!isWithin(root, target)) throw invalidOption('error.answer_file_inside');
+  try {
+    const real = fs.realpathSync(target);
+    if (!isWithin(fs.realpathSync(root), real)) throw invalidOption('error.answer_file_inside');
+    if (!fs.statSync(real).isFile()) throw invalidOption('error.answer_file_plain');
+    return decodeAnswerFile(real);
+  } catch (error) {
+    if (error instanceof SdlcError) throw error;
+    throw invalidOption('error.answer_file_unreadable');
+  }
+}
+
+function decodeAnswerFile(file: string): string {
+  const flags = fs.constants.O_RDONLY | fs.constants.O_NONBLOCK
+    | (process.platform === 'win32' ? 0 : fs.constants.O_NOFOLLOW);
+  const descriptor = fs.openSync(file, flags);
+  try {
+    const stat = fs.fstatSync(descriptor);
+    if (!stat.isFile()) throw invalidOption('error.answer_file_plain');
+    if (stat.size > MAX_ANSWER_BYTES) throw invalidOption('error.answer_file_limit');
+    const bytes = Buffer.alloc(MAX_ANSWER_BYTES + 1);
+    const length = fs.readSync(descriptor, bytes, 0, bytes.length, 0);
+    if (length > MAX_ANSWER_BYTES) throw invalidOption('error.answer_file_limit');
+    try {
+      return new TextDecoder('utf-8', { fatal: true }).decode(bytes.subarray(0, length));
+    } catch {
+      throw invalidOption('error.answer_file_utf8');
+    }
+  } finally {
+    fs.closeSync(descriptor);
+  }
 }
 
 function pickQuestion(ref: ChangeRef, artifact: QuestionArtifact, n: string | undefined): OpenQuestion {

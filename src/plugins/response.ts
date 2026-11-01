@@ -12,12 +12,14 @@ function eventEnvelope(value: unknown, manifest: Manifest): void {
 
 /** Fixed host contract only. Plugin schemas remain inside the bounded worker. */
 export function responseEnvelope(value: unknown, manifest: Manifest, operation: string, hook = false): PluginResponse {
-  const bounded = json(value);
+  const bounded = json(value, LIMITS.jsonBytes, LIMITS.depth + 8);
   const result = object(bounded, 'response');
   keys(result, ['output', 'facts', 'state', 'events'], 'response');
   if (!Object.hasOwn(result, 'output')) fail('plugin_invalid', 'Response must declare output');
+  json(result.output);
   if (!Object.hasOwn(manifest.operations, operation)) fail('plugin_operation', 'Unknown plugin operation');
-  if (result.facts !== undefined) object(result.facts, 'facts');
+  if (result.facts !== undefined) object(json(result.facts), 'facts');
+  if (result.state !== undefined) json(result.state);
   const events = result.events === undefined ? [] : result.events;
   if (!Array.isArray(events) || events.length > LIMITS.effects) fail('plugin_limit', 'Invalid event batch');
   for (const event of events) eventEnvelope(event, manifest);

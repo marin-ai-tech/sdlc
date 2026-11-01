@@ -118,6 +118,33 @@ describe('interactive sdlc init', () => {
     vi.spyOn(process.stderr, 'write').mockImplementation(() => true);
   };
 
+  it('final OpenCode-only flags preserve CLAUDE.md and existing user Claude settings', async () => {
+    const root = tempDir('sdlc-final-tools-');
+    const content = '# User Claude instructions\n';
+    const settings = '{"userOwned":true}\n';
+    write(path.join(root, 'CLAUDE.md'), content);
+    write(path.join(root, '.claude/settings.json'), settings);
+    quiet();
+    await initCommand(root, { tools: 'opencode', hooks: true, layout: 'none' });
+    expect(parse(read(path.join(root, 'openspec/sdlc.yaml'))).tools).toEqual(['opencode']);
+    expect(read(path.join(root, 'CLAUDE.md'))).toBe(content);
+    expect(read(path.join(root, '.claude/settings.json'))).toBe(settings);
+    expect(fs.existsSync(path.join(root, '.claude/skills'))).toBe(false);
+    expect(fs.existsSync(path.join(root, '.claude/commands'))).toBe(false);
+    expect(fs.existsSync(path.join(root, '.opencode/skills'))).toBe(true);
+  }, 120000);
+
+  it('detected CLAUDE.md cannot override the final OpenCode-only wizard choice', async () => {
+    const root = tempDir('sdlc-final-wizard-');
+    write(path.join(root, 'CLAUDE.md'), '# User content\n');
+    const s = scripted({ tools: ['opencode'], confirm: true, roles: false });
+    quiet();
+    await initCommand(root, { hooks: true }, wizard(s.prompter));
+    expect(parse(read(path.join(root, 'openspec/sdlc.yaml'))).tools).toEqual(['opencode']);
+    expect(fs.existsSync(path.join(root, '.claude'))).toBe(false);
+    expect(read(path.join(root, 'CLAUDE.md'))).toBe('# User content\n');
+  }, 120000);
+
   it('writes what the person chose, like the matching flags, plus roles.yaml', async () => {
     const root = repo();
     const s = scripted({ tools: ['claude'], mode: 'block', statusline: true, opsx: false, language: '', roles: true, confirm: true });

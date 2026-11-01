@@ -12,6 +12,21 @@ export interface PluginStore {
   pending: StoredEvent[]; receipts: Receipt[]; receiptFloor: number;
 }
 
+export const PENDING_LIMIT = Object.freeze({ records: 1024, bytes: 1024 * 1024 });
+
+function compactReply(result: PluginResponse): Json {
+  return { output: json(result.output), ...(result.facts === undefined ? {} : { facts: json(result.facts) }) };
+}
+
+function pendingEvents(current: StoredEvent[], added: StoredEvent[]): StoredEvent[] {
+  const pending = [...current, ...added];
+  if (pending.length > PENDING_LIMIT.records
+    || Buffer.byteLength(canonical(pending, LIMITS.storeBytes, LIMITS.depth + 8)) > PENDING_LIMIT.bytes) {
+    fail('plugin_backpressure', 'Pending events reached the lossless bound; restore logging and project events before retrying');
+  }
+  return pending;
+}
+
 function integer(value: unknown, field: string): number {
   if (!Number.isSafeInteger(value) || (value as number) < 0) fail('plugin_store', `Invalid ${field}`);
   return value as number;
@@ -25,13 +40,17 @@ function parseStore(value: unknown, name: string): PluginStore {
   const pending = v.pending.map((raw) => {
     const event = object(raw, 'pending event');
     keys(event, ['id', 'record'], 'pending event');
-    return { id: text(event.id, 'event id'), record: json(object(event.record, 'event record')) as Record<string, Json> };
+    const record = object(event.record, 'event record');
+    if (record.plugin !== undefined) json(object(record.plugin, 'plugin event').payload, LIMITS.eventBytes);
+    return { id: text(event.id, 'event id'),
+      record: json(record, LIMITS.jsonBytes, LIMITS.depth + 8) as Record<string, Json> };
   });
   const receipts = v.receipts.map((raw) => {
     const r = object(raw, 'receipt');
     keys(r, ['id', 'digest', 'issuedAt', 'tx', 'result'], 'receipt');
     return { id: text(r.id, 'request id'), digest: text(r.digest, 'request digest'),
-      issuedAt: integer(r.issuedAt, 'issuedAt'), tx: text(r.tx, 'transaction'), result: json(r.result) };
+      issuedAt: integer(r.issuedAt, 'issuedAt'), tx: text(r.tx, 'transaction'),
+      result: json(r.result, LIMITS.jsonBytes, LIMITS.depth + 4) };
   });
   if (new Set(pending.map((e) => e.id)).size !== pending.length
     || new Set(receipts.map((r) => r.id)).size !== receipts.length) fail('plugin_store', 'Duplicate store identifiers');
@@ -94,7 +113,9 @@ export function requestTime(id: string, floor: number, now = Date.now()): number
 export function receipt(store: PluginStore, id: string, args: unknown, now = Date.now()): Receipt | undefined {
   requestTimestamp(id, store.receiptFloor, now);
   const found = store.receipts.find((r) => r.id === id);
-  if (found && found.digest !== hash(canonical(args))) fail('plugin_request_conflict', 'Request arguments changed');
+  if (found && found.digest !== hash(canonical(args, LIMITS.jsonBytes, LIMITS.depth + 8))) {
+    fail('plugin_request_conflict', 'Request arguments changed');
+  }
   if (!found) requestTime(id, store.receiptFloor, now);
   return found;
 }
@@ -109,9 +130,10 @@ export function commitStore(root: string, previous: PluginStore, id: string, arg
     const floor = Math.max(current.receiptFloor, Date.now() - LIMITS.receiptMs, 0);
     const issuedAt = requestTime(id, floor);
     const next: PluginStore = { ...current, revision: current.revision + 1, receiptFloor: floor,
-      data: result.state === undefined ? current.data : json(result.state), pending: [...current.pending, ...events],
+      data: result.state === undefined ? current.data : json(result.state), pending: pendingEvents(current.pending, events),
       receipts: [...current.receipts.filter((r) => r.issuedAt >= floor),
-        { id, digest: hash(canonical(args)), issuedAt, tx, result: json(result) }] };
+        { id, digest: hash(canonical(args, LIMITS.jsonBytes, LIMITS.depth + 8)), issuedAt, tx,
+          result: compactReply(result) }] };
     atomicStored(root, storeRelative(previous.name), next);
     return next;
   });

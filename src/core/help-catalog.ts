@@ -9,6 +9,7 @@ import { TOOL_IDS } from '../integrations/types.js';
 export { HUMAN_COMMANDS } from './human-commands.js';
 
 const EXAMPLES: Record<string, string> = {
+  'board recover': `sdlc board recover --expect-owner sha256:${'0'.repeat(64)} --json`,
   'config propose': 'sdlc config propose --set gates.plan.required=true --reason "Review the plan gate"',
   'config show': 'sdlc config show C1',
   'config apply': 'sdlc config apply C1',

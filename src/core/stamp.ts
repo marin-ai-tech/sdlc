@@ -39,12 +39,32 @@ export function tryStampArtifacts(
   files: string[],
   stamp: HarnessStamp,
   assertCurrent?: () => void,
-): { stamped: string[]; error?: string } {
-  try {
-    return { stamped: stampArtifacts(changeDir, files, stamp, assertCurrent) };
-  } catch (error) {
-    return { stamped: [], error: error instanceof Error ? error.message : String(error) };
+): StampAttempt {
+  const stamped: string[] = [];
+  const skipped: StampAttempt['skipped'] = [];
+  const ordered = [...new Set(files)].sort();
+  let error: string | undefined;
+  for (const file of ordered) {
+    if (error) {
+      skipped.push({ file, reason: error });
+      continue;
+    }
+    try {
+      stamped.push(...stampArtifacts(changeDir, [file], stamp, assertCurrent));
+    } catch (cause) {
+      error = (cause instanceof Error && cause.message ? cause.message : String(cause)).slice(0, 500);
+      skipped.push({ file, reason: error });
+    }
   }
+  return { stamped, stampedCount: stamped.length, skipped, skippedCount: skipped.length, ...(error ? { error } : {}) };
+}
+
+export interface StampAttempt {
+  stamped: string[];
+  stampedCount: number;
+  skipped: Array<{ file: string; reason: string }>;
+  skippedCount: number;
+  error?: string;
 }
 
 /** Markdown files at the top level of a change folder. */

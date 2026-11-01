@@ -4,6 +4,7 @@ import { randomUUID } from 'node:crypto';
 import { ensureLocalIgnore } from '../core/local-ignore.js';
 import { fail, parseJson, canonical, LIMITS, type Json } from './api.js';
 import { listFilesRecursive } from '../core/fs-utils.js';
+import { acquireWriterLock } from '../core/writer-lock.js';
 
 export const PLUGIN_ROOT = 'openspec/.sdlc/plugins';
 
@@ -49,12 +50,13 @@ export function readStored(root: string, relative: string, limit = LIMITS.storeB
   try {
     const info = fs.fstatSync(fd);
     if (!info.isFile() || info.nlink !== 1 || info.size > limit) fail('plugin_store', 'Unsafe or oversized plugin store');
-    return parseJson(fs.readFileSync(fd), limit);
+    return parseJson(fs.readFileSync(fd), limit, LIMITS.depth + 8);
   } finally { fs.closeSync(fd); }
 }
 
 export function atomicStored(root: string, relative: string, value: unknown): void {
-  const bytes = Buffer.from(canonical(value, LIMITS.storeBytes));
+  // Host envelope levels do not consume the independently validated guest payload depth.
+  const bytes = Buffer.from(canonical(value, LIMITS.storeBytes, LIMITS.depth + 8));
   const file = storagePath(root, relative, true);
   const temporary = `${relative}.${randomUUID()}.tmp`;
   const tmp = storagePath(root, temporary, true);
@@ -69,30 +71,29 @@ export function atomicStored(root: string, relative: string, value: unknown): vo
     fs.fsyncSync(fd);
   } finally { fs.closeSync(fd); }
   storagePath(root, relative);
-  try { fs.renameSync(tmp, file); }
+  try {
+    fs.renameSync(tmp, file);
+    if (process.platform !== 'win32') {
+      const directory = fs.openSync(path.dirname(file), fs.constants.O_RDONLY);
+      try { fs.fsyncSync(directory); }
+      finally { fs.closeSync(directory); }
+    }
+  }
   catch { fail('plugin_indeterminate', 'Atomic store acknowledgement failed; reconcile the request before retrying'); }
 }
 
 export function withPluginLock<T>(root: string, relative: string, action: () => T): T {
   const file = storagePath(root, relative, true);
-  let fd: number;
-  try { fd = fs.openSync(file, 'wx', 0o600); }
+  let lease;
+  try { lease = acquireWriterLock(file, 0); }
   catch (error) {
-    if ((error as NodeJS.ErrnoException).code === 'EEXIST') return fail('plugin_busy', 'Plugin writer is busy');
+    if (error && typeof error === 'object' && 'code' in error && error.code === 'writer_locked') {
+      return fail('plugin_busy', 'Plugin writer is busy; inspect ownership with doctor');
+    }
     throw error;
   }
-  const nonce = randomUUID();
-  try {
-    fs.writeFileSync(fd, JSON.stringify({ pid: process.pid, nonce, at: Date.now() }));
-    fs.fsyncSync(fd);
-    return action();
-  } finally {
-    fs.closeSync(fd);
-    const current = readStored(root, relative);
-    if (current && typeof current === 'object' && !Array.isArray(current) && current.nonce === nonce) {
-      fs.unlinkSync(storagePath(root, relative));
-    }
-  }
+  try { return action(); }
+  finally { lease.release(); }
 }
 
 export function withActivation<T>(root: string, action: () => T, recovery = false): T {

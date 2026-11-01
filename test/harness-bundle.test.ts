@@ -13,15 +13,21 @@ import { projectPaths } from '../src/core/project.js';
 import * as verification from '../src/core/verify.js';
 import * as taskResult from '../src/core/task-result.js';
 import { HarnessBundleHost } from '../src/executors/harness-bundle-host.js';
+import { HarnessAdapter } from '../src/executors/harness-adapter.js';
+import { readLog } from '../src/core/log.js';
 import type { HarnessRuntime } from '../src/executors/harness-runtime.js';
 import type { HarnessValidationRequest } from '../src/executors/harness-validation.js';
 import { FILES } from './farewell-fixture.js';
 import { git, humanEnv, initGitRepo, read, runCli, tempDir, write } from './helpers.js';
 
-function project() {
-  const root = tempDir('sdlc-harness-host-');
-  initGitRepo(root);
+function project(prefix = '') {
+  const top = tempDir('sdlc-harness-host-');
+  initGitRepo(top);
+  const root = path.join(top, prefix);
+  fs.mkdirSync(root, { recursive: true });
+  if (prefix) write(path.join(root, '.gitignore'), '/openspec/.sdlc/board.json\n/openspec/.sdlc/board.lock\n');
   write(path.join(root, 'src/greet.js'), '// original\n');
+  if (prefix) write(path.join(root, 'test/locked.test.ts'), '// locked test\n');
   git(root, ['add', '-A']);
   git(root, ['commit', '-qm', 'initial']);
   const env = humanEnv(tempDir('sdlc-harness-home-'));
@@ -34,6 +40,7 @@ function project() {
   const file = path.join(root, 'openspec/sdlc.yaml');
   const raw = parse(read(file));
   raw.enforcement.mode = 'block';
+  if (prefix) raw.enforcement.test_paths = ['test/**'];
   raw.verify.commands = [{ name: 'candidate', run: 'node check.cjs', required: true }];
   write(file, stringify(raw));
   write(path.join(root, 'check.cjs'), [
@@ -53,13 +60,14 @@ function project() {
     hosted: { type: 'harness', max_risk: 'medium' },
   } }));
   cli(['approve', 'plan', '--change', 'add-farewell']);
+  if (prefix) cli(['tests', 'lock', '--change', 'add-farewell']);
   git(root, ['add', '-A']);
   git(root, ['commit', '-qm', 'approved source']);
   const paths = projectPaths(root);
   const config = loadConfig(file);
   const ref = resolveChange(paths, 'add-farewell');
   const claim = claimTask(root, paths, config, { change: ref.id, task: '1.1', executor: 'hosted', agent: 'codex' });
-  return { root, env, config, ref, claim };
+  return { root, top, env, config, ref, claim };
 }
 
 function localRuntime(p: ReturnType<typeof project>, sandbox: string, remoteCalls: string[] = []) {
@@ -95,7 +103,114 @@ function fixtureValidator(p: ReturnType<typeof project>) {
   });
 }
 
+function privateHostHistory(p: ReturnType<typeof project>) {
+  const token = 'fixture-host-token-never-upload';
+  const run = (args: string[], input?: string) => {
+    const result = spawnSync('git', args, { cwd: p.root, env: p.env, input, encoding: 'utf8', timeout: 5000 });
+    expect(result.status, result.stderr).toBe(0);
+    return result.stdout.trim();
+  };
+  const blob = run(['hash-object', '-w', '--stdin'], token);
+  const tree = run(['mktree'], `100644 blob ${blob}\tcredential.txt\n`);
+  const commit = run(['commit-tree', tree, '-m', 'host-only unrelated history']);
+  run(['update-ref', 'refs/private/host-credentials', commit]);
+  run(['config', 'remote.host-publication.url', `https://${token}@example.invalid/private`]);
+  return { token, blob, commit };
+}
+
 describe('B124: real git bundle round trip with a local sandbox transport', () => {
+  it('Harness candidate checking applies nested project-relative locked globs to exact Git names', async () => {
+    const p = project('packages/app');
+    const sandbox = tempDir('e20-harness-monorepo-');
+    const checkout = path.join(sandbox, 'project');
+    git(sandbox, ['clone', '-q', p.top, checkout]);
+    initGitRepo(checkout);
+    git(checkout, ['switch', '-c', p.claim.item.result.branch]);
+    const changed = 'packages/app/test/locked.test.ts';
+    write(path.join(checkout, changed), '// changed locked test\n');
+    git(checkout, ['add', changed]);
+    git(checkout, ['commit', '-qm',
+      'candidate\n\nSDLC-Change: add-farewell\nSDLC-Task: 1.1\nSDLC-Agent: hosted/codex']);
+    const validator = vi.fn();
+    const host = new HarnessBundleHost({ ...p,
+      runtime: localRuntime(p, sandbox) as unknown as HarnessRuntime, tool: 'codex', validateCandidate: validator });
+    expect(inspectGit(p.root, ['diff', '--name-only', 'HEAD']).stdout)
+      .toBe('packages/app/openspec/.sdlc/log.jsonl');
+    expect(inspectGit(p.root, ['ls-files', '--others', '--exclude-standard']).stdout).toBe('');
+    const result = await host.verify('one', p.claim.item).catch((error: Error) => {
+      const status = inspectGit(p.root, ['status', '--porcelain', '--untracked-files=normal']).stdout;
+      throw new Error(`${error.message}\nNested fixture status:\n${status}`);
+    });
+    expect(result.passed).toBe(false);
+    expect(result.problems).toContainEqual({ code: 'forbidden_path', file: changed });
+    expect(validator).not.toHaveBeenCalled();
+    expect(readLog(p.root).filter((entry) => entry.event === 'task.result_checked')).toHaveLength(1);
+  }, 180000);
+  it('propagates an actual inactive host-bound claim before any runtime call', async () => {
+    const p = project();
+    const board = readBoard(p.root);
+    board.claims[0].expiresAt = '2000-01-01T00:00:00.000Z';
+    write(path.join(p.root, 'openspec/.sdlc/board.json'), JSON.stringify(board));
+    const runtime = { exec: vi.fn() };
+    const validator = vi.fn();
+    const host = new HarnessBundleHost({ ...p, runtime: runtime as unknown as HarnessRuntime,
+      tool: 'codex', validateCandidate: validator });
+    const adapter = new HarnessAdapter(runtime as unknown as HarnessRuntime, host);
+    await expect(adapter.candidates(['one'], p.claim.item)).rejects.toMatchObject({ code: 'harness_refused' });
+    expect(runtime.exec).not.toHaveBeenCalled();
+    expect(validator).not.toHaveBeenCalled();
+  }, 180000);
+  it('transfers only reviewed reachable HEAD history and keeps host-only credential refs/config private', async () => {
+    const p = project();
+    const privateHistory = privateHostHistory(p);
+    const sandbox = tempDir('e20-harness-reviewed-source-');
+    const calls: string[] = [];
+    const runtime = localRuntime(p, sandbox, calls);
+    const host = new HarnessBundleHost({ ...p, runtime: runtime as unknown as HarnessRuntime,
+      tool: 'codex', validateCandidate: fixtureValidator(p) });
+    await host.prepare('local', p.claim.item);
+    const checkout = path.join(sandbox, 'project');
+    const bundleRefs = inspectGit(p.root, ['bundle', 'list-heads', path.join(sandbox, 'input.bundle')]);
+    expect(bundleRefs.ok).toBe(true);
+    expect(bundleRefs.stdout.split(/\r?\n/)).toEqual([`${p.claim.item.base.commit} HEAD`]);
+    expect(inspectGit(checkout, ['cat-file', '-e', privateHistory.blob]).ok).toBe(false);
+    expect(inspectGit(checkout, ['cat-file', '-e', privateHistory.commit]).ok).toBe(false);
+    expect(inspectGit(checkout, ['config', '--get', 'remote.host-publication.url']).ok).toBe(false);
+    expect(calls.join('\n')).not.toContain(privateHistory.token);
+    expect(calls.join('\n')).not.toContain(p.claim.claim.id);
+    expect(readBoard(p.root).claims[0].state).toBe('held');
+  }, 180000);
+  it.each(['core', 'validator'])('records a %s failure once and retains the independent candidate', async (kind) => {
+    const p = project();
+    const hosts = new Map<string, HarnessBundleHost>();
+    for (const session of ['bad', 'good']) {
+      const sandbox = tempDir('e20-harness-candidate-');
+      const runtime = localRuntime(p, sandbox);
+      const host = new HarnessBundleHost({ ...p, runtime: runtime as unknown as HarnessRuntime,
+        tool: 'codex', validateCandidate: fixtureValidator(p) });
+      hosts.set(session, host);
+      await host.prepare(session, p.claim.item);
+      const checkout = path.join(sandbox, 'project');
+      initGitRepo(checkout);
+      write(path.join(checkout, 'src/greet.js'), session === 'bad' && kind === 'validator'
+        ? '// invalid candidate\n' : '// candidate\n');
+      git(checkout, ['add', 'src/greet.js']);
+      const message = session === 'bad' && kind === 'core' ? 'missing required trailers'
+        : 'candidate\n\nSDLC-Change: add-farewell\nSDLC-Task: 1.1\nSDLC-Agent: hosted/codex';
+      git(checkout, ['commit', '-qm', message]);
+    }
+    const initial = readLog(p.root).filter((entry) => entry.event === 'task.result_checked').length;
+    const adapter = new HarnessAdapter({} as HarnessRuntime, { prepare: async () => {}, heartbeat: async () => {},
+      verify: (session, item) => hosts.get(session)!.verify(session, item) });
+    const reports = await adapter.candidateReport(['bad', 'good', 'bad'], p.claim.item);
+    expect(reports.map((report) => [report.session, report.passed])).toEqual([['bad', false], ['good', true]]);
+    const observed = readLog(p.root).filter((entry) => entry.event === 'task.result_checked').slice(initial);
+    expect(observed).toHaveLength(2);
+    expect(observed.filter((entry) => entry.detail === 'ok')).toHaveLength(1);
+    expect(observed.some((entry) => entry.detail?.includes(kind === 'core'
+      ? 'missing_trailer' : 'harness_validator_failed'))).toBe(true);
+    expect(observed.every((entry) => entry.change === 'add-farewell' && entry.executor === 'hosted')).toBe(true);
+  }, 180000);
   it('refuses unrelated history even with matching files, task trailers and passing commands', async () => {
     const p = project();
     const sandbox = tempDir('sdlc-harness-unrelated-');

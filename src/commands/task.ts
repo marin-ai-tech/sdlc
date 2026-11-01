@@ -8,11 +8,11 @@ import { formatIdentity, gitIdentity } from '../core/git.js';
 import { humanCommandFix } from '../core/human-command.js';
 import { t } from '../core/i18n.js';
 import { appendLog } from '../core/log.js';
-import { exportTasks } from '../core/task-contract.js';
 import { checkResult, type ResultProblem, type ResultWarning, type TaskResult } from '../core/task-result.js';
 import { extensionInput, runPrepared } from '../plugins/evaluation.js';
 import { cliActor } from '../plugins/broker.js';
 import { settingsWrite } from '../plugins/activation.js';
+import { exportTaskContract } from '../core/task-export-service.js';
 
 /**
  * `sdlc task export`, `sdlc task check-result` and `sdlc task executors` (B115/B116, epic E16): hand work out to
@@ -41,6 +41,7 @@ interface CheckOptions {
 }
 
 function problemDetail(problem: ResultProblem): string {
+  if (problem.code === 'outside_project') return t('result.problem_outside_project', { file: problem.file ?? '' });
   if (problem.file !== undefined) return problem.file;
   if (problem.task !== undefined) return `${problem.sha?.slice(0, 10)} ${problem.task}`;
   return problem.sha ?? '';
@@ -114,9 +115,8 @@ export async function taskExportCommand(opts: ExportOptions): Promise<void> {
     const ctx = loadProject();
     const ref = resolveChange(ctx.paths, opts.change);
     const ext = extensionInput(opts.extJson);
-    const items = await runPrepared(ctx.root, ctx.config, { operation: 'export', board: false,
-      args: { change: ref.id, task: opts.task, executor: opts.executor, ext }, actor: cliActor(ctx.root, opts.executor) },
-    () => exportTasks(ctx.root, ref, ctx.config, opts.task, opts.executor, ext));
+    const { items } = await exportTaskContract(ctx,
+      { change: ref.id, task: opts.task, executor: opts.executor, ext }, cliActor(ctx.root, opts.executor));
     if (opts.json) {
       printJson({ items, harness: ctx.stamp });
       return;

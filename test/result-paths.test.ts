@@ -31,8 +31,8 @@ const LOCKED = 'test/locked.test.ts';
 /** The plan lists `src/greet.js` and `src/new.js`, not `src/old.js`. */
 const PLAN = FILES['plan.md'].replace('- `test/greet.test.js` (new)', '- `src/new.js` (new)');
 const MESSAGE = ['work', '', 'SDLC-Change: add-farewell', 'SDLC-Task: 1.2', 'SDLC-Agent: swarm-a/coder-1'].join('\n');
-const CURRENT_CODES = ['missing_trailer', 'unknown_task', 'forbidden_path', 'no_commits', 'missing_agent',
-  'unknown_executor', 'executor_not_allowed', 'wrong_executor'];
+const CURRENT_CODES = ['missing_trailer', 'unknown_task', 'forbidden_path', 'outside_project', 'no_commits',
+  'missing_agent', 'unknown_executor', 'executor_not_allowed', 'wrong_executor'];
 
 interface Entry {
   event: string;

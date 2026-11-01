@@ -136,7 +136,9 @@ establish a total-process memory bound or a hard RSS cap.
 | Linear memory | 16 initial 64 KiB pages (1 MiB), 1,024 maximum pages (64 MiB) |
 | Request/response JSON / extension JSON | 1 MiB / 256 KiB |
 | Own store / event / event batch | 4 MiB / 64 KiB / 64 events |
-| Hook / ordinary operation / termination cleanup | 1,000 ms / 5,000 ms / 1,000 ms |
+| Queue / startup (worker, schemas, Wasm instantiation) | 5,000 ms / 10,000 ms |
+| Hook / ordinary guest execution / termination cleanup | 1,000 ms / 5,000 ms / 1,000 ms |
+| Shared preparation ceiling, including retries | 30,000 ms |
 | Request receipt window | 24 hours, subject to the persisted expiry floor |
 
 Execution deadlines include waiting for a worker slot and startup. Late responses are discarded and workers
@@ -199,13 +201,20 @@ A mutation commits a complete schema-valid own state, receipt and event batch by
 core locks, with revision/trust/configuration revalidation. A stale evaluation refuses without a partial write.
 An identical retained request replays its transaction; changed arguments conflict. Receipts expire after 24 hours
 and the persisted floor prevents reviving old identifiers after compaction or clock rollback.
+New receipts retain only reply output and facts, rather than copying complete state and event batches.
+Version1 receipts containing full older responses remain readable; replay never reapplies those effects.
+Guest value depth remains 32 independently of the host's storage envelope.
 
 Events are named `<plugin>.<suffix>`, such as `economy.charged`, and core stamps version, digest, actor,
 request, transaction and stable event ID. Raw guest data is kept inside the attributed payload. Authoritative
 pending events live in the same transaction as state. The project log is a rebuildable projection; disabled
 logging retains pending events. Recovery retries projection, and the log reader deduplicates stable IDs after
-a crash between append and acknowledgement. Atomic replacement and file flushes do not promise power-loss
-durability across every filesystem, engine or OS.
+a crash between append and acknowledgement. Pending events are bounded at 1024 records or 1 MiB.
+Overflow returns recoverable `plugin_backpressure` before changing state, receipt or pending records; it
+never evicts events. Restore logging and drain projection, then retry the same identifier. `doctor` reports
+pending count, bytes and oldest timestamp. On POSIX, acknowledged replacement also flushes the parent directory.
+A failed rename or directory acknowledgement is `plugin_indeterminate`, even if the bytes were committed:
+reconcile the same request before retrying. No universal power-loss guarantee covers every filesystem or OS.
 
 Use `plugins inspect`, `plugins list` and `doctor` for current activation problems. Common codes include
 `plugin_unaccepted`, `plugin_changed`, `plugin_disabled`, `plugin_schema`, `plugin_wasm`, `plugin_timeout`,
@@ -219,6 +228,22 @@ sdlc plugins recover economy --request p1.<original-unix-ms>.<original-32-hex> -
 Recovery refuses to displace a live writer, validates retained state and reports `committed`, `not_committed`
 or `outcome_not_retained`. An expired receipt cannot establish the old outcome. Investigate before a new
 identifier; never erase state or locks as a retry strategy.
+
+Writers and recovery contenders use process-instance identities and unique coordination paths. A PID that
+is alive without a provable matching instance is protected, including legacy 0.29.0 locks. A dead PID or proven
+different birth instance can be reclaimed under the shared fence. Abandoned partial fixed locks require 120
+seconds. If the identity provider is unavailable, ordinary writes still release their own exact nonce;
+unknown live metadata remains protected. Before upgrading, stop writers using the older protocol.
+
+For protected ownership: stop all CLI/server/Harness writers of that checkout, verify that the original
+owner has stopped, and preserve a backup of the diagnosed lock/coordination files. Only after confirmed
+quiescence may a person remove the diagnosed obsolete metadata. Never remove plugin stores, receipts,
+pending events or acceptance records as part of lock recovery. Keep the checkout quiescent until the next
+writer has started with the new protocol. `board recover` additionally requires doctor's complete owner digest.
+
+The local project-log queue preserves unknown or malformed raw lines byte-for-byte while recognized records
+drain with acknowledgement and replay deduplication. Linked storage and append failures produce a diagnostic;
+logging remains observational and does not change the underlying hook decision.
 
 Recovery also returns `temporaryFiles: [{file, bytes, authoritative:false}]` and the boolean
 `temporaryFilesTruncated`. Each `file` is relative to `openspec/.sdlc/plugins/`; at most 64 entries describe

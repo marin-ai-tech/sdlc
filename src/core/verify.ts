@@ -1,6 +1,4 @@
-import { spawn } from 'node:child_process';
 import * as path from 'node:path';
-import { fileURLToPath } from 'node:url';
 import type { SdlcConfig, VerifyCommand } from './config.js';
 import {
   provenance, type ChangeState, type VerifyCommandRecord, type VerifyMcpRecord, type VerifyRecord,
@@ -10,7 +8,7 @@ import { headCommit, isDirty, worktreeFingerprint } from './git.js';
 import { stampText, stripProvenance, withProvenance, type HarnessStamp } from './license.js';
 import { renderExtras, type EvidenceExtras } from './verify-extras.js';
 import { FINGERPRINT_EXCLUDES } from './lifecycle.js';
-import { checkShell, cleanupCheckShell } from './check-shell.js';
+import { runOwnedCheck } from './check-lifecycle.js';
 import { fingerprintFailureReason } from './verify-reason.js';
 
 /**
@@ -22,6 +20,8 @@ import { fingerprintFailureReason } from './verify-reason.js';
  */
 export interface CheckOutcome extends VerifyCommandRecord {
   output: string;
+  cancelled?: 'SIGINT' | 'SIGTERM';
+  cleanup_failed?: boolean;
 }
 
 /** An MCP check's outcome (B12) with the answer the server gave (`result`). */
@@ -41,81 +41,10 @@ export interface VerificationRun {
   mcp?: McpCheckOutcome[];
 }
 
-function tail(text: string, lines: number): string {
-  const all = text.replace(/\r\n?/g, '\n').replace(/\x1b\[[0-9;]*[A-Za-z]/g, '').split('\n');
-  while (all.length > 0 && all[all.length - 1].trim() === '') all.pop();
-  return all.slice(-lines).join('\n');
-}
+
 
 function runCheck(root: string, check: VerifyCommand, timeoutSeconds: number, outputLines: number): Promise<CheckOutcome> {
-  return new Promise((resolve) => {
-    const started = Date.now();
-    const chunks: Buffer[] = [];
-    let size = 0;
-    const keep = (buf: Buffer) => {
-      chunks.push(buf);
-      size += buf.length;
-      // Bound memory: keep roughly the last 2 MB, evidence only needs the tail.
-      while (size > 2 * 1024 * 1024 && chunks.length > 1) size -= chunks.shift()!.length;
-    };
-    const windows = process.platform === 'win32';
-    const wrapper = fileURLToPath(new URL('../../assets/windows/verify-job.ps1', import.meta.url));
-    const argv = windows ? ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-File', wrapper] : [];
-    const child = spawn(windows ? 'powershell.exe' : check.run, argv, {
-      cwd: root,
-      shell: !windows,
-      detached: process.platform !== 'win32',
-      windowsHide: true,
-      env: { ...process.env, CI: process.env.CI ?? '1', FORCE_COLOR: '0', ...check.env,
-        ...(windows ? { SDLC_VERIFY_COMMAND: check.run } : {}) },
-      stdio: ['ignore', 'pipe', 'pipe'],
-    });
-    const shell = checkShell(child);
-    let timedOut = false;
-    let finished = false;
-    let stopping: Promise<void> | undefined;
-    let cleanupTimer: ReturnType<typeof setTimeout> | undefined;
-    const closePipes = () => {
-      child.stdout?.destroy();
-      child.stderr?.destroy();
-    };
-    const timer = setTimeout(() => {
-      timedOut = true;
-      cleanupTimer = setTimeout(() => {
-        child.kill('SIGKILL');
-        closePipes();
-        finish(null, 'Process tree cleanup exceeded its deadline.');
-      }, 6500);
-      stopping = child.pid ? cleanupCheckShell(shell, keep, () => child.kill('SIGKILL')) : Promise.resolve();
-      stopping = stopping.finally(() => {
-        closePipes();
-        finish(null);
-      });
-    }, timeoutSeconds * 1000);
-    child.stdout?.on('data', keep);
-    child.stderr?.on('data', keep);
-    const finish = (code: number | null, errorText?: string) => {
-      if (finished) return;
-      finished = true;
-      clearTimeout(timer);
-      clearTimeout(cleanupTimer);
-      const output = tail(Buffer.concat(chunks).toString('utf-8') + (errorText ? `\n${errorText}` : ''), outputLines);
-      resolve({
-        name: check.name,
-        command: check.run,
-        exit_code: code,
-        duration_ms: Date.now() - started,
-        required: check.required,
-        ...(timedOut ? { timed_out: true } : {}),
-        output,
-      });
-    };
-    child.on('error', (error) => finish(null, error.message));
-    child.on('close', async (code) => {
-      await stopping;
-      finish(timedOut ? null : code);
-    });
-  });
+  return runOwnedCheck(root, check, timeoutSeconds, outputLines);
 }
 
 export async function runVerification(
@@ -135,8 +64,9 @@ export async function runVerification(
   for (const check of selected) {
     options.onCheck?.(check);
     checks.push(await runCheck(root, check, check.timeoutSeconds ?? config.verify.timeoutSeconds, config.verify.outputLines));
+    if (checks[checks.length - 1].cancelled) break;
   }
-  const failed = checks.some((c) => c.required && c.exit_code !== 0);
+  const failed = checks.some((c) => c.cancelled || (c.required && (c.exit_code !== 0 || c.cleanup_failed)));
   const partial = !!options.only && options.only.length > 0 && selected.length < config.verify.commands.length;
   const status: VerificationRun['status'] = failed || partial || selected.length === 0 || !fingerprint
     ? 'failed' : 'passed';
@@ -194,7 +124,8 @@ function mcpEvidence(run: VerificationRun): { rows: string[]; outputs: string[] 
 function requiredCounts(run: VerificationRun): { passedRequired: number; total: number } {
   const requiredMcp = (run.mcp ?? []).filter((m) => m.required);
   const required = run.checks.filter((c) => c.required);
-  const passedRequired = required.filter((c) => c.exit_code === 0).length + requiredMcp.filter((m) => m.ok).length;
+  const passedRequired = required.filter((c) => c.exit_code === 0 && !c.cleanup_failed && !c.cancelled).length
+    + requiredMcp.filter((m) => m.ok).length;
   return { passedRequired, total: required.length + requiredMcp.length };
 }
 
@@ -207,7 +138,7 @@ export function renderEvidence(
   const mcp = mcpEvidence(run);
   const { passedRequired, total } = requiredCounts(run);
   const rows = run.checks.map((c) => {
-    const result = c.timed_out ? '⏱ timed out' : c.exit_code === 0 ? '✅ exit 0' : `❌ exit ${c.exit_code ?? '?'}`;
+    const result = commandResult(c);
     return `| ${c.name}${c.required ? '' : ' (optional)'} | \`${c.command.replace(/\|/g, '\\|')}\` | ${result} | ${(c.duration_ms / 1000).toFixed(1)}s |`;
   });
   const outputs = run.checks.map((c) =>
@@ -234,6 +165,13 @@ export function renderEvidence(
     ...mcp.outputs,
     EVIDENCE_END,
   ].join('\n');
+}
+
+function commandResult(check: CheckOutcome): string {
+  if (check.cancelled) return `❌ cancelled ${check.cancelled}`;
+  if (check.cleanup_failed) return `❌ cleanup failed (exit ${check.exit_code ?? '?'})`;
+  if (check.timed_out) return '⏱ timed out';
+  return check.exit_code === 0 ? '✅ exit 0' : `❌ exit ${check.exit_code ?? '?'}`;
 }
 
 /**

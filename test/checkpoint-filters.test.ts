@@ -20,10 +20,10 @@ const ARTIFACT = 'openspec/changes/demo/intent.md';
 const TEXT = '# Intent\n\nRevision: $Id$\n\nBody.\n';
 const EXPANDED = /\$Id: [0-9a-f]{40,64} \$/;
 
-function project() {
+function project(autocrlf = 'false') {
   const root = tempDir('sdlc-checkpoint-ident-');
   initGitRepo(root);
-  git(root, ['config', 'core.autocrlf', 'false']);
+  git(root, ['config', 'core.autocrlf', autocrlf]);
   write(path.join(root, '.gitattributes'), `${ARTIFACT} ident\n`);
   write(path.join(root, ARTIFACT), TEXT);
   const file = path.join(root, ARTIFACT);
@@ -49,6 +49,38 @@ function refs(cwd: string): string {
 }
 
 describe('F3: checkpoint comparison with a git filter', () => {
+  it('accepts a real ident checkout with core.autocrlf=true', () => {
+    const p = project('true');
+    p.checkout();
+    expect(read(p.file)).toContain('\r\n');
+    const evaluated = p.evaluate();
+    const snapshot = captureCheckpoint(p.root, [ARTIFACT])!;
+    expect(snapshot).toBeDefined();
+    expect(() => assertSnapshotContent(p.root, p.dir, 'intent', snapshot, evaluated, 'tasks.md')).not.toThrow();
+  });
+
+  it('still refuses forged ident bytes with core.autocrlf=true', () => {
+    const p = project('true');
+    p.checkout();
+    write(p.file, read(p.file).replace(EXPANDED, `$Id: ${'0'.repeat(40)} $`));
+    const evaluated = p.evaluate();
+    const snapshot = captureCheckpoint(p.root, [ARTIFACT])!;
+    expect(() => assertSnapshotContent(p.root, p.dir, 'intent', snapshot, evaluated, 'tasks.md'))
+      .toThrow(/changed/);
+    expect(refs(p.root)).toBe('');
+  });
+
+  it('refuses drift after evaluation with core.autocrlf=true', () => {
+    const p = project('true');
+    p.checkout();
+    const evaluated = p.evaluate();
+    write(p.file, read(p.file).replace('Body.', 'Changed body.'));
+    expect(() => recordCheckpoint(p.root, 'demo', 'intent', (snapshot) => {
+      assertSnapshotContent(p.root, p.dir, 'intent', snapshot, evaluated, 'tasks.md');
+    }, [ARTIFACT])).toThrow(/changed/);
+    expect(refs(p.root)).toBe('');
+  });
+
   it('accepts an ident artifact checked out by git', () => {
     const p = project();
     p.checkout();

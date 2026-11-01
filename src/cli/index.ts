@@ -5,7 +5,7 @@ import { statuslineCommand } from '../commands/statusline.js';
 import { archiveCommand, auditCommand, logCommand, validateCommand } from '../commands/lifecycle-ops.js';
 import { changelogCommand } from '../commands/changelog.js';
 import { licenseCommand } from '../commands/license.js';
-import { instructionsCommand, newCommand, nextCommand, statusCommand } from '../commands/changes.js';
+import { instructionsCommand, newCommand, statusCommand } from '../commands/changes.js';
 import { doctorCommand } from '../commands/doctor.js';
 import { healthCommand } from '../commands/health.js';
 import { approvalsVerify } from '../commands/approvals.js';
@@ -51,12 +51,13 @@ import {
   boardReopenCommand, boardDispatchCommand, boardAuctionCommand, boardBidCommand, boardAwardCommand,
 } from '../commands/board.js';
 import { mcpCheckCommand, mcpServeCommand } from '../commands/mcp.js';
+import { boardRecoverCommand } from '../commands/board-recovery.js';
 import { contextPullCommand } from '../commands/context.js';
 import { inboxDoneCommand, inboxListCommand } from '../commands/inbox.js';
 import { eventsFlushCommand, eventsListCommand, eventsSummaryCommand } from '../commands/events.js';
 import { triageIntakeCommand } from '../commands/triage.js';
 import { deliverAfterCommand } from '../mcp/events.js';
-import { nextMeCommand } from '../commands/next-me.js';
+import { nextWithOptions } from '../commands/next-me.js';
 import { approvePreviewCommand } from '../commands/approve-preview.js';
 import { releaseCheckCommand } from '../commands/release.js';
 import { explainCommand } from '../commands/explain.js';
@@ -70,7 +71,7 @@ import { maskNoteArguments } from '../core/person-note.js';
 import { warn } from './output.js';
 
 function cmdDesc(key: string): string {
-  return t(key);
+  return t(key, undefined, 'en');
 }
 
 function applyLocale(flag: string | undefined): void {
@@ -155,11 +156,13 @@ export function buildProgram(): Command {
   const epic = backlog.command('epic').description(cmdDesc('cmd.backlog.epic'));
   epic.command('add <title>').description(cmdDesc('cmd.backlog.epic.add'))
     .option('--goal <text>', 'goal of the epic')
+    .option('--granularity <size>', 'owner-chosen size: package | feature | small')
     .option('--json', 'output JSON')
     .action((title, opts) => backlogEpicAdd(title, opts));
   epic.command('edit <E-id>').description(cmdDesc('cmd.backlog.epic.edit'))
     .option('--title <text>', 'replacement title')
     .option('--goal <text>', 'replacement goal of the epic')
+    .option('--granularity <size>', 'owner-chosen size: package | feature | small')
     .option('--clear-goal', 'remove the goal of the epic')
     .option('--json', 'output JSON')
     .action((id, opts) => backlogEpicEdit(id, opts));
@@ -279,6 +282,7 @@ export function buildProgram(): Command {
     .option('--delivery <mode>', 'both | skills | commands')
     .option('--cli <command>', 'how agents invoke the CLI, e.g. "npx --no-install sdlc" for a project-local install')
     .option('--mode <mode>', 'enforcement mode: off | warn | block')
+    .option('--team-mode <mode>', 'execution profile: solo | team (absent keeps legacy)')
     .option('--no-hooks', 'do not install Claude Code hooks')
     .option('--opsx', "also install OpenSpec's own /opsx workflows for the same tools")
     .option('--statusline', 'install the Claude Code status line')
@@ -425,10 +429,10 @@ export function buildProgram(): Command {
     .option('--me', 'what waits for me: the gates I may decide now, across every active change (read-only)')
     .option('--no-branches', 'skip other-branch discovery in next --me')
     .option('--json', 'output JSON')
-    .action((opts) => (opts.me ? nextMeCommand(opts) : nextCommand(opts)));
+    .action((opts) => nextWithOptions(opts));
 
-  program.command('gate').description(cmdDesc('cmd.gateRead'))
-    .command('read <gate>').description(cmdDesc('cmd.gateRead'))
+  program.command('gate').description(cmdDesc('cmd.gate'))
+    .command('read <gate>').description(cmdDesc('cmd.gate.read'))
     .option('--change <id>', 'change id')
     .option('--json', 'output JSON')
     .action((gate, opts) => gateReadCommand(gate, opts));
@@ -467,6 +471,7 @@ export function buildProgram(): Command {
     .option('--change <id>', 'change id')
     .option('--artifact <artifact>', 'artifact with the question: intent (default), proposal or design')
     .option('--text <answer>', 'the answer, written under the question and into the change record')
+    .option('--text-file <path>', 'UTF-8 answer file inside the project (exclusive with --text)')
     .option('--list', 'list the open questions and their answers (writes nothing)')
     .option('--json', 'output JSON')
     .action((n, opts) => answerCommand(n, opts));
@@ -532,6 +537,10 @@ export function buildProgram(): Command {
     .action((opts) => taskCheckResultCommand(opts));
 
   const board = program.command('board').description(cmdDesc('cmd.board'));
+  board.command('recover').description(cmdDesc('cmd.board.recover'))
+    .requiredOption('--expect-owner <sha256>', 'complete observed ownership digest from doctor')
+    .option('--json', 'output JSON')
+    .action((opts) => boardRecoverCommand(opts));
   board.command('list').description(cmdDesc('cmd.board.list'))
     .option('--change <id>', 'change id')
     .option('--json', 'output JSON')
@@ -759,17 +768,11 @@ export function buildProgram(): Command {
       process.exitCode = result.exitCode ?? 1;
     });
 
-  const plugins = program.command('plugins').description('Inspect and manage trusted runtime plugins');
-  plugins.command('list').description('List configured runtime plugins, activation status and diagnostic problems.')
+  const plugins = program.command('plugins').description(cmdDesc('cmd.plugins'));
+  plugins.command('list').description(cmdDesc('cmd.plugins.list'))
     .option('--json', 'output JSON').action((opts) => pluginsCommand('list', undefined, opts));
-  const pluginActions = {
-    inspect: 'Inspect a runtime plugin package, trust status and configuration problems.',
-    accept: 'Accept a reviewed plugin package digest and initialize or retain its state.',
-    revoke: 'Revoke plugin execution trust while retaining its state and history.',
-    recover: 'Recover inactive plugin writers and reconcile interrupted request outcomes.',
-  };
-  for (const [action, description] of Object.entries(pluginActions)) {
-    plugins.command(`${action} <name>`).description(description).option('--json', 'output JSON')
+  for (const action of ['inspect', 'accept', 'revoke', 'recover']) {
+    plugins.command(`${action} <name>`).description(cmdDesc(`cmd.plugins.${action}`)).option('--json', 'output JSON')
       .option('--expect-digest <digest>', 'accept only the reviewed complete SHA-256 package digest')
       .option('--request <id>', 'reconcile a stable mutating request id during recovery')
       .action((name, opts) => pluginsCommand(action, name, opts));

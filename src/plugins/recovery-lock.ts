@@ -1,13 +1,14 @@
 import * as fs from 'node:fs';
-import { randomUUID } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import { fail, keys, object } from './api.js';
 import { readStored, storagePath } from './activation.js';
+import { processIdentity, processState } from '../core/process-identity.js';
 
 const DIRECTORY = 'recovery-entries';
 const MAX_ENTRIES = 128;
 const ENTRY_BYTES = 512;
-const NAME = /^(\d{1,16})-([a-f0-9]{32})\.(json|next)$/;
-interface Owner { id: string; pid: number; nonce: string; choosing: boolean; ticket: number }
+const NAME = /^(\d{1,16})-(?:([wlu])-([a-f0-9]{64})-)?([a-f0-9]{32})\.(json|next)$/;
+interface Owner { id: string; pid: number; instance?: string; nonce: string; choosing: boolean; ticket: number }
 
 function alive(pid: number): boolean {
   try { process.kill(pid, 0); return true; }
@@ -25,13 +26,21 @@ function readOwner(root: string, id: string, pid: number, nonce: string): Owner 
   catch { return fail('plugin_busy', 'A recovery contender is publishing metadata'); }
   if (raw === undefined) return undefined;
   const value = object(raw, 'recovery contender');
-  keys(value, ['pid', 'nonce', 'choosing', 'ticket'], 'recovery contender');
+  keys(value, ['pid', 'instance', 'nonce', 'choosing', 'ticket'], 'recovery contender');
   if (value.pid !== pid || value.nonce !== nonce || typeof value.choosing !== 'boolean'
+    || value.instance !== undefined && typeof value.instance !== 'string'
     || !Number.isSafeInteger(value.ticket) || (value.ticket as number) < 0
     || (value.choosing ? value.ticket !== 0 : value.ticket === 0)) {
     fail('plugin_store', 'Recovery contender identity or ticket is invalid');
   }
-  return { id, pid, nonce, choosing: value.choosing, ticket: value.ticket as number };
+  return { id, pid, ...(typeof value.instance === 'string' ? { instance: value.instance } : {}),
+    nonce, choosing: value.choosing, ticket: value.ticket as number };
+}
+
+function differentInstance(match: RegExpExecArray, pid: number): boolean {
+  if (!match[2] || match[2] === 'u') return false;
+  const actual = processIdentity(pid);
+  return actual !== undefined && createHash('sha256').update(actual).digest('hex') !== match[3];
 }
 
 /** Dead entries have unique, never-reused names: cleanup cannot unlink a newer contender's path. */
@@ -45,10 +54,12 @@ function owners(root: string): Owner[] {
       const match = NAME.exec(entry.name);
       const pid = match ? Number(match[1]) : NaN;
       if (!match || !Number.isSafeInteger(pid) || pid < 1) fail('plugin_store', 'Invalid recovery contender path');
-      if (!alive(pid)) { remove(root, `${DIRECTORY}/${entry.name}`); continue; }
-      if (match[3] === 'next') continue;
-      const owner = readOwner(root, `${match[1]}-${match[2]}`, pid, match[2]);
-      if (owner) result.push(owner);
+      if (!alive(pid) || differentInstance(match, pid)) { remove(root, `${DIRECTORY}/${entry.name}`); continue; }
+      if (match[5] === 'next') continue;
+      const owner = readOwner(root, entry.name.slice(0, -5), pid, match[4]);
+      if (owner && ['dead', 'different'].includes(processState(pid, owner.instance))) {
+        remove(root, `${DIRECTORY}/${entry.name}`);
+      } else if (owner) result.push(owner);
     }
   } finally { entries.closeSync(); }
   return result;
@@ -79,7 +90,11 @@ function release(root: string, owner: Owner): void {
  */
 export function withRecoveryEntry<T>(root: string, action: () => T): T {
   const nonce = randomUUID().replaceAll('-', '');
-  const owner: Owner = { id: `${process.pid}-${nonce}`, pid: process.pid, nonce, choosing: true, ticket: 0 };
+  const instance = processIdentity(process.pid);
+  const kind = instance?.startsWith('windows:') ? 'w' : instance?.startsWith('linux:') ? 'l' : 'u';
+  const digest = createHash('sha256').update(instance ?? `unknown:${nonce}`).digest('hex');
+  const owner: Owner = { id: `${process.pid}-${kind}-${digest}-${nonce}`,
+    pid: process.pid, ...(instance ? { instance } : {}), nonce, choosing: true, ticket: 0 };
   try {
     publish(root, owner, true);
     const maximum = Math.max(0, ...owners(root).map((entry) => entry.ticket));

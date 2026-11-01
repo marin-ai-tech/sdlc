@@ -83,7 +83,7 @@ function run(
 export function backlogEpicAdd(title: string, opts: Options): void {
   run(
     opts,
-    (ctx) => addEpic(ctx.root, { title, goal: text(opts.goal) }),
+    (ctx) => addEpic(ctx.root, { title, goal: text(opts.goal), granularity: text(opts.granularity) }),
     'backlog.epic.added'
   );
 }
@@ -95,6 +95,7 @@ export function backlogEpicEdit(id: string, opts: Options): void {
       title: text(opts.title),
       goal: text(opts.goal),
       clearGoal: opts.clearGoal === true,
+      granularity: text(opts.granularity),
     }),
     'backlog.epic.edited'
   );

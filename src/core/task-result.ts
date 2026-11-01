@@ -1,6 +1,7 @@
 import picomatch from 'picomatch';
 import { agentEnvironment } from './agent-env.js';
 import { readChangedPaths } from './changed-paths.js';
+import { candidatePathMapper } from './candidate-paths.js';
 import { readChangeState } from './change-state.js';
 import type { ChangeRef } from './changes.js';
 import type { SdlcConfig } from './config.js';
@@ -33,7 +34,7 @@ export interface ResultCommit {
 }
 
 export type ResultProblemCode =
-  'missing_trailer' | 'unknown_task' | 'forbidden_path' | 'no_commits' |
+  'missing_trailer' | 'unknown_task' | 'forbidden_path' | 'outside_project' | 'no_commits' |
   'missing_agent' | 'unknown_executor' | 'executor_not_allowed' | 'wrong_executor' | 'diff_unavailable' | 'plugin_refused';
 
 export interface ResultProblem {
@@ -138,6 +139,7 @@ export function checkResultCore(
   const taskIds = new Set(changeTasks(ref).map((task) => task.id));
   const problems: ResultProblem[] = [];
   const warnings: ResultWarning[] = [];
+  const projectPath = candidatePathMapper(root);
   if (!changed.ok) problems.push({ code: 'diff_unavailable' });
   if (commits.length === 0) problems.push({ code: 'no_commits' });
   for (const commit of commits) {
@@ -156,9 +158,14 @@ export function checkResultCore(
     }
   }
   for (const file of files) {
-    const legacyName = toPosix(file.trim()).replace(/^(?:\.\/)+/, '');
-    if (isForbidden(file) || isForbidden(legacyName)) problems.push({ code: 'forbidden_path', file });
-    else if (!planned.some((entry) => matchesPlanFile(entry, file))) warnings.push({ code: 'outside_plan', file });
+    const relative = projectPath(file);
+    if (relative === undefined) {
+      problems.push({ code: 'outside_project', file });
+      continue;
+    }
+    const legacyName = toPosix(relative.trim()).replace(/^(?:\.\/)+/, '');
+    if (isForbidden(relative) || isForbidden(legacyName)) problems.push({ code: 'forbidden_path', file });
+    else if (!planned.some((entry) => matchesPlanFile(entry, relative))) warnings.push({ code: 'outside_plan', file });
   }
   const executors = registry === undefined
     ? undefined

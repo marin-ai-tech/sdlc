@@ -8,7 +8,8 @@ import { t } from './i18n.js';
 import type { NextAction } from './lifecycle.js';
 import { matchesPlanFile, readPlanFiles } from './plan-files.js';
 import type { ProjectPaths } from './project.js';
-import { shellWriteTargets, simpleCommands } from './policy-shell.js';
+import { shellWriteTargets } from './policy-shell.js';
+import { shellCliInvocations } from './shell-cli.js';
 
 /**
  * A person takes a change over (`sdlc takeover`) and hands it back (`sdlc release-control`). While the change is
@@ -91,30 +92,14 @@ export function takeoverDenial(
 
 /** sdlc steps that only read, allowed on a held change. */
 const READ_ONLY_STEP = /^(?:status|next|trace|audit|help|instructions|validate|roles\s+who)$/i;
-const CHANGE_OPTION = /--change(?:=|\s+)(?:"([^"]*)(?:"|$)|'([^']*)(?:'|$)|([^\s"';&|]+))/gi;
-
-/** The subcommand of an sdlc step: two words for the command groups (`roles who`, `tests lock`). */
-function stepName(match: RegExpExecArray): string {
-  return match[2] === undefined ? match[1] : `${match[1]} ${match[2]}`;
-}
-
-/** An sdlc step after the CLI prefix (binary and global options), with its one- or two-word subcommand. */
-function cliStep(prefix: string): RegExp {
-  return new RegExp(String.raw`${prefix}\s+([a-z][\w-]*)(?:\s+([a-z][\w-]*))?`, 'i');
-}
-
-/** True when a simple command runs an sdlc step that writes, on the change `id`. */
-function writesStep(segment: string, id: string, step: RegExp): boolean {
-  const match = step.exec(segment);
-  if (!match || READ_ONLY_STEP.test(match[1]) || READ_ONLY_STEP.test(stepName(match))) {
-    return false;
-  }
-  return [...segment.matchAll(CHANGE_OPTION)].some((option) =>
-    (option[1] ?? option[2] ?? option[3]).toLowerCase() === id.toLowerCase());
-}
-
-function cliDenial(change: HeldChange, command: string, step: RegExp): TakeoverDenial | undefined {
-  const segment = simpleCommands(command).find((part) => writesStep(part, change.id, step));
+function cliDenial(change: HeldChange, command: string): TakeoverDenial | undefined {
+  const segment = shellCliInvocations(command).find((call) => {
+    if (call.help || READ_ONLY_STEP.test(call.args[0] ?? '') || READ_ONLY_STEP.test(call.args.slice(0, 2).join(' '))) {
+      return false;
+    }
+    return call.args.some((word, i) => (word.startsWith('--change=') ? word.slice(9)
+      : word === '--change' ? call.args[i + 1] : undefined)?.toLowerCase() === change.id.toLowerCase());
+  })?.command.raw;
   if (segment === undefined) {
     return undefined;
   }
@@ -139,9 +124,8 @@ export function shellTakeoverDenial(
   if (written) {
     return written;
   }
-  const step = cliStep(cliPrefix);
   for (const change of held) {
-    const denial = cliDenial(change, command, step);
+    const denial = cliDenial(change, command);
     if (denial) return denial;
   }
   return undefined;

@@ -1,10 +1,8 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { randomUUID } from 'node:crypto';
 import { ensureLocalIgnore } from './local-ignore.js';
 import { SdlcError } from './errors.js';
-
-const WAIT = new Int32Array(new SharedArrayBuffer(4));
+import { acquireWriterLock, recoverWriterLock } from './writer-lock.js';
 
 function refused(detail: string): never {
   throw new SdlcError('log_write', detail);
@@ -32,28 +30,10 @@ export function logFile(root: string, name: string): string {
 export function withLogWriter<T>(root: string, action: () => T): T {
   const lock = logFile(root, 'log.lock');
   ensureLocalIgnore(root, ['log.lock']);
-  const deadline = performance.now() + 250;
-  let fd: number;
-  while (true) {
-    try { fd = fs.openSync(lock, 'wx', 0o600); break; }
-    catch (error) {
-      if ((error as NodeJS.ErrnoException).code !== 'EEXIST') throw error;
-      if (performance.now() >= deadline) refused('Project log writer is busy; reconcile a dead owner explicitly');
-      Atomics.wait(WAIT, 0, 0, 5);
-    }
-  }
-  const nonce = randomUUID();
-  try {
-    fs.writeFileSync(fd, JSON.stringify({ pid: process.pid, nonce }));
-    fs.fsyncSync(fd);
-    return action();
-  } finally {
-    fs.closeSync(fd);
-    try {
-      const current = JSON.parse(fs.readFileSync(lock, 'utf8')) as { nonce?: string };
-      if (current.nonce === nonce) fs.unlinkSync(lock);
-    } catch { /* An incomplete lock requires explicit recovery; never remove another writer's lock. */ }
-  }
+  ensureLocalIgnore(root, ['log.lock.writers/']);
+  const lease = acquireWriterLock(lock, 10_000);
+  try { return action(); }
+  finally { lease.release(); }
 }
 
 function writeComplete(fd: number, bytes: Buffer): void {
@@ -94,15 +74,5 @@ export function appendLogRecords(file: string, records: unknown[]): void {
 }
 
 export function recoverLogWriter(root: string): void {
-  const file = logFile(root, 'log.lock');
-  if (!fs.existsSync(file)) return;
-  const lock = JSON.parse(fs.readFileSync(file, 'utf8')) as { pid?: number; nonce?: string };
-  if (!Number.isSafeInteger(lock.pid) || !lock.pid || lock.pid < 1 || typeof lock.nonce !== 'string') {
-    refused('Malformed project log lock requires inspection');
-  }
-  try { process.kill(lock.pid, 0); refused('Project log writer is still active'); }
-  catch (error) { if ((error as NodeJS.ErrnoException).code !== 'ESRCH') throw error; }
-  const current = JSON.parse(fs.readFileSync(file, 'utf8')) as { nonce?: string };
-  if (current.nonce !== lock.nonce) refused('Project log writer changed');
-  fs.unlinkSync(file);
+  recoverWriterLock(logFile(root, 'log.lock'));
 }

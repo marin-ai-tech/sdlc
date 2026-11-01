@@ -18,6 +18,7 @@ import { stampText, stampTextLocalized } from '../core/license.js';
 import { appendLog, readLog } from '../core/log.js';
 import { filterLog } from '../core/log-filter.js';
 import { changeMarkdown, tryStampArtifacts } from '../core/stamp.js';
+import { presentStamping } from './gate-approval-output.js';
 import { aggregateMetrics, changeMetrics } from '../core/metrics.js';
 import { agentCommits } from '../core/agent-commits.js';
 import { agentEvents } from '../core/agent-events.js';
@@ -197,7 +198,8 @@ export async function archiveCommand(id: string | undefined, opts: ArchiveOption
     }
     const next = resolveNext(ctx);
     if (opts.json) {
-      printJson({ archive: { change: ref.id, ...archive, forced: open.length > 0 }, root: { path: ctx.root }, harness: ctx.stamp, ...(next ? { next } : {}) });
+      printJson({ archive: { change: ref.id, ...archive, forced: open.length > 0 }, stamping,
+        root: { path: ctx.root }, harness: ctx.stamp, ...(next ? { next } : {}) });
       return;
     }
     line(c.green(t('archive.done', {
@@ -211,6 +213,7 @@ export async function archiveCommand(id: string | undefined, opts: ArchiveOption
       })}`);
     }
     for (const w of archive.warnings ?? []) warn(w);
+    presentStamping(stamping);
     emitNextHint(ctx);
   } catch (error) {
     reportFailure(error, opts.json, { archive: null });

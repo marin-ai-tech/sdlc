@@ -196,7 +196,13 @@ describe('Plugin tools over the real HTTP transport', () => {
     expect(items).toHaveLength(1);
     expect(items[0]).toMatchObject({ id: 'add-farewell#1.1', executor: 'mesh', ext });
     const ordinary = await connect(url, TOKEN);
-    const selected = await ordinary.callTool({ name: 'task_export',
+    const logFile = path.join(p.root, 'openspec/.sdlc/log.jsonl');
+    const beforeAnonymous = fs.readFileSync(logFile);
+    expect(code(await ordinary.callTool({ name: 'task_export',
+      arguments: { change: 'add-farewell', task: '1.2', executor: 'mesh', ext } })))
+      .toBe('executor_token_required');
+    expect(fs.readFileSync(logFile)).toEqual(beforeAnonymous);
+    const selected = await client.callTool({ name: 'task_export',
       arguments: { change: 'add-farewell', task: '1.2', executor: 'mesh', ext } });
     expect(selected.isError, JSON.stringify(selected.content)).toBeFalsy();
     expect((selected.structuredContent as { items: Array<Record<string, unknown>> }).items[0].executor).toBe('mesh');

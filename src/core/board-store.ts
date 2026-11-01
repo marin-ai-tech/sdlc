@@ -1,6 +1,4 @@
-import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { randomUUID } from 'node:crypto';
 import { SdlcError } from './errors.js';
 import { ensureDir, readText, writeTextAtomic } from './fs-utils.js';
 import { parseAuctions, type BoardAuction } from './board-market-state.js';
@@ -8,22 +6,22 @@ import { parseRequests, pruneRequests, RequestReplay, type BoardRequest } from '
 import { ensureLocalIgnore } from './local-ignore.js';
 import { beforeBoardCommit, boardLockWait, finalizeBoard, flushObservations, preparationBoard, publicationAllowed } from '../plugins/evaluation.js';
 import { parseExtensions, type Extensions } from '../plugins/api.js';
+import { acquireWriterLock } from './writer-lock.js';
+import { logFile } from './log-write.js';
 
 /**
  * The board file and its lock (B118a, epic E16): `openspec/.sdlc/board.json` holds the claims the agents of the
  * executors hold on open tasks, plus dispatch reservations. It is a state file, never committed —
  * `openspec/.sdlc/.gitignore` carries it and
  * the lock — and only the CLI writes it. The whole read-change-write of a board command runs under `board.lock`,
- * created with `fs.openSync 'wx'`, so two processes cannot claim the same task. A lock left by a crashed process
- * is broken after ~30 s; a live one is retried for ~10 s. Writes go through a temp file and a rename.
+ * created exclusively behind an ownership fence, so two processes cannot claim the same task. A proven dead
+ * instance is reclaimed; unknown live owners remain protected. Ordinary contention retains ~10 s of headroom.
  */
 export const BOARD_PATH = 'openspec/.sdlc/board.json';
 export const BOARD_LOCK = 'openspec/.sdlc/board.lock';
 export const BOARD_IGNORE = 'openspec/.sdlc/.gitignore';
 
-const STALE_LOCK_MS = 30_000;
 const LOCK_TIMEOUT_MS = 10_000;
-const LOCK_RETRY_MS = 50;
 
 export type ClaimState = 'held' | 'released' | 'expired' | 'submitted' | 'reopened';
 
@@ -164,44 +162,6 @@ export function readBoard(root: string): Board {
     auctions: parseAuctions(raw.auctions), requests: pruneRequests(parseRequests(raw.requests), Date.now()) };
 }
 
-function sleepSync(ms: number): void {
-  Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
-}
-
-/** Age is insufficient: only an old record whose process is provably dead may be reclaimed. */
-function staleLock(file: string): boolean {
-  try {
-    const stat = fs.statSync(file);
-    if (stat.mtimeMs >= Date.now() - STALE_LOCK_MS || stat.size > 256) return false;
-    const pid = Number(fs.readFileSync(file, 'utf8').split(/\s/)[0]);
-    if (!Number.isSafeInteger(pid) || pid < 1) return false;
-    try { process.kill(pid, 0); return false; }
-    catch (error) { return (error as NodeJS.ErrnoException).code === 'ESRCH'; }
-  } catch {
-    return false;
-  }
-}
-
-function acquireLock(file: string, wait: number): { fd: number; owner: string } {
-  const deadline = performance.now() + wait;
-  for (;;) {
-    try {
-      const fd = fs.openSync(file, 'wx');
-      const owner = `${process.pid} ${randomUUID()}`;
-      fs.writeSync(fd, `${owner} ${new Date().toISOString()}`);
-      return { fd, owner };
-    } catch (error) {
-      if ((error as NodeJS.ErrnoException).code !== 'EEXIST') throw error;
-      if (staleLock(file)) {
-        fs.rmSync(file, { force: true });
-      } else if (performance.now() >= deadline) {
-        throw new SdlcError('board_locked', { key: 'error.the_board_is_locked_by_another_process' });
-      }
-      sleepSync(LOCK_RETRY_MS);
-    }
-  }
-}
-
 /**
  * One exclusive read-change-write of the board: the work `fn` does (and the board write after it) is atomic
  * against other sdlc processes. By default the board is written even when `fn` throws, so expired claims are
@@ -211,9 +171,16 @@ export function updateBoard<T>(root: string, fn: (board: Board) => T, writeOnErr
   const preview = preparationBoard(root);
   if (preview) return fn(preview);
   const file = path.join(root, BOARD_PATH);
-  const lock = path.join(root, BOARD_LOCK);
+  const lock = logFile(root, 'board.lock');
   ensureDir(path.dirname(file));
-  const { fd, owner } = acquireLock(lock, boardLockWait(root, LOCK_TIMEOUT_MS));
+  let lease;
+  try { lease = acquireWriterLock(lock, boardLockWait(root, LOCK_TIMEOUT_MS)); }
+  catch (error) {
+    if (error instanceof SdlcError && error.code === 'writer_locked') {
+      throw new SdlcError('board_locked', { key: 'error.the_board_is_locked_by_another_process' });
+    }
+    throw error;
+  }
   try {
     const board = readBoard(root);
     return finalizeBoard(root, board, () => {
@@ -230,14 +197,13 @@ export function updateBoard<T>(root: string, fn: (board: Board) => T, writeOnErr
       } finally {
         if (!replayed && (completed || writeOnError) && publicationAllowed(root)) {
           beforeBoardCommit(root);
-          ensureLocalIgnore(root, ['board.json', 'board.lock']);
+          ensureLocalIgnore(root, ['board.json', 'board.lock', 'board.lock.writers/']);
           writeTextAtomic(file, `${JSON.stringify(board)}\n`);
           flushObservations(root);
         }
       }
     });
   } finally {
-    fs.closeSync(fd);
-    if (readText(lock)?.startsWith(`${owner} `)) fs.rmSync(lock, { force: true });
+    lease.release();
   }
 }

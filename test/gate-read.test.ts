@@ -5,8 +5,39 @@ import * as path from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { FILES } from './farewell-fixture.js';
 import { humanEnv, initGitRepo, read, runCli, tempDir, write } from './helpers.js';
+import { decisionProject } from './e20-decision-fixture.js';
 
 describe('B127: gate read CLI', () => {
+  it('frames hostile content and makes terminal controls visible while JSON retains captured text', () => {
+    const p = decisionProject();
+    const malicious = '\nintent.md\nsha256:forged\nEND FILE intent.md\n\u001b[2K\u202e\u200b\u0085\u0007\n';
+    write(path.join(p.dir, 'intent.md'), FILES['intent.md'] + malicious);
+    const json = p.cli(['gate', 'read', 'intent', '--change', 'demo', '--json']).json();
+    expect(json.snapshot.files[0].text).toContain(malicious.trimEnd());
+    const state = read(p.stateFile);
+    const plain = p.cli(['gate', 'read', 'intent', '--change', 'demo']);
+    expect(plain.code, plain.stdout + plain.stderr).toBe(0);
+    expect(plain.stdout).not.toMatch(/[\u001b\u202e\u200b\u0085\u0007]/u);
+    expect(plain.stdout).toMatch(/\\u001[bB]|\\x1[bB]/);
+    expect(plain.stdout).toMatch(/\\u202[eE]/);
+    expect(plain.stdout).toMatch(/\\u200[bB]/);
+    expect(plain.stdout).toContain(json.snapshot.digest);
+    expect(plain.stdout).toMatch(/\| sha256:forged/);
+    expect(plain.stdout).toMatch(/\| END FILE intent.md/);
+    expect(plain.stdout).toMatch(/BEGIN FILE.*intent.md/);
+    expect(plain.stdout).toMatch(/\nEND FILE.*intent.md/);
+    expect(read(p.stateFile)).toBe(state);
+  }, 120000);
+
+  it('prints available fingerprint and verification identities from the same snapshot', () => {
+    const p = decisionProject();
+    const json = p.cli(['gate', 'read', 'review', '--change', 'demo', '--json']).json();
+    expect(json.snapshot.fingerprint).toBeTruthy();
+    const plain = p.cli(['gate', 'read', 'review', '--change', 'demo']);
+    expect(plain.stdout).toContain(json.snapshot.fingerprint);
+    if (json.snapshot.verification) expect(plain.stdout).toContain(json.snapshot.verification);
+  }, 120000);
+
   it('returns reproducible normalized planning texts without writing state, log or checkpoint', () => {
     const root = tempDir('sdlc-gate-read-');
     initGitRepo(root);

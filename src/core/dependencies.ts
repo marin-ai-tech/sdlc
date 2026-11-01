@@ -11,7 +11,8 @@
  *   @colbymchenry/codegraph. `codegraphIndexCommand(tools)` indexes and wires codegraph to the chosen tools only.
  * - `defaultProbe` / `defaultInstaller` spawn the command (with a shell on Windows, where npm is npm.cmd);
  *   the installer shows the command's output to the person and resolves to ok + output, never throws.
- * Nothing here runs unless a person chose it in the interactive init; agents and scripts never install.
+ * Installers run only after affirmative consent in interactive init. Selected OpenCode presence probes also
+ * support noninteractive human setup; agents and scripts never install.
  */
 import { spawnSync } from 'node:child_process';
 import * as fs from 'node:fs';
@@ -20,7 +21,7 @@ import { exists } from './fs-utils.js';
 import { openspecPackageDir } from './openspec-schema.js';
 
 export const DEPENDENCY_IDS = ['openspec', 'codegraph'] as const;
-export type DependencyId = (typeof DEPENDENCY_IDS)[number];
+export type DependencyId = (typeof DEPENDENCY_IDS)[number] | 'opencode';
 
 export interface DependencyStatus {
   id: DependencyId;
@@ -61,6 +62,7 @@ export function codegraphIndexCommand(tools: readonly string[]): string[] {
 const NAMES: Record<DependencyId, string> = {
   openspec: 'OpenSpec CLI',
   codegraph: 'codegraph',
+  opencode: 'OpenCode',
 };
 
 /** Long enough for a node-based CLI to print its version on a busy machine. */
@@ -84,6 +86,7 @@ function firstVersion(text: string): string | undefined {
 }
 
 export function installCommand(id: DependencyId): string[] {
+  if (id === 'opencode') return ['npm', 'install', '-g', 'opencode-ai@1'];
   if (id === 'openspec') {
     // A broken install must not break doctor or init: without the bundled version, install the latest.
     const version = bundledOpenSpecVersion();
@@ -93,19 +96,25 @@ export function installCommand(id: DependencyId): string[] {
 }
 
 export function detectDependencies(root: string, probe: Probe = defaultProbe): DependencyStatus[] {
-  return DEPENDENCY_IDS.map((id) => {
-    const result = probe(id, ['--version'], root);
-    const version = result.ok ? firstVersion(result.output) : undefined;
-    const status: DependencyStatus = {
-      id,
-      name: NAMES[id],
-      found: result.ok,
-      install: installCommand(id),
-    };
-    if (version) status.version = version;
-    if (id === 'codegraph') status.indexed = exists(path.join(root, '.codegraph'));
-    return status;
-  });
+  return DEPENDENCY_IDS.map((id) => detectDependency(root, id, probe));
+}
+
+/** Selected integrations are probed after the final tool choice, independently of optional tooling. */
+export function selectedDependencies(root: string, tools: readonly string[], probe: Probe): DependencyStatus[] {
+  return tools.includes('opencode') ? [detectDependency(root, 'opencode', probe)] : [];
+}
+
+function detectDependency(root: string, id: DependencyId, probe: Probe): DependencyStatus {
+  const result = probe(id, ['--version'], root);
+  const version = result.ok ? firstVersion(result.output) : undefined;
+  return {
+    id,
+    name: NAMES[id],
+    found: result.ok,
+    install: installCommand(id),
+    ...(version ? { version } : {}),
+    ...(id === 'codegraph' ? { indexed: exists(path.join(root, '.codegraph')) } : {}),
+  };
 }
 
 /** True when `command` is an executable file in a PATH folder (with a PATHEXT extension on Windows). */

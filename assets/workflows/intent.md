@@ -28,6 +28,8 @@ If the input is empty, stop and ask the user in plain text for the idea or probl
 6. **Stop at the gate.** Tell the user the intent is ready for the product owner, who accepts it with `sdlc approve intent --change <name>` or sends it back with `sdlc reject intent --change <name> --note "<why>"`. The spec is written only after acceptance ({{cmd:spec}}).
 
 **Guardrails**
+- At each human question, show an editable proposed answer and its literal command from the contract. Keep the
+  question pending until the authorized person runs `sdlc answer`; the draft itself records no answer or approval.
 - Planning only: do not edit project code in this workflow, even if the request asks for implementation.
 - One page. Record assumptions as Open questions rather than guessing.
 - Open questions are the person's to answer. Never write an answer yourself (an `Answer` line you add does not count); keep them as list items under the `## Open questions` heading. When you stop at the gate, name them in your message (read them from the file: `sdlc answer` is a person's command, never run it) and give the command for each: `sdlc answer <n> --change <name> --text "<answer>"`. The intent cannot be approved while one is unanswered.

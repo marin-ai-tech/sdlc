@@ -145,7 +145,10 @@ Mechanics:
   only after the approval record is written, so a refused approval never leaves the ref on an unapproved snapshot.
 - **Approval records the parser rejects.** A malformed entry never counts, but it is not erased: the writer keeps it
   in a write-only side table and writes it back unchanged, including the state copies made by `drop` and `archive`.
-  `sdlc doctor` names each one with its change, gate and position.
+  `sdlc doctor` names each one with its change, gate and position. Malformed whole gates or approval-list
+  shapes retain their original YAML bytes, including comments, across unrelated writes, drop and archive.
+  A decision targeting that malformed gate refuses before state, log or checkpoint changes. Restore it from
+  trusted human-reviewed history; it never supplies approval authority.
 - **The worktree fingerprint for verify, review and release** is the git tree id of all files (tracked + untracked,
   excluding ignored files and `openspec/`). It is computed in a temporary index and does not depend on commits:
   committing verified code does not make the verification stale, while any change to the content does.
@@ -156,6 +159,15 @@ Mechanics:
   `fingerprint_unavailable` (`src/core/verify-reason.ts`). The rule holds when every required check and required MCP
   check passed, the run was not partial and at least one check ran. JSON, the stored record, the text, the verify
   gate, the stop-hook detail and the next hint then name the fingerprint instead of asking to fix the code.
+- **Check runtime and containment.** Windows requires PowerShell with `Add-Type` and a kill-on-close Job Object.
+  Its absolute executable path and private startup readiness protocol separate the 30000 ms initialization
+  ceiling from the real command deadline. Missing PowerShell, execution policy, Constrained Language and
+  Add-Type/job failures refuse startup without granting a pass. Windows timeout cleanup uses the owned process
+  handle, never a PID. POSIX cleanup requires `ps -A -o pid=,ppid=,pgid=`; handled `SIGINT` and `SIGTERM` reach
+  the owned group and finish bounded cleanup, killing or resuming known frozen descendants. A known shell exit
+  retains its code after bounded process and pipe cleanup; lingering pipes alone never create a timeout.
+  Required cleanup failures still fail verification. An already detached, reparented POSIX orphan outside the
+  owned group may survive, and unhandled `SIGKILL` cannot guarantee cleanup.
 - **Separation of duties: agents.** `approve`, `reject`, `waive`, `track set`, `tests unlock`, `archive --force`,
   `license set`, `backlog move`, `backlog drop`, `roles migrate` and the other person's commands of `HUMAN_COMMANDS`
   (4.6) refuse to run in an agent session (`CLAUDECODE=1`, `OPENCODE=1`/`AGENT=1`, `SDLC_AGENT`, `CURSOR_AGENT=1`,
@@ -489,8 +501,14 @@ elapsed awards without changing the file or log. HTTP `board_bid` derives the ex
 `src/commands/board.ts` holds the CLI. The board includes open tasks of active changes whose plan gate is open.
 It uses the same `planOpen` rule as export and stores them in `openspec/.sdlc/board.json` with
 `{version: 1, claims, dispatches}`. A broken file is `board_invalid` and is never reset.
-Writes use `openspec/.sdlc/board.lock` and `fs.openSync 'wx'`. After about 10 seconds of retries, a lock older
-than about 30 seconds is broken as stale. A temporary file and rename let exactly one process win a claim race.
+Writes use `openspec/.sdlc/board.lock` and exclusive creation, with a shared ownership fence for acquisition
+and recovery. Writers record a PID, nonce and operating-system process birth identity when available.
+Only proven dead/different instances are reclaimed; a partial publication requires 120 seconds and the fence.
+Age alone never displaces a live or unknown legacy owner. Normal contention retains about ten seconds of
+headroom. `doctor` reports the complete ownership digest; a person may run
+`sdlc board recover --expect-owner sha256:<64-hex>` after inspecting it. Unknown live ownership requires
+confirmed quiescence and manual recovery, never a forced automated takeover. Read-only listings project an
+atomic board snapshot without taking the writer lock or settling stored decisions.
 Both files are state files under `STATE_FILES`, the `policy-shell` regexes and `hook.boardIntegrity`. They are
 git-ignored by `openspec/.sdlc/.gitignore`. A claim holds a lease (default 900 s, at
 most a day) that `heartbeat` renews and `release` ends; `submit` runs `checkResult` and wants every commit's
@@ -563,4 +581,8 @@ Pure hooks prepare outside board locks; core revalidates snapshots before mutati
 Own state/receipts/pending events live under guarded `openspec/.sdlc/plugins/`; the project log is a projection.
 This relies on Node/V8 and the OS, with bounded linear memory/deadlines, without an OS sandbox, total-process
 memory cap or universal power-loss durability. Runtime packages differ from editor plugin distribution.
+Queue admission, worker/schema/Wasm startup, guest execution and cleanup have separate bounded phases;
+hook preparation shares one thirty-second ceiling across retries. MCP caller identity reaches board/export
+services as a host-owned value from the actual token and served project; environment variables cannot
+impersonate that caller. These services return values and do not invoke stdout-printing CLI handlers.
 See [runtime plugins](33-plugins.md) for the exact ABI, limits, permissions and rollback.

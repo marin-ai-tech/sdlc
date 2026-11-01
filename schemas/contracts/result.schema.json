@@ -41,7 +41,7 @@
         "required": ["code"],
         "properties": {
           "code": { "enum": [
-            "missing_trailer", "unknown_task", "forbidden_path", "no_commits", "missing_agent",
+            "missing_trailer", "unknown_task", "forbidden_path", "outside_project", "no_commits", "missing_agent",
             "unknown_executor", "executor_not_allowed", "wrong_executor", "diff_unavailable", "plugin_refused"
           ] },
           "sha": { "type": "string" },

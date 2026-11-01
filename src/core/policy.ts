@@ -6,7 +6,7 @@ import { folderKey, folderLabel } from './folder-name.js';
 import { harnessStamp, stampText } from './license.js';
 import { evaluateChange, sharedFingerprint, type LifecycleView } from './lifecycle.js';
 import type { ProjectPaths } from './project.js';
-import { callsHumanCommand, CLI_PREFIX, joinContinuations } from './human-command-match.js';
+import { humanCommandMatch, CLI_PREFIX, joinContinuations } from './human-command-match.js';
 import { nextBacklogItem, readBacklog } from './backlog.js';
 import { t } from './i18n.js';
 import { toDiagnostic } from './errors.js';
@@ -28,14 +28,16 @@ import {
   shellStateWrites,
   shellWriteTargets,
   STATE_FILE,
-  STATE_FILE_WRITE,
-  WRITE_OPS,
 } from './policy-shell.js';
 import { shellWriteDestinations } from './policy-shell-writes.js';
 import { patchFiles } from './policy-patch-files.js';
 import { planGateDenial } from './plan-gate.js';
 import { openspecNewChange, openspecWrite } from './openspec-guard.js';
 import { clearedAgentMarkers } from './policy-markers.js';
+import { shellWords } from './shell-words.js';
+import { shellCliProblem } from './shell-cli.js';
+import { launcherDecision } from './launcher-targets.js';
+import { stateCopyDecision } from './state-copy.js';
 
 /**
  * Deterministic guardrails behind the advisory skills - the playbook's
@@ -123,14 +125,6 @@ function matcher(globs: string[]): (p: string) => boolean {
   return (p) => m(p);
 }
 
-/** One spelling per path before matching: forward slashes, no `/./` segments, no doubled slashes. */
-function normalizePaths(command: string): string {
-  return command
-    .replace(/\\/g, '/')
-    .replace(/\/(?:\.\/)+/g, '/')
-    .replace(/\/{2,}/g, '/');
-}
-
 /** Give single-purpose state files their own reason; mixed writes use the general state reason. */
 function stateReason(paths: string[], edit: boolean): string {
   const allMatch = (pattern: RegExp) => paths.length > 0 && paths.every((file) => pattern.test(file));
@@ -193,11 +187,8 @@ function gateOk(view: LifecycleView | undefined, id: string): boolean {
 
 /** A shell write to a state file, by its path text or (after `cd`, by glob, through a link) by what it resolves to. */
 function stateWriteDenial(spelled: string, ctx: PolicyContext, cwd: string): Decision | undefined {
-  if (STATE_FILE_WRITE.test(spelled) && WRITE_OPS.test(spelled)) {
-    const paths = spelled.match(new RegExp(STATE_FILE_WRITE.source, 'gi')) ?? [];
-    return { decision: 'deny', rule: 'state-integrity', reason: stateReason(paths, false) };
-  }
   const hits = [...shellStateWrites(spelled, ctx.paths.root, cwd),
+    ...hardLinkedStateFiles(shellWriteTargets(spelled, ctx.paths.root, cwd), ctx.paths.root, ctx.paths.root),
     ...hardLinkedFiles(shellWriteTargets(spelled, ctx.paths.root, cwd), ctx.paths.root, ctx.paths.root, pluginStateFiles)];
   if (hits.length === 0) return undefined;
   return { decision: 'deny', rule: 'state-integrity', reason: stateReason(hits, false) };
@@ -220,17 +211,26 @@ function evaluateCommand(
     return { decision: 'deny', rule: 'agent-marker',
       reason: t('hook.agentMarker', { markers: clearedAgentMarkers(cmd).join(', ') }) };
   }
-  if (ctx.config.enforcement.forbidAgentApprovals && callsHumanCommand(cmd)) {
+  const problem = shellWords(command).problem;
+  if (problem) return { decision: 'deny', rule: 'shell-parse', reason: problem };
+  const humanCommand = humanCommandMatch(cmd);
+  if (ctx.config.enforcement.forbidAgentApprovals && humanCommand) {
     return {
       decision: 'deny',
       rule: 'separation-of-duties',
-      reason: t('hook.separationOfDuties', { command: quotedCommand(cmd) }),
+      reason: t('hook.separationOfDuties', { command: quotedCommand(humanCommand) }),
     };
   }
   if (removesSdlcCli(cmd)) return { decision: 'deny', rule: 'cli-removal', reason: t('hook.cliRemoval') };
-  const spelled = normalizePaths(cmd);
+  const spelled = cmd;
   const stateDenial = stateWriteDenial(spelled, ctx, cwd);
   if (stateDenial) return stateDenial;
+  const copy = stateCopyDecision(command, ctx.paths.root, cwd);
+  if (copy) return copy;
+  const execution = shellCliProblem(command);
+  if (execution) return { decision: 'deny', rule: 'shell-parse', reason: execution };
+  const launcher = launcherDecision({ tool: 'Bash', kind: 'bash', command, cwd, files: [] }, ctx.paths.root, ctx.config);
+  if (launcher) return launcher;
   // The guard's own configuration (B41): the files that switch the rules on; also the user-level ones (B42).
   // The review policy may live where `review.policy` says (B75).
   const policy = [ctx.config.review.policy];
@@ -300,6 +300,8 @@ function evaluateRules(call: ToolCall, ctx: PolicyContext): Decision {
   }
 
   if (call.kind !== 'edit' || call.files.length === 0) return { decision: 'allow' };
+  const launcher = launcherDecision(call, paths.root, config);
+  if (launcher) return launcher;
   const rels = call.files
     .map((f) => relToRoot(paths.root, call.cwd, f))
     .filter((r): r is string => r !== undefined);

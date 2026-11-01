@@ -1,4 +1,8 @@
 import { defineConfig } from 'vitest/config';
+import * as path from 'node:path';
+import ExactShardSequencer from './scripts/test-shards.mjs';
+
+const report = process.env.SDLC_TEST_REPORT;
 
 export default defineConfig({
   test: {
@@ -10,5 +14,7 @@ export default defineConfig({
     globalSetup: ['test/global-setup.ts'],
     // Output is English unless a test asks for a locale, whatever the machine's language.
     env: { SDLC_LOCALE: 'en' },
+    ...(report ? { reporters: ['default', 'json'], outputFile: { json: path.resolve(report) } } : {}),
+    ...(process.env.SDLC_TEST_SHARD ? { sequence: { sequencer: ExactShardSequencer } } : {}),
   },
 });

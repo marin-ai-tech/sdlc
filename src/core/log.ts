@@ -10,6 +10,7 @@ import { parseLogEntry } from './log-record.js';
 import { appendLogRecords, logFile, withLogWriter } from './log-write.js';
 import type { Json } from '../plugins/api.js';
 import { deferObservation, isPreparation } from '../plugins/evaluation.js';
+import { drainLocalLog } from './log-recovery.js';
 
 /**
  * Append-only project log: one JSON object per line in
@@ -98,27 +99,19 @@ export function appendLocalLog(
       appendLogRecords(file, [entry]);
     });
     queueEvent(root, config, entry);
-  } catch {
-    // Logging cannot prevent a hook decision.
+  } catch (error) {
+    logDiagnostic(error);
   }
 }
 
 function drainHookLog(root: string, file: string): void {
-  const queue = path.join(root, HOOK_LOG_PATH);
-  const drained = `${queue}.${process.pid}.${Date.now()}.drain`;
-  try {
-    fs.renameSync(queue, drained);
-  } catch {
-    return;
-  }
-  try {
-    const records = fs.readFileSync(drained, 'utf8').split('\n').filter((line) => line.trim())
-      .flatMap((line) => { try { const parsed = parseLogEntry(JSON.parse(line)); return parsed ? [parsed] : []; } catch { return []; } });
-    appendLogRecords(file, records);
-    fs.rmSync(drained);
-  } catch {
-    try { fs.renameSync(drained, queue); } catch { /* keep the drain for recovery */ }
-  }
+  drainLocalLog(root, file);
+}
+
+function logDiagnostic(error: unknown): void {
+  const detail = error instanceof Error ? error.message : String(error);
+  try { process.stderr.write(`sdlc: project log pending: ${detail.slice(0, 500)}; run sdlc doctor\n`); }
+  catch { /* Observation failures never alter a command or hook decision. */ }
 }
 
 export function appendLog(
@@ -141,8 +134,8 @@ export function appendLog(
       appendLogRecords(file, [entry]);
     });
     queueEvent(root, config, entry);
-  } catch {
-    // The log is a record, not a gate: failing to write it never fails a command or a hook.
+  } catch (error) {
+    logDiagnostic(error);
   }
 }
 

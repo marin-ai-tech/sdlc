@@ -11,6 +11,7 @@ import {
 } from './lifecycle.js';
 import { awaitedRoles } from './approval-quorum.js';
 import { qaRequired } from './qa-gate.js';
+import { withCliPrefix } from './suggested-command.js';
 
 /**
  * `sdlc explain --change <id>` (0.11.3, B53): why a change is where it is. It reads the lifecycle view (stage,
@@ -85,7 +86,8 @@ export function draftExplanation(root: string, ref: ChangeRef, config: SdlcConfi
     next,
     facts: explainFacts(view, gate),
     roles: waitingRoles(view.next, gate, config),
-    steps: [first, ...followingSteps(view)],
+    steps: [first, ...followingSteps(view)].map(step => ({ ...step,
+      ...(step.cli ? { cli: withCliPrefix(step.cli, config.cli) } : {}) })),
     recent: history.slice(-RECENT_EVENTS).map(recentEvent),
   };
 }

@@ -5,6 +5,8 @@ import { listActiveChanges, resolveChange } from '../core/changes.js';
 import { t } from '../core/i18n.js';
 import { otherBranchChanges, type BranchChange } from '../core/branch-changes.js';
 import { myQueue, type MyQueue } from '../core/my-queue.js';
+import { nextCommand } from './changes.js';
+import { SdlcError } from '../core/errors.js';
 
 /**
  * `sdlc next --me`: the gates waiting for me across the active changes, one line each with the command to run.
@@ -14,6 +16,14 @@ export interface NextMeOptions {
   change?: string;
   json?: boolean;
   branches?: boolean;
+}
+
+export async function nextWithOptions(opts: NextMeOptions & { me?: boolean }): Promise<void> {
+  if (opts.branches === false && !opts.me) {
+    reportFailure(new SdlcError('invalid_option', '--no-branches requires --me'), opts.json);
+    return;
+  }
+  return opts.me ? nextMeCommand(opts) : nextCommand(opts);
 }
 
 export async function nextMeCommand(opts: NextMeOptions): Promise<void> {

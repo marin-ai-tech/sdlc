@@ -18,7 +18,7 @@ import { conflictedRecords } from './record-conflicts.js';
 import { hooksDisabledFiles } from './user-guard.js';
 import { harnessVersion } from './version.js';
 import { readYamlObject } from './yaml-io.js';
-import { malformedApprovals } from './doctor-approvals.js';
+import { malformedApprovals, malformedDecisionShapes } from './doctor-approvals.js';
 import { integrationUnknownKeys } from './config-integration-findings.js';
 import { claudeGitBash, gitBashOnPath } from './claude-git-bash.js';
 import { readManifest, sha256 } from '../integrations/manifest.js';
@@ -31,6 +31,8 @@ import { qwenFolderTrusted } from './qwen-trust.js';
 import { CHAIN_LINE, CHAIN_SUFFIX, inspectGitHook } from '../integrations/git-hook.js';
 import { referencedVariables } from '../mcp/registry.js';
 import { pluginReports } from '../plugins/catalog.js';
+import { writerLockFindings } from './doctor-locks.js';
+import { toDiagnostic } from './errors.js';
 
 /**
  * The checks of `sdlc doctor`, as a function `sdlc health` reuses (config.doctor). Same checks in the same order,
@@ -118,7 +120,9 @@ function configCheck(out: Checks, paths: ProjectPaths): SdlcConfig | undefined {
     out.add('sdlc.yaml', exists ? 'ok' : 'error', message, tt('doctor.fix.init'));
     return config;
   } catch (error) {
-    out.add('sdlc.yaml', 'error', error instanceof Error ? error.message : String(error));
+    const diagnostic = toDiagnostic(error);
+    out.list.push({ check: 'sdlc.yaml', status: 'error', code: diagnostic.code,
+      message: diagnostic.message, ...(diagnostic.fix ? { fix: diagnostic.fix } : {}) });
     return undefined;
   }
 }
@@ -283,6 +287,7 @@ function projectConfigChecks(
     ? tt('doctor.logEntries', { count: readLog(root).length, path: LOG_PATH })
     : tt('doctor.logOff');
   out.add('project log', 'ok', logMessage);
+  out.list.push(...writerLockFindings(root, config.cli));
   mcpVariablesCheck(out, config, env);
   try {
     const raw = readYamlObject(paths.sdlcConfig);
@@ -311,6 +316,11 @@ function changeChecks(out: Checks, root: string, paths: ProjectPaths, config: Sd
   }
   for (const ref of listActiveChanges(paths)) {
     try {
+      for (const { gate, shape } of malformedDecisionShapes(ref)) {
+        out.add(`change ${ref.id} ${gate} ${shape}`, 'warn',
+          out.tt('doctor.malformedGateShape', { change: ref.id, gate, shape }),
+          out.tt('doctor.fix.malformedGateShape', { change: ref.id, gate }));
+      }
       for (const { gate, position } of malformedApprovals(ref)) {
         out.add(`change ${ref.id} ${gate} approval ${position}`, 'warn',
           out.tt('doctor.malformedApproval', { change: ref.id, gate, position }));

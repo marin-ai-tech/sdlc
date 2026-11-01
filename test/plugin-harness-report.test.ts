@@ -1,11 +1,13 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { spawnSync } from 'node:child_process';
-import { describe, expect, it, vi } from 'vitest';
+import { randomUUID } from 'node:crypto';
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { parse, stringify } from 'yaml';
 import { claimTask, type ClaimResult } from '../dist/core/board.js';
 import { readBoard } from '../dist/core/board-store.js';
 import { resolveChange } from '../dist/core/changes.js';
+import { statePath } from '../dist/core/change-state.js';
 import { loadConfig } from '../dist/core/config.js';
 import { SdlcError } from '../dist/core/errors.js';
 import { git as inspectGit, worktreeFingerprint } from '../dist/core/git.js';
@@ -20,6 +22,16 @@ import { capturePackage } from '../dist/plugins/package.js';
 import { readRegistry } from '../dist/plugins/trust.js';
 import { FILES } from './farewell-fixture.js';
 import { BIN, git, humanEnv, initGitRepo, read, REPO_ROOT, tempDir, write } from './helpers.js';
+import { immutableBoardProject, reportBoardProject } from './fixtures/immutable-board-project.js';
+
+const fixturePhases: Array<Record<string, unknown>> = [];
+const seedPhasesMs: Record<string, number> = {};
+let seed: ReturnType<typeof sourceAt> | undefined;
+let seedReady = false;
+const copies = immutableBoardProject(() => {
+  if (!seed || !seedReady) throw new Error('Prepare the real pre-plugin source before copying');
+  return seed.root;
+}, 'sdlc-harness-report-');
 
 function demoPackage(root: string, guard?: 'deny' | 'fault') {
   const source = 'packages/demo';
@@ -39,25 +51,84 @@ function demoPackage(root: string, guard?: 'deny' | 'fault') {
   return capturePackage(root, source);
 }
 
-function project(ext?: Record<string, unknown>, guard?: 'deny' | 'fault') {
-  const root = tempDir('sdlc-harness-report-');
+function sourceAt(root: string, env: NodeJS.ProcessEnv, scope = 'host') {
+  const cli = (args: string[]) => {
+    const started = performance.now();
+    const result = spawnSync(process.execPath, [BIN, ...args, '--json'], {
+      cwd: root, env, encoding: 'utf8', timeout: 20000,
+    });
+    const error = result.error as NodeJS.ErrnoException | undefined;
+    const phase = { command: args, scope, root, elapsedMs: performance.now() - started, boundMs: 20000,
+      status: result.status, signal: result.signal,
+      error: error ? { name: error.name, code: error.code, message: error.message } : null };
+    fixturePhases.push(phase);
+    if (process.env.SDLC_TEST_REPORT) {
+      write(`${process.env.SDLC_TEST_REPORT}.plugin-harness-cli-phases.json`, JSON.stringify(fixturePhases, null, 2));
+    }
+    expect(result.status, `${JSON.stringify(phase)}\n${result.stdout}${result.stderr}`).toBe(0);
+    return result.stdout;
+  };
+  return { root, env, cli };
+}
+
+function scaffoldSeed() {
+  const root = tempDir('sdlc-harness-report-seed-');
   const env = humanEnv(tempDir('sdlc-harness-report-person-'));
   initGitRepo(root);
   write(path.join(root, 'src/greet.js'), '// original\n');
   git(root, ['add', '-A']);
   git(root, ['commit', '-qm', 'initial']);
-  const cli = (args: string[]) => {
-    const result = spawnSync(process.execPath, [BIN, ...args, '--json'], {
-      cwd: root, env, encoding: 'utf8', timeout: 20000,
-    });
-    expect(result.status, result.stdout + result.stderr).toBe(0);
-    return result.stdout;
-  };
+  return sourceAt(root, env, 'seed');
+}
+
+function initializeCopy(source: ReturnType<typeof sourceAt>) {
+  const { root, cli } = source;
   cli(['init', '--tools', 'codex']);
   const file = path.join(root, 'openspec/sdlc.yaml');
   const raw = parse(read(file));
   raw.enforcement.mode = 'block';
   raw.verify.commands = [{ name: 'candidate', run: 'node check.cjs', required: true }];
+  write(file, stringify(raw));
+  write(path.join(root, 'check.cjs'), "if(require('fs').readFileSync('src/greet.js','utf8').trim()!=='// candidate')process.exit(1)\n");
+}
+
+function seedPhase(name: string, action: () => void) {
+  const started = performance.now();
+  action();
+  seedPhasesMs[name] = performance.now() - started;
+}
+
+function prepareSource() {
+  beforeAll(function scaffoldReportSource() {
+    seedPhase('scaffold', () => { seed = scaffoldSeed(); seedReady = true; });
+  });
+  afterAll(reportPreparation);
+}
+
+function reportPreparation() {
+  reportBoardProject('harness-report', copies);
+  if (!process.env.SDLC_TEST_REPORT) return;
+  write(`${process.env.SDLC_TEST_REPORT}.harness-report-preparation.json`, JSON.stringify({ seedPhasesMs,
+    actualSeedPreparationMs: Object.values(seedPhasesMs).reduce((sum, ms) => sum + ms, 0),
+    captureAndCopies: copies.measurements() }, null, 2));
+}
+
+function sourceCopy() {
+  const source = sourceAt(copies.create(), humanEnv(tempDir('sdlc-harness-report-person-')));
+  initializeCopy(source);
+  source.cli(['new', 'add-farewell', '--risk', 'medium']);
+  const dir = path.join(source.root, 'openspec/changes/add-farewell');
+  write(path.join(dir, 'intent.md'), FILES['intent.md']);
+  source.cli(['approve', 'intent', '--change', 'add-farewell']);
+  for (const rel of ['proposal.md', 'specs/greeting/spec.md', 'design.md']) write(path.join(dir, rel), FILES[rel]);
+  source.cli(['approve', 'spec', '--change', 'add-farewell']);
+  return source;
+}
+
+function configurePlugin(source: ReturnType<typeof sourceAt>, ext?: Record<string, unknown>, guard?: 'deny' | 'fault') {
+  const { root, cli } = source;
+  const file = path.join(root, 'openspec/sdlc.yaml');
+  const raw = parse(read(file));
   const demo = ext === undefined && !guard ? undefined : demoPackage(root, guard);
   if (demo) {
     raw.plugins = { demo: { package: demo.source, digest: demo.digest, enabled: true, config: { limit: 3 } } };
@@ -66,19 +137,24 @@ function project(ext?: Record<string, unknown>, guard?: 'deny' | 'fault') {
   }
   write(file, stringify(raw));
   if (demo) cli(['plugins', 'accept', 'demo', '--expect-digest', demo.digest]);
-  write(path.join(root, 'check.cjs'), "if(require('fs').readFileSync('src/greet.js','utf8').trim()!=='// candidate')process.exit(1)\n");
-  cli(['new', 'add-farewell', '--risk', 'medium']);
+  return demo;
+}
+
+function approvePlan(root: string, cli: (args: string[]) => string) {
   const change = (rel: string) => path.join(root, 'openspec/changes/add-farewell', rel);
-  write(change('intent.md'), FILES['intent.md']);
-  cli(['approve', 'intent', '--change', 'add-farewell']);
-  for (const rel of ['proposal.md', 'specs/greeting/spec.md', 'design.md']) write(change(rel), FILES[rel]);
-  cli(['approve', 'spec', '--change', 'add-farewell']);
   write(change('plan.md'), FILES['plan.md']);
   write(change('tasks.md'), '# Tasks\n\n- [ ] 1.1 Implement farewell\n- [ ] 1.2 Another task\n');
   write(path.join(root, 'openspec/executors.yaml'), 'executors:\n  hosted:\n    type: harness\n    max_risk: medium\n');
   cli(['approve', 'plan', '--change', 'add-farewell']);
   git(root, ['add', '-A']);
   git(root, ['commit', '-qm', 'approved source']);
+}
+
+function project(ext?: Record<string, unknown>, guard?: 'deny' | 'fault', source = sourceCopy()) {
+  const { root, env, cli } = source;
+  const demo = configurePlugin(source, ext, guard);
+  approvePlan(root, cli);
+  const file = path.join(root, 'openspec/sdlc.yaml');
   const paths = projectPaths(root);
   const config = loadConfig(file);
   const ref = resolveChange(paths, 'add-farewell');
@@ -166,6 +242,75 @@ async function prepared(options: { task?: string; agent?: string; edit?: string;
 }
 
 describe('structured Harness candidate reports', () => {
+  prepareSource();
+  const isolation = 'isolates real plugin acceptance, authority, Git and state across physical pre-plugin copies';
+  const sources: ReturnType<typeof sourceCopy>[] = [];
+  const preparation: Array<Record<string, unknown>> = [];
+  for (let index = 0; index < 2; index++) {
+    beforeEach(({ task }) => {
+      if (task.name !== isolation) return;
+      const started = performance.now();
+      let source: ReturnType<typeof sourceCopy> | undefined;
+      try {
+        source = sourceCopy();
+        sources.push(source);
+      } finally {
+        preparation.push({ copy: index + 1, elapsedMs: performance.now() - started,
+          budgetMs: 60000, completed: source !== undefined, root: source?.root });
+        if (process.env.SDLC_TEST_REPORT) write(`${process.env.SDLC_TEST_REPORT}.plugin-harness-isolation-preparation.json`,
+          JSON.stringify(preparation, null, 2));
+      }
+    });
+  }
+  afterEach(() => { sources.length = 0; });
+
+  it(isolation, () => {
+    expect(sources).toHaveLength(2);
+    const [first, second] = sources;
+    const snapshot = (root: string) => {
+      const paths = projectPaths(root);
+      const ref = resolveChange(paths, 'add-farewell');
+      return { files: [paths.sdlcConfig, path.join(paths.openspecDir, '.sdlc/log.jsonl'), statePath(ref.dir)]
+        .map((file) => fs.readFileSync(file)), head: inspectGit(root, ['rev-parse', 'HEAD']).stdout };
+    };
+    const untouched = snapshot(second.root);
+    const scaffold = () => ({ entries: fs.readdirSync(seed!.root).sort(),
+      source: read(path.join(seed!.root, 'src/greet.js')),
+      config: read(path.join(seed!.root, '.git/config')),
+      head: inspectGit(seed!.root, ['rev-parse', 'HEAD']).stdout,
+      refs: inspectGit(seed!.root, ['show-ref']).stdout });
+    const privateSeed = scaffold();
+    expect(privateSeed.entries).toEqual(['.git', 'src']);
+    for (const source of [seed!, first, second]) {
+      expect(fs.lstatSync(path.join(source.root, '.git')).isDirectory()).toBe(true);
+      for (const file of ['packages', 'openspec/.sdlc/plugins', 'openspec/.sdlc/board.json']) {
+        expect(fs.existsSync(path.join(source.root, file))).toBe(false);
+      }
+    }
+    expect(fs.realpathSync(first.root)).not.toBe(fs.realpathSync(second.root));
+    expect(first.env.XDG_CONFIG_HOME).not.toBe(second.env.XDG_CONFIG_HOME);
+    const a = project({ demo: { a: 1 } }, undefined, first);
+    expect(snapshot(second.root)).toEqual(untouched);
+    expect(scaffold()).toEqual(privateSeed);
+    const b = project({ demo: { a: 1 } }, undefined, second);
+    expect(readRegistry(a.root).plugins.demo.stateId).not.toBe(readRegistry(b.root).plugins.demo.stateId);
+    expect(readRegistry(a.root).plugins.demo.status).toBe('accepted');
+    expect(readRegistry(b.root).plugins.demo.status).toBe('accepted');
+    expect(a.claim.claim.id).not.toBe(b.claim.claim.id);
+    const bState = pluginBytes(b.root);
+    const aState = pluginBytes(a.root);
+    const request = `p1.${Date.now()}.${randomUUID().replaceAll('-', '')}`;
+    first.cli(['demo', 'reset', '--request', request, '--input-json', '{}']);
+    expect(pluginBytes(a.root)[1]).not.toEqual(aState[1]);
+    write(path.join(a.root, 'src/isolation.txt'), 'only first host\n');
+    expect(fs.existsSync(path.join(b.root, 'src/isolation.txt'))).toBe(false);
+    expect(pluginBytes(b.root)).toEqual(bState);
+    for (const guard of [undefined, 'deny', 'fault'] as const) {
+      const hooks = demoPackage(tempDir('sdlc-harness-report-hooks-'), guard).manifest.hooks;
+      expect(Object.keys(hooks)).toEqual(guard ? ['result_accept'] : []);
+    }
+  }, 120000);
+
   it('prepares a person-provisioned warm worker without accepting or copying host trust', async () => {
     const p = project({ demo: { a: 1, b: [1, 2] } });
     const sandbox = tempDir('sdlc-harness-provisioned-worker-');
@@ -247,14 +392,13 @@ describe('structured Harness candidate reports', () => {
     expect(p.check).not.toHaveBeenCalled();
   }, 120000);
 
-  it('reports missing validator without touching source or transport', async () => {
+  it('propagates missing validator without touching source or transport', async () => {
     const p = project();
     const transport = runtime(p, tempDir('sdlc-harness-missing-validator-'));
     const host = new HarnessBundleHost({ ...p, runtime: transport as unknown as HarnessRuntime, tool: 'codex' });
     const adapter = new HarnessAdapter(transport as unknown as HarnessRuntime, host);
-    expect(await adapter.candidateReport(['missing'], p.claim.item)).toMatchObject([
-      { session: 'missing', passed: false, problems: [{ code: 'harness_validator_missing' }] },
-    ]);
+    await expect(adapter.candidateReport(['missing'], p.claim.item))
+      .rejects.toMatchObject({ code: 'harness_validator_missing' });
     expect(transport.exec).not.toHaveBeenCalled();
   }, 120000);
 

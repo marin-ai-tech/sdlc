@@ -40,6 +40,61 @@ function project(edit?: (config: Record<string, any>) => void) {
 }
 
 describe('B62: answers to open questions', () => {
+  it('requires a new answer after a parent continuation beyond nested context changes', () => {
+    const p = project();
+    write(p.file, intent(['- Which users may access receipts?', '  - Include the existing team.', '',
+      '  Should relief staff also have access?']));
+    expect(p.run(['answer', '1', '--text', 'Only the approved team']).code).toBe(0);
+    const stateFile = path.join(p.root, 'openspec/changes/demo/.sdlc.yaml');
+    const previous = parse(read(stateFile)).answers[0];
+    write(p.file, read(p.file).replace('Should relief staff also have access?',
+      'Should every outside contractor also have access?'));
+    expect(p.run(['answer', '--list']).json().questions[0].answered).toBe(false);
+    expect(p.run(['approve', 'intent']).json().status[0].code).toBe('open_questions');
+    expect(parse(read(stateFile)).answers).toContainEqual(previous);
+    expect(p.run(['answer', '1', '--text', 'Approved permanent and relief staff only']).code).toBe(0);
+    expect(p.run(['answer', '--list']).json().questions[0].answered).toBe(true);
+    expect(parse(read(stateFile)).answers).toContainEqual(previous);
+  }, 120000);
+
+  it('places the answer after the full wrapped question and subitems, preserving CRLF', () => {
+    const p = project();
+    const body = ['- Which users print receipts', '  when the shop is offline?', '  - Include relief staff.',
+      '', '- Is VAT shown on the receipt?'];
+    write(p.file, intent(body).replace(/\n/g, '\r\n'));
+    const answer = p.run(['answer', '1', '--text', 'All cashiers']);
+    expect(answer.code, answer.stdout + answer.stderr).toBe(0);
+    expect(answer.json().question).toBe('Which users print receipts when the shop is offline?');
+    const text = read(p.file);
+    expect(text.indexOf('Answer (')).toBeGreaterThan(text.indexOf('Include relief staff.'));
+    expect(text.indexOf('Answer (')).toBeLessThan(text.indexOf('- Is VAT shown'));
+    expect(text.replace(/\r\n/g, '')).not.toContain('\n');
+    const before = p.run(['gate', 'read', 'intent']).json().snapshot.digest;
+    write(p.file, text.replace('shop is offline?', 'shop is online?'));
+    const questions = p.run(['answer', '--list']).json().questions;
+    expect(questions[0].answered).toBe(false);
+    expect(p.run(['gate', 'read', 'intent']).json().snapshot.digest).not.toBe(before);
+    const state = parse(read(path.join(p.root, 'openspec/changes/demo/.sdlc.yaml')));
+    expect(state.answers[0].question).toBe('Which users print receipts when the shop is offline?');
+  }, 120000);
+
+  it('retains a legacy short answer without counting it for changed full question text', () => {
+    const p = project();
+    expect(p.run(['answer', '1', '--text', 'Cashiers']).code).toBe(0);
+    const stateFile = path.join(p.root, 'openspec/changes/demo/.sdlc.yaml');
+    const legacy = parse(read(stateFile)).answers[0];
+    write(p.file, read(p.file).replace('- Which users print receipts?',
+      '- Which users print receipts?\n  Include temporary staff?'));
+    expect(p.run(['answer', '--list']).json().questions[0]).toMatchObject({
+      text: 'Which users print receipts? Include temporary staff?', answered: false,
+    });
+    expect(parse(read(stateFile)).answers).toContainEqual(legacy);
+    expect(p.run(['approve', 'intent']).json().status[0].code).toBe('open_questions');
+    expect(p.run(['answer', '1', '--text', 'Permanent and temporary cashiers']).code).toBe(0);
+    expect(parse(read(stateFile)).answers).toContainEqual(legacy);
+    expect(p.run(['answer', '--list']).json().questions[0].answered).toBe(true);
+  }, 120000);
+
   it('the gate waits for a person to answer every open question, then it can be approved', () => {
     const p = project();
     const refused = p.run(['approve', 'intent']);

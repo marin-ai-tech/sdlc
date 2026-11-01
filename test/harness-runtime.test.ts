@@ -5,6 +5,7 @@ import type { TaskItem } from '../src/core/task-contract.js';
 import type { Executor } from '../src/core/executors.js';
 import { defaultConfig } from '../src/core/config.js';
 import { HarnessBundleHost } from '../src/executors/harness-bundle-host.js';
+import { SdlcError } from '../src/core/errors.js';
 
 const item: TaskItem = {
   contract: 'sdlc.task/1', id: 'demo#1.1', change: 'demo', kind: 'feature', risk: 'medium', executor: 'hosted',
@@ -23,6 +24,23 @@ function host(): HarnessHost {
 }
 
 describe('B124: documented provider wire contract', () => {
+  it('keeps ordinary 30000ms and exec 90000ms client bounds around a 60-second provider exec', async () => {
+    const timeout = vi.spyOn(AbortSignal, 'timeout');
+    try {
+      const fetcher = vi.fn(async (url: string, _request: RequestInit) => new Response(JSON.stringify(url.endsWith('/sandbox/exec')
+        ? { exit_code: 0 } : { session_id: 'one', status: 'SESSION_STATUS_READY' })));
+      const runtime = new HarnessRuntime('host-only-token', fetcher as never);
+      await runtime.get('one');
+      await runtime.exec('one', ['true']);
+      expect(timeout.mock.calls.map(([value]) => value)).toEqual([30000, 90000]);
+      const request = fetcher.mock.calls[1][1] as RequestInit;
+      expect(JSON.parse(String(request.body))).toMatchObject({ timeout_seconds: 60 });
+      expect(request.body).not.toContain('host-only-token');
+      expect(request.redirect).toBe('error');
+    } finally {
+      timeout.mockRestore();
+    }
+  });
   it('retains UTF-8 and BOM decoding for bounded JSON responses', async () => {
     const body = '\uFEFF' + JSON.stringify({ session_id: 'one', status: 'SESSION_STATUS_READY', note: 'caf\u00e9' });
     const runtime = new HarnessRuntime('dummy-host-token', vi.fn(async () => new Response(body)) as never);
@@ -107,6 +125,27 @@ describe('B124: documented provider wire contract', () => {
 });
 
 describe('B124: task coordinator stays behind host checks and board leases', () => {
+  it.each(['harness_refused', 'claim_expired', 'harness_validator_missing'])
+    ('propagates fatal host refusal %s from candidates()', async (code) => {
+      const bridge = host();
+      vi.mocked(bridge.verify).mockRejectedValue(new SdlcError(code, 'Fatal host-bound refusal'));
+      const adapter = new HarnessAdapter({} as HarnessRuntime, bridge);
+      await expect(adapter.candidates(['one'], item)).rejects.toMatchObject({ code });
+    });
+
+  it('retains an independent candidate after an ordinary verification failure', async () => {
+    const bridge = host();
+    vi.mocked(bridge.verify).mockImplementation(async (session) => {
+      if (session === 'bad') throw new Error('candidate check failed');
+      return { branch: 'verified-branch', passed: true };
+    });
+    const adapter = new HarnessAdapter({} as HarnessRuntime, bridge);
+    expect(await adapter.candidateReport(['bad', 'good', 'bad'], item)).toEqual([
+      { session: 'bad', branch: item.result.branch, passed: false, problems: [{ code: 'harness_verification_failed' }] },
+      { session: 'good', branch: 'verified-branch', passed: true },
+    ]);
+    expect(bridge.verify).toHaveBeenCalledTimes(2);
+  });
   it('refuses candidate verification without an isolated validator before touching host state or the runtime', async () => {
     const runtime = { exec: vi.fn() };
     const bridge = new HarnessBundleHost({

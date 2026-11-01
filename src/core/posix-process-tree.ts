@@ -70,6 +70,7 @@ interface Cleanup {
   rows?: ProcessEntry[];
   signalled: boolean;
   frozenLive: boolean;
+  frozen: Set<number>;
 }
 
 function groupAllowed(state: Cleanup): boolean {
@@ -87,10 +88,24 @@ function send(state: Cleanup, target: number, name: NodeJS.Signals): boolean {
     && state.rows?.some((row) => row.pid === target && row.group === state.pid)) return false;
   const freezingLiveGroup = target === -state.pid && name === 'SIGSTOP' && state.shell?.exited() === false;
   const delivered = signal(target, name);
+  if (delivered && name === 'SIGSTOP') state.frozen.add(target < 0 ? state.pid : target);
+  if (name === 'SIGKILL') state.frozen.delete(target);
   if (freezingLiveGroup && delivered) state.frozenLive = true;
   // Counts delivered signals, not attempts that hit ESRCH.
   state.signalled ||= delivered;
   return delivered;
+}
+
+function resumeFrozen(state: Cleanup): unknown {
+  let failure: unknown;
+  for (const target of [...state.frozen].reverse()) {
+    try {
+      send(state, target, 'SIGCONT');
+    } catch (error) {
+      failure ??= error;
+    }
+  }
+  return failure;
 }
 
 async function discover(state: Cleanup): Promise<void> {
@@ -145,7 +160,7 @@ async function killKnown(state: Cleanup): Promise<unknown> {
 /** Freeze parents before collecting another table, so detached children cannot keep forking unnoticed. */
 export async function stopPosixProcessTree(pid: number, shell?: CheckShell): Promise<{ signalled: boolean }> {
   const state: Cleanup = { pid, shell, known: new Set(shell?.exited() ? [] : [pid]),
-    dropped: new Set(shell?.exited() ? [pid] : []), signalled: false, frozenLive: false };
+    dropped: new Set(shell?.exited() ? [pid] : []), signalled: false, frozenLive: false, frozen: new Set() };
   let failure: unknown;
   try {
     await discover(state);
@@ -154,6 +169,8 @@ export async function stopPosixProcessTree(pid: number, shell?: CheckShell): Pro
   }
   const killFailure = await killKnown(state);
   failure ??= killFailure;
+  const resumeFailure = resumeFrozen(state);
+  failure ??= resumeFailure;
   if (failure) {
     const error = failure instanceof Error ? failure : new Error(String(failure));
     Object.assign(error, { signalled: state.signalled });

@@ -1,7 +1,7 @@
 import * as path from 'node:path';
 import picomatch from 'picomatch';
 import { isFile, readText } from './fs-utils.js';
-import { git } from './git.js';
+import { readWorkingChangedPaths } from './changed-paths.js';
 import { stripProvenance } from './license.js';
 
 /**
@@ -19,7 +19,7 @@ export interface PlanDrift {
   untouched: string[];
 }
 
-const PATH_TOKEN = /(?:`([^`\s]+)`)|(?:^|[\s(])((?:[\w.@-]+\/)+[\w.@*-]+\/?)/gm;
+const PATH_TOKEN = /(?:`([^`\r\n]+)`)|(?:^|[\s(])((?:[\w.@-]+\/)+[\w.@*-]+\/?)/gm;
 
 /** Path-like tokens in plan.md: backticked tokens with a slash or extension, and bare a/b/c paths. */
 export function plannedPaths(planText: string): string[] {
@@ -28,7 +28,7 @@ export function plannedPaths(planText: string): string[] {
     const raw = (m[1] ?? m[2] ?? '').replace(/[),.;:]+$/, '');
     if (!raw || raw.startsWith('http') || raw.startsWith('-') || raw.includes('<')) continue;
     if (m[1] !== undefined && !raw.includes('/') && !/\.[A-Za-z0-9]{1,8}$/.test(raw)) continue;
-    if (/\s/.test(raw)) continue;
+    if (m[1] === undefined && /\s/.test(raw)) continue;
     out.add(raw.replace(/^\.\//, ''));
   }
   return [...out].sort();
@@ -46,17 +46,7 @@ function matchesPlan(file: string, planned: string[]): boolean {
 }
 
 export function changedFiles(root: string, base: string | undefined, exclude: string[] = ['openspec/']): string[] {
-  const files = new Set<string>();
-  const add = (out: string) => out.split('\n').map((s) => s.trim()).filter(Boolean).forEach((f) => files.add(f));
-  if (base) {
-    const committed = git(root, ['diff', '--name-only', `${base}...HEAD`]);
-    if (committed.ok) add(committed.stdout);
-  }
-  const uncommitted = git(root, ['diff', '--name-only', 'HEAD']);
-  if (uncommitted.ok) add(uncommitted.stdout);
-  const untracked = git(root, ['ls-files', '--others', '--exclude-standard']);
-  if (untracked.ok) add(untracked.stdout);
-  return [...files].filter((f) => !exclude.some((e) => f.startsWith(e))).sort();
+  return readWorkingChangedPaths(root, base).filter((file) => !exclude.some((prefix) => file.startsWith(prefix)));
 }
 
 /**

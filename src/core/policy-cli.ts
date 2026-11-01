@@ -1,9 +1,10 @@
 import type { SdlcConfig } from './config.js';
 import type { Decision } from './policy.js';
-import { callsPluginHumanCommand } from './human-command-match.js';
+import { pluginHumanCommandMatch } from './human-command-match.js';
 import { quotedCommand } from './human-command.js';
 import { t } from './i18n.js';
 import { pluginDiagnostic } from '../plugins/api.js';
+import { shellCliInvocations } from './shell-cli.js';
 
 /**
  * The sdlc CLI is the only writer of the state files and the agent's check for human decisions; an agent that
@@ -26,10 +27,12 @@ export function removesSdlcCli(command: string): boolean {
 
 /** Check dynamic person-only commands after static core decisions; catalog faults must deny the call. */
 export function pluginHumanDecision(command: string, root: string, config: SdlcConfig): Decision | undefined {
+  if (!shellCliInvocations(command).some((call) => !call.help)) return undefined;
   try {
-    if (callsPluginHumanCommand(command, root, config)) {
+    const matched = pluginHumanCommandMatch(command, root, config);
+    if (matched) {
       return { decision: 'deny', rule: 'separation-of-duties',
-        reason: t('hook.separationOfDuties', { command: quotedCommand(command) }) };
+        reason: t('hook.separationOfDuties', { command: quotedCommand(matched) }) };
     }
   } catch (error) {
     const problem = pluginDiagnostic(error);

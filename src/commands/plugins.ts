@@ -7,6 +7,7 @@ import { recoverPlugin } from '../plugins/recovery.js';
 import { fail, pluginError } from '../plugins/api.js';
 import { projectEvents } from '../plugins/events.js';
 import { readRegistry } from '../plugins/trust.js';
+import { refreshPluginRules } from '../integrations/plugin-rules.js';
 
 export async function pluginsCommand(action: string, name: string | undefined,
   opts: { json?: boolean; expectDigest?: string; request?: string }): Promise<void> {
@@ -31,6 +32,10 @@ export async function pluginsCommand(action: string, name: string | undefined,
         }
         result = report;
       } else fail('usage', 'Unknown plugin management action');
+    }
+    if (action === 'accept' || action === 'revoke') {
+      const refresh = refreshPluginRules(ctx.root, ctx.config);
+      result = { ...(result as Record<string, unknown>), ruleRefresh: refresh };
     }
     if (opts.json) printJson(result);
     else line(JSON.stringify(result, null, 2));

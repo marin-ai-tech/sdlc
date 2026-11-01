@@ -4,8 +4,9 @@ import { isSeq } from './decision-order.js';
 import { SdlcError } from './errors.js';
 import { isFile } from './fs-utils.js';
 import type { HarnessStamp } from './license.js';
-import { readYamlObject, writeYaml } from './yaml-io.js';
+import { readYamlObject } from './yaml-io.js';
 import { parseApprovalGatesWithRejected } from './approval-records.js';
+import { copyOpaqueDecisions, retainOpaqueDecisions, writeOpaqueDecisions } from './opaque-decisions.js';
 
 /**
  * Per-change lifecycle record, stored as `.sdlc.yaml` inside the OpenSpec
@@ -206,6 +207,7 @@ const keptApprovals = new WeakMap<ChangeState, Record<string, unknown[]>>();
 
 /** A transaction clone must retain the write-only entries from its source state. */
 export function copyKeptApprovals(from: ChangeState, to: ChangeState): void {
+  copyOpaqueDecisions(from, to);
   const rejected = keptApprovals.get(from);
   if (rejected) keptApprovals.set(to, rejected);
 }
@@ -244,7 +246,7 @@ function oneOf<T extends string>(value: unknown, allowed: readonly T[], fallback
 function renameLegacyKeys(value: unknown): unknown {
   if (Array.isArray(value)) return value.map(renameLegacyKeys);
   if (!value || typeof value !== 'object') return value;
-  const out: Record<string, unknown> = {};
+  const out: Record<string, unknown> = Object.create(null);
   for (const [key, inner] of Object.entries(value)) {
     const name = key === 'scdl' && !('sdlc' in value) ? 'sdlc' : key;
     out[name] = renameLegacyKeys(inner);
@@ -313,6 +315,7 @@ export function readChangeState(changeDir: string): ChangeState {
     history: Array.isArray(raw.history) ? (raw.history as HistoryEvent[]) : [],
   };
   keptApprovals.set(state, rejected);
+  retainOpaqueDecisions(state, file, raw.gates);
   return state;
 }
 
@@ -359,9 +362,10 @@ export function writeChangeState(changeDir: string, state: ChangeState, stamp?: 
     ...(state.verify ? { verify: state.verify } : {}),
     history: state.history,
   };
-  writeYaml(
+  writeOpaqueDecisions(
     statePath(changeDir),
     ordered,
+    state,
     '# SDLC lifecycle record for this change (managed by `sdlc`; approvals are bound to artifact digests).'
   );
 }

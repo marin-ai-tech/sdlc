@@ -9,11 +9,13 @@ import { resolveLocale, setLocale, systemLocale, t } from './core/i18n.js';
 import { appendHookLog } from './core/log.js';
 import { evaluateToolCall, normalizeToolCall, sessionSummary, stopCheck, type Decision, type ToolCall } from './core/policy.js';
 import { shellWriteDestinations } from './core/policy-shell-writes.js';
-import { findProjectRoot, projectPaths } from './core/project.js';
+import { projectPaths } from './core/project.js';
+import { findHookProjectRoot } from './core/hook-project.js';
 import { sessionHealthLine } from './core/health/signal.js';
 import { cursorAllow, cursorDefault, cursorDeny, fromCursor, type CursorInput } from './hook-cursor.js';
 import { assertHook, declareOperation, runPrepared } from './plugins/evaluation.js';
 import { pluginDiagnostic, type Json } from './plugins/api.js';
+import { repeatedStopAvailable } from './plugins/hooks.js';
 import {
   configLoadDecision, configLoadSessionLine, configLoadStopMessage, configModeIsOff,
 } from './hook-config.js';
@@ -209,15 +211,9 @@ interface HookLoadError {
 
 function hookProject(input: HookInput): HookProject | HookLoadError | undefined {
   const cwd = input.cwd ?? process.env.CLAUDE_PROJECT_DIR ?? process.cwd();
-  const root = findProjectRoot(cwd);
+  const root = findHookProjectRoot(cwd);
   if (!root) return undefined;
   const paths = projectPaths(root);
-  try {
-    fs.readFileSync(paths.sdlcConfig, 'utf8');
-  } catch (loadError) {
-    if ((loadError as NodeJS.ErrnoException).code === 'ENOENT') return undefined;
-    return { root, file: paths.sdlcConfig, loadError };
-  }
   try {
     const config = loadConfig(paths.sdlcConfig);
     applyHookLocale(config.locale);
@@ -295,6 +291,7 @@ async function stop(agent: Agent, input: HookInput, project: HookProject): Promi
   if (project.config.enforcement.mode === 'off') return;
   try { await pluginBoundary(project, 'stop', { repeated: input.stop_hook_active === true }); }
   catch (error) {
+    if (input.stop_hook_active && await repeatedStopAvailable(project.root, project.config, error)) return;
     const problem = pluginDiagnostic(error);
     writeStop(agent, `${problem.code}: ${problem.message}`);
   }

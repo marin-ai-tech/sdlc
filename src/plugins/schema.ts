@@ -1,8 +1,8 @@
 import { Ajv2020 } from 'ajv/dist/2020.js';
-import * as path from 'node:path';
 import type { ValidateFunction } from 'ajv';
-import { INPUT_CONTROL_FIELDS, fail, object, type Manifest, type Schema } from './api.js';
-import { safeRelative } from './package.js';
+import { INPUT_CONTROL_FIELDS, fail, type Manifest, type Schema } from './api.js';
+import { SdlcError } from '../core/errors.js';
+import { normalizeSchema, schemaPointer } from './schema-anchors.js';
 
 function inspect(value: unknown, depth = 0): void {
   if (depth > 32) fail('plugin_schema', 'Schema is too deep');
@@ -24,49 +24,14 @@ export class PluginSchemas {
   private ajv = new Ajv2020({ strict: true, coerceTypes: false, useDefaults: false,
     removeAdditional: false, allErrors: false, validateFormats: false });
   private compiled = new Map<Schema, ValidateFunction>();
-  private inputSerial = 0;
-
-  private loaded = new Set<string>();
   constructor(private files: Map<string, Buffer>) {}
-
-  private loadReference(reference: string, base: string): void {
-    const relative = reference.split('#')[0];
-    if (!relative) return;
-    if (!safeRelative(relative)) fail('plugin_schema', 'Invalid local schema path');
-    const name = path.posix.join(path.posix.dirname(base), relative);
-    if (this.loaded.has(name)) return;
-    const bytes = this.files.get(name);
-    if (!bytes) fail('plugin_schema', 'Missing local schema document');
-    let value: unknown;
-    try { value = JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(bytes)); }
-    catch { fail('plugin_schema', 'Invalid local JSON schema'); }
-    inspect(value);
-    if (typeof value !== 'boolean') object(value, 'schema document');
-    this.loaded.add(name);
-    this.ajv.addSchema(value as object | boolean, name);
-    this.references(value, name);
-  }
-
-  private references(value: unknown, base = ''): void {
-    if (Array.isArray(value)) { for (const item of value) this.references(item, base); return; }
-    if (!value || typeof value !== 'object') return;
-    for (const [key, item] of Object.entries(value)) {
-      if (key === '$ref' && typeof item === 'string') this.loadReference(item, base);
-      else this.references(item, base);
-    }
-  }
 
   compile(value: Schema, name?: string): ValidateFunction {
     const previous = this.compiled.get(value);
-    if (previous) return previous;
+    if (previous && !name) return previous;
     inspect(value);
-    const input = typeof value === 'string' ? { $ref: value } : value;
-    if (typeof value === 'string' && !value.startsWith('#') && !safeRelative(value.split('#')[0])) {
-      fail('plugin_schema', 'Invalid local schema path');
-    }
     try {
-      if (typeof value === 'string') this.loadReference(value, '');
-      else this.references(value);
+      const input = normalizeSchema(this.files, value) as object | boolean;
       let validate: ValidateFunction;
       if (name) {
         this.ajv.addSchema(input, name);
@@ -74,7 +39,10 @@ export class PluginSchemas {
       } else validate = this.ajv.compile(input);
       this.compiled.set(value, validate);
       return validate;
-    } catch { return fail('plugin_schema', 'Schema is invalid or has an unresolved local reference'); }
+    } catch (error) {
+      if (error instanceof SdlcError) throw error;
+      return fail('plugin_schema', 'Schema is invalid or has an unresolved local reference');
+    }
   }
 
   check(schema: Schema, value: unknown, field: string): void {
@@ -83,43 +51,20 @@ export class PluginSchemas {
 
   /** Follow only applicators that validate the same input root, never nested plugin data. */
   private input(schema: Schema): void {
-    let name: string;
-    do { name = `sdlc-input-${this.inputSerial++}.json`; }
-    while (this.files.has(name) || this.ajv.getSchema(name));
-    // Give anonymous input schemas a retrieval URI so Ajv resolves local pointers and anchors too.
-    const validate = this.compile(schema, name);
+    const root = this.compile(schema).schema;
     const seen = new Set<unknown>();
-    const resolver = this.ajv.opts.uriResolver!;
-    const visit = (value: unknown, base: string, resolved = false): void => {
-      if (!value || typeof value !== 'object' || Array.isArray(value) || seen.has(value)) return;
+    const pending: unknown[] = [root];
+    while (pending.length) {
+      const value = pending.pop();
+      if (!value || typeof value !== 'object' || Array.isArray(value) || seen.has(value)) continue;
       seen.add(value);
       const v = value as Record<string, unknown>;
-      if (!resolved && typeof v.$id === 'string') base = resolver.resolve(base, v.$id);
-      const named = (item: unknown) => item && typeof item === 'object' && !Array.isArray(item)
-        ? Object.keys(item) : [];
-      const required = Array.isArray(v.required) ? v.required : [];
-      const dependencies = v.dependentRequired && typeof v.dependentRequired === 'object'
-        ? Object.values(v.dependentRequired).flatMap((item) => Array.isArray(item) ? item : []) : [];
-      if (INPUT_CONTROL_FIELDS.some((key) => [...named(v.properties), ...named(v.dependentRequired),
-        ...named(v.dependentSchemas), ...required, ...dependencies].includes(key))) {
+      if (INPUT_CONTROL_FIELDS.some((key) => inputNames(v).includes(key))) {
         fail('plugin_schema', 'Operation input schema declares reserved transport identity');
       }
-      if (typeof v.$ref === 'string') {
-        const reference = resolver.resolve(base, v.$ref);
-        const target = this.ajv.getSchema(reference);
-        if (!target) fail('plugin_schema', 'Input schema has an unresolved local reference');
-        // Ajv supplies the effective $id scope, including scopes along a referenced JSON pointer.
-        visit(target.schema, target.schemaEnv.baseId, true);
-      }
-      for (const keyword of ['allOf', 'anyOf', 'oneOf']) {
-        if (Array.isArray(v[keyword])) for (const item of v[keyword]) visit(item, base);
-      }
-      for (const keyword of ['not', 'if', 'then', 'else']) visit(v[keyword], base);
-      if (v.dependentSchemas && typeof v.dependentSchemas === 'object') {
-        for (const item of Object.values(v.dependentSchemas)) visit(item, base);
-      }
-    };
-    visit(validate.schema, validate.schemaEnv.baseId, true);
+      if (typeof v.$ref === 'string') pending.push(schemaPointer(root, v.$ref));
+      pending.push(...rootApplicators(v));
+    }
   }
 
   manifest(manifest: Manifest): void {
@@ -128,4 +73,20 @@ export class PluginSchemas {
     for (const schema of Object.values(manifest.events)) this.compile(schema);
     this.check(manifest.schemas.state, manifest.initialState, 'initialState');
   }
+}
+
+function inputNames(value: Record<string, unknown>): unknown[] {
+  const named = (item: unknown) => item && typeof item === 'object' && !Array.isArray(item) ? Object.keys(item) : [];
+  const dependencies = value.dependentRequired && typeof value.dependentRequired === 'object'
+    ? Object.values(value.dependentRequired).flatMap((item) => Array.isArray(item) ? item : []) : [];
+  return [...named(value.properties), ...named(value.dependentRequired), ...named(value.dependentSchemas),
+    ...(Array.isArray(value.required) ? value.required : []), ...dependencies];
+}
+
+function rootApplicators(value: Record<string, unknown>): unknown[] {
+  const arrays = ['allOf', 'anyOf', 'oneOf'].flatMap((key) => Array.isArray(value[key]) ? value[key] : []);
+  const singles = ['not', 'if', 'then', 'else'].map((key) => value[key]);
+  const dependent = value.dependentSchemas && typeof value.dependentSchemas === 'object'
+    ? Object.values(value.dependentSchemas) : [];
+  return [...arrays, ...singles, ...dependent];
 }

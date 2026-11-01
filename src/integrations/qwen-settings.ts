@@ -128,6 +128,22 @@ export function mergeQwenSettings(root: string, cli: string, id: FamilyId,
   return install ? 'installed' : 'removed';
 }
 
+/** Refresh only owned permission entries; hooks and unrelated settings are left byte-equivalent as JSON values. */
+export function refreshQwenDeny(root: string, cli: string, id: FamilyId, commands: readonly string[]): SettingsChange {
+  const rel = qwenSettingsPath(id);
+  const file = readJson(root, rel);
+  if (!file) return 'absent';
+  const deny = object(file.permissions).deny;
+  const managed = Array.isArray(file._sdlcPluginDeny)
+    || Array.isArray(deny) && deny.some(rule => typeof rule === 'string' && OUR_DENY.test(rule));
+  if (!managed) return 'absent';
+  const next = { ...file };
+  mergePermissions(next, file, cli, true, commands);
+  if (JSON.stringify(file) === JSON.stringify(next)) return 'unchanged';
+  writeJson(root, rel, next);
+  return 'installed';
+}
+
 function commandsOfEvent(hooks: Json, event: string): string[] {
   const groups = hooks[event];
   if (!Array.isArray(groups)) return [];

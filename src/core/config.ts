@@ -16,7 +16,7 @@ import { parseJudgeConfig, serializeJudgeConfig, type JudgeConfig } from './judg
 import { parseMarket, type MarketConfig } from './board-market-config.js';
 import { parseTeamConfig, type TeamConfig } from '../team/team-config.js';
 import { parseStages, type StagesConfig } from './stage-config.js';
-import { readYamlObject } from './yaml-io.js';
+import { readConfigObject } from './config-read.js';
 import { updateYamlFile } from './yaml-update.js';
 import { assertCliValue } from './cli-value.js';
 import { parsePlugins, parsePluginPolicies, type PluginPolicy } from '../plugins/config.js';
@@ -606,8 +606,8 @@ export function parseConfig(raw: Raw, file = 'openspec/sdlc.yaml'): SdlcConfig {
 }
 
 export function loadConfig(file: string): SdlcConfig {
-  if (!isFile(file)) return defaultConfig();
-  return parseConfig(readYamlObject(file) ?? {}, file);
+  const raw = readConfigObject(file);
+  return raw === undefined ? defaultConfig() : parseConfig(raw, file);
 }
 
 function serializeRework(rework: SdlcConfig['rework']): Record<string, unknown> {
@@ -694,6 +694,7 @@ export function serializeConfig(config: SdlcConfig): Record<string, unknown> {
     ...serializeHealth(config.health),
     ...(config.locale ? { locale: config.locale } : {}),
     ...(config.mcp ? { mcp: { serve: config.mcp.serve } } : {}),
+    ...(config.team?.mode ? { team: { mode: config.team.mode } } : {}),
   };
 }
 

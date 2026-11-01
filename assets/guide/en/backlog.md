@@ -27,6 +27,13 @@ sdlc backlog edit B3 --outcome "…"
 - An archived change id cannot be reused by `sdlc new` or `sdlc backlog start`.
 - With no active change, `sdlc next` proposes the next ready item.
 
+## Remembering epic size
+
+Set the owner's explicit choice with `sdlc backlog epic edit E1 --granularity package` (or `feature` / `small`).
+The CLI retains `Granularity: package` through unrelated edits; item and epic priority order stay unchanged.
+The backlog workflow reuses a recorded or already explicit choice. Without one, it shows its proposed split for
+confirmation before adding items. An absent property keeps legacy behavior.
+
 ## Importing
 
 - `sdlc import bmad <path> --to-backlog` turns BMAD epics and tickets (or a PRD/SPEC) into epics and items.

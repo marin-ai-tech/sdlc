@@ -4,6 +4,15 @@ summary: openspec/roles.yaml, who may approve which gate, and signed approvals.
 ---
 # Roles and separation of duties
 
+## Optional solo execution profile
+
+Choose `sdlc init --team-mode solo` for bundled execution-role skills, or `--team-mode team` for team execution.
+The additive `team.mode` setting has no effect on signing roles or separation. Absence preserves legacy behavior.
+Solo mode installs `sdlc-role-analyst`, `sdlc-role-architect`, `sdlc-role-developer`, `sdlc-role-tester` and
+`sdlc-role-reviewer` in the selected tools' skill folders. Spec uses analyst, plan/build use developer, verify uses
+tester and review uses reviewer. The workflow announces each deliberate role switch. These skills grant no human
+authority, accept no third-party scripts and do not trust a registry. Project commit rules continue to apply.
+
 Without `openspec/roles.yaml`, anyone with a git identity may approve. With it, approvals are tied to named people.
 
 ```yaml

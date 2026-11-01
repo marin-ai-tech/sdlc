@@ -18,8 +18,12 @@ Advance a change to its next step in the SDLC.
 
 1. Select the change (see Change selection). If none is active, run `sdlc next --json`.
 2. Run `sdlc next --change <id> --json` for an active change. It returns the derived `stage` and `next`.
+   In solo mode, prefix the next-step explanation with the active `next.executionRole` and load its bundled role
+   skill before continuing. Announce stage/role switches; execution guidance never changes human authority.
 3. If ready backlog items are available, use {{tool:ask}} with 2-4 choices and a recommended item. If `next.action` is `start-backlog-item`, run `sdlc backlog start <id>` using `next.item`, then continue with intent.
 4. If `next.actor` is `human`: stop. Summarize what the person must review (the artifacts or evidence listed by `sdlc status --change <id>`), then give the exact `next.cli` command for them to run in their own terminal. Do not start work that the gate protects.
+   For unanswered questions, show an editable proposed answer and the full literal command, keeping the decision
+   pending until the person runs it. Follow project rules for any commit checkpoint and offer its concrete draft.
 5. If `next.actor` is `agent`: run the workflow named by `next.workflow` - load the `{{skill:<workflow>}}` skill (or follow {{cmd:<workflow>}}) and carry out its steps for this change.
 6. If `next.actor` is `none`: report that the change is archived or complete.
 

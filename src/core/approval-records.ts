@@ -1,6 +1,7 @@
 import type { ApprovalRecord, GateState, ReleaseCheckRecord } from './change-state.js';
 import { isSeq } from './decision-order.js';
 import { recordObject, stringFields } from './record-values.js';
+import { malformedGateShape } from './opaque-decisions.js';
 
 function releaseChecks(value: unknown): ReleaseCheckRecord[] | undefined {
   if (!Array.isArray(value)) return undefined;
@@ -50,7 +51,7 @@ export function parseApprovalGatesWithRejected(value: unknown): {
   const rejected: Record<string, unknown[]> = Object.create(null);
   for (const [name, value] of Object.entries(raw)) {
     const gate = recordObject(value);
-    if (!gate) continue;
+    if (!gate || malformedGateShape(value)) continue;
     const approvals = Array.isArray(gate.approvals) ? gate.approvals.flatMap((entry) => {
       const parsed = parseApproval(entry);
       if (!parsed) (rejected[name] ??= []).push(entry);

@@ -17,9 +17,8 @@ export function workflowInvocation(ctx: ProjectContext, workflow: string): strin
 }
 
 /** Prefer configured cli prefix over the hardcoded `sdlc` in lifecycle.next.cli. */
-export function withCliPrefix(cli: string, prefix: string): string {
-  return cli.replace(/^sdlc\b/, prefix);
-}
+export { withCliPrefix } from '../core/suggested-command.js';
+import { withCliPrefix } from '../core/suggested-command.js';
 
 function backlogHint(ctx: ProjectContext): NextHint | undefined {
   const item = nextBacklogItem(readBacklog(ctx.root));

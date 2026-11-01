@@ -13,7 +13,8 @@ export const LIMITS = Object.freeze({
   moduleBytes: 8 * 1024 * 1024, jsonBytes: 1024 * 1024, extBytes: 256 * 1024,
   storeBytes: 4 * 1024 * 1024, eventBytes: 64 * 1024, depth: 32, effects: 64,
   pages: 1024, initialPages: 16, plugins: 8, workers: 2, hookMs: 1000,
-  operationMs: 5000, cleanupMs: 1000, receiptMs: 86_400_000,
+  operationMs: 5000, queueMs: 5000, startupMs: 10000, preparationMs: 30000,
+  cleanupMs: 1000, receiptMs: 86_400_000,
 });
 
 export interface Operation { access: 'read' | 'executor' | 'person'; input: Schema; output: Schema }
@@ -72,8 +73,8 @@ export function text(value: unknown, where: string): string {
   return value;
 }
 
-function normalize(value: unknown, depth: number, budget: { nodes: number }): Json {
-  if (depth > LIMITS.depth || --budget.nodes < 0) fail('plugin_invalid', 'JSON complexity limit exceeded');
+function normalize(value: unknown, depth: number, budget: { nodes: number; depth: number }): Json {
+  if (depth > budget.depth || --budget.nodes < 0) fail('plugin_invalid', 'JSON complexity limit exceeded');
   if (value === null || typeof value === 'string' || typeof value === 'boolean') return value;
   if (typeof value === 'number' && Number.isFinite(value)) return value;
   if (Array.isArray(value)) return value.map((item) => normalize(item, depth + 1, budget));
@@ -86,14 +87,14 @@ function normalize(value: unknown, depth: number, budget: { nodes: number }): Js
   return result;
 }
 
-export function canonical(value: unknown, limit = LIMITS.jsonBytes): string {
-  const result = JSON.stringify(normalize(value, 0, { nodes: 100_000 }));
+export function canonical(value: unknown, limit = LIMITS.jsonBytes, depth: number = LIMITS.depth): string {
+  const result = JSON.stringify(normalize(value, 0, { nodes: 100_000, depth }));
   if (Buffer.byteLength(result) > limit) fail('plugin_limit', 'JSON byte limit exceeded');
   return result;
 }
 
-export function json(value: unknown, limit = LIMITS.jsonBytes): Json {
-  return JSON.parse(canonical(value, limit)) as Json;
+export function json(value: unknown, limit = LIMITS.jsonBytes, depth: number = LIMITS.depth): Json {
+  return JSON.parse(canonical(value, limit, depth)) as Json;
 }
 
 /** Parse stored or new extensions; only the runtime can authorize new namespaces. */
@@ -105,8 +106,9 @@ export function parseExtensions(raw: unknown): Extensions | undefined {
       || ['__proto__', 'prototype', 'constructor'].includes(name)) {
       fail('plugin_namespace', 'Extension namespace is invalid or reserved');
     }
+    json(value[name]);
   }
-  return json(value, LIMITS.extBytes) as Extensions;
+  return json(value, LIMITS.extBytes, LIMITS.depth + 1) as Extensions;
 }
 
 /** Transport identity is host-owned; nested plugin JSON remains plugin-owned. */
@@ -120,9 +122,9 @@ export function parsePluginInput(raw: unknown): Json {
   return value;
 }
 
-export function parseJson(bytes: Uint8Array, limit = LIMITS.jsonBytes): Json {
+export function parseJson(bytes: Uint8Array, limit = LIMITS.jsonBytes, depth: number = LIMITS.depth): Json {
   if (bytes.byteLength > limit) fail('plugin_limit', 'JSON byte limit exceeded');
-  try { return json(JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(bytes)), limit); }
+  try { return json(JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(bytes)), limit, depth); }
   catch (error) {
     if (error instanceof SdlcError) throw error;
     return fail('plugin_invalid', 'Invalid UTF-8 or JSON');

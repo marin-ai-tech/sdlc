@@ -2,7 +2,7 @@
  * Open questions of an artifact (0.11.4, B62): the top-level list items (`- `, `* `, `1. `) under the
  * `## Open questions` heading, up to the next `## ` heading. Indented sub-items are not questions; an item that
  * says only the catalog's no-questions value, "-" or "n/a" means there are none. HTML comments are skipped.
- * The text of a question is the item text, trimmed, without its marker.
+ * The text of a question includes its continuation paragraphs, trimmed and joined without the list marker.
  */
 
 import { installedLocales, catalog } from './i18n.js';
@@ -73,6 +73,29 @@ function inlineQuestion(lines: string[], heading: number): string | undefined {
   return item && !noQuestions(item) ? item : undefined;
 }
 
+/** Continuation paragraphs belong to the question; nested lists and recorded answers do not. */
+function completeQuestion(lines: string[], from: number, end: number, first: string): string {
+  const parts = [first];
+  let fence = false;
+  let nested: number | undefined;
+  let separated = false;
+  for (let index = from + 1; index < end; index++) {
+    const text = lines[index];
+    if (FENCE.test(text)) { fence = !fence; continue; }
+    if (fence) continue;
+    if (TOP_LEVEL_ITEM.test(text)) break;
+    if (!text.trim()) { separated = true; continue; }
+    const item = /^(\s+)(?:[-*+]|\d+[.)])\s/.exec(text);
+    if (item) { nested = item[1].length; separated = false; continue; }
+    const indent = /^\s*/.exec(text)![0].length;
+    if (nested !== undefined && (!separated || indent > nested)) continue;
+    nested = undefined;
+    separated = false;
+    parts.push(text.trim());
+  }
+  return parts.join(' ');
+}
+
 /** The questions of an artifact's text, numbered from 1. */
 export function parseOpenQuestions(text: string): OpenQuestion[] {
   const lines = visibleLines(text);
@@ -80,7 +103,8 @@ export function parseOpenQuestions(text: string): OpenQuestion[] {
   if (!range) return [];
   const found: OpenQuestion[] = [];
   const inline = inlineQuestion(lines, range.start - 1);
-  if (inline) found.push({ n: 1, text: inline, line: range.start - 1 });
+  if (inline) found.push({ n: 1,
+    text: completeQuestion(lines, range.start - 1, range.end, inline), line: range.start - 1 });
   let fence = false;
   for (let index = range.start; index < range.end; index++) {
     if (FENCE.test(lines[index])) fence = !fence;
@@ -88,7 +112,7 @@ export function parseOpenQuestions(text: string): OpenQuestion[] {
     const item = TOP_LEVEL_ITEM.exec(lines[index].trimEnd());
     const question = item?.[1].trim();
     if (!question || noQuestions(question)) continue;
-    found.push({ n: found.length + 1, text: question, line: index });
+    found.push({ n: found.length + 1, text: completeQuestion(lines, index, range.end, question), line: index });
   }
   return found;
 }
@@ -96,7 +120,13 @@ export function parseOpenQuestions(text: string): OpenQuestion[] {
 /** The index right after the question's own sub-items (indented or blank lines that follow it). */
 function subItemsEnd(lines: string[], from: number): number {
   let index = from + 1;
-  while (index < lines.length && (lines[index].trim() === '' || /^\s/.test(lines[index]))) index++;
+  let fence = false;
+  while (index < lines.length) {
+    if (FENCE.test(lines[index])) fence = !fence;
+    if (!fence && (TOP_LEVEL_ITEM.test(lines[index]) || NEXT_SECTION.test(lines[index])
+      || BOLD_LABEL.test(lines[index].trim()))) break;
+    index++;
+  }
   return index;
 }
 
@@ -107,7 +137,7 @@ export function answerLine(name: string, date: string, answer: string): string {
 
 /**
  * The text with `line` placed right under the question: it replaces an earlier `Answer (` sub-item of that
- * question, or is inserted after the question's line. The file's line endings are kept.
+ * question, or is inserted after its complete continuation and subitems. The file's line endings are kept.
  */
 export function withAnswer(text: string, question: OpenQuestion, line: string): string {
   const eol = text.includes('\r\n') ? '\r\n' : '\n';
@@ -117,7 +147,9 @@ export function withAnswer(text: string, question: OpenQuestion, line: string): 
   if (earlier >= 0) {
     lines[question.line + 1 + earlier] = line;
   } else {
-    lines.splice(question.line + 1, 0, line);
+    let insert = end;
+    while (insert > question.line + 1 && lines[insert - 1].trim() === '') insert--;
+    lines.splice(insert, 0, line);
   }
   return lines.join(eol);
 }

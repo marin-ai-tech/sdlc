@@ -1,6 +1,10 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { patchFiles } from './policy-patch-files.js';
+import { readOnlyFileOpening } from './node-read-options.js';
+import { nodeInlineCode } from './node-inline.js';
+import { nodeCallContext, type NodeCallContext } from './node-call-context.js';
+import { nodeLiteralValue } from './node-literal.js';
 
 /**
  * More shell writers for the plan gate (B84, 0.14.2): git, patch, downloads and one-line interpreters.
@@ -15,7 +19,11 @@ export interface ToolContext {
 
 const GIT_VALUE_OPTIONS = /^(?:-C|-c|--git-dir|--work-tree|--namespace|--exec-path|--config-env)$/;
 const PATCH_INFO = /^--(?:check|stat|numstat|summary)$/;
-const NODE_WRITER = /\b(?:writeFileSync|appendFileSync|createWriteStream|writeFile)\s*\(\s*(['"`])([^'"`]+)\1/g;
+const PY_PAIR = /\b(copy|copy2|copyfile|rename|replace)\s*\(\s*(['"])([^'"]+)\2\s*,\s*(['"])([^'"]+)\4/g;
+const NODE_CALL = /\b([A-Za-z_$][\w$]*)\s*\(\s*(['"`])([^'"`]+)\2/g;
+const NODE_LITERAL = /"([^"]*)"|'([^']*)'|`([^`]*)`/g;
+const NODE_DATA_WRITER = /^(?:writeFileSync|appendFileSync|writeFile|appendFile)$/;
+const NODE_READ = /^(?:require|copyFile(?:Sync)?|readlink(?:Sync)?|readdir(?:Sync)?|stat(?:Sync)?|lstat(?:Sync)?|realpath(?:Sync)?|existsSync|access(?:Sync)?|log|info|warn|error|debug|stringify|parse|write)$/;
 const PY_OPEN = /\bopen\s*\(\s*(['"])([^'"]+)\1([^)]*)\)/g;
 const PY_MODE = /^\s*,\s*(?:mode\s*=\s*)?(['"])([^'"]*)\1|,\s*mode\s*=\s*(['"])([^'"]*)\3/;
 const WEB_REQUEST = /^(?:Invoke-WebRequest|iwr|Invoke-RestMethod|irm)$/i;
@@ -154,13 +162,80 @@ function inlineCode(args: string[], options: string[]): string | undefined {
   return at < 0 ? undefined : args[at + 1];
 }
 
-export function nodeTargets(args: string[]): string[] {
-  const code = inlineCode(args, ['-e', '--eval']);
+export function nodeTargets(args: string[], conservative = false): string[] {
+  const code = nodeInlineCode(args);
   if (code === undefined) return [];
-  return [...code.matchAll(NODE_WRITER)].map((match) => match[2]);
+  const context = nodeCallContext(code);
+  const targets = [...context.targets];
+  if (conservative || context.opaque) targets.push(...potentialInlineLiterals(code, 'node', context, !conservative));
+  return [...new Set(targets)];
 }
 
-export function pythonTargets(args: string[]): string[] {
+/** Exclude only supported literal read/data positions; an unclassified literal is not proof of no effect. */
+function potentialInlineLiterals(
+  code: string, dialect: 'node' | 'python' | 'perl', nodeContext?: NodeCallContext, projectWriterData = false,
+): string[] {
+  const safe = new Set<number>();
+  const context = dialect === 'node' ? nodeContext ?? nodeCallContext(code) : undefined;
+  if (dialect === 'perl') perlReadLiterals(code, safe);
+  for (const call of code.matchAll(NODE_CALL)) {
+    const parsed = context?.callsByIndex.get(call.index!);
+    // Nominal data roles preserve file-list compatibility; conservative guards require actual provenance.
+    const nominalData = projectWriterData && parsed !== undefined && NODE_DATA_WRITER.test(call[1]);
+    if (context && (context.opaque || !parsed?.understood) && !nominalData) continue;
+    const after = call.index! + call[0].length;
+    const readOpen = dialect !== 'perl' && /^open(?:Sync)?$/.test(call[1])
+      && /^\s*(?:\)|,\s*(?:mode\s*=\s*)?(['"])r[sbt]?\1(?=\s*[,)]))/.test(code.slice(after));
+    const pythonRead = dialect === 'python' && (/^(?:print|copy|copy2|copyfile)$/.test(call[1])
+      || call[1] === 'Path' && /^\s*\)\s*\.(?:read_text|read_bytes|exists|is_file|is_dir)\s*\(/.test(code.slice(after)));
+    const readFile = dialect === 'node' && /^readFile(?:Sync)?$/.test(call[1])
+      && readOnlyFileOpening(code.slice(after), context?.mutations.intrinsicUndefined ?? false,
+        context !== undefined && !context.mutations.propertyWrites);
+    const reader = NODE_READ.test(call[1]) || readFile || readOpen || pythonRead
+      || dialect === 'perl' && /^(?:print|printf|say)$/.test(call[1]);
+    if (reader) safe.add(after - call[3].length - 2);
+    if (readFile) readOptionDataPositions(code, after, safe);
+    if (!reader && !NODE_DATA_WRITER.test(call[1])) continue;
+    literalDataPositions(code, after, safe);
+  }
+  if (context) return context.mutations.literals.filter(literal => !safe.has(literal.index))
+    .map(literal => nodeLiteralValue(literal.value) ?? literal.value).filter(literal => literal !== '');
+  return [...code.matchAll(NODE_LITERAL)].filter(literal => !safe.has(literal.index!))
+    .map(literal => literal[1] ?? literal[2] ?? literal[3])
+    .map(literal => dialect === 'perl' ? literal.replace(/^[+>]+\s*/, '') : literal).filter(literal => literal !== '');
+}
+
+function readOptionDataPositions(code: string, after: number, safe: Set<number>): void {
+  const options = /^\s*,\s*\{[^{}]*\}/.exec(code.slice(after))?.[0];
+  if (!options) return;
+  for (const literal of options.matchAll(NODE_LITERAL)) safe.add(after + literal.index!);
+}
+
+function literalDataPositions(code: string, after: number, safe: Set<number>): void {
+  for (;;) {
+    const data = /^\s*,\s*(['"`])([^'"`]+)\1/.exec(code.slice(after));
+    if (!data) return;
+    after += data[0].length;
+    safe.add(after - data[2].length - 2);
+  }
+}
+
+function perlReadLiterals(code: string, safe: Set<number>): void {
+  for (const output of code.matchAll(/\b(?:print|printf|say)\s+(['"])([^'"]+)\1/g)) {
+    const after = output.index! + output[0].length;
+    safe.add(after - output[2].length - 2);
+    literalDataPositions(code, after, safe);
+  }
+  const open = /\bopen\s*\(?\s*(?:my\s+)?\$?[A-Za-z_]\w*\s*,\s*(['"])<\1\s*,\s*(['"])([^'"]+)\2/g;
+  for (const read of code.matchAll(open)) safe.add(read.index! + read[0].length - read[3].length - 2);
+}
+
+export function perlTargets(args: string[]): string[] {
+  const code = inlineCode(args, ['-e', '-E']);
+  return code === undefined ? [] : potentialInlineLiterals(code, 'perl');
+}
+
+export function pythonTargets(args: string[], conservative = false): string[] {
   const code = inlineCode(args, ['-c']);
   if (code === undefined) return [];
   const out: string[] = [];
@@ -169,7 +244,12 @@ export function pythonTargets(args: string[]): string[] {
     const text = mode === null ? '' : mode[2] ?? mode[4] ?? '';
     if (/[wax+]/.test(text)) out.push(match[2]);
   }
-  return out;
+  for (const pair of code.matchAll(PY_PAIR)) {
+    out.push(pair[5]);
+    if (/^(?:rename|replace)$/.test(pair[1])) out.push(pair[3]);
+  }
+  if (conservative) out.push(...potentialInlineLiterals(code, 'python'));
+  return [...new Set(out)];
 }
 
 /** The writers of this module, by verb. */

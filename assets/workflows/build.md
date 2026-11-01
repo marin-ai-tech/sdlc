@@ -17,7 +17,10 @@ Implement the approved plan - Stage 3 (Build). Every step checks its own work be
 2. **Load context from disk**: intent.md, proposal.md, specs/, design.md, plan.md, tasks.md. Put the `tasks.md` items into {{tool:todo}} at the start and keep it in step as tasks are checked. `tasks.md` stays the source of truth. Run `sdlc verify --list` to learn the project's checks.
    For each artifact you write or update, use `sdlc instructions <artifact> --change <id> --json` and write to its `resolvedOutputPath`.
 3. **Parallel streams.** If plan.md marks independent steps `[parallel]` and they touch different files, suggest running them in separate worktrees/sessions; tasks that share files stay sequential in this session.
-4. **Bug-fix protocol** (`kind: bugfix`): the first task writes a test that reproduces the bug. Run it, confirm it fails for the expected reason, commit it, then run `sdlc tests lock --change <id>` - from then on the harness blocks edits to test files, so the fix has to change the code.
+4. **Bug-fix protocol** (`kind: bugfix`): the first task writes a test that reproduces the bug. Run it, confirm it
+   fails for the expected reason and present the concrete baseline commit draft. Complete that checkpoint under
+   the project's commit rules before running `sdlc tests lock --change <id>` - from then on the harness blocks
+   edits to test files, so the fix has to change the code.
 5. **Work the tasks in order.** For each pending task:
    - make the smallest change that satisfies it
    - run the most targeted check first (the test for this behavior), then the group's checks
@@ -25,6 +28,8 @@ Implement the approved plan - Stage 3 (Build). Every step checks its own work be
    - mark `- [ ]` -> `- [x]` only when the task's behavior is fully implemented and its check passed
    - when the implementation departs from plan.md, update plan.md in the same commit
    - end each commit message with the trailers `SDLC-Change: <id>` and `SDLC-Task: <n.m>` (the task number from tasks.md), so `sdlc trace <id>` links the task to its commit
+   - present the literal `git add -- <paths>` and `git commit -F <message-file>` draft for that checkpoint, following
+     the contract's quoting and project commit policy; a reserved commit waits for the person to run or confirm it
 6. **Pause** when a task is unclear, when the design turns out wrong (propose an artifact update), when the work grows beyond the spec, or on any error you cannot resolve. Do not absorb scope silently.
 7. **Finish.** When every implementation task is checked, run the {{cmd:verify}} workflow.
    The verify gate records the checks and needs no task of its own.

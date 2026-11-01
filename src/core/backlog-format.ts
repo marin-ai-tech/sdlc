@@ -4,6 +4,7 @@
  * Lines the model does not hold are recorded by `backlog-keep.ts` and written back where they were.
  */
 import { CHANGE_KINDS, RISK_LEVELS, type ChangeKind, type RiskLevel } from './change-state.js';
+import { isEpicGranularity } from './backlog-granularity.js';
 import {
   BACKLOG_STATUSES,
   UNASSIGNED,
@@ -182,12 +183,15 @@ function applyField(item: BacklogItem, name: string, value: string): void {
 function handleGoalLine(line: string, state: ParseState): boolean {
   const goal = GOAL_RE.exec(line);
   const source = EPIC_SOURCE_RE.exec(line);
+  const granularity = /^Granularity: (.+)$/.exec(line);
+  const size = granularity && isEpicGranularity(granularity[1]) ? granularity[1] : undefined;
   const epic = state.backlog.epics.find((entry) => entry.id === state.epic);
-  if (!state.epic || !epic || (!goal && !source)) {
+  if (!state.epic || !epic || (!goal && !source && !size)) {
     return false;
   }
   if (goal) epic.goal = goal[1];
   if (source) epic.source = source[1];
+  if (size) epic.granularity = size;
   return true;
 }
 
@@ -334,6 +338,9 @@ function renderSectionLines(
   }
   if (epic?.source) {
     lines.push(`Source: ${epic.source}`);
+  }
+  if (epic?.granularity) {
+    lines.push(`Granularity: ${epic.granularity}`);
   }
   lines.push(...extra);
   const sectionItems = backlog.items.filter((item) => item.epic === epic?.id);

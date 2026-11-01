@@ -29,6 +29,13 @@ function refuse(detail: string): never {
   throw new SdlcError('harness_refused', { key: 'error.harnessProtocol', params: { detail } });
 }
 
+const CREDENTIAL_PREFLIGHT = [
+  'if [ "${DIGITALOCEAN_TOKEN+x}${DIGITALOCEAN_ACCESS_TOKEN+x}${DO_API_TOKEN+x}" ] ||',
+  '   [ "${GITHUB_TOKEN+x}${GH_TOKEN+x}${GIT_ASKPASS+x}" ]; then',
+  '  exit 71',
+  'fi',
+].join('\n');
+
 /** Prototype coordinator behind the existing executor and task contracts; it never decides a gate. */
 export class HarnessAdapter {
   constructor(private runtime: HarnessRuntime, private host: HarnessHost) {}
@@ -43,11 +50,7 @@ export class HarnessAdapter {
   async launch(session: string, item: TaskItem): Promise<void> {
     const current = await this.runtime.get(session);
     if (current.status !== 'SESSION_STATUS_READY') refuse('session is not ready');
-    const guard = await this.runtime.exec(session, ['sh', '-c', [
-      'for name in DIGITALOCEAN_TOKEN DO_API_TOKEN GITHUB_TOKEN GH_TOKEN GIT_ASKPASS; do',
-      '  if printenv "$name" >/dev/null 2>&1; then exit 71; fi',
-      'done',
-    ].join('\n')]);
+    const guard = await this.runtime.exec(session, ['sh', '-c', CREDENTIAL_PREFLIGHT]);
     if (guard.exitCode !== 0) refuse('sandbox credential isolation');
     await this.host.heartbeat();
     await this.host.prepare(session, item);
@@ -76,8 +79,9 @@ export class HarnessAdapter {
           ? [{ code: 'harness_verification_failed' }] : result.problems;
         report.push({ session, ...result, ...(problems ? { problems } : {}) });
       } catch (error) {
-        const code = error instanceof SdlcError ? error.code : 'harness_verification_failed';
-        report.push({ session, branch: item.result.branch, passed: false, problems: [{ code }] });
+        if (error instanceof SdlcError && error.code !== 'plugin_refused') throw error;
+        report.push({ session, branch: item.result.branch, passed: false,
+          problems: [{ code: error instanceof SdlcError ? error.code : 'harness_verification_failed' }] });
       }
     }
     return report;

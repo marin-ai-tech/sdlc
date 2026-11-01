@@ -18,6 +18,8 @@ export function assertSnapshotContent(root: string, changeDir: string, gate: str
     if (matches(raw!, file.path, gate, tracks, file.text)) continue;
     const filtered = snapshot.readFiltered(artifact);
     if (filtered !== undefined && matches(filtered, file.path, gate, tracks, file.text)) continue;
+    const converted = snapshot.readConverted?.(artifact);
+    if (converted !== undefined && matches(converted, file.path, gate, tracks, file.text)) continue;
     changed(gate);
   }
 }

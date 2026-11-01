@@ -26,6 +26,9 @@ Produce the implementation plan - Stage 3 (Build). Nothing is implemented withou
 6. **Stop at the gate.** Present the plan and give the engineer the approval command: `sdlc approve plan --change <id>` (`risk: high` also needs `--as tech-lead`). Implementation starts with {{cmd:build}} only after approval.
 
 **Guardrails**
+- In solo mode, use the developer role's planning responsibilities and the architect skill for a deliberate design
+  review. Announce each switch; neither role grants gate authority. Offer a concrete artifact commit draft when
+  the plan is ready, following the project's commit policy and without beginning implementation before approval.
 - Do not edit project code in this workflow.
 - Plans name concrete files and concrete tests; "explore the codebase" or "figure out X" is not a task - do that discovery now.
 - If the plan reveals the spec is wrong, stop and propose a spec revision (the spec gate will need re-approval) rather than planning around it.

@@ -1,10 +1,11 @@
 import { spawn, spawnSync } from 'node:child_process';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { describe, expect, it } from 'vitest';
+import { afterAll, describe, expect, it } from 'vitest';
 import { parse, stringify } from 'yaml';
 import { FILES } from './farewell-fixture.js';
 import { BIN, git, humanEnv, initGitRepo, read, runCli, tempDir, write } from './helpers.js';
+import { immutableBoardProject, reportBoardProject } from './fixtures/immutable-board-project.js';
 
 /**
  * B118 (epic E16): the task board. Open tasks of changes whose plan is approved are on a board; an executor's agent
@@ -43,8 +44,8 @@ interface BoardTask {
   expiresAt?: string;
 }
 
-function project() {
-  const root = tempDir('sdlc-board-');
+function seedProject() {
+  const root = tempDir('sdlc-board-seed-');
   initGitRepo(root);
   git(root, ['checkout', '-q', '-b', 'main']);
   const pkg = { name: 'demo', type: 'module', scripts: { test: 'node --test' } };
@@ -52,9 +53,10 @@ function project() {
   write(path.join(root, 'src/greet.js'), 'export function greet(name) {\n  return `Hello, ${name}`;\n}\n');
   git(root, ['add', '-A']);
   git(root, ['commit', '-q', '-m', 'init']);
-  const env = humanEnv(tempDir('sdlc-home-'));
-  const cli = (args: string[], extra: NodeJS.ProcessEnv = {}, input?: string) =>
-    runCli(args, root, { ...env, ...extra }, input);
+  return root;
+}
+
+function prepareProject(root: string, cli: (args: string[]) => ReturnType<typeof runCli>): void {
   expect(cli(['init', '--tools', 'claude', '--json']).code).toBe(0);
   const file = path.join(root, 'openspec/sdlc.yaml');
   const config = parse(read(file));
@@ -72,6 +74,18 @@ function project() {
   write(path.join(root, 'openspec/executors.yaml'), stringify(REGISTRY));
   git(root, ['add', '-A']);
   git(root, ['commit', '-q', '-m', 'planning and executor registry']);
+}
+
+const copies = immutableBoardProject(seedProject, 'sdlc-board-');
+afterAll(() => reportBoardProject('board', copies));
+
+function project() {
+  const root = copies.create();
+  const env = humanEnv(tempDir('sdlc-home-'));
+  const cli = (args: string[], extra: NodeJS.ProcessEnv = {}, input?: string) =>
+    runCli(args, root, { ...env, ...extra }, input);
+  prepareProject(root, cli);
+  const approve = (gate: string) => expect(cli(['approve', gate, '--change', 'add-farewell', '--json']).code).toBe(0);
   const approvePlan = () => {
     approve('plan');
     git(root, ['add', '-A']);
@@ -205,12 +219,24 @@ describe('B118: leases', () => {
     const claimed = p.claim('1.2', 'swarm-a', 'coder-1', ['--lease', '1']);
     const claim = claimed.json<{ claim: Record<string, string> }>().claim;
     await pause(2500);
+    const boardFile = path.join(p.root, 'openspec/.sdlc/board.json');
+    const logFile = path.join(p.root, 'openspec/.sdlc/log.jsonl');
+    const boardBefore = read(boardFile);
+    const logBefore = read(logFile);
     expect(p.status('add-farewell#1.2')?.status).toBe('open');
     expect(p.status('add-farewell#1.2')?.status).toBe('open');
+    expect(read(boardFile)).toBe(boardBefore);
+    expect(read(logFile)).toBe(logBefore);
+    expect(p.log().filter((e) => e.event === 'task.lease_expired')).toEqual([]);
+    expect(code(p.board(['heartbeat', '--claim', claim.id]))).toBe('claim_expired');
     expect(p.log().filter((e) => e.event === 'task.lease_expired').map((e) => [e.task, e.executor]))
       .toEqual([['1.2', 'swarm-a']]);
+    expect(JSON.parse(read(boardFile)).claims.find((entry: { id: string }) => entry.id === claim.id).state)
+      .toBe('expired');
     expect(code(p.board(['heartbeat', '--claim', claim.id]))).toBe('claim_expired');
     expect(p.claim('1.2', 'swarm-b', 'coder-9').code).toBe(0);
+    expect(p.log().filter((e) => e.event === 'task.lease_expired').map((e) => [e.task, e.executor]))
+      .toEqual([['1.2', 'swarm-a']]);
   }, 240000);
 
   it('a released task is open again; releasing twice is refused', () => {
@@ -279,5 +305,30 @@ describe('B118: the board file belongs to the harness', () => {
     const forbidden = p.cli(['task', 'export', '--change', 'add-farewell', '--executor', 'swarm-a', '--json'], AGENT)
       .json<{ items: { forbidden: string[] }[] }>().items[0].forbidden;
     expect(forbidden).toContain('openspec/.sdlc/board.json');
+  }, 240000);
+});
+
+describe('Immutable pre-plan board fixture isolation', () => {
+  it('real approvals and claim in A leave fresh-home B and the private seed pre-plan and board-free', () => {
+    const first = project();
+    const second = project();
+    expect(first.root).not.toBe(second.root);
+    expect(first.env.XDG_DATA_HOME).not.toBe(second.env.XDG_DATA_HOME);
+    expect(first.env.XDG_CONFIG_HOME).not.toBe(second.env.XDG_CONFIG_HOME);
+    expect(first.tasks()).toEqual([]);
+    expect(second.tasks()).toEqual([]);
+    const state = path.join(second.root, 'openspec/changes/add-farewell/.sdlc.yaml');
+    const log = path.join(second.root, 'openspec/.sdlc/log.jsonl');
+    const before = [read(state), read(log)];
+    first.approvePlan();
+    expect(first.claim('1.2').code).toBe(0);
+    expect(first.status('add-farewell#1.2')?.status).toBe('claimed');
+    expect(second.tasks()).toEqual([]);
+    expect([read(state), read(log)]).toEqual(before);
+    expect(fs.existsSync(path.join(second.root, 'openspec/.sdlc/board.json'))).toBe(false);
+    const third = project();
+    expect(third.tasks()).toEqual([]);
+    expect(fs.existsSync(path.join(third.root, 'openspec/.sdlc/board.json'))).toBe(false);
+    expect(copies.measurements().seedBuilds).toBe(1);
   }, 240000);
 });

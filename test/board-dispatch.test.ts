@@ -1,9 +1,10 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { describe, expect, it } from 'vitest';
+import { afterAll, describe, expect, it } from 'vitest';
 import { parse, stringify } from 'yaml';
 import { FILES } from './farewell-fixture.js';
 import { git, humanEnv, initGitRepo, read, runCli, tempDir, write } from './helpers.js';
+import { immutableBoardProject, reportBoardProject } from './fixtures/immutable-board-project.js';
 
 /**
  * B117 (epic E16): placement through a representative. A person or the lead agent hands one task to an executor of
@@ -38,8 +39,8 @@ interface BoardTask {
   expiresAt?: string;
 }
 
-function project() {
-  const root = tempDir('sdlc-board-dispatch-');
+function seedProject() {
+  const root = tempDir('sdlc-board-dispatch-seed-');
   initGitRepo(root);
   git(root, ['checkout', '-q', '-b', 'main']);
   const pkg = { name: 'demo', type: 'module', scripts: { test: 'node --test' } };
@@ -47,8 +48,10 @@ function project() {
   write(path.join(root, 'src/greet.js'), 'export function greet(name) {\n  return `Hello, ${name}`;\n}\n');
   git(root, ['add', '-A']);
   git(root, ['commit', '-q', '-m', 'init']);
-  const env = humanEnv(tempDir('sdlc-home-'));
-  const cli = (args: string[], extra: NodeJS.ProcessEnv = {}) => runCli(args, root, { ...env, ...extra });
+  return root;
+}
+
+function prepareProject(root: string, cli: (args: string[]) => ReturnType<typeof runCli>): void {
   expect(cli(['init', '--tools', 'claude', '--json']).code).toBe(0);
   const file = path.join(root, 'openspec/sdlc.yaml');
   const config = parse(read(file));
@@ -69,6 +72,16 @@ function project() {
   approve('plan');
   git(root, ['add', '-A']);
   git(root, ['commit', '-q', '-m', 'plan approved']);
+}
+
+const copies = immutableBoardProject(seedProject, 'sdlc-board-dispatch-');
+afterAll(() => reportBoardProject('board-dispatch', copies));
+
+function project() {
+  const root = copies.create();
+  const env = humanEnv(tempDir('sdlc-home-'));
+  const cli = (args: string[], extra: NodeJS.ProcessEnv = {}) => runCli(args, root, { ...env, ...extra });
+  prepareProject(root, cli);
   const board = (args: string[], extra: NodeJS.ProcessEnv = AGENT) => cli(['board', ...args, '--json'], extra);
   const dispatch = (executor: string, extra: string[] = [], who: NodeJS.ProcessEnv = {}) =>
     board(['dispatch', '--change', 'add-farewell', '--task', '1.2', '--executor', executor, ...extra], who);
@@ -119,11 +132,24 @@ describe('B117: sdlc board dispatch', () => {
     const p = project();
     expect(p.dispatch('rep-a', ['--lease', '1']).code).toBe(0);
     await pause(2500);
+    const boardFile = path.join(p.root, 'openspec/.sdlc/board.json');
+    const logFile = path.join(p.root, 'openspec/.sdlc/log.jsonl');
+    const boardBefore = read(boardFile);
+    const logBefore = read(logFile);
     expect(p.status()?.status).toBe('open');
     expect(p.status()?.status).toBe('open');
+    expect(read(boardFile)).toBe(boardBefore);
+    expect(read(logFile)).toBe(logBefore);
+    expect(p.log().filter((e) => e.event === 'task.dispatch_expired')).toEqual([]);
+    const claimed = p.claim('swarm-b', 'coder-9');
+    expect(claimed.code).toBe(0);
     expect(p.log().filter((e) => e.event === 'task.dispatch_expired').map((e) => [e.task, e.executor]))
       .toEqual([['1.2', 'rep-a']]);
-    expect(p.claim('swarm-b', 'coder-9').code).toBe(0);
+    expect(JSON.parse(read(boardFile)).dispatches).toEqual([]);
+    const claim = claimed.json<{ claim: { id: string } }>().claim;
+    expect(p.board(['heartbeat', '--claim', claim.id]).code).toBe(0);
+    expect(p.log().filter((e) => e.event === 'task.dispatch_expired').map((e) => [e.task, e.executor]))
+      .toEqual([['1.2', 'rep-a']]);
   }, 240000);
 
   it('negative: an unknown or disallowed executor, a held, dispatched or submitted task, a bad lease', () => {

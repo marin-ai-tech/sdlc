@@ -71,14 +71,16 @@ describe('B131: verification timeouts terminate descendants', () => {
       'setTimeout(() => {}, 30000);',
     ].join('\n'));
     const config = defaultConfig();
-    // The shell exits at once; the background child keeps the output open, so the check reaches its limit.
-    config.verify.commands = [{ name: 'tree', run: 'node child.cjs & exit 0', required: true }];
+    // A known shell exit remains success while owned background output is cleaned up.
+    config.verify.commands = [{ name: 'tree',
+      run: 'node child.cjs & while [ ! -f grandchild.pid ]; do sleep 0.01; done; exit 0', required: true }];
     config.verify.timeoutSeconds = 3;
     const result = await runVerification(root, config);
     const pids = ['child.pid', 'grandchild.pid'].map((file) => Number(fs.readFileSync(path.join(root, file), 'utf8')));
     try {
-      expect(result.checks[0].timed_out).toBe(true);
-      expect(result.checks[0].exit_code).toBeNull();
+      expect(result.status).toBe('passed');
+      expect(result.checks[0]).not.toHaveProperty('timed_out');
+      expect(result.checks[0].exit_code).toBe(0);
       expect(result.checks[0].output).not.toContain('sent no signal');
       expect(pids.filter(alive)).toEqual([]);
     } finally {
@@ -99,6 +101,9 @@ describe('B131: verification timeouts terminate descendants', () => {
       write(path.join(root, 'launcher.cjs'), [
         "require('child_process').spawn(process.execPath, ['daemon.cjs'], { detached: true, stdio: 'inherit' })",
         '  .unref();',
+        'const ready = setInterval(() => {',
+        "  if (require('fs').existsSync('daemon.pid')) { clearInterval(ready); process.exit(0); }",
+        '}, 10);',
       ].join('\n'));
       const config = defaultConfig();
       config.verify.commands = [{ name: 'tree', run: 'node launcher.cjs', required: true }];
@@ -106,8 +111,10 @@ describe('B131: verification timeouts terminate descendants', () => {
       const result = await runVerification(root, config);
       const daemon = Number(fs.readFileSync(path.join(root, 'daemon.pid'), 'utf8'));
       try {
-        expect(result.checks[0].timed_out).toBe(true);
-        expect(result.checks[0].exit_code).toBeNull();
+        // Retains the observed exit; the accepted detached-orphan limit remains asserted below.
+        expect(result.status).toBe('passed');
+        expect(result.checks[0]).not.toHaveProperty('timed_out');
+        expect(result.checks[0].exit_code).toBe(0);
         expect(result.checks[0].output)
           .toContain("Process tree cleanup sent no signal: the check's shell had already exited.");
         expect(alive(daemon)).toBe(true);

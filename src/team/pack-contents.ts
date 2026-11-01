@@ -9,6 +9,7 @@ import { splitFrontmatter, WORKFLOW_IDS } from '../integrations/assets.js';
 import { isGitPack, packPinned, type PackConfig } from './pack-config.js';
 import { ROLE_ID } from './role-file.js';
 import { LIMITS } from './vetting.js';
+import { workflowCallsHumanCommand } from './workflow-command-match.js';
 
 /**
  * What a pack brings besides roles and skills (B18), read from its fetched copy as plain files (links are not
@@ -166,7 +167,7 @@ function workflowOf(pack: string, file: PackFile, problems: PackProblem[]): Pack
     problems.push(invalid(file.rel, problem));
     return [];
   }
-  if (callsHumanCommand(file.text)) {
+  if (workflowCallsHumanCommand(file.text)) {
     problems.push(forbidden(file.rel, 'the workflow calls a human-only sdlc command'));
     return [];
   }

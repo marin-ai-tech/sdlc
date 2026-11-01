@@ -23,7 +23,9 @@ agreed, not against what you meant.
 2. For each task: first a test that fails for the right reason, then the smallest change that makes it pass, then the
    project's checks. Do not move on with a red check.
 3. Stay inside the plan. A file you did not plan to touch is plan drift: add it to the plan with the reason, or leave it.
-4. Commit one logical step at a time, with the trailers `SDLC-Change: <id>` and `SDLC-Task: <n>`.
+4. Offer a concrete commit draft for one logical step at a time, with the trailers `SDLC-Change: <id>` and
+   `SDLC-Task: <n>`. Follow the project's commit policy: when a person reserves execution, they run or confirm it.
+   Respect project attribution rules and do not add AI attribution where the project forbids it.
 5. On rework or review findings: read each finding and its fix hint, fix exactly that, keep every passing scenario
    passing, and say in the commit what was fixed and why.
 6. Run `sdlc verify --change <id>` before you report the work as done.

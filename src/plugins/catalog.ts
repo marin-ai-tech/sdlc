@@ -2,8 +2,9 @@ import type { SdlcConfig } from '../core/config.js';
 import { capturePackage } from './package.js';
 import { activePlugin, readRegistry, type ActivePlugin } from './trust.js';
 import { readStored } from './activation.js';
-import { canonical, fail, pluginDiagnostic, type Operation, type Schema } from './api.js';
+import { LIMITS, canonical, fail, pluginDiagnostic, type Operation, type Schema } from './api.js';
 import type { PackageSnapshot } from './api.js';
+import { normalizeSchema } from './schema-anchors.js';
 
 export interface PluginDescriptor {
   plugin: string;
@@ -16,61 +17,29 @@ export interface PluginDescriptor {
 
 /** Package-local schemas become self-contained public descriptors without reopening source files. */
 function publicSchema(snapshot: PackageSnapshot, schema: Schema): unknown {
-  const definitions: Record<string, unknown> = Object.create(null);
-  const pointer = (file: string) => file.replaceAll('~', '~0').replaceAll('/', '~1');
-  const root = typeof schema === 'string' ? { $ref: schema } : schema;
-  const documents = new Map<string, unknown>([['', root]]);
-  const anchor = (value: unknown, name: string, at = ''): string | undefined => {
-    if (!value || typeof value !== 'object') return undefined;
-    if ((value as Record<string, unknown>).$anchor === name) return at;
-    for (const [key, item] of Object.entries(value)) {
-      const found = anchor(item, name, `${at}/${pointer(key)}`);
-      if (found !== undefined) return found;
-    }
-    return undefined;
-  };
-  const visit = (value: unknown, base = ''): unknown => {
-    if (Array.isArray(value)) return value.map((item) => visit(item, base));
-    if (!value || typeof value !== 'object') return value;
-    const result: Record<string, unknown> = {};
-    for (const [key, item] of Object.entries(value)) {
-      if (key === '$id' || key === '$anchor') continue;
-      if (key !== '$ref' || typeof item !== 'string') {
-        result[key] = visit(item, base);
-        continue;
-      }
-      const [relative, fragment = ''] = item.split('#');
-      const directory = base.includes('/') ? base.slice(0, base.lastIndexOf('/') + 1) : '';
-      const file = relative ? `${directory}${relative}` : base;
-      if (!Object.hasOwn(definitions, file)) {
-        if (!documents.has(file)) {
-          const bytes = snapshot.files.get(file);
-          if (!bytes) fail('plugin_schema', 'Missing captured schema document');
-          try { documents.set(file, JSON.parse(bytes.toString('utf8'))); }
-          catch { fail('plugin_schema', 'Invalid captured schema document'); }
-        }
-        definitions[file] = true;
-        definitions[file] = visit(documents.get(file), file);
-      }
-      const suffix = !fragment || fragment.startsWith('/') ? fragment : anchor(documents.get(file), fragment);
-      if (suffix === undefined) fail('plugin_schema', 'Missing captured schema anchor');
-      result[key] = `#/$defs/${pointer(file)}${suffix}`;
-    }
-    return result;
-  };
-  definitions[''] = true;
-  definitions[''] = visit(root);
-  return { $ref: '#/$defs/', $defs: definitions };
+  return normalizeSchema(snapshot.files, schema);
 }
 
 function descriptors(root: string, config: SdlcConfig, kind: 'commands' | 'tools'): PluginDescriptor[] {
+  let bytes = 0;
   return activePlugins(root, config).flatMap(({ snapshot }) => {
+    const schemas = new Map<Schema, { value: unknown; bytes: number }>();
+    const read = (schema: Schema) => {
+      if (!schemas.has(schema)) {
+        const value = publicSchema(snapshot, schema);
+        schemas.set(schema, { value, bytes: Buffer.byteLength(JSON.stringify(value)) });
+      }
+      return schemas.get(schema)!;
+    };
     return Object.entries(snapshot.manifest[kind]).map(([segment, operation]) => {
       const declared = snapshot.manifest.operations[operation];
+      const input = read(declared.input);
+      const output = read(declared.output);
+      bytes += input.bytes + output.bytes;
+      if (bytes > LIMITS.packageBytes) fail('plugin_schema', 'Public schema catalog byte limit exceeded');
       return { plugin: snapshot.manifest.name,
         name: kind === 'tools' ? `${snapshot.manifest.name}__${segment}` : `${snapshot.manifest.name} ${segment}`,
-        operation, access: declared.access, inputSchema: publicSchema(snapshot, declared.input),
-        outputSchema: publicSchema(snapshot, declared.output) };
+        operation, access: declared.access, inputSchema: input.value, outputSchema: output.value };
     });
   });
 }
@@ -88,7 +57,7 @@ export function pluginHumanCommands(root: string, config: SdlcConfig): string[] 
 }
 
 export function compatibleDescriptor(left: PluginDescriptor, right: PluginDescriptor): boolean {
-  return canonical(left) === canonical(right);
+  return canonical(left, LIMITS.packageBytes, 72) === canonical(right, LIMITS.packageBytes, 72);
 }
 
 export function activePlugins(root: string, config: SdlcConfig): ActivePlugin[] {

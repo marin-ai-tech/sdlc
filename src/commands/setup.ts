@@ -44,12 +44,15 @@ import {
   defaultInstaller,
   defaultProbe,
   installCommand,
+  selectedDependencies,
   type DependencyId,
+  type DependencyStatus,
   type Installer,
   type Probe,
 } from '../core/dependencies.js';
 import {
   askInitChoices,
+  dependencyMessage,
   initDefaults,
   shouldPrompt,
   starterRoles,
@@ -59,6 +62,7 @@ import {
   type TerminalState,
 } from './init-wizard.js';
 import { layoutOptions, printLayoutText } from './init-layout.js';
+import { parseExecutionMode } from '../team/team-config.js';
 
 export interface InitOptions {
   tools?: string;
@@ -79,6 +83,7 @@ export interface InitOptions {
   /** Register `sdlc mcp serve` for the configured tools (`mcp.serve` in sdlc.yaml, B13). */
   mcp?: boolean;
   roles?: boolean;
+  teamMode?: string;
 }
 
 function assertDelivery(value: string | undefined): Delivery | undefined {
@@ -213,6 +218,7 @@ interface WizardResult {
   roles: boolean;
   install: DependencyId[];
   index: boolean;
+  interactive?: true;
 }
 
 /** Asks interactively when appropriate; returns undefined if the person declines. */
@@ -243,6 +249,7 @@ async function resolveWizard(
     roles: choices.roles,
     install: choices.install,
     index: choices.index,
+    interactive: true,
   };
 }
 
@@ -277,6 +284,7 @@ function optsFromChoices(opts: InitOptions, choices: InitChoices): InitOptions {
     opsx: choices.opsx,
     ...(choices.language ? { language: choices.language } : {}),
     ...(choices.mcp === undefined ? {} : { mcp: choices.mcp }),
+    ...(choices.teamMode === undefined ? {} : { teamMode: choices.teamMode }),
     ...layoutOptions(choices),
   };
 }
@@ -312,6 +320,7 @@ interface InitOutcome {
   opsx?: 'installed' | 'failed';
   rolesNote?: string;
   license: ReturnType<typeof assessLicense>;
+  dependencies: DependencyStatus[];
 }
 
 export async function initCommand(target: string | undefined, opts: InitOptions, deps?: InitDeps): Promise<void> {
@@ -324,6 +333,7 @@ export async function initCommand(target: string | undefined, opts: InitOptions,
     );
     // Refused before anything is written: a value the configuration cannot load would break every later command.
     if (opts.cli !== undefined) assertCliValue(opts.cli, '--cli');
+    parseExecutionMode(opts.teamMode, '--team-mode');
     const root = path.resolve(target ?? process.cwd());
     if (!isDirectory(root)) throw new SdlcError(
       'invalid_path',
@@ -391,6 +401,8 @@ function writeSettings(root: string, opts: InitOptions): Settings {
   config.statusline = opts.statusline || config.statusline;
   config.enforcement.mode = assertMode(opts.mode) ?? config.enforcement.mode;
   config.mcp = mcpSetting(config, opts.mcp);
+  const teamMode = parseExecutionMode(opts.teamMode, '--team-mode');
+  if (teamMode !== undefined) config.team = { ...config.team, mode: teamMode };
   let detectedCommands: string[] = [];
   if (!hadConfig && config.verify.commands.length === 0) {
     const found = detectVerifyCommands(root);
@@ -475,13 +487,16 @@ async function setupProject(
   }
   logSetup(root, config, hadConfig ? 'harness.reinitialized' : 'harness.initialized', tools);
   const license = assessLicense(config.license, detectProjectLicense(root), opts.json ? 'en' : currentLocale());
+  const agent = deps?.io ? deps.io.agent : agentEnvironment();
+  const dependencies = resolved.interactive || agent
+    ? [] : selectedDependencies(root, tools, deps?.probe ?? defaultProbe);
   if (resolved.install.length > 0 || resolved.index) {
     const installer = deps?.installer ?? defaultInstaller;
     await runChosenInstalls(root, resolved.install, { wanted: resolved.index, tools }, installer);
   }
   return {
     root, config, hadConfig, openspecCreated, schemaDefaulted, tools, detectedCommands, result, gitHook, reviewCreated,
-    opsx, rolesNote, license,
+    opsx, rolesNote, license, dependencies,
   };
 }
 
@@ -498,6 +513,7 @@ function initJson(o: InitOutcome): Record<string, unknown> {
       verifyCommands: config.verify.commands.map((v) => v.run),
     },
     tools: o.tools,
+    ...(o.dependencies.length ? { dependencies: o.dependencies } : {}),
     files: result.files,
     claudeHooks: result.claudeHooks,
     ...cursorHooksJson(result),
@@ -524,6 +540,7 @@ function printInitText(o: InitOutcome): void {
   }
   if (o.reviewCreated) line(t('init.reviewPolicy', { policy: config.review.policy }));
   line(t('init.toolsLine', { tools: names }));
+  for (const dependency of o.dependencies) line(dependencyMessage(dependency));
   if (o.rolesNote) line(`  ${o.rolesNote}`);
   if (o.opsx) line(t('init.opsxLine', { opsx: stateLabel(o.opsx) }));
   line(`  ${stampTextLocalized(harnessStamp(config))}`);

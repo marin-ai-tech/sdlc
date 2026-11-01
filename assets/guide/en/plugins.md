@@ -4,8 +4,7 @@ summary: Inspect and accept Wasm packages, use their commands, and retain state 
 ---
 # Runtime plugins
 
-Runtime plugins add namespaced operations, pure hooks and facts. The editor distribution built by
-`sdlc plugin build` installs workflows and hooks; runtime packages are separately accepted Wasm code.
+Accepted Wasm packages add namespaced operations, pure hooks and facts.
 
 ## Enable a package
 
@@ -22,8 +21,7 @@ sdlc doctor --json
 ```
 
 Acceptance does not approve a lifecycle gate. Changed package bytes require a new pin and acceptance.
-The repository's economy and harness-meta examples have `read`, `record`, `reset` and `guard` commands.
-The latter stays in `examples/plugins/harness`; `harness` is reserved for core events.
+Examples: economy and harness-meta (`examples/plugins/harness`; `harness` is a core event namespace).
 Read commands use `--input-json '{}'`. Record commands also need `--executor <registered-id>` and
 `--request p1.<unix-milliseconds>.<32-lowercase-hex-digits>`. Reuse that identifier for an identical retry.
 
@@ -51,7 +49,16 @@ recovery does not read or apply their contents and does not delete these files.
 ## Runtime limits
 
 Only the bounded Wasm memory import is available: no WASI, files, network, process or JavaScript imports.
-The host enforces 64 MiB maximum linear memory, 1,000 ms hooks and 5,000 ms operations including queueing,
-with worker termination. This relies on Node/V8 and the OS; it is not an OS sandbox or a total-process
-memory bound. Transactional replacement does not promise power-loss durability. See the repository's
-English plugins chapter for the ABI, schemas, rollback and reproducible examples.
+The host enforces 64 MiB maximum linear memory. Queueing is bounded at 5,000 ms, startup at 10,000 ms,
+guest hooks at 1,000 ms, ordinary guest operations at 5,000 ms and cleanup at 1,000 ms. Preparation across
+attempts shares a 30,000 ms ceiling. Startup completes before the allocator or guest call starts.
+At most two workers execute and two may remain quarantined. Admission reserves cleanup headroom;
+unreaped workers reduce available slots, and exhausted capacity refuses new calls.
+This relies on Node/V8 and the OS; it is not an OS sandbox or a total-process memory bound.
+
+Receipts retain compact output/facts and can read older version1 responses. Pending events have a lossless
+1024-record/1 MiB bound: `plugin_backpressure` refuses before mutation until logging can drain them.
+POSIX replacements flush their parent directory; uncertain acknowledgements remain `plugin_indeterminate`.
+Reconcile the same request identifier before retrying. Unknown live or legacy lock ownership is protected;
+run `doctor`, stop all checkout writers and confirm quiescence before any manual metadata recovery.
+Never remove stores or pending events to clear a lock.

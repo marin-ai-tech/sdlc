@@ -3,14 +3,43 @@ import * as path from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { stringify } from 'yaml';
 import { Ajv2020 } from 'ajv/dist/2020.js';
+import ts from 'typescript';
+import { createRequire } from 'node:module';
+import { fileURLToPath, pathToFileURL } from 'node:url';
+import { spawnSync } from 'node:child_process';
 import { loadConfig, saveConfig } from '../dist/core/config.js';
 import { parsePlugins } from '../dist/plugins/config.js';
 import { capturePackage } from '../dist/plugins/package.js';
 import { invoke } from '../dist/plugins/runtime.js';
 import { callPluginTool, listedPluginTools } from '../dist/plugins/mcp.js';
-import { packageFiles } from './fixtures/plugin-modules.js';
+import { manifest, packageFiles } from './fixtures/plugin-modules.js';
 import { pluginProject } from './fixtures/plugin-project.js';
-import { tempDir } from './helpers.js';
+import { REPO_ROOT, tempDir } from './helpers.js';
+
+function mutationSource(original: string): string {
+  const parsed = ts.createSourceFile('schema.js', original, ts.ScriptTarget.Latest, true, ts.ScriptKind.JS);
+  const guards: ts.IfStatement[] = [];
+  const visit = (node: ts.Node): void => {
+    if (ts.isIfStatement(node) && node.expression.getText(parsed).startsWith('INPUT_CONTROL_FIELDS.some')
+      && node.thenStatement.getText(parsed).includes('Operation input schema declares reserved transport identity')) {
+      guards.push(node);
+    }
+    ts.forEachChild(node, visit);
+  };
+  visit(parsed);
+  expect(guards).toHaveLength(1);
+  return original.slice(0, guards[0].getStart(parsed)) + ';' + original.slice(guards[0].end);
+}
+
+function relocatedSchema(original: string): string {
+  const source = path.join(REPO_ROOT, 'dist/plugins/schema.js');
+  const require = createRequire(pathToFileURL(source));
+  return original.replace(/from '([^']+)'/g, (whole, name: string) => {
+    if (name.startsWith('node:')) return whole;
+    const target = name.startsWith('.') ? fileURLToPath(new URL(name, pathToFileURL(source))) : require.resolve(name);
+    return `from '${pathToFileURL(target).href}'`;
+  });
+}
 
 const exposure = (input: unknown) => ({
   operations: { read: { access: 'read', input, output: true } },
@@ -30,6 +59,37 @@ async function preflight(input: unknown, documents: Record<string, unknown> = {}
 }
 
 describe('Operation schema routing ownership', () => {
+  it('only removing the ownership guard makes the unchanged anchored negative assertion fail', () => {
+    const original = fs.readFileSync(path.join(REPO_ROOT, 'dist/plugins/schema.js'), 'utf8');
+    const folder = tempDir('sdlc-schema-mutation-');
+    const input = { $ref: '#entry', $defs: { input: { $anchor: 'entry', ...field('project') } } };
+    const candidate = manifest(exposure(input));
+    const assertion = [
+      'import assert from "node:assert/strict";',
+      'const { PluginSchemas } = await import(process.argv[1]);',
+      'const manifest = JSON.parse(process.argv[2]);',
+      'assert.throws(() => new PluginSchemas(new Map()).manifest(manifest), { code: "plugin_schema" });',
+    ].join('\n');
+    const results = [original, mutationSource(original)].map((text, index) => {
+      const file = path.join(folder, `schema-${index}.mjs`);
+      fs.writeFileSync(file, relocatedSchema(text));
+      return spawnSync(process.execPath, ['--input-type=module', '-e', assertion,
+        pathToFileURL(file).href, JSON.stringify(candidate)], { encoding: 'utf8', timeout: 10000 });
+    });
+    expect(results[0].status, results[0].stderr).toBe(0);
+    expect(results[1].status, 'the anchored negative must fail when only its ownership guard is removed').toBe(1);
+    expect(results[1].stderr).toContain('Missing expected exception');
+  });
+
+  it('harmless static anchors pass before a reserved-root anchor reaches the actual ownership guard', async () => {
+    const anchored = (value: unknown) => ({ $ref: '#entry', $defs: { input: { $anchor: 'entry', ...value as object } } });
+    await expect(preflight(anchored({ type: 'object', properties: { payload: { type: 'string' } } })))
+      .resolves.toBeNull();
+    await expect(preflight(anchored(field('project')))).rejects.toMatchObject({
+      code: 'plugin_schema', message: expect.stringMatching(/reserved transport identity/),
+    });
+  });
+
   it.each(['project', 'executor', 'origin', 'request'])('preflight refuses root declaration %s', async (name) => {
     await expect(preflight(field(name))).rejects.toMatchObject({ code: 'plugin_schema' });
     await expect(preflight({ type: 'object', properties: { [name]: true } }))

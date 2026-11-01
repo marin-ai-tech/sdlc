@@ -1,4 +1,5 @@
 import * as path from 'node:path';
+import { configureNext } from './suggested-command.js';
 import type { GateId, SdlcConfig } from './config.js';
 import {
   readChangeState,
@@ -106,6 +107,7 @@ export interface NextAction {
     | 'none';
   /** Workflow id of the skill/command that performs the action (e.g. `spec`). */
   workflow?: string;
+  executionRole?: import('../team/solo.js').ExecutionRole;
   gate?: GateId;
   artifact?: string;
   /** Exact CLI invocation, when the action is a CLI call. */
@@ -287,7 +289,7 @@ export function evaluateChange(
   const next = held ?? limit ?? questionsNext(view, config, state,
     judgeNext(view, config, state,
       debateNext(view, config, draftIntentNext(view, verifyBehaviourNext(view, advice)))));
-  view.next = held || options.skipPeople ? next : nameApprovers(root, config, view, state, next);
+  view.next = configureNext(held || options.skipPeople ? next : nameApprovers(root, config, view, state, next), config);
   // A rejection at the current stage is already in the hint itself; only the others are added.
   const inHint = (note: string) => view.next.message.includes(note.slice(note.indexOf(': ') + 2));
   const rejectionNotes = openRejectionNotes(evaluated).filter((note) => !inHint(note));

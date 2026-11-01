@@ -35,6 +35,7 @@ import { SdlcError } from './errors.js';
 import { readText, writeTextAtomic } from './fs-utils.js';
 import { parseBacklogText, renderBacklog } from './backlog-format.js';
 import { assertUsableDependency } from './backlog-deps.js';
+import { parseEpicGranularity, type EpicGranularity } from './backlog-granularity.js';
 
 export const BACKLOG_PATH = 'openspec/backlog.md';
 export const BACKLOG_STATUSES = ['open', 'in-progress', 'done', 'dropped'] as const;
@@ -48,6 +49,7 @@ export interface BacklogEpic {
   title: string;
   goal?: string;
   source?: string;
+  granularity?: EpicGranularity;
   line: number;
 }
 
@@ -285,7 +287,10 @@ export function addBacklogItem(
 }
 
 /** Adds an epic section (next free `E<n>`) before Unassigned. */
-export function addEpic(root: string, input: { title: string; goal?: string; source?: string }): BacklogEpic {
+export function addEpic(
+  root: string,
+  input: { title: string; goal?: string; source?: string; granularity?: string },
+): BacklogEpic {
   oneLine(input.title, 'title');
   if (input.goal !== undefined) {
     oneLine(input.goal, 'goal');
@@ -293,13 +298,14 @@ export function addEpic(root: string, input: { title: string; goal?: string; sou
   if (input.source !== undefined) {
     oneLine(input.source, 'source');
   }
+  const granularity = parseEpicGranularity(input.granularity);
   const backlog = readBacklog(root);
   const id = historicalId(
     root,
     'E',
     backlog.epics.map((epic) => epic.id)
   );
-  backlog.epics.push({ id, title: input.title, goal: input.goal, source: input.source, line: 0 });
+  backlog.epics.push({ id, title: input.title, goal: input.goal, source: input.source, granularity, line: 0 });
   save(root, backlog);
   return readBacklog(root).epics.find((epic) => epic.id === id)!;
 }

@@ -60,13 +60,13 @@ export class HarnessRuntime {
     this.#fetch = fetcher;
   }
 
-  private async request(route: string, method = 'GET', body?: unknown): Promise<unknown> {
+  private async request(route: string, method = 'GET', body?: unknown, timeoutMs = 30000): Promise<unknown> {
     let response: Response;
     try {
       response = await this.#fetch(`https://api.digitalocean.com/v2/agents/${route}`, {
         method, headers: { Authorization: `Bearer ${this.#token}`, 'Content-Type': 'application/json' },
         ...(body === undefined ? {} : { body: JSON.stringify(body) }),
-        signal: AbortSignal.timeout(30000), redirect: 'error',
+        signal: AbortSignal.timeout(timeoutMs), redirect: 'error',
       });
     } catch {
       fail('transport failed');
@@ -105,7 +105,7 @@ export class HarnessRuntime {
     if (!argv.length || argv.some((arg) => typeof arg !== 'string')) fail('argv');
     const raw = recordObject(await this.request(`sessions/${identifier(id)}/sandbox/exec`, 'POST', {
       argv, stdin, workdir, timeout_seconds: 60,
-    }));
+    }, 90000));
     if (!raw || !Number.isInteger(raw.exit_code)
       || (raw.stdout !== undefined && typeof raw.stdout !== 'string')
       || (raw.stderr !== undefined && typeof raw.stderr !== 'string')) fail('exec response');

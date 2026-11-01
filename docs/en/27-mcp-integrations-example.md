@@ -93,18 +93,54 @@ sdlc mcp serve --http 127.0.0.1:8765
 | no token, or another token | 401 |
 | the right token, a browser `Origin` of another host | 403 |
 | another path than `/mcp` | 404 |
-| the right token | 11 read tools (listed below) |
+| the right server token | 12 core read tools, plus accepted plugin read tools |
 | `approve`, `reject`, `waive`, `track` | `unknown_tool`: decisions are not tools |
 | an argument that starts with `-` | `invalid_arguments` |
 
 Without `SDLC_MCP_TOKEN`, or with a short one, the server does not start (`token_required`). Over stdio the agent
 gets the same tools, and the resources: the context packs, the living specs and each change's artifacts.
 
-The 11 tools are:
+The 12 core read tools for server-token and stdio clients are:
 
-- `board_list`, `status`, `next`, `instructions`;
-- `trace`, `audit`, `help`, `guide`;
-- `explain`, `health`, `report`.
+- `task_export`, `board_list`, `status`, `next`;
+- `instructions`, `trace`, `audit`, `help`;
+- `guide`, `explain`, `health`, `report`.
+
+An HTTP executor token also enables the 5 core board write tools:
+
+- `board_claim` and `board_heartbeat`;
+- `board_release` and `board_submit`;
+- `board_bid`.
+
+The token binds both the registered executor and its served project. Board write arguments cannot provide an
+`executor`, and a token for one project cannot select another. With several projects, ordinary clients select
+`project`; `status` without it returns all projects. An executor token defaults to its own project.
+
+### Work export and extension data
+
+`task_export` accepts optional `change`, `task`, `executor` and `ext` arguments. It requires an approved plan and
+the normal task and executor eligibility checks. A tokenless caller has no executor token: it uses stdio or the
+HTTP server token. It must omit `executor`: supplying one returns
+`executor_token_required` and creates no `task.exported` event. A permitted identity-free export stays unattributed.
+An executor registry can still return `executor_required` when an export needs identity.
+
+For an executor-token call, omitted `executor` uses the token identity. An explicit different value is refused
+with `invalid_arguments`. No process environment flag supplies MCP origin or executor authority.
+
+The `ext` argument is a JSON object keyed by accepted plugin namespaces. Both `task_export` and `board_claim`
+validate it as task extensions; `board_bid` validates bid extensions. Numbers, arrays, booleans and null retain
+their JSON types. The [MCP tool inventory](11-mcp-use-cases.md#core-tool-inventory) lists the exact core arguments.
+
+### Dynamic tools and protocol output
+
+Accepted enabled plugins add tools such as `economy__read`, with input nested under `input`.
+Read plugin operations are available to ordinary clients. Executor operations require the token-bound project
+and a stable `request`; person-only operations are neither listed nor callable through MCP.
+Discovery and invocation use the current accepted catalog, so revocation removes authority after listing too.
+
+Board, export and plugin operations return service values to the MCP handler. Other core reads collect JSON from
+isolated CLI subprocesses. The server's stdout contains only MCP protocol messages; command presenters cannot
+insert unrelated text into it. The server token never acquires executor rights from the shell environment.
 
 ## 27.3. Issues into the backlog
 

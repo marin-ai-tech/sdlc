@@ -44,14 +44,30 @@ describe('help and the supported tools', () => {
     expect(text).not.toContain('$sdlc-next');
   }, 120000);
 
-  it('negative: a broken openspec/sdlc.yaml does not break help; it shows the default tools', () => {
+  it('negative: malformed existing configuration reports its parse and repair diagnosis', () => {
     const root = tempDir('sdlc-help-broken-');
     const env = humanEnv(tempDir('sdlc-home-'));
     initGitRepo(root);
     git(root, ['commit', '-q', '--allow-empty', '-m', 'init']);
     expect(runCli(['init', '--tools', 'codex', '--json'], root, env).code).toBe(0);
-    fs.writeFileSync(path.join(root, 'openspec', 'sdlc.yaml'), 'version: 1\ntools: [codex\n');
+    const file = path.join(root, 'openspec', 'sdlc.yaml');
+    const malformed = 'version: 1\ntools: [codex\n';
+    fs.writeFileSync(file, malformed);
     const r = runCli(['help'], root, env);
+    expect(r.code, r.stderr).toBe(1);
+    expect(r.stderr).toContain('is not valid YAML');
+    expect(r.stderr).toContain('Fix the YAML syntax');
+    expect(r.stderr).toContain(file);
+    expect(r.stdout).not.toContain('/sdlc:next · /sdlc-next');
+    const json = runCli(['help', '--json'], root, env);
+    expect(json.code, json.stdout + json.stderr).toBe(1);
+    expect(json.json().status[0].code).toBe('invalid_yaml');
+    expect(json.json()).not.toHaveProperty('workflows');
+    expect(fs.readFileSync(file, 'utf8')).toBe(malformed);
+  }, 120000);
+
+  it('negative: genuinely absent configuration shows the default tools', () => {
+    const r = project()(['help']);
     expect(r.code, r.stderr).toBe(0);
     expect(r.stdout).toContain('/sdlc:next · /sdlc-next');
   }, 120000);

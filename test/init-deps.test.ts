@@ -82,6 +82,9 @@ const defaults = (dependencies?: DependencyStatus[]) =>
 afterEach(() => vi.restoreAllMocks());
 
 describe('optional tools: detection and install commands', () => {
+  it('OpenCode installs are pinned to the supported first major', () => {
+    expect(installCommand('opencode' as never)).toEqual(['npm', 'install', '-g', 'opencode-ai@1']);
+  });
   it('OpenSpec is pinned to the bundled version; codegraph comes from npm', () => {
     expect(installCommand('openspec')).toEqual(OPENSPEC_INSTALL);
     expect(installCommand('codegraph')).toEqual(CODEGRAPH_INSTALL);
@@ -111,6 +114,40 @@ describe('optional tools: detection and install commands', () => {
 });
 
 describe('the wizard offers what is missing', () => {
+  it('selected missing OpenCode offers only the supported major and honors yes/no', async () => {
+    const dep = { id: 'opencode', name: 'OpenCode', found: false,
+      install: ['npm', 'install', '-g', 'opencode-ai@1'] } as unknown as DependencyStatus;
+    for (const accepted of [true, false]) {
+      const s = scripted({ tools: ['opencode'] });
+      const confirm = s.prompter.confirm;
+      s.prompter.confirm = async (message, initial) => /install opencode/i.test(message)
+        ? (s.asked.push(`confirm:${message}`), accepted) : confirm(message, initial);
+      const choices = await askInitChoices(s.prompter, defaults([dep]));
+      expect(s.asked.some((question) => /opencode-ai@1/.test(question))).toBe(true);
+      expect(choices?.install.includes('opencode' as never)).toBe(accepted);
+      expect(s.said.join('\n')).toContain('npm install -g opencode-ai@1');
+    }
+  });
+
+  it('an installed other OpenCode major is printed and never replaced or offered', async () => {
+    const dep = { id: 'opencode', name: 'OpenCode', found: true, version: '2.3.4',
+      install: ['npm', 'install', '-g', 'opencode-ai@1'] } as unknown as DependencyStatus;
+    const s = scripted({ tools: ['opencode'] });
+    const choices = await askInitChoices(s.prompter, defaults([dep]));
+    expect(s.said.join('\n')).toContain('2.3.4');
+    expect(s.asked.some((question) => /install opencode/i.test(question))).toBe(false);
+    expect(choices?.install).toEqual([]);
+  });
+
+  it('deselected OpenCode is not offered as an optional installation', async () => {
+    const dep = { id: 'opencode', name: 'OpenCode', found: false,
+      install: ['npm', 'install', '-g', 'opencode-ai@1'] } as unknown as DependencyStatus;
+    const s = scripted({ tools: ['claude'] });
+    const choices = await askInitChoices(s.prompter, defaults([dep]));
+    expect(s.asked.some((question) => /install opencode/i.test(question))).toBe(false);
+    expect(choices?.install).toEqual([]);
+  });
+
   it('asks to install each missing tool right after the tools question, then about the index; the summary shows the commands', async () => {
     const s = scripted({ installOpenSpec: true, installCodegraph: true, index: true });
     const choices = await askInitChoices(s.prompter, defaults(missing()));
@@ -149,6 +186,38 @@ describe('interactive init installs only what the person chose', () => {
     vi.spyOn(process.stderr, 'write').mockImplementation((chunk) => (err.push(String(chunk)), true));
     return err;
   };
+
+  it('selected OpenCode installation runs only after yes and reports a failed install', async () => {
+    const root = tempDir('sdlc-opencode-install-');
+    const inst = installer(root, false);
+    const err = quiet();
+    const s = scripted({ tools: ['opencode'], installOpenSpec: false, installCodegraph: false });
+    const confirm = s.prompter.confirm;
+    s.prompter.confirm = async (message, initial) => /install opencode/i.test(message)
+      ? (s.asked.push(`confirm:${message}`), true) : confirm(message, initial);
+    await initCommand(root, { hooks: true }, { prompter: s.prompter, io: TTY,
+      probe: probe({}).fn, installer: inst.fn });
+    expect(inst.calls.map((call) => call.command)).toEqual([['npm', 'install', '-g', 'opencode-ai@1']]);
+    expect(inst.calls.every((call) => call.settingsWritten)).toBe(true);
+    expect(err.join('')).toContain('npm install -g opencode-ai@1');
+  }, 120000);
+
+  it('noninteractive explicit OpenCode prints a next step and never installs or asks', async () => {
+    const root = tempDir('sdlc-opencode-noninteractive-');
+    const inst = installer(root);
+    const output: string[] = [];
+    quiet();
+    vi.spyOn(process.stdout, 'write').mockImplementation((chunk) => (output.push(String(chunk)), true));
+    vi.spyOn(process.stderr, 'write').mockImplementation((chunk) => (output.push(String(chunk)), true));
+    const s = scripted();
+    await initCommand(root, { tools: 'opencode', hooks: true, layout: 'none' }, {
+      prompter: s.prompter, io: { stdinTTY: false, stdoutTTY: false },
+      probe: probe({}).fn, installer: inst.fn,
+    });
+    expect(s.asked).toEqual([]);
+    expect(inst.calls).toEqual([]);
+    expect(output.join('')).toContain('npm install -g opencode-ai@1');
+  }, 120000);
 
   it('yes to everything: the installs and the index run after the settings are written', async () => {
     const root = repo();

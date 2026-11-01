@@ -1,7 +1,7 @@
 import { spawnSync } from 'node:child_process';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it } from 'vitest';
 import { parse } from 'yaml';
 import { defaultConfig } from '../src/core/config.js';
 import { evaluateToolCall, normalizeToolCall } from '../src/core/policy.js';
@@ -14,7 +14,7 @@ import { git, humanEnv, initGitRepo, read, REPO_ROOT, runCli, tempDir, write } f
 const INTENT = '# Intent: x\n\nAuthor: Pat. Status: draft. Source: idea\n\n## Problem\nP.\n\n## Proposed outcome\nO.\n\n## Affected users and systems\nAll.\n\n## Constraints\nNone\n\n## Success measures\nM.\n\n## Out of scope\nNone\n\n## Open questions\nNone\n';
 
 /** A project as the package wrote it before the rename: `scdl:` keys and the old provenance line. */
-function legacyProject() {
+function legacyScaffold() {
   const root = tempDir('sdlc-legacy-');
   const env = humanEnv(tempDir('sdlc-home-'));
   initGitRepo(root);
@@ -24,16 +24,33 @@ function legacyProject() {
   expect(cli(['new', 'old-change', '--json']).code).toBe(0);
   const dir = path.join(root, 'openspec/changes/old-change');
   write(path.join(dir, 'intent.md'), INTENT);
+  return { root, dir, cli };
+}
+
+function stampLegacyApproval(project: ReturnType<typeof legacyScaffold>): void {
+  const { root, dir, cli } = project;
   expect(cli(['approve', 'intent', '--change', 'old-change', '--json']).code).toBe(0);
   const legacy = (file: string, from: RegExp, to: string) => write(file, read(file).replace(from, to));
   legacy(path.join(dir, '.sdlc.yaml'), /\bsdlc:/g, 'scdl:');
   legacy(path.join(dir, 'intent.md'), /sdlc-provenance: sdlc /g, 'sdlc-provenance: scdl ');
   legacy(path.join(dir, 'intent.md'), /marin-ai-tech\/sdlc/g, 'marin-ai-tech/scdl');
   legacy(path.join(root, 'openspec/.sdlc/log.jsonl'), /"sdlc":/g, '"scdl":');
-  return { root, dir, cli };
 }
 
 describe('projects written before the rename from scdl', () => {
+  it('registered binary matching preserves case and suffix boundaries from source and compiled core', async () => {
+    const source = await import('../src/core/shell-cli.js');
+    const compiled = await import('../dist/core/shell-cli.js');
+    for (const parse of [source.shellCliInvocations, compiled.shellCliInvocations]) {
+      for (const program of ['sdlc', 'scdl', 'SCDL.CMD', './bin/ScDl.ExE', 'sdlc.ps1', 'node ./bin/SCDL.JS']) {
+        expect(parse(`${program} approve plan --change x`), program).toHaveLength(1);
+      }
+      for (const program of ['xscdl', 'scdl-extra', 'scdl.cmd.exe', 'sdlc.mjs', 'printf scdl']) {
+        expect(parse(`${program} approve plan --change x`), program).toEqual([]);
+      }
+    }
+  });
+
   it('the legacy Windows command alias cannot bypass a plugin person-only command', async () => {
     const p = await pluginProject({ output: 1 });
     expect(callsPluginHumanCommand('SCDL.CMD --locale en economy configure', p.root, p.config)).toBe(true);
@@ -42,38 +59,52 @@ describe('projects written before the rename from scdl', () => {
     expect(store.data).toEqual({});
   });
 
-  it('the fixture really is in the old format', () => {
-    const { root, dir } = legacyProject();
-    expect(read(path.join(dir, '.sdlc.yaml'))).toMatch(/\bscdl:/);
-    expect(read(path.join(dir, '.sdlc.yaml'))).not.toMatch(/\bsdlc:/);
-    expect(read(path.join(dir, 'intent.md'))).toMatch(/sdlc-provenance: scdl /);
-    expect(read(path.join(root, 'openspec/.sdlc/log.jsonl'))).toMatch(/"scdl":/);
-  });
+  describe('persisted legacy decisions', () => {
+    let prepared: ReturnType<typeof legacyScaffold>;
+    beforeEach(function createLegacyChange({ task }) {
+      const started = performance.now();
+      prepared = legacyScaffold();
+      task.meta.legacyScaffoldMs = performance.now() - started;
+    });
+    beforeEach(function recordLegacyApproval({ task }) {
+      const started = performance.now();
+      stampLegacyApproval(prepared);
+      task.meta.legacyApprovalMs = performance.now() - started;
+    });
 
-  it('an approval stamped by scdl stays approved: the old provenance line is still left out of the digest', () => {
-    const { cli } = legacyProject();
-    type Status = { change: { gates: Array<{ id: string; status: string }> } };
-    const status = cli(['status', '--change', 'old-change', '--json']).json<Status>();
-    expect(status.change.gates.find((g) => g.id === 'intent')?.status).toBe('approved');
-  });
+    it('the fixture really is in the old format', () => {
+      const { root, dir } = prepared;
+      expect(read(path.join(dir, '.sdlc.yaml'))).toMatch(/\bscdl:/);
+      expect(read(path.join(dir, '.sdlc.yaml'))).not.toMatch(/\bsdlc:/);
+      expect(read(path.join(dir, 'intent.md'))).toMatch(/sdlc-provenance: scdl /);
+      expect(read(path.join(root, 'openspec/.sdlc/log.jsonl'))).toMatch(/"scdl":/);
+    });
 
-  it('the log and the audit still show the version recorded under the old key', () => {
-    const { cli } = legacyProject();
-    const log = cli(['log', '--json']).json<{ entries: Array<{ sdlc?: string; event: string }> }>();
-    expect(log.entries.length).toBeGreaterThan(0);
-    expect(log.entries.every((e) => typeof e.sdlc === 'string')).toBe(true);
-    expect(cli(['log']).stdout).toMatch(/\[sdlc \d+\.\d+\.\d+/);
-  });
+    it('an approval stamped by scdl stays approved: the old provenance line is still left out of the digest', () => {
+      const { cli } = prepared;
+      type Status = { change: { gates: Array<{ id: string; status: string }> } };
+      const status = cli(['status', '--change', 'old-change', '--json']).json<Status>();
+      expect(status.change.gates.find((g) => g.id === 'intent')?.status).toBe('approved');
+    });
 
-  it('new writes use the new key and replace the old provenance line', () => {
-    const { dir, cli } = legacyProject();
-    expect(cli(['reject', 'intent', '--change', 'old-change', '--note', 'again', '--json']).code).toBe(0);
-    const state = parse(read(path.join(dir, '.sdlc.yaml')));
-    expect(state.harness.sdlc).toMatch(/^\d+\.\d+\.\d+/);
-    expect(read(path.join(dir, '.sdlc.yaml'))).not.toMatch(/^\s*harness:\s*\n\s*scdl:/m);
-    const rejection = state.gates.intent.rejection;
-    expect(rejection.sdlc).toMatch(/^\d+\.\d+\.\d+/);
-    expect(rejection.scdl).toBeUndefined();
+    it('the log and the audit still show the version recorded under the old key', () => {
+      const { cli } = prepared;
+      const log = cli(['log', '--json']).json<{ entries: Array<{ sdlc?: string; event: string }> }>();
+      expect(log.entries.length).toBeGreaterThan(0);
+      expect(log.entries.every((e) => typeof e.sdlc === 'string')).toBe(true);
+      expect(cli(['log']).stdout).toMatch(/\[sdlc \d+\.\d+\.\d+/);
+    });
+
+    it('new writes use the new key and replace the old provenance line', () => {
+      const { dir, cli } = prepared;
+      expect(cli(['reject', 'intent', '--change', 'old-change', '--note', 'again', '--json']).code).toBe(0);
+      const state = parse(read(path.join(dir, '.sdlc.yaml')));
+      expect(state.harness.sdlc).toMatch(/^\d+\.\d+\.\d+/);
+      expect(read(path.join(dir, '.sdlc.yaml'))).not.toMatch(/^\s*harness:\s*\n\s*scdl:/m);
+      const rejection = state.gates.intent.rejection;
+      expect(rejection.sdlc).toMatch(/^\d+\.\d+\.\d+/);
+      expect(rejection.scdl).toBeUndefined();
+    });
   });
 
   it('negative: the hook still denies `scdl approve` to agents (the old name is not a way around it)', () => {

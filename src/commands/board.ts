@@ -1,22 +1,18 @@
 import { loadProject } from '../cli/context.js';
 import { line, printJson, reportFailure } from '../cli/output.js';
-import {
-  boardTaskListing, claimTask, heartbeatClaim, releaseClaim, submitClaim,
-} from '../core/board.js';
 import type { BoardClaim } from '../core/board-store.js';
 import { reopenTask } from '../core/board-reopen.js';
 import { dispatchTask } from '../core/board-dispatch.js';
-import { openAuction, bidTask, awardTask, type BidOptions } from '../core/board-market.js';
+import { openAuction, awardTask, type BidOptions } from '../core/board-market.js';
 import { t } from '../core/i18n.js';
-import { git } from '../core/git.js';
 import type { ResultProblem } from '../core/task-result.js';
 import { extensionInput, runPrepared } from '../plugins/evaluation.js';
 import { cliActor } from '../plugins/broker.js';
+import { listBoard, claimBoard, heartbeatBoard, releaseBoard, submitBoard, bidBoard } from '../core/board-service.js';
 
 /**
- * `sdlc board *` (epic E16): list, dispatch, claim, heartbeat, release and submit tasks.
- * Anyone may run them, an agent too - they decide no gate
- * and write only the board's own state file, so they are not on the human-only list.
+ * Ordinary `sdlc board` commands (epic E16) are available to agents and decide no gate.
+ * The separate `board recover` command is person-only and requires the observed owner digest.
  */
 
 interface ListOptions {
@@ -83,8 +79,7 @@ export async function boardBidCommand(opts: BidOptions & { json?: boolean; extJs
   try {
     const ctx = loadProject();
     const input = { ...opts, ...(opts.extJson === undefined ? {} : { ext: extensionInput(opts.extJson) }) };
-    const bid = await runPrepared(ctx.root, ctx.config, { operation: 'bid', args: input,
-      actor: cliActor(ctx.root, opts.executor), board: true }, () => bidTask(ctx.root, ctx.paths, ctx.config, input));
+    const bid = await bidBoard(ctx, input, cliActor(ctx.root, opts.executor));
     if (opts.json) printJson({ bid });
     else line(t('board.bid.done', { executor: bid.executor, minutes: String(bid.minutes) }));
   } catch (error) {
@@ -135,10 +130,7 @@ function publicClaim(claim: BoardClaim): Record<string, unknown> {
 export async function boardListCommand(opts: ListOptions): Promise<void> {
   try {
     const ctx = loadProject();
-    const { tasks, errors } = await runPrepared(ctx.root, ctx.config, { operation: 'list', args: { change: opts.change },
-      actor: cliActor(ctx.root), board: true }, () => boardTaskListing(ctx.root, ctx.paths, ctx.config, opts.change));
-    const status = git(ctx.root, ['status', '--porcelain', '--', 'openspec/.sdlc/log.jsonl']);
-    const uncommittedLog = status.ok && status.stdout.length > 0;
+    const { tasks, errors, uncommittedLog } = await listBoard(ctx, opts.change, cliActor(ctx.root));
     if (opts.json) {
       printJson({ tasks, uncommittedLog, ...(errors.length > 0 ? { errors } : {}) });
       return;
@@ -177,8 +169,7 @@ export async function boardClaimCommand(opts: ClaimOptions): Promise<void> {
   try {
     const ctx = loadProject();
     const input = { ...opts, ...(opts.extJson === undefined ? {} : { ext: extensionInput(opts.extJson) }) };
-    const { claim, item } = await runPrepared(ctx.root, ctx.config, { operation: 'claim', args: input,
-      actor: cliActor(ctx.root, opts.executor), board: true }, () => claimTask(ctx.root, ctx.paths, ctx.config, input));
+    const { claim, item } = await claimBoard(ctx, input, cliActor(ctx.root, opts.executor));
     if (opts.json) {
       printJson({ claim: publicClaim(claim), item });
       return;
@@ -194,9 +185,8 @@ export async function boardClaimCommand(opts: ClaimOptions): Promise<void> {
 export async function boardHeartbeatCommand(opts: ClaimIdOptions): Promise<void> {
   try {
     const ctx = loadProject();
-    const claim = await runPrepared(ctx.root, ctx.config, { operation: 'heartbeat',
-      args: { claim: opts.claim, executor: opts.executor, request: opts.request }, actor: cliActor(ctx.root, opts.executor), board: true },
-    () => heartbeatClaim(ctx.root, ctx.config, opts.claim, opts.executor, opts.request));
+    const claim = await heartbeatBoard(ctx,
+      { claim: opts.claim, executor: opts.executor, request: opts.request }, cliActor(ctx.root, opts.executor));
     if (opts.json) {
       printJson({ claim: publicClaim(claim) });
       return;
@@ -210,9 +200,8 @@ export async function boardHeartbeatCommand(opts: ClaimIdOptions): Promise<void>
 export async function boardReleaseCommand(opts: ReleaseOptions): Promise<void> {
   try {
     const ctx = loadProject();
-    const claim = await runPrepared(ctx.root, ctx.config, { operation: 'release',
-      args: { claim: opts.claim, note: opts.note, executor: opts.executor, request: opts.request }, actor: cliActor(ctx.root, opts.executor), board: true },
-    () => releaseClaim(ctx.root, ctx.config, opts.claim, opts.note, opts.executor, opts.request));
+    const claim = await releaseBoard(ctx,
+      { claim: opts.claim, note: opts.note, executor: opts.executor, request: opts.request }, cliActor(ctx.root, opts.executor));
     if (opts.json) {
       printJson({ claim: publicClaim(claim) });
       return;
@@ -232,10 +221,9 @@ function problemDetail(problem: ResultProblem): string {
 export async function boardSubmitCommand(opts: SubmitOptions): Promise<void> {
   try {
     const ctx = loadProject();
-    const { claim, result } = await runPrepared(ctx.root, ctx.config, { operation: 'submit',
-      args: { claim: opts.claim, branch: opts.branch, base: opts.base, executor: opts.executor, request: opts.request },
-      actor: cliActor(ctx.root, opts.executor), board: true }, () => submitClaim(
-      ctx.root, ctx.paths, ctx.config, opts.claim, opts.branch, opts.base, opts.executor, opts.request));
+    const { claim, result } = await submitBoard(ctx,
+      { claim: opts.claim, branch: opts.branch, base: opts.base, executor: opts.executor, request: opts.request },
+      cliActor(ctx.root, opts.executor));
     if (!result.ok) process.exitCode = 1;
     if (opts.json) {
       printJson({ claim: publicClaim(claim), result });

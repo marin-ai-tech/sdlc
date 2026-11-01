@@ -5,6 +5,7 @@ import { unsafeSkillPath } from '../team/vetting.js';
 import { sha256 } from './manifest.js';
 import { TEAM_SKILL_ROOTS } from './skills.js';
 import type { GeneratedFile, RenderContext, ToolId } from './types.js';
+import { renderSoloSkills } from '../team/solo.js';
 
 /**
  * The installed team skills (B74) as generated files, so the manifest owns them like the rest: each file team.json
@@ -16,12 +17,13 @@ import type { GeneratedFile, RenderContext, ToolId } from './types.js';
  * person edited it).
  */
 export function renderTeamSkills(ctx: RenderContext): GeneratedFile[] {
-  if (ctx.root === undefined) return [];
+  const bundled = renderSoloSkills(ctx);
+  if (ctx.root === undefined) return bundled;
   const root = ctx.root;
   const roots = configuredRoots(ctx.tools);
   const team = readTeam(root);
-  return Object.values(team.skills).flatMap((entry) => configuredDirs(entry, roots)
-    .flatMap((dir) => copyFiles(root, dir, entry)));
+  return [...bundled, ...Object.values(team.skills).flatMap((entry) => configuredDirs(entry, roots)
+    .flatMap((dir) => copyFiles(root, dir, entry)))];
 }
 
 /** The skills folder of each configured tool (an OpenCode copy from before Claude Code was added stays too). */

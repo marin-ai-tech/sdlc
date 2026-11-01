@@ -1,7 +1,7 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { changeDirs, inboxFiles } from './policy-shell.js';
-import { STATE_FILES } from './state-files.js';
+import { STATE_FILES, writerCoordinationFiles } from './state-files.js';
 
 /**
  * Hard links to state files (B40). A hard link is the state file under another name: an edit through it writes the
@@ -29,7 +29,8 @@ function linkedId(abs: string): FileId | undefined {
 
 /** The state files of the project, root-relative: the fixed ones, each change's `.sdlc.yaml`, the inbox files. */
 function stateFiles(root: string): string[] {
-  return [...STATE_FILES, ...changeDirs(root).map((dir) => `${dir}/.sdlc.yaml`), ...inboxFiles(root)];
+  return [...STATE_FILES, ...changeDirs(root).map((dir) => `${dir}/.sdlc.yaml`), ...inboxFiles(root),
+    ...writerCoordinationFiles(root)];
 }
 
 function sameFile(id: FileId, abs: string): boolean {

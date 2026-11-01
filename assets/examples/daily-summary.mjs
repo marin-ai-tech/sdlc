@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Daily summary - an example shipped with sdlc (0.12.0, B25).
+ * Daily summary - an example shipped with sdlc since 0.12.0.
  *
  * Writes `daily-summary-<YYYY-MM-DD>.md` with what was done in the last day, what comes next, what is blocked and what
  * waits on people, from `sdlc report --format json --since <yesterday>`. It publishes nothing by itself: run it from a

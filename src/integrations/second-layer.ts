@@ -1,6 +1,7 @@
 import { HUMAN_COMMANDS } from '../core/human-commands.js';
 import { loadConfig, type SdlcConfig } from '../core/config.js';
 import { pluginHumanCommands } from '../plugins/catalog.js';
+import { pluginDiagnostic } from '../plugins/api.js';
 
 /**
  * What the second layer refuses (B84, 0.14.2): Codex's command rules and Qwen's `permissions.deny`.
@@ -9,8 +10,19 @@ import { pluginHumanCommands } from '../plugins/catalog.js';
 export const SECOND_LAYER_COMMANDS: readonly string[] = [...HUMAN_COMMANDS, 'adopt --apply', 'init --roles'];
 
 export function secondLayerCommands(root?: string, config?: SdlcConfig): string[] {
-  const dynamic = root ? pluginHumanCommands(root, config ?? loadConfig(`${root}/openspec/sdlc.yaml`)) : [];
-  return [...SECOND_LAYER_COMMANDS, ...dynamic];
+  const plan = secondLayerPlan(root, config);
+  for (const diagnostic of plan.diagnostics) process.stderr.write(`sdlc: ${diagnostic.code}: ${diagnostic.message}\n`);
+  return plan.commands;
+}
+
+export function secondLayerPlan(root?: string, config?: SdlcConfig) {
+  try {
+    const dynamic = root ? pluginHumanCommands(root, config ?? loadConfig(`${root}/openspec/sdlc.yaml`)) : [];
+    return { commands: [...SECOND_LAYER_COMMANDS, ...dynamic], diagnostics: [] as Array<{ code: string; message: string }> };
+  } catch (error) {
+    return { commands: [...SECOND_LAYER_COMMANDS], diagnostics: [{ code: pluginDiagnostic(error).code,
+      message: 'Dynamic plugin restrictions are unavailable; static human-command restrictions are retained.' }] };
+  }
 }
 
 /** The package's alias bin and npm's Windows shims, spelled only when the configured cli is exactly `sdlc`. */

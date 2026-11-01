@@ -1,5 +1,6 @@
-# CI: every push to master and every pull request runs the tests on Linux, with npm 10 (Node 20 and 22) and npm 11
-# (Node 24). The release workflow tests again on a tag; push master first and tag after this is green, so a
+# CI: every push to master and every pull request runs the full suite on Linux (Node 20, 22, 24) and native Windows
+# (Node 24).
+# The release workflow tests again on a tag; push master first and tag after this is green, so a
 # difference between Linux and Windows, or between npm versions, is found before a release.
 name: ci
 
@@ -13,11 +14,15 @@ permissions:
 
 jobs:
   test:
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
       matrix:
-        node: [20, 22, 24]
+        include:
+          - { os: ubuntu-latest, node: 20 }
+          - { os: ubuntu-latest, node: 22 }
+          - { os: ubuntu-latest, node: 24 }
+          - { os: windows-latest, node: 24 }
     steps:
       - uses: actions/checkout@v4
 

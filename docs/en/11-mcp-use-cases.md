@@ -53,7 +53,11 @@ Choose the capability that matches what your client or team needs.
   - Direction: sdlc → others
   - Command or setting: `sdlc mcp serve --http <host:port>` and `SDLC_MCP_TOKEN`
   - Who uses it: remote assistants, central servers
-- **Capability:** Claim, heartbeat, release and submit board tasks
+- **Capability:** Export approved work contracts, including accepted plugin extensions
+  - Direction: sdlc → others
+  - Command or setting: `task_export`; executor attribution requires the matching token
+  - Who uses it: orchestrators and registered executors
+- **Capability:** Claim, heartbeat, release, submit and bid for board tasks
   - Direction: sdlc → executors
   - Command or setting: board tools over HTTP with an executor token
   - Who uses it: agents of a registered executor
@@ -109,7 +113,68 @@ Choose the capability that matches what your client or team needs.
 - unlock tests;
 - set the license or uninstall.
 
-Over MCP, sdlc reads and reports. Executor tokens can claim, heartbeat, release and submit board tasks.
+Over MCP, sdlc reads and reports. Executor tokens can claim, heartbeat, release, submit and bid for board tasks.
+
+### Core tool inventory
+
+The 12 core read tools are listed for stdio and HTTP server-token clients:
+
+| Tool | Required arguments | Optional arguments |
+|---|---|---|
+| `task_export` | none | `change`, `task`, `executor`, `ext` |
+| `board_list` | none | `change` |
+| `status` | none | `change` |
+| `next` | none | `change` |
+| `instructions` | `artifact`, `change` | none |
+| `trace` | `change` | none |
+| `audit` | none | `change` |
+| `help` | none | `topic` |
+| `guide` | none | `topic` |
+| `explain` | none | `change` |
+| `health` | none | `since`, `days` |
+| `report` | none | `since`, `change` |
+
+An authenticated HTTP executor token also exposes the 5 core board write tools:
+
+| Tool | Required arguments | Optional arguments |
+|---|---|---|
+| `board_claim` | `change`, `task`, `agent` | `lease`, `request`, `ext` |
+| `board_heartbeat` | `claim` | `request` |
+| `board_release` | `claim` | `note`, `request` |
+| `board_submit` | `claim`, `branch` | `base`, `request` |
+| `board_bid` | `change`, `task`, `agent`, `minutes` | `cost`, `note`, `request`, `ext` |
+
+Core scalar arguments are strings. `lease`, `minutes` and `cost` also accept JSON numbers; `ext` is an object.
+Unknown fields, empty scalar values and option-like scalar values are refused. With several served projects,
+the schemas also expose `project`; omit it when the server serves only one project.
+That routing selector is checked separately as a served-project name.
+
+### Work contracts, extensions and attribution
+
+`task_export` returns the open work items of an approved change, subject to the normal plan, task and executor
+eligibility checks. Its optional `task` selects one task. `executor` is an attribution request, not an identity proof.
+
+- A tokenless caller means stdio or an HTTP server-token caller without an executor identity.
+- A tokenless call must omit `executor`. A supplied value returns `executor_token_required` before export and
+  creates no `task.exported` event.
+- An identity-free export remains unattributed and emits no `task.exported` event. A configured executor
+  registry can still require identity and return `executor_required`; use the matching executor token then.
+- With an executor token, omitting `executor` uses that executor. An explicit different value is refused with
+  `invalid_arguments`; the input cannot select another executor.
+
+`task_export` and `board_claim` accept `ext` against the accepted plugins' task-extension schemas.
+`board_bid` accepts `ext` against their bid-extension schemas. Namespace values preserve their JSON types:
+
+```json
+{
+  "change": "add-export",
+  "task": "1.2",
+  "ext": { "economy": { "budget": 2, "labels": ["reviewed"], "urgent": false } }
+}
+```
+
+The example requires an accepted plugin declaring that extension schema. Extension namespaces cannot replace
+the transport's `project`, `executor`, `origin` or `request`. Unknown namespaces and invalid schemas are refused.
 
 ## 11.2. Connecting a client
 
@@ -151,7 +216,9 @@ In Claude Desktop, edit `claude_desktop_config.json`:
 
 - With one project, the tools are exactly as in the project.
 - With several, every tool takes a `project` argument: the project's `project.name` from `openspec/sdlc.yaml`, else
-  its folder name. `status` without it answers for all projects.
+  its folder name. For stdio and server-token clients, `status` without it answers for all projects.
+- An executor token defaults to its own project and refuses an explicit different project. It grants no authority
+  for another served project, even when the executor names are the same.
 - A folder that is not an sdlc project, or two projects with the same name, stop the server at start.
 - Without `--project`, the server serves the folder it starts in.
 
@@ -171,8 +238,8 @@ console.log(structuredContent.changes.map((c) => `${c.change}: ${c.stage}`));
 await client.close();
 ```
 
-Every tool answers with exactly the JSON of the matching CLI command (`sdlc status --json` and so on). A script can
-therefore be written and tested against the CLI first.
+Core tools return the matching operation's JSON as text content and structured content. A script can use the CLI
+JSON to learn the result shape, while supplying the MCP tool's declared arguments and authenticated caller context.
 
 ### Remote clients over HTTP
 
@@ -476,8 +543,9 @@ then `board_claim` with `{ "change": "add-export", "task": "1.2", "agent": "lead
 includes a secret claim id and the work item. It calls `board_heartbeat` with `{ "claim": "<id>" }` while
 working, then `board_submit` with `{ "claim": "<id>", "branch": "<result-branch>" }`, or `board_release`
 with `{ "claim": "<id>", "note": "<reason>" }`. `lease` on claim and `base` on submit are optional.
-The tool inputs have no `executor` field. The token supplies that identity and scopes calls to its project.
-The server token and stdio can only use `board_list`. Dispatch, reopen and gate decisions stay outside MCP.
+The board write inputs have no `executor` field. The token supplies that identity and scopes calls to its project.
+The server token and stdio can use `board_list` and the other core read tools, including `task_export` under its
+attribution rules. Dispatch, reopen and gate decisions stay outside MCP.
 
 - **Who can call the sdlc server:** over stdio, whoever can start a process in the project folder can read it.
   Over HTTP, a client needs to reach the port and hold the token from `SDLC_MCP_TOKEN`; otherwise it gets 401.
@@ -486,7 +554,9 @@ The server token and stdio can only use `board_list`. Dispatch, reopen and gate 
 - **What it can read:** the same as the CLI's JSON: change names, stages, people from `roles.yaml`, file paths in
   traces, audit history. Treat a connected chat client as someone with read access to the repository.
 - **What it cannot do:** decide anything or run arbitrary commands. An executor token can write board state
-  through the four board write tools; the server token cannot. Tool arguments that look like options are refused.
+  through the five board tools above; the server token cannot. Core scalar arguments that look like options are refused.
+- **Where identity comes from:** the authenticated HTTP request supplies the project and executor. Process
+  environment flags and tool arguments cannot manufacture that identity or change an MCP call into a person's CLI call.
 - **What sdlc sends to other servers:** the arguments of your `verify.mcp` checks (`${HEAD}`, `${CHANGE}` and your
   literals) and the `${VAR}` values for that server. It also sends the `args` of `context.sources`, the owner and
   repository of `issues`, and the comment naming the archived change. Chat handles go only to a receiver that names
@@ -499,8 +569,9 @@ These limits matter when you connect remote clients or rely on notifications.
 - **One shared server token, plain HTTP.** `sdlc mcp serve --http` has no TLS. Between machines, keep it on a
   private network or behind a TLS proxy. To change the server token, restart the server with a new one. Executor
   tokens need no restart: a person reissues them with `sdlc task executors token <id>` or removes the executor.
-- **One CLI process per tool call.** That costs about half a second, which matters only for scripts that make many
-  calls.
+- **Two core dispatch paths.** Board and task-export calls use returned services with the authenticated caller.
+  Other core read tools run isolated CLI subprocesses and collect their JSON. Plugin tools also return values
+  directly. No Commander presenter writes into the MCP server's stdout; stdout carries only protocol messages.
 - **Overdue is noticed by the next command,** session start or `sdlc events flush`; there is no daemon. Run `sdlc
   events flush` on a schedule if you need it on time.
 - **Tools and resources only.** The server does not offer MCP prompts.
@@ -519,9 +590,11 @@ The [glossary](glossary.md) explains [MCP](glossary.md), [executor](glossary.md)
 
 ## Runtime plugin tools
 
-Accepted enabled plugins expose namespaced tools such as `economy__read` with `{input:{}}`. Read operations
-are available to ordinary clients; executor tools require an HTTP token bound to the selected project and
-registered executor. Mutations add a stable `request`; the executor comes from the token. Multiproject calls
-select `project`. Person-only tools are hidden and direct calls are refused, even on a person-started server.
+Accepted enabled plugins expose namespaced tools such as `economy__read` with `{input:{}}`. These dynamic tools
+are additional to the core inventory. Read operations are available to ordinary clients.
+Executor tools require an HTTP token bound to the selected project and
+registered executor. Mutations require a stable `request` in `p1.<unix-ms>.<32hex>` form; read tools reject it.
+The executor comes from the token. With several projects, calls select `project`.
+A person-only tool is hidden and a direct call is refused, even when a person starts the server.
 Revocation and catalog freshness are checked again at invocation; a stale listing does not preserve authority.
 Conflicting project catalogs cannot create ambiguous plugin tools. See [runtime plugins](33-plugins.md).

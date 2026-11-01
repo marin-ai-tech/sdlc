@@ -3,6 +3,8 @@ import { absolute, isDirCommand, moveTo, relToRoot, simpleCommands, type DirStat
 import { patchFiles } from './policy-patch-files.js';
 import { scanShell } from './policy-shell-scanner.js';
 import { isWebRequest, toolTargets, type ToolContext } from './policy-shell-tools.js';
+import { decodedShellWords } from './shell-words.js';
+import { programLocation } from './shell-program.js';
 
 /** Files a shell command writes, root-relative. Quoted text and here-document bodies are data. */
 const NULL_SINKS = /^(?:\/dev\/null|\$null|nul)$/i;
@@ -64,57 +66,9 @@ export function withoutHeredocs(command: string): string {
   return heredocs(command).text;
 }
 
-/** Tokenize arguments and redirections without exposing punctuation inside quoted strings. */
-function plainWordChar(ch: string, i: number, segment: string, out: Word[], flush: () => void): boolean {
-  if (/\s|[(),{}]/.test(ch)) {
-    flush();
-    return true;
-  }
-  if (ch === '>' || ch === '<') {
-    flush();
-    if (segment[i - 1] !== ch) {
-      out.push({ value: ch, operator: true });
-    }
-    return true;
-  }
-  return false;
-}
-
 function words(segment: string): Word[] {
-  const out: Word[] = [];
-  let value = '';
-  let here = false;
-  const flush = () => {
-    if (value) {
-      out.push({ value });
-    }
-    value = '';
-  };
-  scanShell(segment, (ch, i, quoted, edge) => {
-    if (!here && ch === '@' && edge && (segment[i + 1] === "'" || segment[i + 1] === '"')) {
-      flush();
-      here = true;
-    }
-    if (here) {
-      if (edge && (ch === "'" || ch === '"') && segment[i + 1] === '@') {
-        here = false;
-      }
-      return;
-    }
-    if (edge) {
-      return;
-    }
-    if (quoted) {
-      value += ch;
-      return;
-    }
-    if (plainWordChar(ch, i, segment, out, flush)) {
-      return;
-    }
-    value += ch;
-  });
-  flush();
-  return out;
+  const windows = /^\s*(?:\[|[A-Za-z]+-[A-Za-z]+|(?:cmd|robocopy|xcopy)\b)/i.test(segment);
+  return decodedShellWords(segment, windows);
 }
 
 function redirects(tokens: Word[]): { targets: string[]; args: string[]; inputs: string[] } {
@@ -202,6 +156,8 @@ function copyTargets(args: string[], rename: boolean): string[] {
 }
 
 function shellCopyTargets(args: string[]): string[] {
+  const inline = args.find((arg) => arg.startsWith('--target-directory='));
+  if (inline !== undefined) return [inline.slice('--target-directory='.length)];
   const at = args.findIndex((arg) => arg === '-t' || arg === '--target-directory');
   if (at >= 0) return args[at + 1] === undefined ? [] : [args[at + 1]];
   const operands = args.filter((arg) => !arg.startsWith('-'));
@@ -244,9 +200,18 @@ function commandTargets(verb: string, args: string[]): string[] {
     return args.filter((arg, i) => !arg.startsWith('-') && i !== size + 1);
   }
   if (/^dd$/i.test(verb)) return args.filter((arg) => arg.startsWith('of=')).map((arg) => arg.slice(3));
-  if (/^(?:sed|perl)$/i.test(verb)) return inPlaceTargets(args);
+  if (/^(?:sed|perl)$/i.test(verb)) return [...inPlaceTargets(args), ...scriptWriteTargets(verb, args)];
+  if (/^(?:awk|gawk)$/i.test(verb)) return scriptWriteTargets(verb, args);
   if (isWebRequest(verb)) return webTargets(args);
   return [];
+}
+
+/** sed's w command and awk output redirections write even when the program is otherwise a reader. */
+function scriptWriteTargets(verb: string, args: string[]): string[] {
+  const expression = args.filter((arg) => !arg.startsWith('-')).join('\n');
+  const pattern = /^sed$/i.test(verb) ? /(?:^|[;\n])\s*(?:\d+(?:,\d+)?)?w\s+([^;\n]+)/g
+    : />{1,2}\s*(['"])([^'"]+)\1/g;
+  return [...expression.matchAll(pattern)].map((match) => (match[2] ?? match[1]).trim());
 }
 
 /** `Invoke-WebRequest`/`iwr` `-OutFile <file>` (a unique prefix like `-OutF` counts). */
@@ -342,16 +307,15 @@ function segmentTargets(parsed: Parsed, verb: string, dir: string | undefined): 
   return [...commandTargets(verb, parsed.args), ...toolTargets(verb, parsed.args, ctx)];
 }
 
-/** Project files (root-relative, posix) a shell command writes. */
-export function shellWriteDestinations(command: string, root: string, cwd: string, depth = 0): string[] {
+/** Absolute destinations before project containment, shared by protected-state and ordinary write views. */
+export function shellWriteDestinationPaths(command: string, cwd: string, depth = 0): string[] {
   const source = heredocs(command);
-  const rels = new Set<string>();
+  const destinations = new Set<string>();
   const state: DirState = { dir: path.resolve(cwd), stack: [] };
-  const add = (word: string) => {
+  const add = (word: string, dir = state.dir) => {
     if (NULL_SINKS.test(word)) return;
-    const abs = absolute(state.dir, word.replace(/\\/g, '/'));
-    const rel = abs === undefined ? undefined : relToRoot(root, root, abs);
-    if (rel !== undefined && rel !== '') rels.add(rel);
+    const abs = absolute(dir, word.replace(/\\/g, '/'));
+    if (abs !== undefined && abs !== '') destinations.add(abs);
   };
   for (const segment of simpleCommands(source.text)) {
     const parsed = commandWords(segment);
@@ -359,15 +323,27 @@ export function shellWriteDestinations(command: string, root: string, cwd: strin
       moveTo(state, parsed.verb, parsed.args);
       continue;
     }
-    parsed.targets.forEach(add);
+    parsed.targets.forEach(word => add(word));
     if (parsed.verb !== undefined) {
-      segmentTargets(parsed, parsed.verb, state.dir).forEach(add);
-      const nested = innerCommand(parsed.verb, parsed.args);
-      if (nested !== undefined && depth < MAX_DEPTH && state.dir !== undefined) {
-        shellWriteDestinations(nested, root, state.dir, depth + 1).forEach((rel) => rels.add(rel));
+      const list = [parsed.verb, ...parsed.args];
+      const execution = programLocation(list, state.dir);
+      if (execution.at < 0) continue;
+      const verb = list[execution.at];
+      const args = parsed.args.slice(execution.at);
+      segmentTargets({ ...parsed, args }, verb, execution.dir).forEach(word => add(word, execution.dir));
+      const nested = innerCommand(verb, args);
+      if (nested !== undefined && depth < MAX_DEPTH && execution.dir !== undefined) {
+        const inner = /^cmd(?:\.exe)?$/i.test(verb) ? nested.replace(/\\/g, '/') : nested;
+        shellWriteDestinationPaths(inner, execution.dir, depth + 1).forEach((file) => destinations.add(file));
       }
     }
   }
-  source.patches.forEach(add);
-  return [...rels];
+  source.patches.forEach(word => add(word));
+  return [...destinations];
+}
+
+/** Project files (root-relative, posix) a shell command writes. */
+export function shellWriteDestinations(command: string, root: string, cwd: string, depth = 0): string[] {
+  return shellWriteDestinationPaths(command, cwd, depth)
+    .map(file => relToRoot(root, root, file)).filter((file): file is string => file !== undefined && file !== '');
 }

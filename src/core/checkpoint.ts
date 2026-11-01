@@ -39,6 +39,7 @@ export interface CheckpointTree extends Repo {
   ordinaryTree: string;
   read(projectRelativePath: string): string | undefined;
   readFiltered(projectRelativePath: string): string | undefined;
+  readConverted?(projectRelativePath: string): string | undefined;
 }
 
 /** A raw snapshot, not yet a checkpoint ref or a commit. The reader always reads that immutable tree. */
@@ -52,7 +53,8 @@ export function captureCheckpoint(root: string, include: string[] = []): Checkpo
   const read = checkpointReader(repo.top, snapshot.tree, canonicalRoot, root);
   return { ...repo, ...snapshot,
     read: (rel) => read(`${repo.prefix}${rel}`),
-    readFiltered: (rel) => read(`${repo.prefix}${rel}`, true) };
+    readFiltered: (rel) => read(`${repo.prefix}${rel}`, true),
+    readConverted: (rel) => read(`${repo.prefix}${rel}`, 'converted') };
 }
 
 /** Files to restore from a checkpoint: repository-relative paths, and which of them the checkpoint holds. */
@@ -187,6 +189,9 @@ export function dirtyFiles(scope: CheckpointScope): string[] {
 }
 
 function savedContent(scope: CheckpointScope, rel: string): Buffer | undefined {
+  const root = path.resolve(scope.top, scope.prefix);
+  const converted = checkpointReader(scope.top, scope.ref, root, root)(rel, 'converted');
+  if (converted !== undefined) return Buffer.from(converted, 'utf8');
   const blob = spawnSync('git', [...RAW, 'cat-file', '--filters', `${scope.ref}:${rel}`],
     { cwd: scope.top, maxBuffer: MAX_BUFFER });
   return blob.status === 0 ? blob.stdout : undefined;

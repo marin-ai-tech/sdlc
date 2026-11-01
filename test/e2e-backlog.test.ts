@@ -2,6 +2,7 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { beforeAll, describe, expect, it } from 'vitest';
 import { git, humanEnv, initGitRepo, read, REPO_ROOT, runCli, tempDir, write } from './helpers.js';
+import { immutableProjectTemplate } from './fixtures/project-template.js';
 
 /**
  * Backlog end to end, with the bundled OpenSpec CLI: a BMAD initiative becomes
@@ -27,14 +28,7 @@ const COVERAGE = [
   '- verification-gaps: none found — checked: the test asserts the exact total',
 ].join('\n');
 
-function copyTree(from: string, to: string): void {
-  for (const entry of fs.readdirSync(from, { withFileTypes: true })) {
-    const src = path.join(from, entry.name);
-    const dst = path.join(to, entry.name);
-    if (entry.isDirectory()) copyTree(src, dst);
-    else write(dst, fs.readFileSync(src, 'utf-8'));
-  }
-}
+const BMAD = immutableProjectTemplate(path.join(REPO_ROOT, 'test/fixtures/bmad/checkout'));
 
 describe('backlog e2e (0.4.0)', () => {
   let root: string;
@@ -50,7 +44,7 @@ describe('backlog e2e (0.4.0)', () => {
     env = humanEnv(tempDir('sdlc-home-'));
     initGitRepo(root);
     write(path.join(root, 'package.json'), JSON.stringify({ name: 'shop', type: 'module', scripts: { test: 'node --test' } }));
-    copyTree(path.join(REPO_ROOT, 'test/fixtures/bmad/checkout'), path.join(root, '_bmad-output/initiative-checkout'));
+    BMAD.copyTo(path.join(root, '_bmad-output/initiative-checkout'));
     git(root, ['add', '-A']);
     git(root, ['commit', '-qm', 'init']);
     expect(runCli(['init', '--tools', 'claude,opencode', '--json'], root, env).code).toBe(0);
@@ -76,25 +70,39 @@ describe('backlog e2e (0.4.0)', () => {
     expect(cli(['next', '--json']).json().change).toBe(changeId);
   });
 
-  it('3. the change goes through every gate for real', () => {
+  it('3a. intent gate', () => {
     expect(cli(['approve', 'intent', '--change', changeId]).code).toBe(0);
+  });
+
+  it('3b. spec gate', () => {
     for (const f of ['proposal.md', 'specs/pricing/spec.md', 'design.md']) write(path.join(changeDir(), f), ARTIFACTS[f]);
     expect(cli(['validate', '--change', changeId, '--json']).code).toBe(0);
     expect(cli(['approve', 'spec', '--change', changeId]).code).toBe(0);
+  });
+
+  it('3c. plan gate', () => {
     for (const f of ['plan.md', 'tasks.md']) write(path.join(changeDir(), f), ARTIFACTS[f]);
     expect(cli(['approve', 'plan', '--change', changeId]).code).toBe(0);
+  });
 
+  it('3d. verification gate', () => {
     write(path.join(root, 'test/price.test.js'), "import { test } from 'node:test';\nimport assert from 'node:assert/strict';\nimport { price } from '../src/price.js';\ntest('Same total', () => assert.equal(price([{ amount: 2 }, { amount: 3 }]), 5));\n");
     write(path.join(root, 'src/price.js'), 'export function price(lines) {\n  return lines.reduce((sum, line) => sum + line.amount, 0);\n}\n');
     write(path.join(changeDir(), 'tasks.md'), ARTIFACTS['tasks.md'].replace(/- \[ \]/g, '- [x]'));
     const v = cli(['verify', '--change', changeId, '--json']);
     expect(v.code, v.stdout + v.stderr).toBe(0);
+  });
+
+  it('3e. review evidence and checks', () => {
     const evidence = read(path.join(changeDir(), 'verification.md'));
     fs.writeFileSync(path.join(changeDir(), 'verification.md'), evidence.replace(/(## Behavioral verification[\s\S]*?\|---\|---\|---\|---\|\n)/, '$1| Same total | node --test | 5 | PASS |\n'));
     write(path.join(changeDir(), 'review.md'), `# Review: ${changeId}\n\n## Findings\n\nNone.\n\n${COVERAGE}\n`);
     git(root, ['add', '-A']);
     git(root, ['commit', '-qm', 'pricing function']);
     expect(cli(['review', 'check', '--change', changeId]).code).toBe(0);
+  });
+
+  it('3f. review approval gate', () => {
     const approve = cli(['approve', 'review', '--change', changeId]);
     expect(approve.code, approve.stdout + approve.stderr).toBe(0);
   });

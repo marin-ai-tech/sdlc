@@ -71,15 +71,11 @@ function printTopic(
   return true;
 }
 
-/** The project's configuration, if help runs inside a project whose sdlc.yaml loads; help never fails on it. */
+/** Absence uses defaults; an unreadable configured project remains an explicit error. */
 function projectConfig(): SdlcConfig | undefined {
   const root = findProjectRoot();
   if (!root) return undefined;
-  try {
-    return loadConfig(projectPaths(root).sdlcConfig);
-  } catch {
-    return undefined;
-  }
+  return loadConfig(projectPaths(root).sdlcConfig);
 }
 
 export function helpCommand(topic: string | undefined, opts: { json?: boolean }): void {

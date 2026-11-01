@@ -11,6 +11,10 @@ vi.mock('../src/core/process-tree.js', () => ({ stopProcessTree: vi.fn() }));
 vi.mock('../src/core/git.js', () => ({
   worktreeFingerprint: () => `git-tree:${'a'.repeat(40)}`, headCommit: () => 'abc', isDirty: () => false,
 }));
+// The cleanup unit boundary begins after startup; the real private startup protocol is tested natively.
+vi.mock('../src/core/check-startup.js', () => ({ startOwnedCheck: () => ({
+  child: spawn('prepared-test-wrapper', []), ready: Promise.resolve(), dispose: () => {},
+}) }));
 
 const platform = Object.getOwnPropertyDescriptor(process, 'platform')!;
 const note = 'Process tree cleanup sent no signal: the check\'s shell had already exited.';
@@ -65,6 +69,13 @@ function expectTimedOutAndFailed(run: Run): void {
   expect(run.status).toBe('failed');
 }
 
+/** Observed exit is retained; lingering pipes alone never create a timeout. */
+function expectObservedExit(run: Run, failed = false): void {
+  expect(run.checks[0].exit_code).toBe(0);
+  expect(run.checks[0]).not.toHaveProperty('timed_out');
+  expect(run.status).toBe(failed ? 'failed' : 'passed');
+}
+
 describe('B133: verification reports a cleanup that sent no signal', () => {
   beforeEach(() => {
     vi.useFakeTimers();
@@ -87,7 +98,7 @@ describe('B133: verification reports a cleanup that sent no signal', () => {
     vi.mocked(stopProcessTree).mockResolvedValue({ signalled: false } as never);
     const run = await timedOutCheck(fakeChild(), true);
     expect(occurrences(run.checks[0].output, note)).toBe(1);
-    expectTimedOutAndFailed(run);
+    expectObservedExit(run);
     expect(cleanupShell()?.exited?.()).toBe(true);
   });
 
@@ -100,7 +111,7 @@ describe('B133: verification reports a cleanup that sent no signal', () => {
     expect(occurrences(output, failureLine)).toBe(1);
     expect(occurrences(output, note)).toBe(1);
     expect(output.indexOf(note)).toBeGreaterThan(output.indexOf(failureLine));
-    expectTimedOutAndFailed(run);
+    expectObservedExit(run, true);
     expect(cleanupShell()?.exited?.()).toBe(true);
   });
 
@@ -120,7 +131,7 @@ describe('B133: verification reports a cleanup that sent no signal', () => {
     const run = await timedOutCheck(fakeChild(), true);
     expect(run.checks[0].output).not.toContain(note);
     expect(run.checks[0].output).not.toContain('sent no signal');
-    expectTimedOutAndFailed(run);
+    expectObservedExit(run);
     expect(cleanupShell()?.exited?.()).toBe(true);
   });
 });

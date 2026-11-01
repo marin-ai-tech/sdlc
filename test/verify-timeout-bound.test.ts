@@ -11,6 +11,10 @@ vi.mock('../src/core/process-tree.js', () => ({ stopProcessTree: vi.fn() }));
 vi.mock('../src/core/git.js', () => ({
   worktreeFingerprint: () => `git-tree:${'a'.repeat(40)}`, headCommit: () => 'abc', isDirty: () => false,
 }));
+// This suite starts at an already prepared check; actual Windows startup has separate native coverage.
+vi.mock('../src/core/check-startup.js', () => ({ startOwnedCheck: () => ({
+  child: spawn('prepared-test-wrapper', []), ready: Promise.resolve(), dispose: () => {},
+}) }));
 
 describe('B131: timeout completion does not depend on inherited pipes', () => {
   afterEach(() => vi.useRealTimers());
@@ -33,6 +37,7 @@ describe('B131: timeout completion does not depend on inherited pipes', () => {
     expect(result?.status).toBe('failed');
     expect(child.stdout.destroyed).toBe(true);
     expect(child.stderr.destroyed).toBe(true);
+    if (cleanup === 'stuck') expect(result?.checks[0].output).toContain('Limit: 6500 ms.');
     await pending;
   });
 });

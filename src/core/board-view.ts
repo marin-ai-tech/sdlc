@@ -8,8 +8,7 @@ import { taskView, type BoardTaskView } from './board.js';
 import { readExecutors } from './executors.js';
 import { evaluateChange } from './lifecycle.js';
 import { changeTasks, planOpen } from './task-contract.js';
-import { winner } from './board-market.js';
-import { activePlugins } from '../plugins/catalog.js';
+import { boardAt } from './board-projection.js';
 
 /**
  * The board as the report and the dashboard show it (B122, epic E16). It only reads: no lock, no write of
@@ -22,28 +21,6 @@ export type BoardTaskSnapshot = BoardTaskView;
 export interface BoardSnapshot {
   tasks: BoardTaskSnapshot[];
   byExecutor: Array<{ executor: string; claimed: number; submitted: number }>;
-}
-
-/** A copy of the board as of `now`: expired held claims and dispatches dropped, nothing written. */
-function boardAt(root: string, config: SdlcConfig, board: Board, now: number): Board {
-  let guarded = false;
-  try { guarded = activePlugins(root, config).some((plugin) => !!plugin.snapshot.manifest.hooks.award)
-    || !!config.pluginPolicies?.some((policy) => policy.hook === 'award'); }
-  catch { guarded = Object.values(config.plugins ?? {}).some((setting) => setting.enabled); }
-  const live = (expiresAt: string) => Date.parse(expiresAt) > now;
-  const elapsed = guarded ? [] : board.auctions.filter((auction) => !live(auction.closesAt) && auction.bids.length);
-  const awarded = elapsed.map((auction) => ({
-    item: auction.item, change: auction.change, task: auction.task,
-    executor: winner(root, auction.bids, config.board?.market.rule ?? 'fastest').executor,
-    dispatchedAt: new Date(now).toISOString(), expiresAt: new Date(now + 900_000).toISOString(),
-    leaseSeconds: 900,
-  }));
-  return {
-    ...board,
-    claims: board.claims.filter((claim) => claim.state !== 'held' || live(claim.expiresAt)),
-    dispatches: [...board.dispatches.filter((dispatch) => live(dispatch.expiresAt)), ...awarded],
-    auctions: guarded ? board.auctions : board.auctions.filter((auction) => live(auction.closesAt)),
-  };
 }
 
 function changeSnapshots(root: string, ref: ChangeRef, config: SdlcConfig, board: Board): BoardTaskSnapshot[] {
