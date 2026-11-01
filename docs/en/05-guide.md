@@ -479,6 +479,9 @@ The registry is `openspec/deferred-work.md`; each `### D<n> [open] Title` entry 
 
 ### Send a change back, take it over
 
+[Gate decisions and tracks](34-gate-decisions-and-tracks.md) compares approve, reject, waive and rework, and the
+full and lite tracks, with examples of when to use each.
+
 `sdlc rework <gate> --change <id> --reason <category> --note "<what has to change>"` sends work back
 to the intent, spec, plan, qa, or review stage. The gate counts as rejected until approved again.
 Approvals before the rework stop counting, including later gates' approvals.

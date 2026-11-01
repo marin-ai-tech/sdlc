@@ -18,6 +18,7 @@ These paths help you get oriented and make your first change.
 Pick the part of the process you need today.
 
 - [AI-ready project](07-ai-ready-project.md) — prepare project context for agents.
+- [Gate decisions and tracks](34-gate-decisions-and-tracks.md) — approve, reject, waive or rework, full or lite.
 - [Roles and signed approvals](08-roles-and-signing.md) — assign decisions and protect them.
 - [Calculator demo and dashboard](09-demo-and-automation.md) — keep the demo's view current.
 - [Integrations and MCP](10-integrations.md) — connect checks, context and events.
