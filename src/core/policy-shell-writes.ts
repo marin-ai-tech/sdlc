@@ -5,9 +5,9 @@ import { scanShell } from './policy-shell-scanner.js';
 import { isWebRequest, toolTargets, type ToolContext } from './policy-shell-tools.js';
 import { decodedShellWords } from './shell-words.js';
 import { programLocation } from './shell-program.js';
+import { NULL_SINKS, harmlessRedirect } from './shell-redirects.js';
 
 /** Files a shell command writes, root-relative. Quoted text and here-document bodies are data. */
-const NULL_SINKS = /^(?:\/dev\/null|\$null|nul)$/i;
 const CONTENT = /^(?:Set-Content|Add-Content|Clear-Content|Out-File|New-Item|sc|ac|clc|ni)$/i;
 const COPY = /^(?:Copy-Item|Move-Item|cpi|mi|copy|move)$/i;
 const RENAME = /^(?:Rename-Item|ren|rni)$/i;
@@ -79,7 +79,7 @@ function redirects(tokens: Word[]): { targets: string[]; args: string[]; inputs:
     const token = tokens[i];
     if (token.value === '>' && token.operator) {
       const next = tokens[i + 1]?.value;
-      if (next !== undefined && !/^&(?:\d+|-)$/.test(next)) {
+      if (next !== undefined && !harmlessRedirect(next)) {
         targets.push(next);
       }
       i += 1;

@@ -3,6 +3,7 @@ import type { RoleFile } from '../team/role-file.js';
 import { roleBody, subagentName } from '../team/render.js';
 import { AGENT_IDS, loadAgent, WORKFLOW_IDS } from './assets.js';
 import { renderBody } from './render.js';
+import { roleSkillInstructions } from './role-skills.js';
 import { cliSpellings, SECOND_LAYER_COMMANDS, secondLayerCommands } from './second-layer.js';
 import { skillFile, type SkillExtra, type SkillTarget } from './skills.js';
 import type { GeneratedFile, RenderContext, ToolAdapter } from './types.js';
@@ -54,7 +55,7 @@ function agentFile(agent: CodexAgent, body: string, notice: string): GeneratedFi
 
 function roleAgent(role: RoleFile, ctx: RenderContext, notice: string): GeneratedFile {
   const agent = { name: subagentName(role), description: role.description, readonly: role.readonly };
-  return agentFile(agent, roleBody(role, ctx), notice);
+  return agentFile(agent, roleSkillInstructions(role, roleBody(role, ctx)), notice);
 }
 
 /** The built-in subagents, then one per accepted role (B70); a role named like a built-in one takes its file. */

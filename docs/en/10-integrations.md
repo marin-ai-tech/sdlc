@@ -307,8 +307,10 @@ Each generated workflow belongs to a stage:
 | review, release | deploy |
 | archive, triage | maintain |
 
-A workflow ends with a short **Stage resources** section listing its stage's skills, subagents and MCP servers, and
-nothing from other stages. The MCP servers of a stage come from the registry's `stages`, so they are written down only
+A workflow ends with a short **Stage resources** section listing its configured stage skills, the installed skills
+of accepted roles that own the stage, its subagents and MCP servers. A role's installed skills also appear in its
+generated subagent, which loads them before starting. Resources of other stages are omitted. The MCP servers of a
+stage come from the registry's `stages`, so they are written down only
 once. The Claude Code skill also pre-allows the tools of those servers (`allowed-tools: Bash(sdlc *), mcp__build__*`).
 Projects without `stages` and without servers get exactly the files they had before.
 

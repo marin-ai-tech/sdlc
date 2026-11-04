@@ -28,7 +28,7 @@ export interface RenderContext {
   stamp: HarnessStamp;
   /** The project root, when rendering for a project (not for the plugin); the team's facts are read from it. */
   root?: string;
-  /** The accepted roles of the agent team (B70); empty or absent renders exactly as before. */
+  /** Accepted roles; their `skills` contain only team.json-installed skills (B240). */
   team?: RoleFile[];
 }
 

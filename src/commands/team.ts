@@ -5,7 +5,7 @@ import { SdlcError } from '../core/errors.js';
 import { formatIdentity, gitIdentity } from '../core/git.js';
 import { t } from '../core/i18n.js';
 import { DRAFTS_DIR } from '../team/record.js';
-import { checkTeamSkills, type SkillCheck } from '../team/skill-check.js';
+import { checkTeamSkills, type DraftCheck, type SkillCheck } from '../team/skill-check.js';
 import { acceptSkill, installRoleSkills, type SkillsOutcome } from '../team/skills.js';
 import type { PackReport } from '../team/packs.js';
 import { acceptPack, type PackAcceptResult } from '../team/pack-accept.js';
@@ -79,7 +79,9 @@ function printSkills(skills: SkillsOutcome): void {
   }
   for (const id of skills.unchanged) line(t('team.accept.skillUnchanged', { id }));
   for (const item of skills.needsAcceptance) {
-    line(t('team.accept.skillNeedsAcceptance', { id: item.id, scripts: item.scripts.join(', ') }));
+    line(t('team.accept.skillNeedsAcceptance', {
+      id: item.id, scripts: [...item.scripts, ...item.data].join(', '),
+    }));
   }
   for (const item of skills.refused) line(t('team.accept.skillRefused', { id: item.id, reason: item.reason }));
   for (const item of skills.unavailable) line(t('team.accept.skillUnavailable', { id: item.id, reason: item.reason }));
@@ -200,13 +202,35 @@ function skillState(skill: SkillCheck): string {
   return skill.needsAcceptance ? t('team.check.needsAcceptance', { id: skill.id }) : t('team.check.notInstalled');
 }
 
-function printCheck(skills: SkillCheck[], warnings: string[]): void {
+/** At most five URLs of a skill, with the total when there are more; `team check --json` keeps them all. */
+function urlLine(skill: SkillCheck): string {
+  const list = skill.urls.slice(0, 5).join(', ');
+  if (skill.urlCount <= 5) return t('team.check.urls', { list });
+  return t('team.check.urlsTotal', { list, total: skill.urlCount });
+}
+
+function printCheck(skills: SkillCheck[], drafts: DraftCheck[], warnings: string[]): void {
   if (skills.length === 0) line(t('team.check.empty'));
   for (const skill of skills) {
     line(`${skill.id} ${skill.version ?? '?'} (${skill.source}): ${skillState(skill)}`);
     if (skill.scripts.length > 0) line(`  ${t('team.check.scripts', { list: skill.scripts.join(', ') })}`);
+    if (skill.data.length > 0) line(`  ${t('team.check.data', { list: skill.data.join(', ') })}`);
     if (skill.allowedTools.length > 0) line(`  allowed-tools: ${skill.allowedTools.join(' ')}`);
-    if (skill.urls.length > 0) line(`  ${t('team.check.urls', { list: skill.urls.join(', ') })}`);
+    if (skill.urls.length > 0) line(`  ${urlLine(skill)}`);
+  }
+  for (const draft of drafts) {
+    for (const skill of draft.skills) {
+      if (skill.status === 'waits-for-person') {
+        const scripts = [...skill.scripts, ...skill.data].join(', ');
+        line(`  ${t('team.check.draftWaits', { role: draft.role, id: skill.id, scripts })}`);
+      }
+      if (skill.status === 'unavailable') {
+        line(`  ${t('team.check.draftUnavailable', { role: draft.role, id: skill.id, reason: skill.reason })}`);
+      }
+      if (skill.status === 'refused') {
+        line(`  ${t('team.check.draftRefused', { role: draft.role, id: skill.id, reason: skill.reason })}`);
+      }
+    }
   }
   for (const warning of warnings) line(`${t('label.warning')}: ${warning}`);
 }
@@ -217,7 +241,7 @@ export async function teamCheckCommand(opts: Options): Promise<void> {
     const ctx = loadProject();
     const result = await checkTeamSkills(ctx.root, ctx.config);
     if (opts.json) return printJson(result);
-    printCheck(result.skills, result.warnings);
+    printCheck(result.skills, result.drafts, result.warnings);
     if (result.error) line(t('team.check.registryError', { error: result.error }));
   } catch (error) {
     reportFailure(error, opts.json);

@@ -48,6 +48,10 @@ Hard rule. `.sdlc.yaml`, `openspec/roles.yaml`, the shared log, the local hook d
 Only a person edits the executor registry `openspec/executors.yaml`.
 **Do:** use `sdlc approve` (a person), `sdlc backlog add|edit` or `sdlc verify` for their records.
 Have a person edit the registry; change board state through `sdlc board`.
+Reads with stderr redirected to `/dev/null`, `nul` or `$null`, or with a descriptor duplicated or closed, remain reads.
+An uncertain copy names its unresolved source or destination; use a literal path to make the target inspectable.
+An inline script string that could match state only as a glob names that string. Put the script in a file to avoid the
+inline string scan.
 
 ## guard-config
 
@@ -59,6 +63,8 @@ sdlc generates for the agents (`sdlc-*` subagents, workflow skills and commands)
 `review.policy`), the sdlc schema, `openspec/config.yaml` and the configured launcher (`package.json` `scripts.sdlc`
 or the shim the `cli:` setting runs).
 **Do:** ask a person to make the change; `sdlc update` restores generated files.
+Reading these files with stderr sent to `/dev/null`, `nul` or `$null`, or with a descriptor duplicated or closed,
+is allowed. A second redirect to a guarded file and other writes still receive this denial.
 
 ## shell-parse
 

@@ -8,7 +8,8 @@
  * the clone, which then installs the clone globally on top of the real install). The release branch therefore
  * carries the built dist/ and no `prepare`, so npm has nothing to build. master keeps building from source.
  *
- * Usage (CI, after `npm ci`, which builds dist/): node scripts/release-branch.mjs --in-place
+ * Usage (CI, after `npm ci`, which builds dist/): node scripts/release-branch.mjs --package-only
+ * For the release branch, use --in-place to update .gitignore as well.
  */
 import fs from 'node:fs';
 import path from 'node:path';
@@ -27,8 +28,10 @@ export function releaseGitignore(text) {
 }
 
 function main(argv) {
-  if (!argv.includes('--in-place')) {
-    process.stderr.write('usage: node scripts/release-branch.mjs --in-place  (rewrites package.json and .gitignore here)\n');
+  const inPlace = argv.length === 1 && argv[0] === '--in-place';
+  const packageOnly = argv.length === 1 && argv[0] === '--package-only';
+  if (!inPlace && !packageOnly) {
+    process.stderr.write('usage: node scripts/release-branch.mjs --package-only|--in-place\n');
     return 2;
   }
   const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -39,9 +42,12 @@ function main(argv) {
   const pkgFile = path.join(root, 'package.json');
   const pkg = JSON.parse(fs.readFileSync(pkgFile, 'utf-8'));
   fs.writeFileSync(pkgFile, `${JSON.stringify(releasePackageJson(pkg), null, 2)}\n`);
-  const ignoreFile = path.join(root, '.gitignore');
-  fs.writeFileSync(ignoreFile, releaseGitignore(fs.readFileSync(ignoreFile, 'utf-8')));
-  process.stdout.write(`release tree ready: ${pkg.name}@${pkg.version} with dist/, without prepare\n`);
+  if (inPlace) {
+    const ignoreFile = path.join(root, '.gitignore');
+    fs.writeFileSync(ignoreFile, releaseGitignore(fs.readFileSync(ignoreFile, 'utf-8')));
+  }
+  process.stdout.write(`release ${packageOnly ? 'package' : 'tree'} ready: ${pkg.name}@${pkg.version}`
+    + ' with dist/, without prepare\n');
   return 0;
 }
 

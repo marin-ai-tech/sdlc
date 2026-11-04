@@ -50,7 +50,8 @@ function parsePathNames(output: string): ChangedPaths {
 /** Committed, working and untracked names share exact NUL framing and refuse unavailable evidence. */
 export function readWorkingChangedPaths(root: string, base?: string): string[] {
   const options = ['--name-status', '-z', '--no-renames', '--no-relative', '--ignore-submodules=none'];
-  const files = base ? requiredListing(root, ['diff', ...options, `${base}...HEAD`], true) : [];
+  const range = base && git(root, ['cat-file', '-t', base]).stdout === 'tree' ? `${base}..HEAD` : `${base}...HEAD`;
+  const files = base ? requiredListing(root, ['diff', ...options, range], true) : [];
   files.push(...requiredListing(root, ['diff', ...options, 'HEAD'], true));
   files.push(...requiredListing(root, ['ls-files', '-z', '--full-name', '--others', '--exclude-standard'], false));
   return [...new Set(files)].sort();

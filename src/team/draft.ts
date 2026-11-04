@@ -15,7 +15,7 @@ export function registryDraft(role: RegistryRole, server: string): string {
   const front = {
     id: role.id,
     title: role.title,
-    description: role.title,
+    description: role.description ?? role.title,
     stages: role.stages,
     tools: role.tools,
     readonly: role.readonly,

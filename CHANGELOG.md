@@ -2,6 +2,73 @@
 
 All notable changes to sdlc. Versions follow [Semantic Versioning](https://semver.org/); while the major version is 0, a minor version may change behavior.
 
+## 0.30.1 — 2026-11-03
+
+Field findings from running sdlc with an external team registry: a role's skills now reach the role's work, harmless
+reads are no longer refused, and refused copies name what could not be resolved. Read Compatibility and Known limits
+before you update.
+
+### Added
+- An accepted role's installed skills reach its subagent: the `skills:` field for Claude Code, and for the other tools
+  a line in the instructions that tells the subagent to load them. Skills that wait for a person or were refused are
+  left out.
+- A stage's workflow lists the installed skills of the roles that own it, after the skills configured for that stage.
+- A registry role's description reaches its draft.
+- `sdlc team check` calls JSON and YAML files in a skill data, not scripts. They still wait for a person, and they are
+  not harmless: see Known limits. URL lists show a few and the total.
+- `sdlc team check` and the team workflow say which skills will wait for a person before any role is accepted.
+- `sdlc validate` flags a task that only the verify stage can do and points to the Proof section of `plan.md`; the
+  plan instructions keep such work in Proof.
+- A refused copy names the operand it could not resolve, as written, with its role. An inline script refused for a
+  string that looks like a glob names that string and suggests putting the script in a file.
+
+### Changed
+- A read with a null or descriptor redirect (`2>/dev/null`, `2>&1`, `2>$null`) is no longer refused as a change of the
+  guarded or state file it reads. The same redirect beside `>`, `>>` or `tee` to that file is still refused.
+- The check of copies of state-bearing change folders by cp, robocopy, xcopy and Copy-Item is stricter. It reads a
+  backslash path the same way on Linux and macOS, refuses a variable under a backslash path, and looks at every
+  uncertain copy in a command, not only the first.
+- A change built on the base branch is reviewed from its first commit, so on a project without branches
+  `review context` and `review suggest` see its files. This needs the change folder committed and a base branch named
+  main or master, or set by `origin/HEAD`. A given base always wins.
+- The untouched list of plan drift holds only paths from the plan's Files that change section, not sample strings.
+- The release tarball has no `prepare` script, so `npm install` of it prints no warning. A clone still builds on
+  install.
+
+### Compatibility
+- Run `sdlc update` to regenerate subagents and workflows. Generated files count in the code a change is verified on,
+  unless git ignores them. So for a change in progress the update makes verification stale, and signed review and
+  release approvals need a new decision. Intent, spec and plan approvals stay. Finish a change past verify before you
+  update, where you can.
+- No stored format changed. To go back, install 0.30.0 and run `sdlc update`; the same goes stale again.
+- `stages.<stage>.skills` keeps working and is listed first. A setting can be removed if it mirrors installed skills
+  of a role that owns the stage.
+
+### Known limits
+- The fixes for Windows separators in write paths and for path aliases, promised for 0.30.1 in the notes of 0.30.0,
+  are planned for 0.30.2. The limits listed under 0.30.0 stay, except that a recursive copy spelled with `\` after an
+  uncertain copy is now refused.
+- The hook reads a known set of writers; it does not stop every write to a state file or the project config. Among
+  those it misses: `>|`, `sort -o`, `yq -i`, `touch`, `curl -o`, `chmod`, `unlink`, a path after `$PWD/`, a write
+  through a shell variable, and a relative write after a `cd` it cannot resolve. All were so before this release. The
+  hook alone does not prove an approval: where one must hold, turn signing on and run
+  `sdlc approvals verify --mode required` in CI.
+- Copies are checked for cp, robocopy, xcopy and Copy-Item only. Other programs, such as rsync, tar and scp, and a
+  move through a variable are not checked.
+- On a change built on the base branch the separation check can find no code authors, so the author of the code may be
+  able to sign its review. Verify evidence and health keep the old base there.
+- A config nested in an installed skill's folder can change what the hook enforces for a command run from that folder,
+  and a registry role's tools field can add keys to its generated subagent. Read a skill's data files and a registry
+  role before you accept them.
+- Skills named for a stage are a hint to the main agent, which may skip them. Only the `skills:` field of a Claude
+  Code subagent preloads them; on the other tools the subagent is told to load them. A recorded skill whose folder was
+  deleted is still listed.
+- Some refusals name an operand imperfectly: `--target-directory=$X` and a variable destination of robocopy, xcopy or
+  Copy-Item appear as a source, and `"$A b"` is cut at the space. The decision is right in these cases.
+- A heredoc whose body holds an apostrophe is refused as a broken shell quote.
+- The review base for a reused change id starts at the earliest commit of that id, and other commits on the base
+  branch appear in the review context.
+
 ## 0.30.0 — 2026-11-01
 
 Field feedback and hardening: recovery after crashes, stricter enforcement of shell commands, clearer setup, and

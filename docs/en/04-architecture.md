@@ -243,6 +243,13 @@ One engine (`src/core/policy.ts`) and one dispatcher (`sdlc hook pre-tool | sess
 `enforcement.mode: off | warn | block`. In `warn`, the hard rules still apply. If the CLI is absent, hooks allow the
 action and `sdlc doctor` reports the problem.
 
+A read with a null or descriptor redirect remains allowed when the command has no other write. An unresolved copy
+source or destination is denied with the operand named; a found state copy takes priority. An inline string matching
+state only as a glob is denied with the string named and a suggestion to put the script in a file.
+
+Known limit: a write through a shell variable that holds a literal path is not followed, so a redirect, in-place
+edit, delete or move to such a variable is not refused. A copy through a variable is refused.
+
 A failed check follows each tool's hook behavior:
 
 - The OpenCode plugin and Claude Code hook retry once, then block with the reason. OpenCode on Windows can kill a

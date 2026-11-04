@@ -1,7 +1,7 @@
 import { loadProject } from '../cli/context.js';
 import { line, printJson, reportFailure } from '../cli/output.js';
 import { resolveChange } from '../core/changes.js';
-import { defaultBaseRef } from '../core/git.js';
+import { changeBase } from '../core/change-base.js';
 import { t } from '../core/i18n.js';
 import { computePlanDrift } from '../core/plan-drift.js';
 import { requireRoles, suggestReviewers, type ReviewSuggestion } from '../core/review-suggest.js';
@@ -28,7 +28,7 @@ export function reviewSuggest(opts: Options): void {
     const ctx = loadProject();
     const roles = requireRoles(ctx.root);
     const ref = resolveChange(ctx.paths, opts.change);
-    const base = opts.base ?? ctx.config.review.base ?? defaultBaseRef(ctx.root);
+    const base = changeBase(ctx, ref, opts.base ?? ctx.config.review.base);
     const ignore = Object.keys(readManifest(ctx.root).files);
     const files = computePlanDrift(ctx.root, ref.dir, base, ignore).changedFiles;
     const result = suggestReviewers(ctx, roles, ref, base, files);

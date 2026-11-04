@@ -22,7 +22,8 @@ Produce the implementation plan - Stage 3 (Build). Nothing is implemented withou
 4. **Interrogate the plan with the engineer.** Ask: what could this change break? Which step is riskiest? Which options were rejected and why? Iterate until an engineer who never saw this conversation could implement the change from plan.md alone.
 5. **Write `tasks.md`**: `sdlc instructions tasks --change <id> --json`. For a bug fix, name the reproducing
    test in the plan; the first build task writes and runs it after a person approves the plan. Write tasks to that
-   response's `resolvedOutputPath`.
+   response's `resolvedOutputPath`. Manual, browser and device checks and screenshots that only the verify stage can
+   do belong under Proof, not in tasks.md; record them in plan.md.
 6. **Stop at the gate.** Present the plan and give the engineer the approval command: `sdlc approve plan --change <id>` (`risk: high` also needs `--as tech-lead`). Implementation starts with {{cmd:build}} only after approval.
 
 **Guardrails**

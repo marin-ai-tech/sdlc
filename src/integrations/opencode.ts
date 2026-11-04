@@ -3,6 +3,7 @@ import type { RoleFile } from '../team/role-file.js';
 import { agentNames, roleBody, runsChecks, subagentName } from '../team/render.js';
 import { AGENT_IDS, loadAgent, loadWorkflow, readAsset, WORKFLOW_IDS } from './assets.js';
 import { appendNotice, renderBody, yamlString } from './render.js';
+import { roleSkillInstructions } from './role-skills.js';
 import { stageResources, stageSection } from './stage-resources.js';
 import type { GeneratedFile, RenderContext, ToolAdapter } from './types.js';
 
@@ -61,7 +62,8 @@ function agentFiles(ctx: RenderContext): GeneratedFile[] {
     files.push(agentFile(agent.name, agent.description, access, body, ctx));
   }
   for (const role of team) {
-    files.push(agentFile(subagentName(role), role.description, roleAccess(role), roleBody(role, ctx), ctx));
+    const body = roleSkillInstructions(role, roleBody(role, ctx));
+    files.push(agentFile(subagentName(role), role.description, roleAccess(role), body, ctx));
   }
   return files;
 }

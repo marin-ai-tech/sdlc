@@ -1,4 +1,4 @@
-# Release: on a version tag (v0.6.2), test, attach the npm pack archive to a GitHub release and update the
+# Release: on a version tag (v0.6.2), test, attach the packed archive to a GitHub release and update the
 # `release` branch with the built code.
 #
 #   npm install -g https://github.com/marin-ai-tech/sdlc/releases/latest/download/sdlc.tgz
@@ -36,6 +36,9 @@ jobs:
         run: |
           npm ci
           npm test
+
+      - name: Prepare package metadata for the release archive
+        run: node scripts/release-branch.mjs --package-only
 
       - name: Pack
         run: |

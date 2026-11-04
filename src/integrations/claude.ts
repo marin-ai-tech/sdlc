@@ -16,13 +16,15 @@ const CLAUDE_TOOL_NAMES: Record<string, string> = {
 };
 
 /** A subagent file `.claude/agents/<name>.md`: name, description and Claude tool names in the front matter. */
-function agentFile(agent: { name: string; description: string; tools: string[] }, body: string, notice: string) {
+function agentFile(agent: { name: string; description: string; tools: string[]; skills?: string[] },
+  body: string, notice: string) {
   const tools = agent.tools.map((t) => CLAUDE_TOOL_NAMES[t] ?? t).join(', ');
   const content = appendNotice([
     '---',
     `name: ${agent.name}`,
     `description: ${yamlString(agent.description)}`,
     `tools: ${tools}`,
+    ...(agent.skills?.length ? ['skills:', ...agent.skills.map((id) => `  - ${yamlString(id)}`)] : []),
     '---',
     '',
     body,
@@ -44,7 +46,7 @@ function agentFiles(ctx: RenderContext, notice: string): GeneratedFile[] {
     files.push(agentFile(agent, renderBody(agent.body, { surface: 'claude-agent', cli: ctx.cli }), notice));
   }
   for (const role of team) {
-    const agent = { name: subagentName(role), description: role.description, tools: role.tools };
+    const agent = { name: subagentName(role), description: role.description, tools: role.tools, skills: role.skills };
     files.push(agentFile(agent, roleBody(role, ctx), notice));
   }
   return files;

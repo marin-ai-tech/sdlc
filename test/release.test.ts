@@ -83,6 +83,55 @@ describe('the release branch (install from git: npm install -g github:marin-ai-t
   }, 960000);
 });
 
+describe('the release archive (B246)', () => {
+  it('B246.C1: --package-only drops prepare from package.json, keeps the rest and leaves .gitignore alone', () => {
+    const dir = snapshot();
+    const ignore = fs.readFileSync(path.join(dir, '.gitignore'), 'utf-8');
+    const run = spawnSync(process.execPath, ['scripts/release-branch.mjs', '--package-only'], { cwd: dir, encoding: 'utf-8' });
+    expect(run.status, run.stderr).toBe(0);
+    const out = JSON.parse(fs.readFileSync(path.join(dir, 'package.json'), 'utf-8'));
+    expect(out.scripts.prepare).toBeUndefined();
+    expect(out.scripts.compile).toBe(pkg().scripts.compile);
+    expect(out.version).toBe(pkg().version);
+    expect(fs.readFileSync(path.join(dir, '.gitignore'), 'utf-8')).toBe(ignore);
+  }, 120000);
+
+  it('B246.C1: the release branch step still works after the archive step', () => {
+    const dir = snapshot();
+    const run = (flag: string) => spawnSync(process.execPath, ['scripts/release-branch.mjs', flag],
+      { cwd: dir, encoding: 'utf-8', timeout: 60000 });
+    expect(run('--package-only').status).toBe(0);
+    expect(run('--in-place').status).toBe(0);
+    expect(JSON.parse(fs.readFileSync(path.join(dir, 'package.json'), 'utf-8')).scripts.prepare).toBeUndefined();
+    expect(fs.readFileSync(path.join(dir, '.gitignore'), 'utf-8')).not.toMatch(/^\/?dist\/$/m);
+  }, 120000);
+
+  it('B246.C3: the repository package.json keeps prepare, so a clone builds dist on npm install', () => {
+    expect(pkg().scripts.prepare).toMatch(/tsc/);
+  });
+
+  it.skipIf(process.env.SDLC_INSTALL_TEST !== '1')('B246.C1, C2: the packed archive installs with no install-script warning (network, slow)', () => {
+    const dir = snapshot();
+    expect(spawnSync(process.execPath, ['scripts/release-branch.mjs', '--package-only'], { cwd: dir }).status).toBe(0);
+    const packed = npm(['pack', '--silent', '--ignore-scripts'], dir);
+    const tgz = path.join(dir, packed.stdout.trim().split('\n').pop()!);
+    const listed = spawnSync('tar', ['-xOf', tgz.replace(/\\/g, '/'), 'package/package.json', '--force-local'], { encoding: 'utf-8' });
+    expect(JSON.parse(listed.stdout).scripts.prepare).toBeUndefined();
+    const project = tempDir('sdlc-tgz-project-');
+    fs.writeFileSync(path.join(project, 'package.json'), '{"name":"t","version":"1.0.0","private":true}\n');
+    const r = npm(['install', tgz, '--no-audit', '--no-fund'], project);
+    const output = `${r.stdout}\n${r.stderr}`;
+    expect(r.status, output.slice(-3000)).toBe(0);
+    expect(output).not.toMatch(/install.?scripts?|allow-scripts|prepare/i);
+    const installed = ['node_modules/@marin-ai/sdlc', 'node_modules/sdlc'].map((rel) => path.join(project, rel))
+      .find((dir) => fs.existsSync(path.join(dir, 'dist/cli/index.js')));
+    expect(installed).toBeDefined();
+    const version = spawnSync(process.execPath, [path.join(installed!, 'bin/sdlc.js'), '--version'],
+      { encoding: 'utf-8', timeout: 60000 });
+    expect(version.stdout.trim()).toBe(pkg().version);
+  }, 960000);
+});
+
 describe('the release workflow', () => {
   const wf = () => parse(fs.readFileSync(WORKFLOW, 'utf-8'));
   const script = () => Object.values(wf().jobs).flatMap((job) => (job as { steps: Array<{ run?: string }> }).steps)
@@ -92,6 +141,15 @@ describe('the release workflow', () => {
     expect(wf().on.push.tags).toEqual(['v*']);
     expect(wf().permissions.contents).toBe('write');
     for (const re of [/npm ci/, /npm test/, /npm pack/, /sdlc\.tgz/, /gh release create/]) expect(script()).toMatch(re);
+  });
+
+  it('B246.C1: the package.json is rewritten without prepare before the archive is packed', () => {
+    const text = fs.readFileSync(WORKFLOW, 'utf-8');
+    const rewrite = text.indexOf('release-branch.mjs --package-only');
+    expect(rewrite).toBeGreaterThan(-1);
+    expect(rewrite).toBeLessThan(text.indexOf('npm pack'));
+    // The tests ran on the source package, with its prepare, before the rewrite.
+    expect(text.indexOf('npm test')).toBeLessThan(rewrite);
   });
 
   it('it updates the release branch with the built code through the same script', () => {

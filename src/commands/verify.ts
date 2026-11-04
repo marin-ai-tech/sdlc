@@ -3,12 +3,13 @@ import { loadProject, recordChangeEvent, type ProjectContext } from '../cli/cont
 import { c, line, printJson, reportFailure } from '../cli/output.js';
 import { emitNextHint, resolveNext } from '../cli/next-hint.js';
 import { readChangeState } from '../core/change-state.js';
+import { changeBase } from '../core/change-base.js';
 import { resolveChange } from '../core/changes.js';
 import { readChangeDeltas } from '../core/deltas.js';
 import { readDeferred } from '../core/deferred.js';
 import { SdlcError } from '../core/errors.js';
 import { isFile, readText } from '../core/fs-utils.js';
-import { defaultBaseRef, formatIdentity, gitIdentity, headCommit } from '../core/git.js';
+import { defaultBaseRef, formatIdentity, git, gitIdentity, headCommit } from '../core/git.js';
 import { computePlanDrift } from '../core/plan-drift.js';
 import { checkCoverage, parseCoverage, parseFindings, summarizeFindings } from '../core/review.js';
 import { applyVerifyToState, runVerification, writeEvidence, type VerificationRun } from '../core/verify.js';
@@ -52,7 +53,7 @@ async function withMcp(
   return withMcpChecks(run, ctx.config, mcp);
 }
 
-/** B57, B58: planned files nobody touched (base as for the review context) and the `verification/` attachments. */
+/** B57, B58: planned files nobody touched since the verify base and the `verification/` attachments. */
 function evidenceExtras(ctx: ProjectContext, changeDir: string): EvidenceExtras {
   const base = ctx.config.review.base ?? defaultBaseRef(ctx.root);
   const ignore = Object.keys(readManifest(ctx.root).files);
@@ -267,7 +268,7 @@ export async function reviewCommand(action: string, opts: { change?: string; bas
       if (summary.blocking.length > 0 || deferred.missing.length > 0 || (coverage.enforced && (coverage.missing.length > 0 || coverage.unchecked.length > 0))) process.exitCode = 1;
       return;
     }
-    const base = opts.base ?? ctx.config.review.base ?? defaultBaseRef(ctx.root);
+    const base = changeBase(ctx, ref, opts.base ?? ctx.config.review.base);
     const drift = computePlanDrift(ctx.root, ref.dir, base, Object.keys(readManifest(ctx.root).files));
     const policyFile = path.join(ctx.root, ctx.config.review.policy);
     const policy = readText(policyFile) ?? readAsset('project', 'REVIEW.md');
@@ -293,7 +294,8 @@ export async function reviewCommand(action: string, opts: { change?: string; bas
         verification: rel('verification.md'),
         review: rel('review.md'),
       },
-      diffCommand: base ? `git diff ${base}...HEAD && git diff HEAD` : 'git diff HEAD',
+      diffCommand: base ? `git diff ${base}${git(ctx.root, ['cat-file', '-t', base]).stdout === 'tree'
+        ? '..' : '...'}HEAD && git diff HEAD` : 'git diff HEAD',
     };
     if (opts.json) return printJson(payload);
     const baseLabel = base ?? 'n/a';

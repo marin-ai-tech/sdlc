@@ -232,6 +232,8 @@ artifacts:
       - For a bug fix, task 1.1 writes the failing test that reproduces the bug
         and confirms it fails for the expected reason.
       - The verify gate runs the configured checks and needs no task in tasks.md.
+      - Manual, browser and device checks and screenshots that only the verify
+        stage can do belong under Proof in plan.md, not in tasks.md.
 
       Check design.md Open questions first: resolve with the user anything that
       would change what gets built.

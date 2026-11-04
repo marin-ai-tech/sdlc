@@ -1,6 +1,7 @@
 import type { SdlcConfig } from '../core/config.js';
 import type { StageConfigId } from '../core/stage-config.js';
 import type { RoleFile } from '../team/role-file.js';
+import { stageRoleSkills } from './role-skills.js';
 import { roleForWorkflow, type ExecutionRole } from '../team/solo.js';
 
 /**
@@ -69,7 +70,12 @@ export function stageResources(
   const servers = (config.mcp?.servers ?? [])
     .filter((s) => s.agents && s.stages.includes(stage))
     .map((s) => s.name);
-  const skills = [...(own?.skills ?? []), ...(executionRole ? [`sdlc-role-${executionRole}`] : [])];
+  const configuredSkills = own?.skills ?? [];
+  const fromRoles = stageRoleSkills(team, stage);
+  const soloSkill = executionRole ? [`sdlc-role-${executionRole}`] : [];
+  const skills = fromRoles.length > 0
+    ? [...new Set([...configuredSkills, ...fromRoles, ...soloSkill])]
+    : [...configuredSkills, ...soloSkill];
   const simplify = simplifies(config, workflow);
   const configured = [...(own?.agents ?? []), ...(simplify ? [SIMPLIFIER] : [])];
   const agents = stageAgents(configured, stage, team);

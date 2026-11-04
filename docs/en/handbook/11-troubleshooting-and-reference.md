@@ -337,7 +337,7 @@ Find the symptom first, then check its cause and suggested next step.
 | An approval stopped counting | the artifact or the code changed after it (stale), or a rework of an earlier gate | `sdlc approve <gate> --change <id> --preview`, then approve again |
 | Approving again is refused with `unchanged_after_rework` | nothing changed since the approval before the rework | change the artifact, or approve with `--note` saying why nothing had to change |
 | The agent is paused everywhere | a person took a change over that has no plan.md | the person runs `sdlc release-control --change <id> --note "…"` |
-| Plan drift says every planned file is untouched | you commit on the base branch itself (the default base is `origin/HEAD`, then `main`, then `master`) | work on a branch, or set `review.base` |
+| All planned files look untouched | no change commit or paths outside the diff | check history and `review.base` |
 | `--out must stay inside the project` | `sdlc report` or `sdlc dashboard` with an outside path | write inside the project (and ignore it), or redirect: `sdlc report > ../file.md` |
 | The audit export is refused | the folder exists and is not empty, or it is inside `openspec/` | choose a new folder outside the repository |
 | Events never arrive | the receiver's server is unreachable, or the tool rejects the `event` argument | `sdlc events list`; `sdlc mcp check`; `sdlc events flush` |
@@ -368,6 +368,8 @@ Find the symptom first, then check its cause and suggested next step.
 | Every agent call is denied with `config-load`, reads included | `openspec/sdlc.yaml` fails to load, for example a `cli` value or a role name that is now refused | a person runs `sdlc doctor`, fixes the named field and runs `sdlc update` if `cli` changed |
 | Hooks still allow everything after an upgrade, with a refused `cli` such as `true sdlc` | the hook commands in the agent settings were written from the old value, and `true sdlc ...` never reaches sdlc | a person sets an accepted `cli` (`sdlc`, or `npx`, `pnpm`, `yarn`, `bunx` or `node` first) and runs `sdlc update` |
 | `--change <name>` answers that the folder was skipped | the folder name under `openspec/changes/` is not a change id, so it only adds restrictions | a person renames the folder to a lowercase change id |
+
+On the default branch, review starts before the change's first commit. An explicit `review.base` takes priority.
 
 
 

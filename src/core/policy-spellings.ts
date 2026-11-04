@@ -1,6 +1,9 @@
 import { t } from './i18n.js';
+import * as path from 'node:path';
 import type { Decision } from './policy.js';
-import { stateCopyDecision } from './state-copy.js';
+import { stateCopyInspection, type CopyInspection } from './state-copy.js';
+import { insideStateFolder, relToRoot } from './policy-shell.js';
+import { namedPart } from './state-reasons.js';
 
 /**
  * The spellings of a command the path checks read: as written and, when it has a `\`, with `\` read as a separator
@@ -17,16 +20,29 @@ export function pathSpellings(command: string): string[] {
  * A copy of a state file found only in the `\`-as-separator spelling. Only a found state file counts there: that
  * spelling breaks POSIX escapes (`source\[1\]`, quotes inside `sh -c`), so its "cannot be inspected" is not evidence.
  */
-function copiedStateInSpelling(command: string, root: string, cwd: string): Decision | undefined {
+function copiedStateInSpelling(command: string, root: string, cwd: string): CopyInspection {
   const spelled = pathSpellings(command)[1];
-  if (spelled === undefined) return undefined;
-  const decision = stateCopyDecision(spelled, root, cwd);
-  return decision?.reason === t('hook.stateIntegrityBash') ? decision : undefined;
+  if (spelled === undefined) return { kind: 'none' };
+  const result = stateCopyInspection(spelled, root, cwd);
+  if (result.kind !== 'unknown') return result;
+  for (const prefix of result.prefixes) {
+    const rel = relToRoot(root, root, path.resolve(cwd, prefix));
+    if (rel && insideStateFolder(rel)) return { kind: 'found' };
+  }
+  return { kind: 'none' };
 }
 
 /** The state-copy decision for the command as written, else a found state copy in its `\`-separator spelling. */
 export function copyDecision(command: string, root: string, cwd: string): Decision | undefined {
-  return stateCopyDecision(command, root, cwd) ?? copiedStateInSpelling(command, root, cwd);
+  const direct = stateCopyInspection(command, root, cwd);
+  const alternate = copiedStateInSpelling(command, root, cwd);
+  const result = direct.kind === 'found' || alternate.kind === 'found' ? { kind: 'found' } as CopyInspection
+    : direct.kind === 'unknown' ? direct : alternate;
+  if (result.kind === 'none') return undefined;
+  const reason = result.kind === 'found' ? t('hook.stateIntegrityBash')
+    : result.role === 'directory' ? t('hook.copyUnresolvedDirectory', { part: namedPart(result.part) })
+      : t('hook.copyUnresolved', { role: result.role, part: namedPart(result.part) });
+  return { decision: 'deny', rule: 'state-integrity', reason };
 }
 
 /** The first decision a check returns over the spellings, in order. */

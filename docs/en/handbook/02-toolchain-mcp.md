@@ -273,6 +273,9 @@ those stages.
    - Other skills, subagents and MCP servers of the project are not for this stage.
    ```
 
+   When an accepted role owns the design stage, its installed skills are also listed under Skills for this stage,
+   after configured stage skills. Skills waiting for a person or refused are omitted.
+
    The Claude Code skill also pre-allows those tools (`allowed-tools: Bash(sdlc *), mcp__knowledge__*`).
 
 4. Understand what the rule does not cover:

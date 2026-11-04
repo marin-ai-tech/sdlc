@@ -514,7 +514,13 @@ The plan's files are every path listed under "Files that change" in plan.md.
 This includes paths in backticks, plain list items (`- src/greet.js (modified)`), and globs (`src/legacy/**`).
 Without plan.md, or when that list names no path, the takeover
 holds the whole project. The takeover, `rework --reset` and the warning about planned files the change did not touch
-read this list in the same way; plan drift (`sdlc review context`) reads the whole plan.
+read this list in the same way. In `sdlc review context`, plan drift reads the whole plan for `unplanned`, while
+`untouched` reads only "Files that change".
+
+When a change is committed directly on the default base branch, `sdlc review context` compares HEAD with the
+parent of the oldest commit of the change's `.openspec.yaml`, following renames. An explicit `--base` or configured
+`review.base` wins. This base can show more than the change: other commits on the branch since then, and an older
+change that used the same id.
 
 The plan gate holds code edits until a plan is approved. With one active change, its approved plan opens code edits.
 With several active changes, the agent may edit code, or write it through the shell, only in files that an approved plan
@@ -1284,11 +1290,13 @@ JSON output, the project log, and change records are always English, so agents a
 
 ```bash
 npm install            # uses --legacy-peer-deps via .npmrc
-npm run compile        # dist/ is build output (not in git); `npm install` and `npm install -g github:…` build it via the prepare script
+npm run compile        # dist/ is build output (not in git); npm install in a clone builds it via prepare
 npm test               # compiles, then runs unit + end-to-end tests (real OpenSpec CLI)
 node bin/sdlc.js --help
 node bin/sdlc.js plugin build plugin --marketplace   # regenerate the committed plugin
 ```
+
+The published release tarball includes `dist/` and omits `prepare`, so installing it does not run a build.
 
 ## 📚 Terms
 

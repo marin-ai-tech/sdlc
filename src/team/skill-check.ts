@@ -5,9 +5,10 @@ import { listFilesRecursive, normalizeNewlines, readText } from '../core/fs-util
 import { t } from '../core/i18n.js';
 import { sha256 } from '../integrations/manifest.js';
 import { acceptedRoles } from './accepted.js';
-import { readTeam, skillDirs, type SkillEntry } from './record.js';
+import { parseRoleFile } from './role-file.js';
+import { DRAFTS_DIR, draftPath, readTeam, roleIdsIn, skillDirs, type SkillEntry } from './record.js';
 import { fetchSkills, teamSkillTargets, type SkillFetch } from './skills.js';
-import { scriptsOf, unsafeSkillPath, type SkillFile } from './vetting.js';
+import { dataOf, needsPerson, scriptsOf, unsafeSkillPath, type SkillFile } from './vetting.js';
 
 /**
  * `sdlc team check` (B74): every skill the accepted roles list (and every installed one), with its version, source,
@@ -24,16 +25,30 @@ export interface SkillCheck {
   installed: boolean;
   needsAcceptance: boolean;
   scripts: string[];
+  data: string[];
   allowedTools: string[];
   urls: string[];
+  urlCount: number;
   warnings: string[];
   reason?: string;
 }
 
 export interface TeamCheck {
   skills: SkillCheck[];
+  drafts: DraftCheck[];
   warnings: string[];
   error?: string;
+}
+
+export type DraftSkill = { id: string; status: 'installable' }
+  | { id: string; status: 'installed' }
+  | { id: string; status: 'unavailable'; reason: string }
+  | { id: string; status: 'waits-for-person'; scripts: string[]; data: string[] }
+  | { id: string; status: 'refused'; reason: string };
+
+export interface DraftCheck {
+  role: string;
+  skills: DraftSkill[];
 }
 
 /** A grant without a limit: the tool alone, or with `*`, `**`, `:*` or `/**` as its only pattern. */
@@ -84,7 +99,9 @@ function described(id: string, files: readonly SkillFile[], state: State, proble
   const allowedTools = allowedToolsOf(files);
   const grants = allowedTools.filter(isUnrestricted).map((tool) => t('team.check.unrestricted', { id, tool }));
   const warnings = [...problems, ...grants];
-  return { id, ...state, scripts: scriptsOf(files), allowedTools, urls: urlsOf(files), warnings };
+  const urls = urlsOf(files);
+  return { id, ...state, scripts: scriptsOf(files), data: dataOf(files), allowedTools,
+    urls, urlCount: urls.length, warnings };
 }
 
 /** Files in the skill's folder `dir` that team.json does not list. */
@@ -136,30 +153,56 @@ function installedCheck(root: string, id: string, entry: SkillEntry, targets: st
 }
 
 function remoteCheck(id: string, fetched: SkillFetch): SkillCheck {
-  const vetted = fetched.skills[id];
+  const vetted = Object.hasOwn(fetched.skills, id) ? fetched.skills[id] : undefined;
   const source = fetched.origins[id]?.source ?? 'registry';
   const failed = { version: null, source, checksumOk: false, installed: false, needsAcceptance: false };
   if (!vetted) return { ...described(id, [], failed, []), reason: fetched.error ?? 'not fetched' };
   if (!('ok' in vetted)) return { ...described(id, [], failed, []), reason: vetted.reason };
   const skill = vetted.ok;
-  const needsAcceptance = scriptsOf(skill.files).length > 0;
+  const needsAcceptance = needsPerson(skill.files);
   const state = { version: skill.version, source, checksumOk: true, installed: false, needsAcceptance };
   return described(id, skill.files, state, []);
+}
+
+function draftSkill(id: string, fetched: SkillFetch, installed: boolean): DraftSkill {
+  if (installed) return { id, status: 'installed' };
+  if (!Object.hasOwn(fetched.skills, id)) {
+    return { id, status: 'unavailable', reason: fetched.error ?? 'not fetched' };
+  }
+  const vetted = fetched.skills[id];
+  if (!('ok' in vetted)) return { id, status: 'refused', reason: vetted.reason };
+  const scripts = scriptsOf(vetted.ok.files);
+  const data = dataOf(vetted.ok.files);
+  return needsPerson(vetted.ok.files) ? { id, status: 'waits-for-person', scripts, data }
+    : { id, status: 'installable' };
+}
+
+function draftRoles(root: string): Array<{ role: string; ids: string[] }> {
+  return roleIdsIn(root, DRAFTS_DIR).map((id) => {
+    const text = readText(path.join(root, draftPath(id))) ?? '';
+    return { role: id, ids: parseRoleFile(id, text).skills };
+  });
 }
 
 /** The check of every skill of the team; the registry (then the packs) is asked only for the skills not installed. */
 export async function checkTeamSkills(root: string, config: SdlcConfig): Promise<TeamCheck> {
   const team = readTeam(root);
   const listedIds = acceptedRoles(root).flatMap((role) => role.skills);
+  const roles = draftRoles(root);
   const ids = [...new Set([...listedIds, ...Object.keys(team.skills)])].sort();
-  const missing = ids.filter((id) => !team.skills[id]);
+  const draftIds = roles.flatMap((role) => role.ids);
+  const missing = [...new Set([...ids.filter((id) => !Object.hasOwn(team.skills, id)),
+    ...draftIds.filter((id) => !Object.hasOwn(team.skills, id))])];
   const none: SkillFetch = { skills: {}, origins: {} };
   const fetched = missing.length > 0 ? await fetchSkills(root, config, missing) : none;
   const check = (id: string) => {
-    const entry = team.skills[id];
+    const entry = Object.hasOwn(team.skills, id) ? team.skills[id] : undefined;
     return entry ? installedCheck(root, id, entry, teamSkillTargets(config, id)) : remoteCheck(id, fetched);
   };
   const skills = ids.map(check);
+  const drafts = roles.map(({ role, ids: roleIds }) => ({
+    role, skills: roleIds.map((id) => draftSkill(id, fetched, Object.hasOwn(team.skills, id))),
+  }));
   const warnings = skills.flatMap((skill) => skill.warnings);
-  return { skills, warnings, ...(fetched.error ? { error: fetched.error } : {}) };
+  return { skills, drafts, warnings, ...(fetched.error ? { error: fetched.error } : {}) };
 }

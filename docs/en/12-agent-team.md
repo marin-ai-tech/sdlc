@@ -168,7 +168,11 @@ The registry is an [MCP](glossary.md) server with four tools:
 - `sdlc team sync` takes roles from it first and fills the gaps from the built-ins. Each item is checked against its
   checksum, and a mismatch is refused.
 - A draft records the server, the version and the checksum.
+- A registry role's optional description (up to 500 characters) becomes the draft description. Without one, its title
+  is used.
 - A newer version of an accepted role arrives as a draft. It never replaces the accepted one silently.
+- After sync, `sdlc team check --json` reports each draft role's skills as installable, waiting for a person, or
+  refused. It does not install them.
 
 ## 12.5. Packs from git or npm
 
@@ -225,11 +229,16 @@ Check where they go and what a person must accept separately.
   `sdlc team check` checks every copy. `openspec/.sdlc/team.json` records all the folders of a skill (`dirs`); an
   older record with only `dir` is still read.
 
-- **A skill that carries more than Markdown** (scripts, binaries) waits for a person: `sdlc team accept --skill <id>`.
+- **Any file other than Markdown waits for a person:** `sdlc team accept --skill <id>`. JSON and YAML are reported as
+  data, not scripts, but still wait for acceptance. A file such as `data.json.sh` is reported as a script. Binary
+  refusal remains in force.
+- **Installed role skills reach the work.** The role's generated subagent names them, and workflows for stages the
+  role owns list them after configured stage skills. Skills waiting for acceptance, refused, or missing are omitted.
 - **`sdlc team check`** lists every skill with:
   - its source and version;
   - whether the checksum matches;
-  - its scripts;
+  - its scripts and data files;
+  - its URLs (at most five in text, with the total when there are more; all in JSON with `urlCount`);
   - its allowed tools, with a warning when they grant unrestricted shell or file writes.
 
 Take only what the team needs, from sources it trusts. A skill is instructions and code your agents will follow.
@@ -264,7 +273,7 @@ Use these commands to sync, inspect and accept team roles and skills.
 | `sdlc team sync [--json]` | anyone | drafts from the registry, packs and built-ins |
 | `sdlc team list [--json]` | anyone | roles, sources, status: draft, accepted, changed |
 | `sdlc team check [--json]` | anyone | the skills of the accepted roles, vetted |
-| `sdlc team accept <role>` / `--skill <id>` | a person | accept a role or a skill with scripts |
+| `sdlc team accept <role>` / `--skill <id>` | a person | accept a role, or a skill with any file other than Markdown |
 | `sdlc team accept --pack <name>` | a person | accept the lenses, workflows and checks of a pack |
 | `/sdlc:team` (`/sdlc-team`) | the agent | sync, learn the project, draft the project's rules |
 

@@ -8,6 +8,7 @@ import { t } from './i18n.js';
 import { evaluateChange } from './lifecycle.js';
 import { openspecFailure, runOpenSpecJson } from './openspec.js';
 import { readOpenSpecMetadata } from './openspec-schema.js';
+import { verifyOnlyTasks } from './verify-only-tasks.js';
 
 export interface ValidationIssue {
   source: 'openspec' | 'sdlc';
@@ -76,5 +77,6 @@ export function validateOne(ctx: ProjectContext, ref: ChangeRef): {
       line: issue.line, message: issue.message,
     })));
   }
+  issues.push(...verifyOnlyTasks(ref.dir));
   return { change: ref.id, valid: !issues.some((issue) => issue.level === 'error'), issues };
 }

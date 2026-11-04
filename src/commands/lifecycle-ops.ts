@@ -49,8 +49,9 @@ export async function validateCommand(opts: { change?: string; all?: boolean; js
         items: items.map((item) => ({
           change: item.change,
           valid: item.valid,
-          issues: item.issues.map(({ source, level, path: p, line: ln, message }) => ({
+          issues: item.issues.map(({ source, level, path: p, line: ln, message, textKey, textParams }) => ({
             source, level, ...(p ? { path: p } : {}), ...(ln ? { line: ln } : {}), message,
+            ...(textKey ? { textKey, textParams } : {}),
           })),
         })),
         overlaps,

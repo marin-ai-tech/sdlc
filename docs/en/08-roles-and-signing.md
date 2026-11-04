@@ -62,6 +62,8 @@ separation:
 - **separation** (the defaults are shown):
   - `author_cannot_approve`: gates the authors of the change's code may not approve. Authors are the commit authors and
     `Co-authored-by` trailers on the branch since the review base, counting only files outside `openspec/`.
+    Known limit: for a change built directly on the base branch, the author list is empty. This rule then does
+    not prevent a code author from approving review or release.
   - `distinct_approvers`: pairs of gates that need two different people.
   - `max_gates_per_person`: how many gates of one change one person may approve (0 = no limit).
 

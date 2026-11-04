@@ -26,6 +26,7 @@ import {
   linkedStateFiles,
   relToRoot,
   shellStateWrites,
+  shellStateInlineGlobPart,
   shellWriteTargets,
   STATE_FILE,
 } from './policy-shell.js';
@@ -38,6 +39,7 @@ import { shellWords } from './shell-words.js';
 import { shellCliProblem } from './shell-cli.js';
 import { launcherDecision } from './launcher-targets.js';
 import { copyDecision, firstDecision, pathSpellings } from './policy-spellings.js';
+import { namedPart, stateReason } from './state-reasons.js';
 
 /**
  * Deterministic guardrails behind the advisory skills - the playbook's
@@ -125,18 +127,6 @@ function matcher(globs: string[]): (p: string) => boolean {
   return (p) => m(p);
 }
 
-/** Give single-purpose state files their own reason; mixed writes use the general state reason. */
-function stateReason(paths: string[], edit: boolean): string {
-  const allMatch = (pattern: RegExp) => paths.length > 0 && paths.every((file) => pattern.test(file));
-  if (allMatch(/(?:^|\/)backlog\.md$/i)) return t('hook.backlogIntegrity');
-  if (allMatch(/(?:^|\/)roles\.yaml$/i)) return t('hook.rolesIntegrity');
-  if (allMatch(/(?:^|\/)executors\.yaml$/i)) return t('hook.executorsIntegrity');
-  if (allMatch(/(?:^|\/)team\.json$/i)) return t('hook.teamIntegrity');
-  if (allMatch(/(?:^|\/)board\.(?:json|lock)$/i)) return t('hook.boardIntegrity');
-  if (allMatch(/(?:^|\/)inbox(?:\/|$)/i)) return t('hook.inboxIntegrity');
-  return t(edit ? 'hook.stateIntegrityEdit' : 'hook.stateIntegrityBash');
-}
-
 export interface PolicyContext {
   paths: ProjectPaths;
   config: SdlcConfig;
@@ -191,7 +181,10 @@ function stateWriteDenial(spelled: string, ctx: PolicyContext, cwd: string): Dec
     ...hardLinkedStateFiles(shellWriteTargets(spelled, ctx.paths.root, cwd), ctx.paths.root, ctx.paths.root),
     ...hardLinkedFiles(shellWriteTargets(spelled, ctx.paths.root, cwd), ctx.paths.root, ctx.paths.root, pluginStateFiles)];
   if (hits.length === 0) return undefined;
-  return { decision: 'deny', rule: 'state-integrity', reason: stateReason(hits, false) };
+  const part = shellStateInlineGlobPart(spelled, ctx.paths.root, cwd);
+  const reason = part ? t('hook.stateInlineString', { part: namedPart(JSON.stringify(part)) })
+    : stateReason(hits, false);
+  return { decision: 'deny', rule: 'state-integrity', reason };
 }
 
 /**

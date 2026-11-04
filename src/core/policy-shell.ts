@@ -10,6 +10,7 @@ import { nodeTargets, pythonTargets, perlTargets } from './policy-shell-tools.js
 import { STATE_FILES, WRITER_COORDINATION_DIRS, writerCoordinationFiles } from './state-files.js';
 import { copyOperands } from './copy-operands.js';
 import { programLocation } from './shell-program.js';
+import { harmlessRedirectPath, withoutHarmlessRedirects } from './shell-redirects.js';
 
 /**
  * Which state files a tool call writes, beyond the path text `policy.ts` matches (rule `state-integrity`):
@@ -76,6 +77,15 @@ export const WRITE_OPS = anyOf([...REDIRECT_OPS, ...FILE_OPS]);
 const FOLDER_OPS = anyOf(FILE_OPS);
 /** Folders that hold state files: openspec/, the change folders (active and archived), openspec/.sdlc, the inbox. */
 const STATE_FOLDER = /^openspec(?:\/changes(?:\/archive)?(?:\/[^/]+)?|\/\.sdlc(?:\/inbox|\/plugins(?:\/.*)?)?)?$/i;
+
+/** A root-relative path equal to or inside a protected state folder, including a trailing separator. */
+export function insideStateFolder(relative: string): boolean {
+  const parts = relative.replace(/\/+$/, '').split('/');
+  for (let end = 1; end <= parts.length; end += 1) {
+    if (STATE_FOLDER.test(parts.slice(0, end).join('/'))) return true;
+  }
+  return false;
+}
 
 /** The state files at fixed places; a `.sdlc.yaml` may sit in any change directory. */
 const FIXED_STATE_FILES = [...STATE_FILES, '.sdlc.yaml'];
@@ -281,6 +291,8 @@ export interface WriteSegment {
   folders?: boolean;
   /** Explicit projected destinations do not depend on a second raw-text writer classification. */
   destinations?: string[];
+  redirects?: string[];
+  inlineTargets?: string[];
 }
 
 /** `git -C <dir> …`: the paths after it are relative to that directory; the option itself names no target. */
@@ -304,9 +316,11 @@ export function writeSegments(command: string, cwd: string): WriteSegment[] {
   return scopedWriteSegments(command, { dir: path.resolve(cwd), stack: [] }, 0, {});
 }
 
+/** A quoted `$null` is a real file name; it is judged like `nul`, because `absolute` rightly cannot resolve a `$`. */
 function redirectTargets(command: ShellCommand): string[] {
   return command.words.filter((_word, index) => command.words[index - 1]?.operator
-    && command.words[index - 1].value === '>').map((word) => word.value);
+    && command.words[index - 1].value === '>' && !harmlessRedirectPath(_word.value))
+    .map((word) => (word.value.toLowerCase() === '$null' ? 'nul' : word.value));
 }
 
 function scopedWriteSegments(input: string, state: DirState, depth: number, context: ShellContext): WriteSegment[] {
@@ -314,8 +328,11 @@ function scopedWriteSegments(input: string, state: DirState, depth: number, cont
   const parsed = shellWords(input, context.dialect === 'cmd' ? true : undefined, context);
   for (const part of parsed.commands) {
     const redirects = redirectTargets(part);
-    if (redirects.length) out.push({ text: part.raw, dir: state.dir, words: ['', ...redirects], folders: false,
-      destinations: redirects.flatMap(file => absolute(state.dir, file) ?? []) });
+    if (redirects.length) {
+      const destinations = redirects.flatMap((file) => absolute(state.dir, file) ?? []);
+      out.push({ text: part.raw, dir: state.dir, words: ['', ...redirects], folders: false,
+        destinations, redirects });
+    }
     const execution = programLocation(part.words.filter(word => !word.operator).map(word => word.value), state.dir);
     const body = shellBody(part, context);
     if (body) {
@@ -357,13 +374,13 @@ function projectedWrite(
     const targets = files
       .map(file => absolute(execution.dir, file)).filter((file): file is string => file !== undefined);
     return targets.length ? { text: command.raw, dir, words: [argv[at], ...targets],
-      destinations: targets, folders: true } : undefined;
+      destinations: targets, inlineTargets: files, folders: true } : undefined;
   }
   if (/^(?:grep|rg|sed|awk|gawk)$/i.test(name)) {
     const targets = shellWriteDestinationPaths(command.raw, dir ?? '');
     return targets.length ? { text: command.raw, dir, words: [list[0], ...targets] } : undefined;
   }
-  return WRITE_OPS.test(command.raw)
+  return WRITE_OPS.test(withoutHarmlessRedirects(command))
     ? { text: command.raw, ...gitDir(execution.dir, at > 0 ? argv.slice(at) : list) } : undefined;
 }
 
@@ -373,6 +390,23 @@ function projectedWrite(
  */
 export function shellStateWrites(command: string, root: string, cwd: string): string[] {
   return shellWrites(command, root, cwd, STATE_SET);
+}
+
+/** A possible inline target that reaches state only by glob expansion, with literal hits taking precedence. */
+export function shellStateInlineGlobPart(command: string, root: string, cwd: string): string | undefined {
+  let glob: string | undefined;
+  for (const segment of writeSegments(command, cwd)) {
+    if (!segment.inlineTargets && segment.words.some((word) =>
+      wordHit(root, segment.dir, word, segment.folders ?? FOLDER_OPS.test(segment.text), STATE_SET))) {
+      return undefined;
+    }
+    for (const target of segment.inlineTargets ?? []) {
+      if (wordHit(root, segment.dir, target, true, STATE_SET) === undefined) continue;
+      if (!GLOB_CHARS.test(target)) return undefined;
+      glob ??= target;
+    }
+  }
+  return glob;
 }
 
 /**

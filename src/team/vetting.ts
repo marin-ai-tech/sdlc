@@ -16,6 +16,7 @@ export interface RegistryRole {
   id: string;
   version: string;
   title: string;
+  description?: string;
   stages: string[];
   tools: string[];
   readonly: boolean;
@@ -71,9 +72,23 @@ export function isMarkdown(rel: string): boolean {
   return /\.md$/i.test(rel);
 }
 
-/** The files of a skill that are not Markdown (scripts, binaries): they wait for a person. */
+/** JSON and YAML files are data only when that is their final extension. */
+export function isData(rel: string): boolean {
+  return /\.(?:json|yaml|yml)$/i.test(rel);
+}
+
+export function dataOf(files: readonly SkillFile[]): string[] {
+  return files.map((file) => file.path).filter(isData).sort();
+}
+
+/** Other non-Markdown files keep the skill waiting for a person. */
 export function scriptsOf(files: readonly SkillFile[]): string[] {
-  return files.map((file) => file.path).filter((rel) => !isMarkdown(rel)).sort();
+  return files.map((file) => file.path).filter((rel) => !isMarkdown(rel) && !isData(rel)).sort();
+}
+
+/** Only Markdown skills can be installed without a person's acceptance. */
+export function needsPerson(files: readonly SkillFile[]): boolean {
+  return files.some((file) => !isMarkdown(file.path));
 }
 
 export function isSkillId(id: string): boolean {
@@ -106,6 +121,7 @@ function roleShape(raw: Record<string, unknown>, id: string): Vetted<RegistryRol
   const role = {
     id, version, body, checksum, skills, title: str(raw.title) ?? id, stages: strings(raw.stages) ?? [],
     tools: strings(raw.tools) ?? [], readonly: raw.readonly !== false,
+    ...(str(raw.description) ? { description: str(raw.description)!.slice(0, 500) } : {}),
   };
   return { ok: role };
 }

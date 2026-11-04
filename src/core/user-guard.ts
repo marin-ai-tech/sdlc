@@ -159,7 +159,8 @@ export function userShellGuardWrites(command: string, cwd: string, env: Env): st
   const guard = guardKeys(env);
   const hits: string[] = [];
   for (const segment of writeSegments(expandUserPaths(command, env), cwd)) {
-    hits.push(...textHits(guard, segment.text), ...wordHits(guard, segment));
+    for (const text of segment.redirects ?? [segment.text]) hits.push(...textHits(guard, text));
+    hits.push(...wordHits(guard, segment));
   }
   return hits;
 }

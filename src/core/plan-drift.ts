@@ -3,6 +3,7 @@ import picomatch from 'picomatch';
 import { isFile, readText } from './fs-utils.js';
 import { readWorkingChangedPaths } from './changed-paths.js';
 import { stripProvenance } from './license.js';
+import { filesThatChange } from './plan-files.js';
 
 /**
  * Plan drift: how the diff departs from the approved plan. The playbook's PR
@@ -55,11 +56,13 @@ export function changedFiles(root: string, base: string | undefined, exclude: st
  */
 export function computePlanDrift(root: string, changeDir: string, base: string | undefined, ignore: string[] = []): PlanDrift {
   const planFile = path.join(changeDir, 'plan.md');
-  const planned = isFile(planFile) ? plannedPaths(stripProvenance(readText(planFile) ?? '')) : [];
+  const plan = isFile(planFile) ? stripProvenance(readText(planFile) ?? '') : '';
+  const planned = plannedPaths(plan);
+  const plannedFiles = filesThatChange(plan);
   const ignored = new Set(ignore);
   const changed = changedFiles(root, base).filter((f) => !ignored.has(f));
   const unplanned = planned.length > 0 ? changed.filter((f) => !matchesPlan(f, planned)) : [];
-  const untouched = planned.filter(
+  const untouched = plannedFiles.filter(
     (p) => !p.endsWith('/') && !/[*?[]/.test(p) && p.includes('/') && !changed.includes(p)
   );
   return { ...(base ? { base } : {}), changedFiles: changed, plannedPaths: planned, unplanned, untouched };

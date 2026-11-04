@@ -22,6 +22,8 @@ import { renderPackWorkflows } from './pack-workflows.js';
 import { renderSkills } from './skills.js';
 import { renderTeamSkills } from './team-skills.js';
 import { acceptedRoles } from '../team/accepted.js';
+import { readTeam } from '../team/record.js';
+import { roleSkills } from './role-skills.js';
 import { TOOL_IDS, type GeneratedFile, type RenderContext, type ToolAdapter, type ToolId } from './types.js';
 
 export const ADAPTERS: Record<ToolId, ToolAdapter> = {
@@ -75,7 +77,9 @@ export function schemaFiles(stamp: HarnessStamp): GeneratedFile[] {
 export function renderContext(config: SdlcConfig, tools: ToolId[], root?: string): RenderContext {
   const stamp = harnessStamp(config);
   const base = { tools, delivery: config.delivery, cli: config.cli, version: stamp.version, config, stamp };
-  return root === undefined ? base : { ...base, root, team: acceptedRoles(root) };
+  if (root === undefined) return base;
+  const installed = new Set(Object.keys(readTeam(root).skills));
+  return { ...base, root, team: roleSkills(acceptedRoles(root), installed) };
 }
 
 export function renderAll(ctx: RenderContext): GeneratedFile[] {

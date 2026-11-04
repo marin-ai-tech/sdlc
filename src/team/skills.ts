@@ -14,7 +14,8 @@ import {
   failure, listed, RegistryItemError, registryServer, withRegistry, type RegistryCall,
 } from './registry-client.js';
 import type { Refused } from './sync.js';
-import { isSkillId, scriptsOf, unsafeSkillPath, vetSkill, type RegistrySkill, type Vetted } from './vetting.js';
+import { dataOf, isSkillId, needsPerson, scriptsOf, unsafeSkillPath, vetSkill,
+  type RegistrySkill, type Vetted } from './vetting.js';
 
 /**
  * Vetted skills (B74). The skills an accepted role lists are fetched from the team registry, checked (checksum,
@@ -42,7 +43,7 @@ export interface SkillFetch {
 export interface SkillsOutcome {
   installed: Array<{ id: string; version: string; dir: string; dirs: string[] }>;
   unchanged: string[];
-  needsAcceptance: Array<{ id: string; version: string; scripts: string[] }>;
+  needsAcceptance: Array<{ id: string; version: string; scripts: string[]; data: string[] }>;
   refused: Refused[];
   unavailable: Refused[];
 }
@@ -242,13 +243,16 @@ function installedItem(entry: SkillEntry, id: string): SkillsOutcome['installed'
 }
 
 function sortSkill(place: Place, id: string, fetched: SkillFetch, outcome: SkillsOutcome): void {
-  const vetted = fetched.skills[id];
+  const vetted = Object.hasOwn(fetched.skills, id) ? fetched.skills[id] : undefined;
   if (!vetted) return void outcome.unavailable.push({ id, reason: fetched.error ?? 'not fetched' });
   if (!('ok' in vetted)) return void outcome.refused.push({ id, reason: vetted.reason });
   const skill = vetted.ok;
   if (installedEverywhere(place, skill)) return void outcome.unchanged.push(id);
   const scripts = scriptsOf(skill.files);
-  if (scripts.length > 0) return void outcome.needsAcceptance.push({ id, version: skill.version, scripts });
+  if (needsPerson(skill.files)) {
+    outcome.needsAcceptance.push({ id, version: skill.version, scripts, data: dataOf(skill.files) });
+    return;
+  }
   const problem = installSkill(place, skill);
   if (problem) outcome.refused.push({ id, reason: problem });
   else outcome.installed.push(installedItem(place.team.skills[id], id));

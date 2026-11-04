@@ -279,9 +279,12 @@ export function guardEditHits(
 function textHits(command: string, cwd: string, patterns: GuardPatterns): string[] {
   const hits: string[] = [];
   for (const segment of writeSegments(command, cwd)) {
-    const spelled = segment.dir === undefined ? patterns.text.exec(segment.text) : null;
-    const match = patterns.varText.exec(segment.text) ?? spelled;
-    if (match) hits.push(match[1]);
+    const texts = segment.redirects ?? [segment.text];
+    for (const text of texts) {
+      const spelled = segment.dir === undefined ? patterns.text.exec(text) : null;
+      const match = patterns.varText.exec(text) ?? spelled;
+      if (match) hits.push(match[1]);
+    }
   }
   return hits;
 }

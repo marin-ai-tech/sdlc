@@ -3,6 +3,7 @@ import type { RoleFile } from '../team/role-file.js';
 import { agentNames, roleBody, subagentName } from '../team/render.js';
 import { AGENT_IDS, loadAgent, loadWorkflow, WORKFLOW_IDS, type WorkflowId } from './assets.js';
 import { appendNotice, renderBody, yamlString } from './render.js';
+import { roleSkillInstructions } from './role-skills.js';
 import { skillFile, type SkillExtra, type SkillTarget } from './skills.js';
 import { stageResources, stageSection } from './stage-resources.js';
 import type { GeneratedFile, RenderContext, ToolAdapter } from './types.js';
@@ -78,7 +79,7 @@ function agentFile(agent: CursorAgent, body: string, notice: string): GeneratedF
 
 function roleAgent(role: RoleFile, ctx: RenderContext, notice: string): GeneratedFile {
   const agent = { name: subagentName(role), description: role.description, readonly: role.readonly };
-  return agentFile(agent, roleBody(role, ctx), notice);
+  return agentFile(agent, roleSkillInstructions(role, roleBody(role, ctx)), notice);
 }
 
 /** The built-in subagents, then one per accepted role (B70); a role named like a built-in one takes its file. */

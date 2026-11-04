@@ -755,6 +755,9 @@ the place of two of them.
    - Other skills, subagents and MCP servers of the project are not for this stage.
    ```
 
+   Installed skills of the accepted tester role also appear under Skills for this stage. The generated tester
+   subagent names those skills; a skill waiting for a person or refused is omitted.
+
 5. See the protection. The generated `sdlc-*` files are part of the guard. An agent's edit of
    `.claude/agents/sdlc-verifier.md` is denied (rule `guard-config`); `sdlc update` restores a changed file.
 
