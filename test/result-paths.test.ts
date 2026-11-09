@@ -221,8 +221,9 @@ describe('B151: check-result compares every changed path under its real name', (
   it('a submodule-ignore setting does not hide a moved gitlink under the locked test paths', () => {
     // Review round 1, F5: with diff.ignoreSubmodules=all the listing of a moved gitlink was empty but readable.
     const p = project();
-    git(p.root, ['config', 'diff.ignoreSubmodules', 'all']);
+    // The fixture comes first: git 2.39 honours this setting in `git commit` and would find nothing to commit.
     p.movedGitlink('moved-gitlink', 'test/vendor');
+    git(p.root, ['config', 'diff.ignoreSubmodules', 'all']);
     const r = p.check('moved-gitlink');
     const result = r.json<Result>();
     expect(result.files).toEqual(['test/vendor']);

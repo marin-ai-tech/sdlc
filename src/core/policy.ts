@@ -6,40 +6,31 @@ import { folderKey, folderLabel } from './folder-name.js';
 import { harnessStamp, stampText } from './license.js';
 import { evaluateChange, sharedFingerprint, type LifecycleView } from './lifecycle.js';
 import type { ProjectPaths } from './project.js';
-import { humanCommandMatch, CLI_PREFIX, joinContinuations } from './human-command-match.js';
+import { joinContinuations } from './human-command-match.js';
 import { nextBacklogItem, readBacklog } from './backlog.js';
 import { t } from './i18n.js';
 import { toDiagnostic } from './errors.js';
-import { quotedCommand } from './human-command.js';
-import { pluginHumanDecision, removesSdlcCli } from './policy-cli.js';
-import { clearsAgentMarker } from './policy-markers.js';
-import { handBackLine, shellTakeoverDenial, takeoverDenial } from './takeover.js';
+import { pluginHumanDecision } from './policy-cli.js';
+import { handBackLine, takeoverDenial } from './takeover.js';
 import { hardLinkedStateFiles, hardLinkedFiles } from './policy-hardlink.js';
 import { pluginStateFiles } from '../plugins/activation.js';
-import { guardDenial, guardEditHits, shellGuardWrites } from './policy-guard.js';
-import { userGuardEditHits, userShellGuardWrites } from './user-guard.js';
+import { guardDenial, guardEditHits } from './policy-guard.js';
+import { userGuardEditHits } from './user-guard.js';
 import { editWrites, type EditWrite } from './edit-texts.js';
-import { secretEditDenial, shellSecretDenial } from './policy-secrets.js';
+import { secretEditDenial } from './policy-secrets.js';
 import { INVALID_FOLDER_STAGE, mcpStageDecision } from './policy-mcp.js';
 import { inboxSessionLines } from '../mcp/inbox.js';
 import {
   linkedStateFiles,
   relToRoot,
-  shellStateWrites,
-  shellStateInlineGlobPart,
-  shellWriteTargets,
   STATE_FILE,
 } from './policy-shell.js';
-import { shellWriteDestinations } from './policy-shell-writes.js';
 import { patchFiles } from './policy-patch-files.js';
 import { planGateDenial } from './plan-gate.js';
-import { openspecNewChange, openspecWrite } from './openspec-guard.js';
-import { clearedAgentMarkers } from './policy-markers.js';
-import { shellWords } from './shell-words.js';
-import { shellCliProblem } from './shell-cli.js';
+import { openspecWrite } from './openspec-guard.js';
 import { launcherDecision } from './launcher-targets.js';
-import { copyDecision, firstDecision, pathSpellings } from './policy-spellings.js';
-import { namedPart, stateReason } from './state-reasons.js';
+import { stateReason } from './state-reasons.js';
+import { evaluateShellCommand } from './policy-literal-pass.js';
 
 /**
  * Deterministic guardrails behind the advisory skills - the playbook's
@@ -103,7 +94,8 @@ export function normalizeToolCall(tool: string, input: Record<string, unknown>, 
     const v = input[key];
     if (typeof v === 'string' && (v.includes('***') || v.includes('+++ '))) files.push(...patchFiles(v));
   }
-  const command = typeof input.command === 'string' ? input.command : typeof input.cmd === 'string' ? input.cmd : undefined;
+  const command = typeof input.command === 'string' ? input.command
+    : typeof input.cmd === 'string' ? input.cmd : undefined;
   const kind: ToolKind = BASH_TOOLS.has(lower) || (command !== undefined && !EDIT_TOOLS.has(lower))
     ? 'bash'
     : EDIT_TOOLS.has(lower) || (files.length > 0 && !READ_TOOLS.has(lower))
@@ -131,6 +123,7 @@ export interface PolicyContext {
   paths: ProjectPaths;
   config: SdlcConfig;
   env?: NodeJS.ProcessEnv;
+  literalDeadlineMs?: number;
 }
 
 interface ChangeSnapshot {
@@ -175,18 +168,6 @@ function gateOk(view: LifecycleView | undefined, id: string): boolean {
   return !!g && (g.status === 'approved' || g.status === 'waived' || g.status === 'n/a');
 }
 
-/** A shell write to a state file, by its path text or (after `cd`, by glob, through a link) by what it resolves to. */
-function stateWriteDenial(spelled: string, ctx: PolicyContext, cwd: string): Decision | undefined {
-  const hits = [...shellStateWrites(spelled, ctx.paths.root, cwd),
-    ...hardLinkedStateFiles(shellWriteTargets(spelled, ctx.paths.root, cwd), ctx.paths.root, ctx.paths.root),
-    ...hardLinkedFiles(shellWriteTargets(spelled, ctx.paths.root, cwd), ctx.paths.root, ctx.paths.root, pluginStateFiles)];
-  if (hits.length === 0) return undefined;
-  const part = shellStateInlineGlobPart(spelled, ctx.paths.root, cwd);
-  const reason = part ? t('hook.stateInlineString', { part: namedPart(JSON.stringify(part)) })
-    : stateReason(hits, false);
-  return { decision: 'deny', rule: 'state-integrity', reason };
-}
-
 /**
  * Shell commands: cleared agent markers, human-only CLI steps, removing the CLI, writes to state files and to the
  * guard's configuration, a change a person holds, releases without an approved release gate.
@@ -198,60 +179,11 @@ function evaluateCommand(
   cwd: string,
   soft: Soft,
 ): Decision {
-  const cmd = joinContinuations(command);
-  // First: a command that clears the markers would also slip past the CLI's own agent check.
-  if (clearsAgentMarker(cmd)) {
-    return { decision: 'deny', rule: 'agent-marker',
-      reason: t('hook.agentMarker', { markers: clearedAgentMarkers(cmd).join(', ') }) };
-  }
-  const problem = shellWords(command).problem;
-  if (problem) return { decision: 'deny', rule: 'shell-parse', reason: problem };
-  const humanCommand = humanCommandMatch(cmd);
-  if (ctx.config.enforcement.forbidAgentApprovals && humanCommand) {
-    return {
-      decision: 'deny',
-      rule: 'separation-of-duties',
-      reason: t('hook.separationOfDuties', { command: quotedCommand(humanCommand) }),
-    };
-  }
-  if (removesSdlcCli(cmd)) return { decision: 'deny', rule: 'cli-removal', reason: t('hook.cliRemoval') };
-  const spellings = pathSpellings(cmd);
-  const stateDenial = firstDecision(spellings, (spelled) => stateWriteDenial(spelled, ctx, cwd));
-  if (stateDenial) return stateDenial;
-  const copy = copyDecision(command, ctx.paths.root, cwd);
-  if (copy) return copy;
-  const execution = shellCliProblem(command);
-  if (execution) return { decision: 'deny', rule: 'shell-parse', reason: execution };
-  const launcher = launcherDecision({ tool: 'Bash', kind: 'bash', command, cwd, files: [] }, ctx.paths.root, ctx.config);
-  if (launcher) return launcher;
-  // The guard's own configuration (B41): the files that switch the rules on; also the user-level ones (B42).
-  // The review policy may live where `review.policy` says (B75).
-  const policy = [ctx.config.review.policy];
-  const guardHits = [...new Set(spellings.flatMap((spelled) => [
-    ...shellGuardWrites(spelled, ctx.paths.root, cwd, policy),
-    ...userShellGuardWrites(spelled, cwd, env),
-  ]))];
-  const guard = guardDenial(guardHits);
-  if (guard) return guard;
-  // A key or token the command writes (B16): a shell write has no reliable target, so no exemption applies.
-  const secret = shellSecretDenial(cmd);
-  if (secret) return secret;
-  // A change a person holds: no shell writes to its paths, no sdlc steps on it but the read-only ones.
-  const held = firstDecision(spellings, (spelled) => shellTakeoverDenial(ctx.paths, spelled, cwd, CLI_PREFIX));
-  if (held) return held;
-  // 0.14.0 (B82): the files a command writes count for tests-locked and the plan gate, like an edit's.
-  const written = shellWriteDestinations(cmd, ctx.paths.root, cwd);
-  const protectedHit = written.find(matcher(ctx.config.enforcement.protectedPaths));
-  if (protectedHit) {
-    return { decision: 'deny', rule: 'protected-path', reason: t('hook.protectedPath', { path: protectedHit }) };
-  }
-  const creation = openspecNewChange(cmd);
-  if (creation) return soft(creation.rule, creation.reason);
-  const openspec = openspecWrite(written, ctx.paths);
-  if (openspec) return soft(openspec.rule, openspec.reason);
-  const gated = codeGateDenial(written, ctx, soft);
-  if (gated) return gated;
-  return releaseDecision(cmd, ctx, env);
+  return evaluateShellCommand(command, ctx, env, cwd, soft, {
+    locked: (hidden) => testsLockedDenial(hidden, snapshots(ctx), matcher(ctx.config.enforcement.testPaths)),
+    gated: (written, wholeTree) => codeGateDenial(written, ctx, soft, wholeTree),
+    release: (cmd) => releaseDecision(cmd, ctx, env),
+  });
 }
 
 /** A release command without an approved release gate (and without SDLC_RELEASE_APPROVAL) is denied. */
@@ -360,14 +292,17 @@ function testsLockedDenial(rels: string[], changes: ChangeSnapshot[], isTest: (p
  * Tests-locked and the plan gate for root-relative paths an edit or (0.14.0, B82) a shell command writes; the exempt
  * paths (`openspec/**` and the like) stay writable before the plan.
  */
-function codeGateDenial(rels: string[], ctx: PolicyContext, soft: Soft): Decision | undefined {
+function codeGateDenial(rels: string[], ctx: PolicyContext, soft: Soft, wholeTree = false): Decision | undefined {
   const { enforcement } = ctx.config;
   const isTest = matcher(enforcement.testPaths);
   const isExempt = matcher(enforcement.exemptPaths);
-  const code = enforcement.requireApprovedPlan ? rels.filter((r) => !isExempt(r)) : [];
-  if (!rels.some(isTest) && code.length === 0) return undefined;
+  const code = enforcement.requireApprovedPlan
+    ? [...rels.filter((r) => !isExempt(r)), ...(wholeTree ? ['.'] : [])] : [];
+  if (!wholeTree && !rels.some(isTest) && code.length === 0) return undefined;
   const changes = snapshots(ctx);
-  return testsLockedDenial(rels, changes, isTest) ?? planGateDenial(code, changes, soft);
+  const testMatch = (p: string) => p === '.' && wholeTree || isTest(p);
+  return testsLockedDenial([...rels, ...(wholeTree ? ['.'] : [])], changes, testMatch)
+    ?? planGateDenial(code, changes, soft);
 }
 
 /** Session start with no active change: the next backlog item, then the open inbox items. */
@@ -425,7 +360,8 @@ export function stopCheck(ctx: PolicyContext): string | undefined {
       const view = evaluateChange(ctx.paths.root, ref, ctx.config, { fingerprint });
       const verify = view.gates.find((g) => g.id === 'verify');
       const planOk = gateOk(view, 'plan');
-      if (planOk && view.tasks.total > 0 && view.tasks.remaining === 0 && verify && verify.status !== 'passed' && verify.required) {
+      if (planOk && view.tasks.total > 0 && view.tasks.remaining === 0
+        && verify && verify.status !== 'passed' && verify.required) {
         return t(folderKey(ref.id, 'hook.verifyBeforeStop', 'hook.verifyBeforeStopFolder'), {
           change: folderLabel(ref.id),
           detail: verify.reason ?? verify.status,

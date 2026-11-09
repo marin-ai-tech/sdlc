@@ -9,9 +9,9 @@ import { shellWriteDestinationPaths } from './policy-shell-writes.js';
 import { nodeTargets, pythonTargets, perlTargets } from './policy-shell-tools.js';
 import { STATE_FILES, WRITER_COORDINATION_DIRS, writerCoordinationFiles } from './state-files.js';
 import { copyOperands } from './copy-operands.js';
-import { programLocation } from './shell-program.js';
 import { harmlessRedirectPath, withoutHarmlessRedirects } from './shell-redirects.js';
-
+import { writerTargets, writerProgramLocation, writerArguments, WRITE_OPS, FOLDER_OPS } from './shell-writers.js';
+export { WRITE_OPS } from './shell-writers.js';
 /**
  * Which state files a tool call writes, beyond the path text `policy.ts` matches (rule `state-integrity`):
  * - a bare file name after `cd`/`pushd` (and PowerShell `Set-Location`/`Push-Location`) into a directory;
@@ -26,7 +26,6 @@ import { harmlessRedirectPath, withoutHarmlessRedirects } from './shell-redirect
  * through a glob is found in the glob's own directory under openspec/ and in the change directories on disk.
  * The same machinery serves the guard's own configuration (B41, `policy-guard.ts`) through `shellWrites`.
  */
-
 /**
  * Harness records only the CLI writes: per-change `.sdlc.yaml`, the project log, roles, the backlog, the inbox
  * of MCP results kept for the agent (`openspec/.sdlc/inbox/<id>.json`), the record of the accepted roles of the
@@ -44,37 +43,13 @@ export const STATE_FILE = new RegExp(
   '(^|/)\\.sdlc\\.yaml$|^openspec/\\.sdlc/(?:hook-)?log\\.jsonl$|' +
     '^openspec/\\.sdlc/(?:log\\.lock|team\\.json|board\\.json|board\\.lock)$' +
     '|^openspec/\\.sdlc/(?:log|board)\\.lock\\.writers(?:/.*)?$' +
-    '|^openspec/\\.sdlc/plugins(?:/.*)?$|^openspec/\\.sdlc/inbox/[^/]+$|^openspec/(?:roles\\.yaml|executors\\.yaml|backlog\\.md)$',
+    '|^openspec/\\.sdlc/plugins(?:/.*)?$|^openspec/\\.sdlc/inbox/[^/]+$' +
+    '|^openspec/(?:roles\\.yaml|executors\\.yaml|backlog\\.md)$',
   'i'
 );
 /** The backlog's order and removal are a person's decision; agents change the file through `sdlc backlog`. */
 export const BACKLOG_FILE = 'openspec/backlog.md';
 
-/** Redirections write the file they name; they cannot replace a folder. */
-const REDIRECT_OPS = [/>>?/, /\btee\b/];
-/** Commands that write, move, delete or link the paths among their arguments (files or whole folders). */
-const FILE_OPS = [
-  /\bmv\b/, /\bcp\b/, /\brm\b/, /\btruncate\b/, /\bpython[0-9.]*\b/, /\bnode\b\s+-e/, /\bdd\b/,
-  // `-i` anywhere among the options (`sed -E -i`), or in a cluster (`perl -pi`).
-  /\bsed\b[^;&|\n]*\s(?:-[A-Za-z]*i|--in-place)/, /\bperl\b[^;&|\n]*\s-[A-Za-z]*i/, /\bfind\b[^;&|\n]*\s-delete\b/,
-  // cmd.exe and .NET spellings.
-  /\b(?:del|erase|copy|move|ren|rmdir|rd)\b/,
-  /\[(?:System\.)?IO\.File\]::(?:Write|Append|Delete|Copy|Move|Replace)/, /\[(?:System\.)?IO\.Directory\]::Delete/,
-  // A link is a write by proxy: the next write to the link lands in the state file.
-  /\bln\b/, /\b(?:link|mklink)\b/, /\bfsutil\s+hardlink\s+create\b/,
-  // git can put an older copy back, also with options before the subcommand (`git -C <dir> checkout`).
-  /\bgit(?:\s+-[Cc]\s*\S+|\s+--[\w-]+(?:=\S+)?)*\s+(?:checkout|restore|apply|mv|rm)\b/,
-  // PowerShell writes through cmdlets rather than redirection.
-  /\b(?:Set|Add|Clear)-Content\b/, /\bOut-File\b/, /\b(?:Copy|Move|Remove|Rename|New)-Item\b/,
-];
-
-function anyOf(patterns: RegExp[]): RegExp {
-  return new RegExp(patterns.map((pattern) => pattern.source).join('|'), 'i');
-}
-
-export const WRITE_OPS = anyOf([...REDIRECT_OPS, ...FILE_OPS]);
-/** Write ops that can replace, delete or fill a whole folder. */
-const FOLDER_OPS = anyOf(FILE_OPS);
 /** Folders that hold state files: openspec/, the change folders (active and archived), openspec/.sdlc, the inbox. */
 const STATE_FOLDER = /^openspec(?:\/changes(?:\/archive)?(?:\/[^/]+)?|\/\.sdlc(?:\/inbox|\/plugins(?:\/.*)?)?)?$/i;
 
@@ -178,8 +153,9 @@ export interface DirState {
 }
 
 /** Splits at shell operators outside quotes and PowerShell here-strings. */
-export function simpleCommands(command: string): string[] {
-  return shellWords(command).commands.map((part) => part.raw);
+export function simpleCommands(command: string, context: ShellContext = {}): string[] {
+  return shellWords(command, context.dialect === 'cmd' ? true : undefined, context)
+    .commands.map((part) => part.raw);
 }
 
 /**
@@ -318,9 +294,12 @@ export function writeSegments(command: string, cwd: string): WriteSegment[] {
 
 /** A quoted `$null` is a real file name; it is judged like `nul`, because `absolute` rightly cannot resolve a `$`. */
 function redirectTargets(command: ShellCommand): string[] {
-  return command.words.filter((_word, index) => command.words[index - 1]?.operator
-    && command.words[index - 1].value === '>' && !harmlessRedirectPath(_word.value))
-    .map((word) => (word.value.toLowerCase() === '$null' ? 'nul' : word.value));
+  const words = command.words.filter((word, index) => word.value !== '&'
+    || command.words[index - 1]?.value !== '>' || !command.words[index - 1]?.operator);
+  return words.filter((_word, index) => words[index - 1]?.operator
+    && words[index - 1].value === '>' && !harmlessRedirectPath(_word.value))
+    .map((word) => (word.value.toLowerCase() === '$null' ? 'nul'
+      : word.value.startsWith('&') ? word.value.slice(1) : word.value));
 }
 
 function scopedWriteSegments(input: string, state: DirState, depth: number, context: ShellContext): WriteSegment[] {
@@ -333,7 +312,8 @@ function scopedWriteSegments(input: string, state: DirState, depth: number, cont
       out.push({ text: part.raw, dir: state.dir, words: ['', ...redirects], folders: false,
         destinations, redirects });
     }
-    const execution = programLocation(part.words.filter(word => !word.operator).map(word => word.value), state.dir);
+    const argv = writerArguments(part);
+    const execution = writerProgramLocation(argv.map(word => word.value), state.dir);
     const body = shellBody(part, context);
     if (body) {
       if (depth < MAX_SHELL_BODY_DEPTH) out.push(...scopedWriteSegments(
@@ -357,8 +337,9 @@ function projectedWrite(
   command: ShellCommand, list: string[], dir: string | undefined, context: ShellContext,
 ): WriteSegment | undefined {
   const copy = copyOperands(command, context);
-  const argv = command.words.filter(word => !word.operator).map(word => word.value);
-  const execution = programLocation(argv, dir);
+  const programWords = writerArguments(command);
+  const argv = programWords.map(word => word.value);
+  const execution = writerProgramLocation(argv, dir);
   if (execution.at < 0) return undefined;
   if (copy?.recursive) {
     const destinations = copy.destinations.flatMap(file => absolute(execution.dir, file) ?? []);
@@ -366,6 +347,21 @@ function projectedWrite(
   }
   const at = execution.at;
   const name = path.posix.basename(argv[at]?.replace(/\\/g, '/') ?? '').replace(/\.exe$/i, '');
+  const legacyWords = at > 0 && programWords[at]
+    ? command.words.slice(command.words.indexOf(programWords[at]))
+      .filter(word => !word.operator).map(word => word.value)
+    : list;
+  const legacy = WRITE_OPS.test(withoutHarmlessRedirects(command))
+    ? gitDir(execution.dir, legacyWords) : undefined;
+  const known = writerTargets(name, argv.slice(at + 1), { dir: execution.dir, inputs: [] });
+  if (known.targets.length > 0 && !/^(?:node|python[\d.]*|py|perl)$/i.test(name)) {
+    const destinations = known.targets.flatMap(file => absolute(execution.dir, file) ?? []);
+    const legacyWords = legacy?.words.slice(1).map(word => legacy.dir === execution.dir
+      ? word : absolute(legacy.dir, word) ?? word) ?? [];
+    if (known.targets.length > 0) return { text: command.raw, dir: execution.dir,
+      words: [name, ...destinations, ...legacyWords], destinations: destinations.length ? destinations : known.targets,
+      folders: known.folders || legacy !== undefined && FOLDER_OPS.test(command.raw) };
+  }
   if (/^(?:node|python[\d.]*|py|perl)$/i.test(name)) {
     const args = argv.slice(at + 1);
     const files = /^node/i.test(name) ? nodeTargets(args, true)
@@ -380,8 +376,7 @@ function projectedWrite(
     const targets = shellWriteDestinationPaths(command.raw, dir ?? '');
     return targets.length ? { text: command.raw, dir, words: [list[0], ...targets] } : undefined;
   }
-  return WRITE_OPS.test(withoutHarmlessRedirects(command))
-    ? { text: command.raw, ...gitDir(execution.dir, at > 0 ? argv.slice(at) : list) } : undefined;
+  return legacy === undefined ? undefined : { text: command.raw, ...legacy };
 }
 
 /**
@@ -429,7 +424,8 @@ const REDIRECT_TARGET = /\d*>>?\s*(?:"([^"]+)"|'([^']+)'|([^\s;&|<>()]+))/g;
 
 /** The words a write segment writes to: redirection targets, and every argument of a writing command. */
 function segmentTargets(segment: WriteSegment): string[] {
-  if (segment.destinations) return segment.destinations;
+  if (segment.destinations) return segment.folders
+    ? [...segment.destinations, ...segment.words.slice(1)] : segment.destinations;
   const targets = [...segment.text.matchAll(REDIRECT_TARGET)].map((m) => m[1] ?? m[2] ?? m[3]);
   if (segment.folders ?? FOLDER_OPS.test(segment.text)) targets.push(...segment.words.slice(1));
   return targets;

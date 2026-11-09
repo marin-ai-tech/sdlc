@@ -46,9 +46,12 @@ describe('1-2: more shell writes to state files, file by file or a whole folder'
     const { root, ctx } = context();
     write(path.join(root, 'openspec/changes/demo/.openspec.yaml'), 'schema: sdlc\n');
     for (const command of ['rm -rf openspec/changes/demo/tmp', 'cp a.md openspec/changes/demo/notes.md',
-      'ls -la openspec/changes/demo', 'git diff -- openspec/changes/demo', 'del build\\out.txt']) {
+      'ls -la openspec/changes/demo', 'git diff -- openspec/changes/demo']) {
       expect(evaluateToolCall(bash(root, command), ctx).decision, command).toBe('allow');
     }
+    // B248 (owner's answer 4): a delete of a project file counts for the plan gate, so with no plan it warns.
+    const deleted = evaluateToolCall(bash(root, 'del build\\out.txt'), ctx);
+    expect(deleted).toMatchObject({ decision: 'warn', rule: 'plan-gate' });
   });
 });
 

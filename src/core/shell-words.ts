@@ -29,7 +29,7 @@ export interface ShellWords {
   problem?: string;
 }
 
-const MAX_INPUT = 131072;
+export const MAX_INPUT = 131072;
 const MAX_WORDS = 4096;
 const MAX_NESTING = 16;
 
@@ -198,7 +198,7 @@ function boundary(state: Lexer): boolean {
   } else if (/[<>]/.test(char) && (input[at - 1] !== '=' || input[at + 1] === '(')) {
     if (state.word && /^(?:\d+|\*)$/.test(state.word.value) && state.word.end === at) state.word = undefined;
     else flush(state);
-    const end = at + (input[at + 1] === char ? 2 : 1);
+    const end = at + (input[at + 1] === char || char === '>' && input[at + 1] === '|' ? 2 : 1);
     state.words.push({ value: char, start: at, end, operator: true });
     if (input[at + 1] === '(') state.words.at(-1)!.expansion = 'command';
     state.at = end;
@@ -233,6 +233,69 @@ function scalarWord(state: Lexer): void {
   if (expansion) state.word!.expansion = stronger(state.word!.expansion, expansion);
 }
 
+function closingBrace(input: string, at: number): { end: number; closed: boolean } {
+  let depth = 1;
+  let end = at + 2;
+  let quote = '';
+  while (end < input.length && depth > 0) {
+    const char = input[end];
+    if (char === '\\') {
+      end += 2;
+      continue;
+    }
+    if (char === "'" && quote !== '"' || char === '"' && quote !== "'") {
+      quote = quote === char ? '' : quote || char;
+      end += 1;
+      continue;
+    }
+    if (quote) {
+      end += 1;
+      continue;
+    }
+    if (input.slice(end, end + 2) === '${') {
+      depth += 1;
+      end += 2;
+      continue;
+    }
+    if (char === '}') depth -= 1;
+    end += 1;
+  }
+  return { end, closed: depth === 0 };
+}
+
+function substitutionInBraces(input: string, start: number, end: number): boolean {
+  let quote = '';
+  for (let i = start; i < end; i += 1) {
+    const char = input[i];
+    if (char === '\\') {
+      i += 1;
+      continue;
+    }
+    if (char === "'" && quote !== '"' || char === '"' && quote !== "'") {
+      quote = quote === char ? '' : quote || char;
+      continue;
+    }
+    if (quote === "'") continue;
+    if (char === '$' && input[i + 1] === '(') return true;
+    if (char === '`' && input.indexOf('`', i + 1) < end && input.indexOf('`', i + 1) >= 0) return true;
+  }
+  return false;
+}
+
+function bracedExpansion(state: Lexer): void {
+  const { input, at } = state;
+  const commandForm = /[\s|]/.test(input[at + 2] ?? '');
+  const { end, closed } = closingBrace(input, at);
+  state.word!.value += input.slice(at, end);
+  state.word!.dynamic = true;
+  // The outer braces are one word, but their default/assignment text still executes substitutions.
+  const command = substitutionInBraces(input, at + 2, end - (closed ? 1 : 0));
+  state.word!.expansion = stronger(state.word!.expansion,
+    command || commandForm ? 'command' : state.context.dialect === 'posix' ? 'fields' : 'value');
+  if (!closed) state.problem ??= 'Unterminated shell variable expansion.';
+  state.at = end;
+}
+
 function readWord(state: Lexer): void {
   const { input, at } = state;
   const char = input[at];
@@ -242,7 +305,9 @@ function readWord(state: Lexer): void {
   }
   const word = state.word;
   const ansi = char === '$' && input[at + 1] === "'";
-  if (ansi || /['"]/.test(char) || char === '@' && /['"]/.test(input[at + 1] ?? '')) {
+  if (char === '$' && input[at + 1] === '{') {
+    bracedExpansion(state);
+  } else if (ansi || /['"]/.test(char) || char === '@' && /['"]/.test(input[at + 1] ?? '')) {
     const part = char === '@' ? hereString(input, at, state.context)
       : quoted(input, at + (ansi ? 1 : 0), ansi, state.context);
     appendQuoted(state, part);

@@ -4,6 +4,7 @@ import { listFilesRecursive } from './fs-utils.js';
 import { t } from './i18n.js';
 import { hardLinkedFiles } from './policy-hardlink.js';
 import { linkedFiles, shellWrites, writeSegments, type ProtectedSet } from './policy-shell.js';
+import { hiddenTargetHits, textPatterns } from './shell-hidden-targets.js';
 
 /**
  * The guard's own configuration (B41). The files that switch the guard on (the enforcement mode, the Claude Code
@@ -117,11 +118,7 @@ const GUARD_FOLDERS = [
   ...GENERATED_DIRS,
 ];
 /** A guard path as a word of its own: after a space, a quote, `=`, `(`, `,` or `>`, optionally after `./`. */
-const PATH_START = String.raw`(?:^|[\s'"=(,>])(?:\./)?`;
-const PATH_END = String.raw`(?=$|[\s'";&|),<>])`;
-const GUARD_TEXT = new RegExp(`${PATH_START}(${GUARD_NAMES})${PATH_END}`, 'i');
-/** A guard path that starts at a variable: `$PWD/.mcp.json`, `${CLAUDE_PROJECT_DIR}/.claude/settings.json`. */
-const GUARD_VAR_TEXT = new RegExp(String.raw`\$\{?\w+\}?/(${GUARD_NAMES})${PATH_END}`, 'i');
+const GUARD_TEXT_PATTERNS = textPatterns(GUARD_NAMES);
 
 const TEAM_FILE = 'openspec/.sdlc/team.json';
 const SKILL_ID = /^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/;
@@ -150,15 +147,14 @@ interface GuardPatterns {
   skillDirs: string[];
 }
 
-const STATIC_PATTERNS: GuardPatterns = { file: GUARD_FILE, text: GUARD_TEXT, varText: GUARD_VAR_TEXT, skillDirs: [] };
+const STATIC_PATTERNS: GuardPatterns = { file: GUARD_FILE, ...GUARD_TEXT_PATTERNS, skillDirs: [] };
 let cached: { key: string; patterns: GuardPatterns } | undefined;
 
 function skillPatterns(ids: string[]): GuardPatterns {
   const names = `${GUARD_NAMES}|${SKILL_ROOT_NAME}/(?:${ids.join('|')})/${String.raw`[^\s'"]+`}`;
   return {
     file: new RegExp(`^(?:${names})$`, 'i'),
-    text: new RegExp(`${PATH_START}(${names})${PATH_END}`, 'i'),
-    varText: new RegExp(String.raw`\$\{?\w+\}?/(${names})${PATH_END}`, 'i'),
+    ...textPatterns(names),
     skillDirs: SKILL_ROOTS.flatMap((dir) => ids.map((id) => `${dir}/${id}`)),
   };
 }
@@ -275,20 +271,6 @@ export function guardEditHits(
   ];
 }
 
-/** Guard paths spelled in write segments whose directory is unknown or that start at a variable. */
-function textHits(command: string, cwd: string, patterns: GuardPatterns): string[] {
-  const hits: string[] = [];
-  for (const segment of writeSegments(command, cwd)) {
-    const texts = segment.redirects ?? [segment.text];
-    for (const text of texts) {
-      const spelled = segment.dir === undefined ? patterns.text.exec(text) : null;
-      const match = patterns.varText.exec(text) ?? spelled;
-      if (match) hits.push(match[1]);
-    }
-  }
-  return hits;
-}
-
 /** The configured guard paths a shell command writes (`extra`, e.g. the review policy). */
 function extraShellHits(command: string, root: string, cwd: string, extra: readonly string[]): string[] {
   const pattern = extraPattern(extra);
@@ -301,7 +283,7 @@ function extraShellHits(command: string, root: string, cwd: string, extra: reado
 export function shellGuardWrites(command: string, root: string, cwd: string, extra: readonly string[] = []): string[] {
   return [
     ...shellWrites(command, root, cwd, guardSet(root)),
-    ...textHits(command, cwd, patternsFor(root)),
+    ...hiddenTargetHits(command, cwd, patternsFor(root).file, patternsFor(root)),
     ...extraShellHits(command, root, cwd, extra),
   ];
 }

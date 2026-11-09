@@ -2,8 +2,14 @@ import { t } from './i18n.js';
 import * as path from 'node:path';
 import type { Decision } from './policy.js';
 import { stateCopyInspection, type CopyInspection } from './state-copy.js';
-import { insideStateFolder, relToRoot } from './policy-shell.js';
+import { insideStateFolder, relToRoot, STATE_FILE } from './policy-shell.js';
+import { hiddenTargetHits } from './shell-hidden-targets.js';
 import { namedPart } from './state-reasons.js';
+import { stateReason } from './state-reasons.js';
+import { literalValueSpellings } from './shell-literal-values.js';
+import { shellStateWrites, shellStateInlineGlobPart, shellWriteTargets } from './policy-shell.js';
+import { hardLinkedFiles, hardLinkedStateFiles } from './policy-hardlink.js';
+import { pluginStateFiles } from '../plugins/activation.js';
 
 /**
  * The spellings of a command the path checks read: as written and, when it has a `\`, with `\` read as a separator
@@ -14,6 +20,16 @@ export function pathSpellings(command: string): string[] {
   if (!command.includes('\\')) return [command];
   const normalized = command.replace(/\\/g, '/').replace(/\/(?:\.\/)+/g, '/').replace(/\/{2,}/g, '/');
   return normalized === command ? [command] : [command, normalized];
+}
+
+/** Path spellings plus literal values, retaining the written command as the first view. */
+export function commandSpellings(command: string, deadline?: number): {
+  spellings: string[]; writeSpellings: string[]; exceeded: boolean; timedOut: boolean
+} {
+  const literal = literalValueSpellings(command, 0, {}, deadline);
+  const writeSpellings = [...new Set([command, ...literal.spellings])];
+  return { spellings: [...new Set(writeSpellings.flatMap((spelling) => pathSpellings(spelling)))],
+    writeSpellings, exceeded: literal.exceeded, timedOut: literal.timedOut };
 }
 
 /**
@@ -53,4 +69,16 @@ export function firstDecision(spellings: string[], check: (spelled: string) => D
     if (decision) return decision;
   }
   return undefined;
+}
+
+/** A shell write to a state file, by its path text or (after `cd`, by glob, through a link) by what it resolves to. */
+export function stateWriteDenial(spelled: string, root: string, cwd: string): Decision | undefined {
+  const hits = [...shellStateWrites(spelled, root, cwd), ...hiddenTargetHits(spelled, cwd, STATE_FILE),
+    ...hardLinkedStateFiles(shellWriteTargets(spelled, root, cwd), root, root),
+    ...hardLinkedFiles(shellWriteTargets(spelled, root, cwd), root, root, pluginStateFiles)];
+  if (hits.length === 0) return undefined;
+  const part = shellStateInlineGlobPart(spelled, root, cwd);
+  const reason = part ? t('hook.stateInlineString', { part: namedPart(JSON.stringify(part)) })
+    : stateReason(hits, false);
+  return { decision: 'deny', rule: 'state-integrity', reason };
 }

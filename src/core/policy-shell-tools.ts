@@ -36,7 +36,7 @@ function optionValue(args: string[], i: number, long: string): string | undefine
 }
 
 /** git's global options before the subcommand: the `-C` directory and the subcommand's index. */
-function gitGlobal(args: string[]): { dir: string; at: number } {
+export function gitGlobal(args: string[]): { dir: string; at: number } {
   let dir = '';
   let i = 0;
   while (i < args.length && args[i].startsWith('-')) {
@@ -102,8 +102,28 @@ function gitSubcommand(sub: string, args: string[], dir: string | undefined): st
   if (sub === 'checkout') return afterDashes(args);
   if (sub === 'restore') return restoreTargets(args);
   if (sub === 'mv') return args.filter((arg) => !arg.startsWith('-'));
+  if (sub === 'rm') return args.includes('--cached') ? [] : args.filter((arg) => !arg.startsWith('-'));
   if (sub === 'apply') return gitApplyTargets(args, dir);
+  if (sub === 'show' || sub === 'diff' || sub === 'log') return outputOption(args, ['--output']);
+  if (sub === 'format-patch') return outputOption(args, ['-o', '--output-directory']);
+  if (sub === 'config') return configTargets(args);
   return [];
+}
+
+function outputOption(args: string[], options: string[]): string[] {
+  const result: string[] = [];
+  for (let i = 0; i < args.length; i += 1) {
+    for (const option of options) {
+      if (args[i] === option && args[i + 1]) result.push(args[i + 1]);
+      if (args[i].startsWith(`${option}=`)) result.push(args[i].slice(option.length + 1));
+    }
+  }
+  return result;
+}
+
+function configTargets(args: string[]): string[] {
+  if (args.some(arg => /^(?:--get|--get-all|--get-regexp|--list|-l)$/.test(arg))) return [];
+  return outputOption(args, ['-f', '--file']);
 }
 
 /** `git [-C dir] checkout -- p`, `restore`, `mv`, `apply`. */
@@ -119,9 +139,14 @@ export function gitTargets(args: string[], ctx: ToolContext): string[] {
 /** `patch [-pN] (< file | -i file)`. */
 export function patchTargets(args: string[], ctx: ToolContext): string[] {
   if (args.includes('--dry-run')) return [];
+  const output = outputOption(args, ['-o', '--output']);
   const at = args.findIndex((arg) => arg === '-i' || arg === '--input');
   const file = at >= 0 ? args[at + 1] : ctx.inputs[0];
-  return file === undefined ? [] : filesOfPatch(ctx.dir, file, patchStrip(args));
+  const options = new Set(['-i', '--input', '-p', '--strip', '-o', '--output']);
+  const operands = args.filter((arg, index) => !arg.startsWith('-') && !options.has(args[index - 1])
+    && !ctx.inputs.includes(arg));
+  return [...output, ...operands.slice(0, 1),
+    ...(file === undefined ? [] : filesOfPatch(ctx.dir, file, patchStrip(args)))];
 }
 
 /** `curl -o|--output <file>` (also a combined `-sSLo file`). */

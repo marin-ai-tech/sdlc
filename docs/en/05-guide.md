@@ -649,6 +649,54 @@ It is logged once as `gate.<gate>.auto_waived` and counted as a policy waiver; a
 `tracks: [lite]` waives every lite change, including features, and raises a doctor warning.
 See [13. Process hygiene and project health](13-process-health.md).
 
+### Limits of a static reading
+
+The hook reads the text of one command. It stops mistakes and casual workarounds; it is not a security boundary.
+Where an approval must hold, turn signing on and run `sdlc approvals verify --mode required` in CI.
+
+What it follows: a literal assignment in the same command, so `T=openspec/roles.yaml; rm "$T"` is refused like
+`rm openspec/roles.yaml`, also through `export`, a `for` list, PowerShell `$T = '...'` and cmd `set`. One list of
+known writers feeds every check. A delete counts for the plan gate and locked tests. `git stash` in its writing forms,
+`git reset --hard` and `git clean -f` count for those two checks as a write of the whole tree, in any folder, since
+the hook cannot tell which tree another folder belongs to. An input redirect
+before a git subcommand, a `cd` it cannot resolve and a variable prefix such as `$PWD/` do not hide a state, guarded,
+protected or test path.
+
+A command whose variables give more than 16 possible spellings is refused: split the loop or put the commands in a
+script file. So is a long command when its spellings, counted with the command itself, times its words pass 512.
+It is also refused when its spellings together hold more than 512 words or more than 32,768 characters; the words
+of nested shell bodies count too. These budgets bound words and characters, not time. So the work that literal
+values add also has a time limit, measured between steps. Building the spellings with values has half a second
+from its start. The command as written is then checked with no limit and keeps its own refusal. Checking the
+added spellings has 5 s, ending by 20 s after the check started. Past either limit the command is refused with
+shell-parse. A command
+substitution is refused; make a temporary file with plain `mktemp`. A variable set to an empty value is read as an
+empty word, and a file argument set to it is refused as an empty path.
+Text after a `#` is read like any other command text, so a path named in a comment can be refused; keep comments
+out of commands.
+
+What it does not follow:
+
+- an assignment in an earlier shell call, or an export read by a script;
+- a script or program given a protected path, or holding one, and any program the agent wrote;
+- `source`, aliases and functions; `xargs`; `find ... -delete` for the plan gate and locked tests (the state and
+  guard checks refuse it);
+- a delete of a folder that holds protected paths or locked tests, such as `rm -rf src`;
+- a variable prefix is read as the project root, so with tests locked `"$TMPDIR/test/out.log"` counts as a test path;
+- values read at run time (`read`, `printf -v`, a substitution) and file names built by program logic;
+- `mkdir`;
+- `git stash`, `git reset --hard` and `git clean` after the plan is approved, and branch switches, merges, pulls and
+  rebases, which rewrite tracked files without naming them;
+- the plan gate after a directory that cannot be resolved, since any relative path would match it;
+- a quoted or escaped `}` in the default text of a braced use, such as `${T:-'}'}`;
+- a PowerShell assignment followed by a comment on its line;
+- a write target after a quoted `#` or a `<# #>` block, and a whole-tree git write followed by a comment, such as
+  `git clean -fd # -n`;
+- a `cd` to a variable before a nested shell body, such as `cd $D; bash -c '...'`;
+- one long step of the added checks: the time limit is checked between steps, so a write through a value after a
+  `cd` into a folder hundreds of levels deep can still keep the hook past the host timeout, which then allows the
+  call (a watchdog in the hook is planned).
+
 ### Project health and explaining a change
 
 `sdlc health [--json]` lists findings about process flow, quality, discipline, and configuration:

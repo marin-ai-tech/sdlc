@@ -6,6 +6,8 @@ export interface ProgramLocation {
   problem?: string;
 }
 
+export const POSIX_SHELL_NAME = /^(?:bash|sh|zsh)(?:\.exe)?$/i;
+
 const VALUES: Record<string, readonly string[]> = {
   env: ['-u', '--unset', '-C', '--chdir'],
   sudo: ['-u', '--user', '-g', '--group', '-h', '--host', '-p', '--prompt', '-C', '--close-from',

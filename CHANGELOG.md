@@ -2,6 +2,60 @@
 
 All notable changes to sdlc. Versions follow [Semantic Versioning](https://semver.org/); while the major version is 0, a minor version may change behavior.
 
+## 0.31.0 — 2026-11-08
+
+The hook follows a write through a shell variable and reads one list of known writers in every check, so a write it
+refuses in its plain form is refused in its hidden forms too. Agents get new refusals: read Changed and Known limits
+before you update.
+
+### Added
+- A literal assignment in the same command is followed. `T=openspec/roles.yaml; rm "$T"` is refused like
+  `rm openspec/roles.yaml`. This works through `export`, a `for` list, PowerShell `$T = '...'` and cmd `set`.
+- A value assigned away before the write stops counting. A value that may or may not be assigned still counts.
+- One list of known writers feeds the state, guard, protected-path, locked-test and plan-gate checks. It adds the
+  clobber redirect `>|`, `install`, `eval` of a string, curl and wget output options, `sort -o`, rsync, patch, touch,
+  tar, unlink, chmod, chown, sponge and `yq -i`.
+- The list also adds `git show --output`, `git diff --output`, `git config -f`, and the PowerShell Export-Csv,
+  Set-Item, `ri`, Start-Process output and .NET file forms.
+- The limits of a static reading are written in the architecture document, the guide and `sdlc guide denials`.
+
+### Changed
+- A delete of a project file counts as a write for the plan gate and locked tests. Files outside the project stay free.
+- `git stash` in its writing forms, `git reset --hard` and `git clean -f` count as a write of the whole tree for the
+  plan gate and locked tests, in any folder. `git stash list` and `show`, `reset --soft` and `clean -n` stay allowed.
+- Forms that hid a target no longer hide it: an input redirect before a git subcommand, a `cd` the hook cannot
+  resolve, and a variable prefix such as `$PWD/` before a state, guarded, protected or test path.
+- A command whose variables give more than 16 possible spellings is refused with shell-parse. Split the loop or put
+  the commands in a script file.
+- A long command is refused the same way past a work budget: its spellings times its words over 512, or spellings
+  over 512 words or 32,768 characters in all.
+- The work that literal values add has a time limit. Past it the command is refused with shell-parse; the command as
+  written is always checked first and keeps its own refusal.
+- Text after a `#` is read like any other command text, so a path named in a comment can be refused. Keep comments
+  out of commands.
+
+### Compatibility
+- These refusals apply to agents only; a person's own terminal is not affected. Before the plan is signed, an agent's
+  `rm` of a project file, `git reset --hard` and `git clean -f` are refused.
+- No stored format changed. To go back, install 0.30.1 and run `sdlc update`.
+- Run `sdlc update` to reach the new hook. As in 0.30.1, the update regenerates files that count in the verified code,
+  so for a change in progress verification goes stale. Finish a change past verify before you update, where you can.
+
+### Known limits
+- The hook reads the text of one command. It is not a security boundary: where an approval must hold, turn signing on
+  and run `sdlc approvals verify --mode required` in CI.
+- It does not follow an assignment in an earlier shell call, `source`, aliases, functions, `xargs`, values read at
+  run time, or a program the agent wrote. The guide lists every limit under "Limits of a static reading".
+- A delete of a folder that holds protected paths or locked tests, such as `rm -rf src`, is not refused by those two
+  checks. `mkdir` is not a write for them.
+- After the plan is approved, whole-tree git writes and branch switches, merges, pulls and rebases are not checked.
+- One long step of the added checks, for example after a `cd` into a folder hundreds of levels deep, can keep the
+  hook past the host timeout, and the host then allows the call. A watchdog in the hook is planned.
+- `bash -lc` and other option clusters with `c` are not followed into the body, and writes inside
+  `Start-Process -ArgumentList` are not refused.
+- The release branch was not updated at 0.30.1, so an install from `#release` gave 0.30.0. The release URL always
+  gives the published version.
+
 ## 0.30.1 — 2026-11-03
 
 Field findings from running sdlc with an external team registry: a role's skills now reach the role's work, harmless

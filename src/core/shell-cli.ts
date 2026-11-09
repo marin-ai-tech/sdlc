@@ -1,6 +1,7 @@
 import { createRequire } from 'node:module';
 import { shellWords, type ShellCommand, type ShellWord, type ShellContext } from './shell-words.js';
-import { programLocation } from './shell-program.js';
+import { programLocation, POSIX_SHELL_NAME } from './shell-program.js';
+import { writerProgramLocation } from './shell-writers.js';
 import { nodeLaunch, nodeInlineOption, type NodeLaunch } from './node-inline.js';
 import { nodeCallContext } from './node-call-context.js';
 
@@ -103,11 +104,22 @@ function bodyInput(command: ShellCommand, tokens: ShellWord[], posix: boolean): 
 export function shellBody(command: ShellCommand, context: ShellContext = {}): ShellBody | undefined {
   const tokens = command.words.filter((word) => !word.operator);
   const words = tokens.map((word) => word.value);
-  const at = programAt(words);
+  const at = writerProgramLocation(words).at;
   const program = basename(words[at] ?? '');
   const cmd = /^cmd(?:\.exe)?$/i.test(program);
   const ps = /^(?:pwsh|powershell)(?:\.exe)?$/i.test(program);
-  if (!cmd && !ps && !/^(?:bash|sh|zsh)$/i.test(program)) return undefined;
+  const expression = /^(?:eval|iex|Invoke-Expression)$/i.test(program);
+  if (expression) {
+    const body = tokens.slice(at + 1).filter((word, index) => index !== 0 || word.value !== '--');
+    if (body.length === 0) return undefined;
+    const input = body.map(word => word.value).join(' ');
+    const joined = shellWords(input, false, { dialect: /^eval$/i.test(program) ? 'posix' : 'powershell' });
+    return { input,
+      execution: body.some(word => word.dynamic || word.expansion !== undefined)
+        || joined.commands.some(part => part.words.some(word => word.dynamic)),
+      context: { dialect: /^eval$/i.test(program) ? 'posix' : 'powershell' } };
+  }
+  if (!cmd && !ps && !POSIX_SHELL_NAME.test(program)) return undefined;
   const option = words.findIndex((word, index) => index > at && (cmd ? /^\/[ck]$/i.test(word)
     : ps ? /^-(?:c|co|com|comm|comma|comman|command)$/i.test(word) : word === '-c'));
   const body = tokens.slice(option + 1);
@@ -126,7 +138,8 @@ export function shellBody(command: ShellCommand, context: ShellContext = {}): Sh
 }
 
 function nodeWordProblem(words: ShellWord[], launch: NodeLaunch): string | undefined {
-  if (launch.codeAt === undefined && !launch.query && !words.some(word => nodeInlineOption(word.value))) return undefined;
+  if (launch.codeAt === undefined && !launch.query
+    && !words.some(word => nodeInlineOption(word.value))) return undefined;
   const region = words.slice(0, (launch.optionsEnd ?? words.length - 1) + 1);
   return region.some(word => word.dynamic || word.pattern === 'glob')
     ? 'Cannot statically resolve executable Node word expansion.' : undefined;
