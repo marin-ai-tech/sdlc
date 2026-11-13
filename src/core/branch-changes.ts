@@ -1,3 +1,4 @@
+import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { listActiveChanges, listArchivedChanges, isValidChangeId } from './changes.js';
 import { git } from './git.js';
@@ -8,7 +9,15 @@ export interface BranchChange { id: string; branch: string }
 /** Changes visible on other refs as of the last fetch. Reads refs and trees only. */
 export function otherBranchChanges(root: string): BranchChange[] {
   const top = git(root, ['rev-parse', '--show-toplevel']);
-  if (!top.ok || path.resolve(top.stdout) !== path.resolve(root)) return [];
+  if (!top.ok) return [];
+  if (path.resolve(top.stdout) !== path.resolve(root)) {
+    if (process.platform !== 'win32') return [];
+    try {
+      if (path.relative(fs.realpathSync.native(top.stdout), fs.realpathSync.native(root)) !== '') return [];
+    } catch {
+      return [];
+    }
+  }
   const current = git(root, ['symbolic-ref', '--quiet', 'HEAD']).stdout;
   const refs = git(root, ['for-each-ref', '--format=%(refname)', 'refs/heads', 'refs/remotes']);
   if (!refs.ok) return [];

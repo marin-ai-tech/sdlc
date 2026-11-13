@@ -8,6 +8,7 @@ import { readBoard } from '../src/core/board-store.js';
 import { defaultConfig } from '../src/core/config.js';
 import { git as readGit } from '../src/core/git.js';
 import { projectPaths } from '../src/core/project.js';
+import { evaluateToolCall, normalizeToolCall } from '../src/core/policy.js';
 import { checkResultCore } from '../src/core/task-result.js';
 import { git, humanEnv, initGitRepo, runCli, tempDir, write } from './helpers.js';
 
@@ -234,4 +235,46 @@ describe('candidate Git boundaries and failure controls', () => {
     expect(candidatePathMapper(worktree)('src/greet.js')).toBe('src/greet.js');
     expect(candidatePathMapper(worktree)('../outside.js')).toBeUndefined();
   });
+});
+
+describe.runIf(process.platform === 'win32')('policy with Windows short and full project paths', () => {
+  it('protects existing and absent targets for every root and cwd spelling', ({ skip }) => {
+    const root = tempDir('sdlc-policy-long-path-');
+    write(path.join(root, 'openspec/roles.yaml'), 'original');
+    const short = windowsShortPath(root);
+    const full = fs.realpathSync.native(root);
+    if (path.resolve(short).toLowerCase() === path.resolve(full).toLowerCase()) {
+      skip('No real Windows 8.3 alias on this volume; a separate short-name run is required');
+    }
+    expect(fs.realpathSync.native(short).toLowerCase()).toBe(full.toLowerCase());
+    const config = defaultConfig();
+    config.enforcement.mode = 'block';
+    config.enforcement.requireApprovedPlan = false;
+    config.enforcement.protectedPaths = ['src/gen/**'];
+    for (const project of [short, full]) {
+      for (const cwd of [short, full]) {
+        const decide = (input: string) => evaluateToolCall(normalizeToolCall('Bash', { command: input }, cwd),
+          { paths: projectPaths(project), config });
+        for (const verb of ['touch', 'install a', 'echo x >']) {
+          expect(decide(`${verb} openspec/roles.yaml`)).toMatchObject({ decision: 'deny', rule: 'state-integrity' });
+          expect(decide(`${verb} src/gen/new.ts`)).toMatchObject({ decision: 'deny', rule: 'protected-path' });
+        }
+        expect(decide('cat openspec/roles.yaml').decision).toBe('allow');
+        expect(decide('echo x > ../ordinary-neighbour.txt').decision).toBe('allow');
+      }
+    }
+    const failedLookup = vi.spyOn(fs.realpathSync, 'native').mockImplementation(() => {
+      throw Object.assign(new Error('Injected filesystem error'), { code: 'EACCES' });
+    });
+    try {
+      const decide = (input: string) => evaluateToolCall(normalizeToolCall('Bash', { command: input }, short),
+        { paths: projectPaths(full), config });
+      expect(decide('echo x > openspec/roles.yaml').decision).toBe('deny');
+      expect(decide('cat openspec/roles.yaml').decision).toBe('allow');
+      expect(evaluateToolCall(normalizeToolCall('Write', { file_path: path.join(short, 'openspec/roles.yaml') }, short),
+        { paths: projectPaths(full), config }).decision).toBe('deny');
+    } finally {
+      failedLookup.mockRestore();
+    }
+  }, 30000);
 });

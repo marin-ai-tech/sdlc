@@ -72,8 +72,48 @@ const UNRESOLVED = /[$`~%]/;
 
 export function relToRoot(root: string, cwd: string, file: string): string | undefined {
   const abs = path.isAbsolute(file) ? file : path.resolve(cwd, file);
-  if (!isWithin(root, abs)) return undefined;
-  return toPosix(path.relative(root, abs));
+  if (isWithin(root, abs)) return toPosix(path.relative(root, abs));
+  if (process.platform !== 'win32') return undefined;
+  try {
+    const physicalRoot = fs.realpathSync.native(root);
+    const physicalTarget = physicalPath(abs);
+    if (physicalTarget && isWithin(physicalRoot, physicalTarget)) {
+      return toPosix(path.relative(physicalRoot, physicalTarget));
+    }
+  } catch {
+    return undefined;
+  }
+  return undefined;
+}
+
+/** Resolve existing ancestors so an absent target can still be checked against its physical project root. */
+function physicalPath(target: string): string | undefined {
+  let current = path.resolve(target);
+  const missing: string[] = [];
+  for (;;) {
+    try {
+      return path.join(fs.realpathSync.native(current), ...missing);
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== 'ENOENT') return undefined;
+      const parent = path.dirname(current);
+      if (parent === current) return undefined;
+      missing.unshift(path.basename(current));
+      current = parent;
+    }
+  }
+}
+
+/** An outside-looking Windows path needs physical proof before it can be treated as outside the project. */
+export function uncertainWindowsPath(root: string, cwd: string, file: string): boolean {
+  if (process.platform !== 'win32') return false;
+  const absoluteFile = path.isAbsolute(file) ? file : path.resolve(cwd, file);
+  if (isWithin(root, absoluteFile)) return false;
+  try {
+    fs.realpathSync.native(root);
+    return physicalPath(absoluteFile) === undefined;
+  } catch {
+    return true;
+  }
 }
 
 /** The root-relative path of `abs` when it matches `pattern`, or undefined. */
@@ -172,7 +212,11 @@ function words(segment: string): string[] {
 
 /** A word as an absolute path from the current directory, or undefined when it cannot be told. */
 export function absolute(dir: string | undefined, word: string | undefined): string | undefined {
-  if (word === undefined || word.startsWith('-') || UNRESOLVED.test(word)) return undefined;
+  if (word === undefined || word.startsWith('-')) return undefined;
+  if (path.isAbsolute(word) && process.platform === 'win32') {
+    return /[$`%]/.test(word) ? undefined : path.resolve(word);
+  }
+  if (UNRESOLVED.test(word)) return undefined;
   if (path.isAbsolute(word)) return path.resolve(word);
   return dir === undefined ? undefined : path.resolve(dir, word);
 }
