@@ -30,7 +30,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "command -v sdlc >/dev/null 2>&1 && sdlc hook stop || true",
+            "command": "command -v sdlc >/dev/null 2>/dev/null && sdlc hook stop || true",
             "timeout": 120
           }
         ]

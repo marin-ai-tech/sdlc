@@ -137,3 +137,40 @@ describe('the plugin passes the Claude plugin directory checks', () => {
     for (const line of scripts) expect(line.slice(0, 6), line).toBe('100755');
   });
 });
+
+/**
+ * B273: the directory held v0.30.1 with "Hook can approve tool calls or change their input". The hook never
+ * approves a call, so its text takes the forms the directory accepts for that case: the answer printed whole by one
+ * command, no printf conversions or backslash escapes, other output to standard error without 2>&1.
+ */
+describe('B273: the plugin hooks take the forms the directory accepts', () => {
+  const FORMS: Array<[string, RegExp]> = [
+    ['printf', /\bprintf\b/],
+    ['a % conversion', /%[a-zA-Z]/],
+    ['a backslash', /\\/],
+    ['2>&1', /2>&1/],
+  ];
+
+  function hookTexts(): Array<[string, string]> {
+    const commands = hookCommands().map(({ event, command }): [string, string] => [`${event} command`, command]);
+    const named = [...new Set(hookCommands().flatMap((h) => namedFiles(h.command)))];
+    return [...commands, ...named.map((rel): [string, string] => [rel, String(file(rel)!.content)])];
+  }
+
+  it.each(FORMS)('no hook command or hook script holds %s', (_form, pattern) => {
+    for (const [where, text] of hookTexts()) expect(text, where).not.toMatch(pattern);
+  });
+
+  it('the failure notice is written to standard error on the line that holds it', () => {
+    const script = String(file('hooks/pre-tool.sh')!.content);
+    const lines = script.split('\n').filter((line) => /could not run|sdlc doctor/.test(line));
+    expect(lines.length).toBeGreaterThan(0);
+    for (const line of lines) expect(line.trimEnd(), line).toMatch(/>&2$/);
+  });
+
+  it('negative: the answer still reaches standard output whole, from one command', () => {
+    const script = String(file('hooks/pre-tool.sh')!.content);
+    const stdout = script.split('\n').filter((line) => /\bcat "\$in\.out"/.test(line));
+    expect(stdout).toEqual(['cat "$in.out"']);
+  });
+});

@@ -15,7 +15,7 @@ import { HarnessRuntime } from '../src/executors/harness-runtime.js';
 import type { HarnessCandidateValidator, HarnessValidationRequest } from '../src/executors/harness-validation.js';
 import { auditProject, auditRuntime, auditSourceCopy, auditValidator, candidate, claimAuditSource,
   prepareAuditSource } from './fixtures/harness-audit.js';
-import { git, initGitRepo, read, write } from './helpers.js';
+import { git, initGitRepo, read, tempDir, write } from './helpers.js';
 
 const LIMIT = 512 * 1024;
 vi.mock('node:fs', async (importOriginal) => {
@@ -46,6 +46,69 @@ function sourceSnapshot(root: string) {
     head: gitModule.git(root, ['rev-parse', 'HEAD']).stdout,
     board: fs.existsSync(path.join(root, 'openspec/.sdlc/board.json')) };
 }
+
+/** H9 checks physical directory identity; spelling or a string prefix is not proof. */
+function assertH9Isolation(output: string, expected: string, source: string): void {
+  const actual = output.trim();
+  if (!actual || /[\r\n]/.test(actual) || !path.isAbsolute(actual)
+    || !path.isAbsolute(expected) || !path.isAbsolute(source)) throw new Error('Invalid H9 path');
+  const [actualPath, expectedPath, sourcePath] = [actual, expected, source].map((entry) => {
+    const physical = fs.realpathSync.native(entry);
+    if (!fs.statSync(physical).isDirectory()) throw new Error('H9 path is not a directory');
+    return physical;
+  });
+  if (path.relative(expectedPath, actualPath) !== '') throw new Error('H9 output is not the validator directory');
+  if (path.relative(expectedPath, sourcePath) === '') throw new Error('H9 validator is the source directory');
+}
+
+describe('H9 physical path controls', () => {
+  it('accepts one physical validator directory and rejects a similar neighbouring directory', () => {
+    const root = tempDir('sdlc-h9-boundary-');
+    const expected = path.join(root, 'checkout');
+    const neighbour = path.join(root, 'checkout-neighbour');
+    const source = path.join(root, 'source');
+    for (const dir of [expected, neighbour, source]) fs.mkdirSync(dir);
+    expect(() => assertH9Isolation(expected, expected, source)).not.toThrow();
+    expect(() => assertH9Isolation(neighbour, expected, source)).toThrow();
+  });
+
+  it('rejects empty or inaccessible paths instead of accepting unproven identity', () => {
+    const root = tempDir('sdlc-h9-missing-');
+    const expected = path.join(root, 'checkout');
+    const source = path.join(root, 'source');
+    fs.mkdirSync(expected);
+    fs.mkdirSync(source);
+    expect(() => assertH9Isolation('', expected, source)).toThrow();
+    expect(() => assertH9Isolation('relative', expected, source)).toThrow();
+    expect(() => assertH9Isolation(`${expected}\n${expected}`, expected, source)).toThrow();
+    expect(() => assertH9Isolation(expected, '.', source)).toThrow();
+    expect(() => assertH9Isolation(expected, expected, '.')).toThrow();
+    expect(() => assertH9Isolation(path.join(root, 'missing'), expected, source)).toThrow();
+    expect(() => assertH9Isolation(expected, path.join(root, 'missing'), source)).toThrow();
+    expect(() => assertH9Isolation(expected, expected, path.join(root, 'missing'))).toThrow();
+  });
+
+  it('rejects the source directory through a real link and accepts an alias of the validator', ({ skip }) => {
+    const root = tempDir('sdlc-h9-link-');
+    const source = path.join(root, 'source');
+    const validator = path.join(root, 'validator');
+    const sourceAlias = path.join(root, 'source-alias');
+    const validatorAlias = path.join(root, 'validator-alias');
+    fs.mkdirSync(source);
+    fs.mkdirSync(validator);
+    try {
+      fs.symlinkSync(source, sourceAlias, process.platform === 'win32' ? 'junction' : 'dir');
+      fs.symlinkSync(validator, validatorAlias, process.platform === 'win32' ? 'junction' : 'dir');
+    } catch (error) {
+      if (['EPERM', 'EACCES', 'ENOTSUP'].includes((error as NodeJS.ErrnoException).code ?? '')) {
+        skip('Filesystem cannot create real links; a separate real-link control is required');
+      }
+      throw error;
+    }
+    expect(() => assertH9Isolation(sourceAlias, sourceAlias, source)).toThrow();
+    expect(() => assertH9Isolation(validatorAlias, validator, source)).not.toThrow();
+  });
+});
 
 describe('Historical Harness acceptance boundaries H1–H10', () => {
   describe('physical source identity', () => {
@@ -281,7 +344,7 @@ describe('Historical Harness acceptance boundaries H1–H10', () => {
       expect(checks).toHaveBeenCalledOnce();
       expect(checks.mock.calls[0][0]).toBe(roots[0]);
       const run = (await validator.mock.results[0].value).run;
-      expect(run.checks[0].output).toContain(roots[0]);
+      assertH9Isolation(run.checks[0].output, roots[0], p.root);
       expect(read(path.join(p.root, 'src/greet.js'))).toBe('// original\n');
     }, 120000);
 
