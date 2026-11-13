@@ -64,7 +64,15 @@ describe.runIf(process.platform === 'win32')('finding 2: doctor checks where Cla
     const r = missing.cli(['doctor']);
     expect(r.stdout + r.stderr).toMatch(/CLAUDE_CODE_GIT_BASH_PATH/);
     const empty = tempDir('sdlc-0236-programs-');
-    const unset = project('claude', { CLAUDE_CODE_GIT_BASH_PATH: '', ProgramFiles: empty, ProgramW6432: empty });
+    // Windows can restore ProgramFiles at process startup; set the fixture values inside each CLI process.
+    const preload = path.join(empty, 'fixture-program-files.cjs');
+    write(preload, `process.env.ProgramFiles = ${JSON.stringify(empty)};\n`
+      + `process.env.ProgramW6432 = ${JSON.stringify(empty)};\n`);
+    const requireFixture = `--require ${JSON.stringify(preload.replace(/\\/g, '/'))}`;
+    const options = [process.env.NODE_OPTIONS, requireFixture].filter(Boolean).join(' ');
+    const unset = project('claude', {
+      CLAUDE_CODE_GIT_BASH_PATH: '', ProgramFiles: empty, ProgramW6432: empty, NODE_OPTIONS: options,
+    });
     expect(unset.cli(['doctor']).stdout).toMatch(/CLAUDE_CODE_GIT_BASH_PATH/);
   }, 240000);
 

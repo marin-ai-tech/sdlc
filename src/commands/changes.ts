@@ -1,3 +1,4 @@
+import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { loadProject, recordChangeEvent, type ProjectContext } from '../cli/context.js';
 import { c, gateBadge, line, printJson, reportFailure, warn } from '../cli/output.js';
@@ -492,8 +493,20 @@ export async function instructionsCommand(artifact: string, opts: { change?: str
     const originalOutputPath = result.data.outputPath;
     const destination = typeof resolvedOutputPath === 'string' ? resolvedOutputPath
       : typeof originalOutputPath === 'string' ? path.resolve(ref.dir, originalOutputPath) : undefined;
-    const outputPath = destination === undefined ? originalOutputPath
+    let outputPath = destination === undefined ? originalOutputPath
       : path.relative(ctx.root, destination).split(path.sep).join('/');
+    // OpenSpec can return the long Windows spelling while the project root uses its short spelling.
+    if (destination !== undefined && process.platform === 'win32'
+      && typeof outputPath === 'string' && (outputPath === '..' || outputPath.startsWith('../'))) {
+      try {
+        const physicalRoot = fs.realpathSync.native(ctx.root);
+        const physicalParent = fs.realpathSync.native(path.dirname(destination));
+        outputPath = path.relative(physicalRoot, path.join(physicalParent, path.basename(destination)))
+          .split(path.sep).join('/');
+      } catch {
+        // Preserve OpenSpec's original result when the parent cannot be resolved.
+      }
+    }
     printJson({ ...result.data, outputPath, sdlc: instructionsSdlcJson(view, artifact),
       ...contextPackJson(pack) });
     if (!result.ok) process.exitCode = 1;

@@ -1,3 +1,4 @@
+import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { captureCheckpoint } from '../src/core/checkpoint.js';
@@ -26,7 +27,8 @@ vi.mock('node:child_process', async (original) => {
       return result;
     }
     for (const [absolute, target] of links) {
-      const relative = path.relative(options.cwd, absolute).replace(/\\/g, '/');
+      const relative = path.relative(fs.realpathSync.native(options.cwd), fs.realpathSync.native(absolute))
+        .replace(/\\/g, '/');
       if (actual.spawnSync('git', ['--literal-pathspecs', 'ls-files', '--error-unmatch', '--', relative], options)
         .status !== 0) continue;
       const blob = actual.spawnSync('git', ['hash-object', '-w', '--stdin'], { ...options, input: target,

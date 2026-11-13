@@ -8,6 +8,7 @@ import { readBoard } from '../src/core/board-store.js';
 import { defaultConfig } from '../src/core/config.js';
 import { git as readGit } from '../src/core/git.js';
 import { projectPaths } from '../src/core/project.js';
+import { evaluateToolCall, normalizeToolCall } from '../src/core/policy.js';
 import { checkResultCore } from '../src/core/task-result.js';
 import { git, humanEnv, initGitRepo, runCli, tempDir, write } from './helpers.js';
 
@@ -90,13 +91,13 @@ describe('candidate Git boundaries and failure controls', () => {
       'enforcement:\n  test_paths: [test/**]\n  protected_paths: [private/**]\nlog:\n  enabled: false\n');
     write(path.join(root, 'test/locked.test.ts'), 'locked\n');
     write(path.join(root, 'private/secret [x].txt'), 'protected\n');
-    write(path.join(root, 'src/старый [x].txt'), 'old\n');
+    write(path.join(root, 'src/\u0441\u0442\u0430\u0440\u044b\u0439 [x].txt'), 'old\n');
     git(top, ['add', '-A']);
     git(top, ['commit', '-qm', 'baseline']);
     const base = readGit(top, ['rev-parse', 'HEAD']).stdout;
     fs.mkdirSync(path.join(root, 'src'), { recursive: true });
     fs.renameSync(path.join(root, 'test/locked.test.ts'), path.join(root, 'src/moved.test.ts'));
-    fs.rmSync(path.join(root, 'src/старый [x].txt'));
+    fs.rmSync(path.join(root, 'src/\u0441\u0442\u0430\u0440\u044b\u0439 [x].txt'));
     write(path.join(root, 'private/secret [x].txt'), 'changed\n');
     write(path.join(top, 'packages/other/outside.txt'), 'neighbour\n');
     git(top, ['add', '-A']);
@@ -109,7 +110,7 @@ describe('candidate Git boundaries and failure controls', () => {
     const ref = { id: 'demo', dir: changeDir, archived: false };
     const result = checkResultCore(root, ref, config, branch, base);
     expect(result.files).toEqual(expect.arrayContaining([
-      `${prefix}/test/locked.test.ts`, `${prefix}/src/moved.test.ts`, `${prefix}/src/старый [x].txt`,
+      `${prefix}/test/locked.test.ts`, `${prefix}/src/moved.test.ts`, `${prefix}/src/\u0441\u0442\u0430\u0440\u044b\u0439 [x].txt`,
       `${prefix}/private/secret [x].txt`, 'packages/other/outside.txt',
     ]));
     expect(result.problems).toEqual(expect.arrayContaining([
@@ -117,7 +118,7 @@ describe('candidate Git boundaries and failure controls', () => {
       { code: 'forbidden_path', file: `${prefix}/private/secret [x].txt` },
       { code: 'outside_project', file: 'packages/other/outside.txt' },
     ]));
-    expect(result.problems.filter(problem => problem.file === `${prefix}/src/старый [x].txt`)).toEqual([]);
+    expect(result.problems.filter(problem => problem.file === `${prefix}/src/\u0441\u0442\u0430\u0440\u044b\u0439 [x].txt`)).toEqual([]);
     const cli = runCli(['task', 'check-result', '--branch', branch, '--change', 'demo', '--base', base, '--json'],
       root, humanEnv(tempDir('sdlc-candidate-person-')));
     expect(cli.code, cli.stdout + cli.stderr).toBe(1);
@@ -234,4 +235,46 @@ describe('candidate Git boundaries and failure controls', () => {
     expect(candidatePathMapper(worktree)('src/greet.js')).toBe('src/greet.js');
     expect(candidatePathMapper(worktree)('../outside.js')).toBeUndefined();
   });
+});
+
+describe.runIf(process.platform === 'win32')('policy with Windows short and full project paths', () => {
+  it('protects existing and absent targets for every root and cwd spelling', ({ skip }) => {
+    const root = tempDir('sdlc-policy-long-path-');
+    write(path.join(root, 'openspec/roles.yaml'), 'original');
+    const short = windowsShortPath(root);
+    const full = fs.realpathSync.native(root);
+    if (path.resolve(short).toLowerCase() === path.resolve(full).toLowerCase()) {
+      skip('No real Windows 8.3 alias on this volume; a separate short-name run is required');
+    }
+    expect(fs.realpathSync.native(short).toLowerCase()).toBe(full.toLowerCase());
+    const config = defaultConfig();
+    config.enforcement.mode = 'block';
+    config.enforcement.requireApprovedPlan = false;
+    config.enforcement.protectedPaths = ['src/gen/**'];
+    for (const project of [short, full]) {
+      for (const cwd of [short, full]) {
+        const decide = (input: string) => evaluateToolCall(normalizeToolCall('Bash', { command: input }, cwd),
+          { paths: projectPaths(project), config });
+        for (const verb of ['touch', 'install a', 'echo x >']) {
+          expect(decide(`${verb} openspec/roles.yaml`)).toMatchObject({ decision: 'deny', rule: 'state-integrity' });
+          expect(decide(`${verb} src/gen/new.ts`)).toMatchObject({ decision: 'deny', rule: 'protected-path' });
+        }
+        expect(decide('cat openspec/roles.yaml').decision).toBe('allow');
+        expect(decide('echo x > ../ordinary-neighbour.txt').decision).toBe('allow');
+      }
+    }
+    const failedLookup = vi.spyOn(fs.realpathSync, 'native').mockImplementation(() => {
+      throw Object.assign(new Error('Injected filesystem error'), { code: 'EACCES' });
+    });
+    try {
+      const decide = (input: string) => evaluateToolCall(normalizeToolCall('Bash', { command: input }, short),
+        { paths: projectPaths(full), config });
+      expect(decide('echo x > openspec/roles.yaml').decision).toBe('deny');
+      expect(decide('cat openspec/roles.yaml').decision).toBe('allow');
+      expect(evaluateToolCall(normalizeToolCall('Write', { file_path: path.join(short, 'openspec/roles.yaml') }, short),
+        { paths: projectPaths(full), config }).decision).toBe('deny');
+    } finally {
+      failedLookup.mockRestore();
+    }
+  }, 30000);
 });

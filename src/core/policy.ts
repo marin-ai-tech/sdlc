@@ -24,7 +24,9 @@ import {
   linkedStateFiles,
   relToRoot,
   STATE_FILE,
+  uncertainWindowsPath,
 } from './policy-shell.js';
+import { shellWriteDestinationPaths } from './policy-shell-writes.js';
 import { patchFiles } from './policy-patch-files.js';
 import { planGateDenial } from './plan-gate.js';
 import { openspecWrite } from './openspec-guard.js';
@@ -179,6 +181,10 @@ function evaluateCommand(
   cwd: string,
   soft: Soft,
 ): Decision {
+  if (process.platform === 'win32'
+    && shellWriteDestinationPaths(command, cwd).some((file) => uncertainWindowsPath(ctx.paths.root, cwd, file))) {
+    return { decision: 'deny', rule: 'shell-parse', reason: 'Could not determine the physical boundary of a write target.' };
+  }
   return evaluateShellCommand(command, ctx, env, cwd, soft, {
     locked: (hidden) => testsLockedDenial(hidden, snapshots(ctx), matcher(ctx.config.enforcement.testPaths)),
     gated: (written, wholeTree) => codeGateDenial(written, ctx, soft, wholeTree),
@@ -225,6 +231,9 @@ function evaluateRules(call: ToolCall, ctx: PolicyContext): Decision {
   }
 
   if (call.kind !== 'edit' || call.files.length === 0) return { decision: 'allow' };
+  if (call.files.some((file) => uncertainWindowsPath(paths.root, call.cwd, file))) {
+    return { decision: 'deny', rule: 'protected-path', reason: 'Could not determine the physical boundary of a write target.' };
+  }
   const launcher = launcherDecision(call, paths.root, config);
   if (launcher) return launcher;
   const rels = call.files

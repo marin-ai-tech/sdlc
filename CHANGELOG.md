@@ -2,6 +2,16 @@
 
 All notable changes to sdlc. Versions follow [Semantic Versioning](https://semver.org/); while the major version is 0, a minor version may change behavior.
 
+## 0.31.1 — 2026-11-13
+
+### Fixed
+- Local Git exclusions and candidate path checks handle Windows short paths for the same project directory.
+- Claude plugin hooks follow the plugin directory's hook policy.
+
+### Known limits
+- A project reached through a parent junction above the Git root can still receive a safe refusal for a local exclusion.
+- The H9 isolation check does not automatically retain the original command output; save it separately when needed.
+
 ## 0.31.0 — 2026-11-08
 
 The hook follows a write through a shell variable and reads one list of known writers in every check, so a write it

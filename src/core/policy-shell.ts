@@ -1,7 +1,9 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import picomatch from 'picomatch';
-import { isWithin, toPosix, listFilesRecursive } from './fs-utils.js';
+import { listFilesRecursive } from './fs-utils.js';
+import { relToRoot } from './policy-shell-paths.js';
+export { relToRoot, uncertainWindowsPath } from './policy-shell-paths.js';
 import { INBOX_DIR } from '../mcp/inbox.js';
 import { decodedShellWords, shellWords, type ShellCommand, type ShellContext } from './shell-words.js';
 import { shellBody, MAX_SHELL_BODY_DEPTH } from './shell-cli.js';
@@ -69,12 +71,6 @@ const DIR_COMMAND = /^(?:cd|chdir|pushd|Set-Location|sl|Push-Location)$/i;
 const POP_COMMAND = /^(?:popd|Pop-Location)$/i;
 /** Words that cannot be resolved from the text: variables, command substitution, the home directory. */
 const UNRESOLVED = /[$`~%]/;
-
-export function relToRoot(root: string, cwd: string, file: string): string | undefined {
-  const abs = path.isAbsolute(file) ? file : path.resolve(cwd, file);
-  if (!isWithin(root, abs)) return undefined;
-  return toPosix(path.relative(root, abs));
-}
 
 /** The root-relative path of `abs` when it matches `pattern`, or undefined. */
 function relMatching(root: string, abs: string | undefined, pattern: RegExp): string | undefined {
@@ -172,7 +168,11 @@ function words(segment: string): string[] {
 
 /** A word as an absolute path from the current directory, or undefined when it cannot be told. */
 export function absolute(dir: string | undefined, word: string | undefined): string | undefined {
-  if (word === undefined || word.startsWith('-') || UNRESOLVED.test(word)) return undefined;
+  if (word === undefined || word.startsWith('-')) return undefined;
+  if (path.isAbsolute(word) && process.platform === 'win32') {
+    return /[$`%]/.test(word) ? undefined : path.resolve(word);
+  }
+  if (UNRESOLVED.test(word)) return undefined;
   if (path.isAbsolute(word)) return path.resolve(word);
   return dir === undefined ? undefined : path.resolve(dir, word);
 }
