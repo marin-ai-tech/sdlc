@@ -90,13 +90,13 @@ describe('candidate Git boundaries and failure controls', () => {
       'enforcement:\n  test_paths: [test/**]\n  protected_paths: [private/**]\nlog:\n  enabled: false\n');
     write(path.join(root, 'test/locked.test.ts'), 'locked\n');
     write(path.join(root, 'private/secret [x].txt'), 'protected\n');
-    write(path.join(root, 'src/старый [x].txt'), 'old\n');
+    write(path.join(root, 'src/\u0441\u0442\u0430\u0440\u044b\u0439 [x].txt'), 'old\n');
     git(top, ['add', '-A']);
     git(top, ['commit', '-qm', 'baseline']);
     const base = readGit(top, ['rev-parse', 'HEAD']).stdout;
     fs.mkdirSync(path.join(root, 'src'), { recursive: true });
     fs.renameSync(path.join(root, 'test/locked.test.ts'), path.join(root, 'src/moved.test.ts'));
-    fs.rmSync(path.join(root, 'src/старый [x].txt'));
+    fs.rmSync(path.join(root, 'src/\u0441\u0442\u0430\u0440\u044b\u0439 [x].txt'));
     write(path.join(root, 'private/secret [x].txt'), 'changed\n');
     write(path.join(top, 'packages/other/outside.txt'), 'neighbour\n');
     git(top, ['add', '-A']);
@@ -109,7 +109,7 @@ describe('candidate Git boundaries and failure controls', () => {
     const ref = { id: 'demo', dir: changeDir, archived: false };
     const result = checkResultCore(root, ref, config, branch, base);
     expect(result.files).toEqual(expect.arrayContaining([
-      `${prefix}/test/locked.test.ts`, `${prefix}/src/moved.test.ts`, `${prefix}/src/старый [x].txt`,
+      `${prefix}/test/locked.test.ts`, `${prefix}/src/moved.test.ts`, `${prefix}/src/\u0441\u0442\u0430\u0440\u044b\u0439 [x].txt`,
       `${prefix}/private/secret [x].txt`, 'packages/other/outside.txt',
     ]));
     expect(result.problems).toEqual(expect.arrayContaining([
@@ -117,7 +117,7 @@ describe('candidate Git boundaries and failure controls', () => {
       { code: 'forbidden_path', file: `${prefix}/private/secret [x].txt` },
       { code: 'outside_project', file: 'packages/other/outside.txt' },
     ]));
-    expect(result.problems.filter(problem => problem.file === `${prefix}/src/старый [x].txt`)).toEqual([]);
+    expect(result.problems.filter(problem => problem.file === `${prefix}/src/\u0441\u0442\u0430\u0440\u044b\u0439 [x].txt`)).toEqual([]);
     const cli = runCli(['task', 'check-result', '--branch', branch, '--change', 'demo', '--base', base, '--json'],
       root, humanEnv(tempDir('sdlc-candidate-person-')));
     expect(cli.code, cli.stdout + cli.stderr).toBe(1);
