@@ -32,7 +32,10 @@ const created: string[] = [];
  * the roles file, the project log, an ordinary folder and, when asked, a change a person holds.
  */
 function posixRoot(held = false): string {
-  const real = fs.realpathSync(fs.mkdtempSync(`${process.env.SDLC_TEST_TMP ?? os.tmpdir()}/sdlc-posix-paths-`));
+  // These fixtures intentionally omit the drive; keep them on the process's current drive on Windows.
+  const parent = process.platform === 'win32' ? `${process.cwd()}/.sdlc-tmp` : process.env.SDLC_TEST_TMP ?? os.tmpdir();
+  fs.mkdirSync(parent, { recursive: true });
+  const real = fs.realpathSync(fs.mkdtempSync(`${parent}/sdlc-posix-paths-`));
   created.push(real);
   const put = (relative: string, text: string) => {
     fs.mkdirSync(`${real}/${relative}`.replace(/\/[^/]+$/, ''), { recursive: true });

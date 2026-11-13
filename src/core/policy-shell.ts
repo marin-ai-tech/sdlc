@@ -1,7 +1,9 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import picomatch from 'picomatch';
-import { isWithin, toPosix, listFilesRecursive } from './fs-utils.js';
+import { listFilesRecursive } from './fs-utils.js';
+import { relToRoot } from './policy-shell-paths.js';
+export { relToRoot, uncertainWindowsPath } from './policy-shell-paths.js';
 import { INBOX_DIR } from '../mcp/inbox.js';
 import { decodedShellWords, shellWords, type ShellCommand, type ShellContext } from './shell-words.js';
 import { shellBody, MAX_SHELL_BODY_DEPTH } from './shell-cli.js';
@@ -69,52 +71,6 @@ const DIR_COMMAND = /^(?:cd|chdir|pushd|Set-Location|sl|Push-Location)$/i;
 const POP_COMMAND = /^(?:popd|Pop-Location)$/i;
 /** Words that cannot be resolved from the text: variables, command substitution, the home directory. */
 const UNRESOLVED = /[$`~%]/;
-
-export function relToRoot(root: string, cwd: string, file: string): string | undefined {
-  const abs = path.isAbsolute(file) ? file : path.resolve(cwd, file);
-  if (isWithin(root, abs)) return toPosix(path.relative(root, abs));
-  if (process.platform !== 'win32') return undefined;
-  try {
-    const physicalRoot = fs.realpathSync.native(root);
-    const physicalTarget = physicalPath(abs);
-    if (physicalTarget && isWithin(physicalRoot, physicalTarget)) {
-      return toPosix(path.relative(physicalRoot, physicalTarget));
-    }
-  } catch {
-    return undefined;
-  }
-  return undefined;
-}
-
-/** Resolve existing ancestors so an absent target can still be checked against its physical project root. */
-function physicalPath(target: string): string | undefined {
-  let current = path.resolve(target);
-  const missing: string[] = [];
-  for (;;) {
-    try {
-      return path.join(fs.realpathSync.native(current), ...missing);
-    } catch (error) {
-      if ((error as NodeJS.ErrnoException).code !== 'ENOENT') return undefined;
-      const parent = path.dirname(current);
-      if (parent === current) return undefined;
-      missing.unshift(path.basename(current));
-      current = parent;
-    }
-  }
-}
-
-/** An outside-looking Windows path needs physical proof before it can be treated as outside the project. */
-export function uncertainWindowsPath(root: string, cwd: string, file: string): boolean {
-  if (process.platform !== 'win32') return false;
-  const absoluteFile = path.isAbsolute(file) ? file : path.resolve(cwd, file);
-  if (isWithin(root, absoluteFile)) return false;
-  try {
-    fs.realpathSync.native(root);
-    return physicalPath(absoluteFile) === undefined;
-  } catch {
-    return true;
-  }
-}
 
 /** The root-relative path of `abs` when it matches `pattern`, or undefined. */
 function relMatching(root: string, abs: string | undefined, pattern: RegExp): string | undefined {

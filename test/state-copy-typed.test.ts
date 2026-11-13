@@ -35,7 +35,10 @@ const { projectPaths } = await import('../src/core/project.js');
 const created: string[] = [];
 
 function posixRoot(): string {
-  const real = fs.realpathSync(fs.mkdtempSync(`${process.env.SDLC_TEST_TMP ?? os.tmpdir()}/sdlc-copy-typed-`));
+  // These fixtures intentionally omit the drive; keep them on the process's current drive on Windows.
+  const parent = process.platform === 'win32' ? `${process.cwd()}/.sdlc-tmp` : process.env.SDLC_TEST_TMP ?? os.tmpdir();
+  fs.mkdirSync(parent, { recursive: true });
+  const real = fs.realpathSync(fs.mkdtempSync(`${parent}/sdlc-copy-typed-`));
   created.push(real);
   const put = (relative: string, text: string) => {
     fs.mkdirSync(`${real}/${relative}`.replace(/\/[^/]+$/, ''), { recursive: true });
