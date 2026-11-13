@@ -8,6 +8,8 @@ const REFUSED = 2;
 
 export const WINDOWS_ONLY_FILES = [
   'test/audit-verify-process-tree.test.ts',
+  'test/candidate-path-short.test.ts',
+  'test/local-ignore-project.test.ts',
   'test/e2e-0236-mixed-tools.test.ts',
   'test/verify-startup.test.ts',
   'test/workflow-decision-hints.test.ts',
@@ -20,6 +22,7 @@ export const WINDOWS_BRANCH_FILES = [
   'test/approval-real-git.test.ts',
   'test/audit-digest-integrity.test.ts',
   'test/audit-gate-read.test.ts',
+  'test/audit-harness-runtime.test.ts',
   'test/b146-review-fixes.test.ts',
   'test/checkpoint-linked-root.test.ts',
   'test/claude-hook-failure.test.ts',
