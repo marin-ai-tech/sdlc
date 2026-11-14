@@ -23,6 +23,7 @@ import { renderSkills } from './skills.js';
 import { renderTeamSkills } from './team-skills.js';
 import { acceptedRoles } from '../team/accepted.js';
 import { readTeam } from '../team/record.js';
+import { applyRulesBlock } from '../team/rules-block.js';
 import { roleSkills } from './role-skills.js';
 import { TOOL_IDS, type GeneratedFile, type RenderContext, type ToolAdapter, type ToolId } from './types.js';
 
@@ -78,8 +79,12 @@ export function renderContext(config: SdlcConfig, tools: ToolId[], root?: string
   const stamp = harnessStamp(config);
   const base = { tools, delivery: config.delivery, cli: config.cli, version: stamp.version, config, stamp };
   if (root === undefined) return base;
-  const installed = new Set(Object.keys(readTeam(root).skills));
-  return { ...base, root, team: roleSkills(acceptedRoles(root), installed) };
+  const record = readTeam(root);
+  const installed = new Set(Object.keys(record.skills));
+  const pathRules = Object.entries(record.rules ?? {}).filter(([, rule]) => rule.paths && rule.paths.length > 0)
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([id, rule]) => ({ id, description: rule.description, paths: rule.paths ?? [], text: rule.text }));
+  return { ...base, root, team: roleSkills(acceptedRoles(root), installed), pathRules };
 }
 
 export function renderAll(ctx: RenderContext): GeneratedFile[] {
@@ -122,6 +127,8 @@ export function installIntegrations(
     version: ctx.version,
     license: ctx.stamp.license,
   });
+  // 0.32.0: the team rules block of AGENTS.md follows the accepted rules; the text around it stays the person's.
+  if (!options.dryRun) applyRulesBlock(root, config, readTeam(root).rules ?? {});
   const wantHooks = tools.includes('claude') && options.hooks !== false;
   const claudeHooks = tools.includes('claude') || fs.existsSync(path.join(root, '.claude', 'settings.json'))
     ? mergeClaudeHooks(root, config.cli, wantHooks, options.dryRun)

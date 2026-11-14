@@ -273,6 +273,15 @@ empty word, and a file argument set to it is refused as an empty path.
 Text after a `#` is read like any other command text, so a path named in a comment can be refused; keep comments
 out of commands.
 
+Every line of a here-document body (`<<EOF`, `<<-EOF`) is read as a command by every check, the write check too.
+A body that bash runs, or a write after a partly quoted delimiter such as `<<'E'OF`, can therefore not hide a write.
+The price is that a harmless body can be refused, for example Markdown with a backtick code span or a script with
+`rm` in a word. Write such a file with the editor tool instead of a here-document. `apply_patch` still reads its
+body as a patch.
+
+In an inline `node -e` script, an event name, a compared value, a `case` label and an object key are not files it
+writes. A write whose path the hook cannot read from such a script is still refused. Put the script in a file.
+
 What it does not follow:
 
 - an assignment in an earlier shell call, or an export read by a script;
@@ -387,6 +396,9 @@ the [Supported tools](05-guide.md#supported-tools) table in the guide compares a
 | Question tool | AskUserQuestion (2–4 choices) | `question` (choices + free text) |
 | Todo list | TodoWrite mirrors `tasks.md` during `/sdlc:build` (`tasks.md` stays the source of truth) | `todowrite` mirrors `tasks.md` during `/sdlc-build` |
 | Live CLI injection | inline live output of `sdlc … --json` in `/sdlc:status`, `/sdlc:next`, `/sdlc:help` via the tool `!` injection (fallback: run the same command) | same `!` injection form |
+
+OpenCode's `permission` map gives read-only agents `edit: deny`, `bash: allow`, and `webfetch: deny`.
+An ordinary file write through bash is not refused; the sdlc plugin checks writes that matter.
 
 ### Cursor
 

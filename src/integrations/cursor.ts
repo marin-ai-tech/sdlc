@@ -2,7 +2,7 @@ import { generatedNotice } from '../core/license.js';
 import type { RoleFile } from '../team/role-file.js';
 import { agentNames, roleBody, subagentName } from '../team/render.js';
 import { AGENT_IDS, loadAgent, loadWorkflow, WORKFLOW_IDS, type WorkflowId } from './assets.js';
-import { appendNotice, renderBody, yamlString } from './render.js';
+import { appendNotice, renderBody, sourceMarkerLine, yamlString } from './render.js';
 import { roleSkillInstructions } from './role-skills.js';
 import { skillFile, type SkillExtra, type SkillTarget } from './skills.js';
 import { stageResources, stageSection } from './stage-resources.js';
@@ -60,6 +60,7 @@ interface CursorAgent {
   name: string;
   description: string;
   readonly: boolean;
+  marker?: RoleFile['marker'];
 }
 
 /** A subagent `.cursor/agents/<name>.md`: name, description, the parent's model, read-only or not. */
@@ -70,6 +71,7 @@ function agentFile(agent: CursorAgent, body: string, notice: string): GeneratedF
     `description: ${yamlString(agent.description)}`,
     'model: inherit',
     `readonly: ${agent.readonly ? 'true' : 'false'}`,
+    ...sourceMarkerLine(agent.marker),
     '---',
     '',
     body,
@@ -78,7 +80,8 @@ function agentFile(agent: CursorAgent, body: string, notice: string): GeneratedF
 }
 
 function roleAgent(role: RoleFile, ctx: RenderContext, notice: string): GeneratedFile {
-  const agent = { name: subagentName(role), description: role.description, readonly: role.readonly };
+  const agent = { name: subagentName(role), description: role.description, readonly: role.readonly,
+    marker: role.marker };
   return agentFile(agent, roleSkillInstructions(role, roleBody(role, ctx)), notice);
 }
 

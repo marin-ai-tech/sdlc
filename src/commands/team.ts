@@ -12,6 +12,8 @@ import { acceptPack, type PackAcceptResult } from '../team/pack-accept.js';
 import type { PackContentsReport } from '../team/pack-effect.js';
 import { listPacks, type PackListItem } from '../team/pack-list.js';
 import { acceptRole, listTeam, syncTeam, type SyncResult, type TeamListRole } from '../team/team.js';
+import { acceptRule } from '../team/rules-accept.js';
+import { syncRules, type RulesSync } from '../team/rules.js';
 import { assertHuman } from './gates.js';
 
 /** `sdlc team sync | accept | list | check` (B69, B71, B72, B74): the agent team of the project. */
@@ -47,17 +49,30 @@ function printSync(result: SyncResult): void {
   }
   for (const pack of result.packs ?? []) printPack(pack);
   for (const item of result.refused) line(t('team.sync.refused', { id: item.id, reason: item.reason }));
+  for (const item of result.warnings ?? []) {
+    line(`${t('label.warning')}: ${t('team.sync.invalidMarker', { id: item.id, reason: item.reason })}`);
+  }
   for (const file of result.created) line(t('team.sync.created', { path: file }));
   for (const kept of result.kept) line(t(`team.sync.kept.${kept.reason}`, { id: kept.id }));
   if (result.created.length > 0) line(t('team.sync.next', { dir: DRAFTS_DIR }));
+}
+
+/** 0.32.0: the registry's rules that fit the project, and the others, with the command a person runs. */
+function printRules(rules: RulesSync | undefined): void {
+  if (!rules) return;
+  if (rules.error) line(t('team.sync.rulesError', { server: rules.server ?? '', error: rules.error }));
+  for (const item of rules.proposed) line(t('team.sync.ruleProposed', { id: item.id, reason: item.reason }));
+  if (rules.other.length > 0) line(t('team.sync.rulesOther', { list: rules.other.map((item) => item.id).join(', ') }));
 }
 
 export async function teamSyncCommand(opts: Options): Promise<void> {
   try {
     const ctx = loadProject();
     const result = await syncTeam(ctx.root, ctx.config);
-    if (opts.json) return printJson(result);
+    const rules = await syncRules(ctx.root, ctx.config);
+    if (opts.json) return printJson({ ...result, ...(rules ? { rules } : {}) });
     printSync(result);
+    printRules(rules);
   } catch (error) {
     reportFailure(error, opts.json);
   }
@@ -134,11 +149,24 @@ function acceptPackCommand(name: string, opts: Options): void {
   printPackAccept(result);
 }
 
-type AcceptOptions = Options & { skill?: string; pack?: string };
+type AcceptOptions = Options & { skill?: string; pack?: string; rule?: string };
+
+/** 0.32.0: a person accepts a team rule of the registry; refused like `team accept` for an agent. */
+async function acceptRuleCommand(id: string, opts: Options): Promise<void> {
+  const ctx = loadProject();
+  assertHuman(ctx.config, 'team accept');
+  assertDecisionRole(ctx.root, 'team accept');
+  const result = await acceptRule(ctx.root, ctx.config, id, identity(ctx.root));
+  if (opts.json) return printJson(result);
+  const where = result.placed === 'agents-md' ? result.agentsGuide ?? 'AGENTS.md' : (result.paths ?? []).join(', ');
+  const key = result.placed === 'agents-md' ? 'team.acceptRule.agents' : 'team.acceptRule.roles';
+  line(t(key, { id: result.rule, version: result.version, where, team: result.team }));
+}
 
 /** A person's command: refused in an agent session (`agent_cannot_approve`), like a gate decision. */
 export async function teamAcceptCommand(role: string | undefined, opts: AcceptOptions): Promise<void> {
   try {
+    if (opts.rule !== undefined) return await acceptRuleCommand(opts.rule, opts);
     if (opts.pack !== undefined) return acceptPackCommand(opts.pack, opts);
     if (opts.skill !== undefined) return await acceptSkillCommand(opts.skill, opts);
     if (role === undefined) throw new SdlcError('usage', { key: 'error.team_accept_what' });

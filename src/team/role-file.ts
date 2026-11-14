@@ -1,6 +1,7 @@
 import { parse } from 'yaml';
 import { normalizeNewlines } from '../core/fs-utils.js';
 import { STAGE_IDS, type StageConfigId } from '../core/stage-config.js';
+import type { SourceMarker } from './vetting.js';
 
 /**
  * A role of the agent team as a file (B69): YAML front matter (`id`, `title`, `description`, `stages`, `tools`,
@@ -20,6 +21,7 @@ export interface RoleFile {
   skills: string[];
   /** Where the draft came from, as its front matter says (`source.kind`: registry or builtin). */
   sourceKind?: string;
+  marker?: SourceMarker;
   /** The `id` the front matter declares, when it has one. */
   declaredId?: string;
 }

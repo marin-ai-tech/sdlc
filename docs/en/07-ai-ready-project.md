@@ -65,6 +65,14 @@ These two files give tools a shared starting point.
 is a thin Claude Code wrapper: its first line is `@AGENTS.md`, followed only by Claude-specific notes. Keep shared rules
 in the main guide so every agent follows the same project policy.
 
+`sdlc init` creates `AGENTS.md` from the template when the project has none, even without a layout mode. For Claude
+Code it also creates the thin `CLAUDE.md` when that is missing. An existing file is never replaced.
+
+The template has a block for the team's rules, between `<!-- sdlc:rules:start -->` and `<!-- sdlc:rules:end -->`.
+`sdlc team accept --rule <id>` fills it with the general rules from the team's registry, and `sdlc update` rewrites
+it. The block is sdlc's; everything outside it is yours. See [the agent team](12-agent-team.md) for how rules are
+chosen and accepted.
+
 ## 7.4. OpenSpec and the lifecycle
 
 The project documents support each change as it moves through the lifecycle.

@@ -18,7 +18,7 @@ import { guardDenial, guardEditHits } from './policy-guard.js';
 import { userGuardEditHits } from './user-guard.js';
 import { editWrites, type EditWrite } from './edit-texts.js';
 import { secretEditDenial } from './policy-secrets.js';
-import { INVALID_FOLDER_STAGE, mcpStageDecision } from './policy-mcp.js';
+import { INVALID_FOLDER_STAGE, mcpEventsDecision, mcpStageDecision } from './policy-mcp.js';
 import { inboxSessionLines } from '../mcp/inbox.js';
 import {
   linkedStateFiles,
@@ -208,6 +208,7 @@ function releaseDecision(cmd: string, ctx: PolicyContext, env: NodeJS.ProcessEnv
 /** Every rule; a call the other rules allow may still be a registry MCP server out of stage (B43). */
 export function evaluateToolCall(call: ToolCall, ctx: PolicyContext): Decision {
   let decision = evaluateRules(call, ctx);
+  decision = mcpEventsDecision(call.tool, ctx.config) ?? decision;
   if (decision.decision === 'allow') {
     const stages = () => snapshots(ctx).flatMap((change) =>
       change.valid ? change.view ? [change.view.stage] : [] : [INVALID_FOLDER_STAGE]);

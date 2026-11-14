@@ -12,7 +12,7 @@ import {
 } from './registry-client.js';
 import { ROLE_ID } from './role-file.js';
 import { builtinSource, builtinVersion, teamLocale, type RoleDraft } from './sources.js';
-import { vetRole } from './vetting.js';
+import { vetMarker, vetRole } from './vetting.js';
 
 /**
  * `sdlc team sync` (B69, B71, B76): the roles of the team registry first (in the project's locale), then those of
@@ -37,6 +37,7 @@ export interface SyncResult {
   created: string[];
   kept: Array<{ id: string; reason: KeptReason }>;
   refused: Refused[];
+  warnings?: Refused[];
   registry?: { server: string; reachable: boolean; roles: string[]; error?: string };
   packs?: PackReport[];
 }
@@ -48,14 +49,20 @@ interface Wanted {
   listed: unknown;
 }
 
-async function fetchRole(call: RegistryCall, want: Wanted): Promise<RoleDraft | Refused> {
+async function fetchRole(call: RegistryCall, want: Wanted, warnings: Refused[]): Promise<RoleDraft | Refused> {
   try {
-    const vetted = vetRole(await call('get_role', { id: want.id, locale: want.locale }), want.id, want.listed);
+    const answer = await call('get_role', { id: want.id, locale: want.locale });
+    const vetted = vetRole(answer, want.id, want.listed);
     if (!('ok' in vetted)) return { id: want.id, reason: vetted.reason };
     const role = vetted.ok;
+    const raw = answer as Record<string, unknown>;
+    if (raw.marker !== undefined) {
+      const marker = vetMarker(raw.marker);
+      if (!('ok' in marker)) warnings.push({ id: want.id, reason: marker.reason });
+    }
     const text = registryDraft(role, want.server);
     const { version, checksum } = role;
-    return { id: role.id, text, source: 'registry', version, server: want.server, checksum };
+    return { id: role.id, text, source: 'registry', version, server: want.server, checksum, marker: role.marker };
   } catch (error) {
     if (error instanceof RegistryItemError) return { id: want.id, reason: error.message };
     throw error;
@@ -67,6 +74,7 @@ async function fetchRoles(
   locale: Locale,
   server: string,
   refused: Refused[],
+  warnings: Refused[],
 ): Promise<RoleDraft[]> {
   const drafts: RoleDraft[] = [];
   const seen = new Set<string>();
@@ -77,7 +85,7 @@ async function fetchRoles(
       continue;
     }
     seen.add(id);
-    const draft = await fetchRole(call, { id, locale, server, listed: item.checksum });
+    const draft = await fetchRole(call, { id, locale, server, listed: item.checksum }, warnings);
     if ('reason' in draft) refused.push(draft);
     else drafts.push(draft);
   }
@@ -88,7 +96,9 @@ async function registryDrafts(config: SdlcConfig, locale: Locale, result: SyncRe
   const server = registryServer(config);
   if (!server) return [];
   try {
-    const drafts = await withRegistry(server, (call) => fetchRoles(call, locale, server.name, result.refused));
+    const warnings = result.warnings ?? [];
+    const drafts = await withRegistry(server, (call) => fetchRoles(call, locale, server.name, result.refused, warnings));
+    if (warnings.length > 0) result.warnings = warnings;
     result.registry = { server: server.name, reachable: true, roles: drafts.map((draft) => draft.id) };
     return drafts;
   } catch (error) {
@@ -135,9 +145,9 @@ function placeDraft(root: string, team: TeamRecord, draft: RoleDraft, result: Sy
     return false;
   }
   writeTextAtomic(path.join(root, draftPath(draft.id)), draft.text);
-  const { server, version, checksum } = draft;
+  const { server, version, checksum, marker } = draft;
   const pack = draft.pack ? { pack: draft.pack } : {};
-  team.drafts[draft.id] = { kind: draft.source, ...pack, server, version, checksum, text: draft.text };
+  team.drafts[draft.id] = { kind: draft.source, ...pack, server, version, checksum, marker, text: draft.text };
   result.created.push(draftPath(draft.id));
   return true;
 }

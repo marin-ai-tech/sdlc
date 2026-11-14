@@ -97,11 +97,17 @@ function list(values: string[]): string {
 export function stageSection(resources: StageResources | undefined): string {
   if (!resources) return '';
   const lines = ['', `## Stage resources (${resources.stage})`, ''];
+  if (resources.skills.length > 0) {
+    lines.push(`- First step, before any stage work: load the skills ${list(resources.skills)} by name.`);
+  }
   if (resources.executionRole) {
     lines.push(`- Active execution role: ${resources.executionRole}. Follow its bundled skill for this workflow.`);
     lines.push('- The execution role is guidance; human authority and project commit rules still apply.');
   }
   if (resources.skills.length > 0) lines.push(`- Skills for this stage: ${list(resources.skills)}.`);
+  if (resources.skills.length > 0) {
+    lines.push('- In your final report, name the skills loaded and explain why any listed skill could not be loaded.');
+  }
   if (resources.agents.length > 0) lines.push(`- Subagents for this stage: ${list(resources.agents)}.`);
   if (resources.simplify) lines.push(SIMPLIFY_STEP);
   if (resources.servers.length > 0) {

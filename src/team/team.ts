@@ -88,9 +88,9 @@ function acceptedEntry(team: TeamRecord, id: string, text: string, by: string, f
   const base = { digest: roleDigest(text), by, at: new Date().toISOString() };
   const record = fromDraft ? team.drafts[id] : undefined;
   if (record?.kind === 'registry' || record?.kind === 'pack') {
-    const { version, server, checksum } = record;
+    const { version, server, checksum, marker } = record;
     const pack = record.pack ? { pack: record.pack } : {};
-    return { ...base, source: record.kind, version, server, checksum, ...pack };
+    return { ...base, source: record.kind, version, server, checksum, marker, ...pack };
   }
   const previous = team.roles[id];
   const sourced = previous?.source === 'registry' || previous?.source === 'pack';

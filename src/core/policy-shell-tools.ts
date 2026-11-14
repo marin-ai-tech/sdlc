@@ -202,6 +202,7 @@ function potentialInlineLiterals(
 ): string[] {
   const safe = new Set<number>();
   const context = dialect === 'node' ? nodeContext ?? nodeCallContext(code) : undefined;
+  if (context) nodeDataLiterals(code, context, safe);
   if (dialect === 'perl') perlReadLiterals(code, safe);
   for (const call of code.matchAll(NODE_CALL)) {
     const parsed = context?.callsByIndex.get(call.index!);
@@ -228,6 +229,23 @@ function potentialInlineLiterals(
   return [...code.matchAll(NODE_LITERAL)].filter(literal => !safe.has(literal.index!))
     .map(literal => literal[1] ?? literal[2] ?? literal[3])
     .map(literal => dialect === 'perl' ? literal.replace(/^[+>]+\s*/, '') : literal).filter(literal => literal !== '');
+}
+
+/** Data syntax does not name a destination, even when surrounding calls are opaque. */
+function nodeDataLiterals(code: string, context: NodeCallContext, safe: Set<number>): void {
+  const source = context.mutations.source;
+  const event = /\.\s*(?:on|once|off|emit|addListener|removeListener)\s*\(\s*$/;
+  const comparison = /(?:===|!==|==|!=)\s*$/;
+  const comparisonAfter = /^\s*(?:===|!==|==|!=)/;
+  for (const literal of context.mutations.literals) {
+    if (code[literal.index] === '`') continue;
+    const before = source.slice(0, literal.index);
+    const after = source.slice(literal.end);
+    if (event.test(before) || comparison.test(before) || comparisonAfter.test(after)
+      || /\bcase\s*$/.test(before) || /[{,]\s*$/.test(before) && /^\s*:/.test(after)) {
+      safe.add(literal.index);
+    }
+  }
 }
 
 function readOptionDataPositions(code: string, after: number, safe: Set<number>): void {

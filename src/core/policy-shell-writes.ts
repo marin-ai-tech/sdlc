@@ -32,9 +32,14 @@ function heredocMarker(line: string): string | undefined {
   return marker;
 }
 
-/** Remove sh here-document bodies, retaining an apply_patch body as patch input. */
+/**
+ * The command for the write scan, with an apply_patch body also read as patch input. A here-document body is NOT
+ * removed (0.32.0): every line of it is read as a command, as the other checks do. Removing it relied on finding the
+ * delimiter the way bash does, and a partly quoted one (`<<'E'OF`) or a body that bash runs (`bash <<'EOF'`) hid
+ * later writes from the plan gate, locked tests and protected paths. Reading the body as commands can refuse a
+ * harmless body (a named limit); it never lets a write through.
+ */
 function heredocs(command: string): { text: string; patches: string[] } {
-  const kept: string[] = [];
   const patches: string[] = [];
   let end: string | undefined;
   let patch = false;
@@ -48,13 +53,13 @@ function heredocs(command: string): { text: string; patches: string[] } {
       }
       continue;
     }
-    kept.push(line);
     end = heredocMarker(line);
     patch = end !== undefined && /(?:^|[;&|\s])apply_patch\s+<</.test(line);
   }
-  return { text: kept.join('\n'), patches: patchFiles(patches.join('\n')) };
+  return { text: command, patches: patchFiles(patches.join('\n')) };
 }
 
+/** The command as the literal-value reading sees it: here-document bodies included (0.32.0, see heredocs()). */
 export function withoutHeredocs(command: string): string {
   return heredocs(command).text;
 }

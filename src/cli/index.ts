@@ -147,6 +147,7 @@ export function buildProgram(): Command {
   team.command('accept [role]').description(cmdDesc('cmd.team.accept'))
     .option('--skill <id>', 'accept a skill of the team registry, scripts included (human only)')
     .option('--pack <name>', 'accept the lenses, workflows and checks of a pack (human only)')
+    .option('--rule <id>', 'accept a team rule of the registry (human only)')
     .option('--json', 'output JSON').action((role, opts) => teamAcceptCommand(role, opts));
   team.command('list').description(cmdDesc('cmd.team.list'))
     .option('--json', 'output JSON').action((opts) => teamListCommand(opts));

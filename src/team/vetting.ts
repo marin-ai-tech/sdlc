@@ -23,6 +23,34 @@ export interface RegistryRole {
   skills: string[];
   body: string;
   checksum: string;
+  marker?: SourceMarker;
+}
+
+export interface SourceMarker {
+  key: string;
+  value: string;
+}
+
+/**
+ * A marker key is allowed, not refused by a list: lowercase kebab-case ending in `-source` (`skillforge-source`).
+ * A deny list missed keys that configure an agent (`memory`, `hooks`, `isolation`, `steps`...); no tool reads a
+ * `*-source` key as configuration.
+ */
+const MARKER_KEY = /^[a-z][a-z0-9]*(?:-[a-z0-9]+)*-source$/;
+
+/** Accept only a harmless, one-line front matter field from a registry. */
+export function vetMarker(value: unknown): Vetted<SourceMarker> {
+  const raw = record(value);
+  if (!raw || typeof raw.key !== 'string' || typeof raw.value !== 'string') {
+    return { reason: 'marker needs a key and value' };
+  }
+  if (raw.key.length > 64 || !MARKER_KEY.test(raw.key)) {
+    return { reason: 'marker key must be kebab-case ending in -source' };
+  }
+  if (raw.value.length === 0 || raw.value.length > 200 || !/^[\x20-\x7e]+$/.test(raw.value)) {
+    return { reason: 'marker value must be one printable line of at most 200 characters' };
+  }
+  return { ok: { key: raw.key, value: raw.value } };
 }
 
 export interface RegistrySkill {
@@ -118,10 +146,12 @@ function roleShape(raw: Record<string, unknown>, id: string): Vetted<RegistryRol
   if (version.length > 64 || !/^[\w.+-]+$/.test(version)) return { reason: 'version is not a plain version string' };
   const skills = strings(raw.skills ?? []);
   if (!skills || skills.some((skill) => !isSkillId(skill))) return { reason: 'skills must be skill ids' };
+  const vettedMarker = raw.marker === undefined ? undefined : vetMarker(raw.marker);
   const role = {
     id, version, body, checksum, skills, title: str(raw.title) ?? id, stages: strings(raw.stages) ?? [],
     tools: strings(raw.tools) ?? [], readonly: raw.readonly !== false,
     ...(str(raw.description) ? { description: str(raw.description)!.slice(0, 500) } : {}),
+    ...(vettedMarker && 'ok' in vettedMarker ? { marker: vettedMarker.ok } : {}),
   };
   return { ok: role };
 }

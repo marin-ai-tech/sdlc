@@ -46,13 +46,15 @@ const GENERATED_NAMES = [
   String.raw`\.(?:opencode|cursor|qwen|gigacode)/commands/sdlc-[^/\s'"]+\.md`,
   // Cursor (B80): the rule every agent reads.
   String.raw`\.cursor/rules/sdlc\.mdc`,
+  // 0.32.0: the team rules a person accepted, as Claude Code rules.
+  String.raw`\.claude/rules/[^/\s'"]+\.md`,
   // Codex CLI (B82): its subagents, the skills it reads and its command rules.
   String.raw`\.codex/agents/sdlc-[^/\s'"]+\.toml`,
   String.raw`\.agents/skills/sdlc-[^/\s'"]+/[^\s'"]+`,
   String.raw`\.codex/rules/sdlc\.rules`,
 ];
 /** Folders that hold generated files; with them, their parents in the tools' folders. */
-const GENERATED_DIRS = ['.claude/agents', '.claude/skills', '.claude/commands', '.claude/commands/sdlc',
+const GENERATED_DIRS = ['.claude/agents', '.claude/skills', '.claude/commands', '.claude/commands/sdlc', '.claude/rules',
   '.opencode/agents', '.opencode/skills', '.opencode/commands',
   '.cursor/agents', '.cursor/skills', '.cursor/commands', '.cursor/rules',
   '.codex/agents', '.codex/rules', '.agents/skills',
@@ -297,5 +299,7 @@ export function guardDenial(hits: string[]): { decision: 'deny'; rule: string; r
   const role = ROLE_FILE.test(hits[0]) || /^docs(?:\/agents)?$/i.test(hits[0]);
   const skill = TEAM_SKILL_PATH.test(hits[0]);
   const key = role ? 'hook.guardRole' : skill ? 'hook.guardSkill' : 'hook.guardConfig';
-  return { decision: 'deny', rule: 'guard-config', reason: t(key, { path: hits[0] }) };
+  // An empty target is the project root (B271 keeps the refusal); the reason says so instead of naming nothing.
+  const guarded = hits[0] === '' ? t('hook.guardEmptyPath') : hits[0];
+  return { decision: 'deny', rule: 'guard-config', reason: t(key, { path: guarded }) };
 }

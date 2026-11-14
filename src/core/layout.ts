@@ -227,6 +227,8 @@ export interface TemplateContext {
   /** How agents call the CLI (`sdlc`, `npx --no-install sdlc`), for `{{cli}}`. */
   cli: string;
   tools?: string[];
+  /** When set, a line linking a role this returns false for is left out (no dangling links, 0.32.0). */
+  linked?: (id: string) => boolean;
 }
 
 const AGENT_COMMANDS = [
@@ -301,7 +303,7 @@ export function detectLayout(root: string, mapping: LayoutMapping = {}, tools?: 
  */
 export function renderLayoutTemplate(text: string, targetPath: string, ctx: TemplateContext): string {
   const lines = text.split('\n').filter((line) => [...line.matchAll(/\{\{path:([^{}]+)\}\}/g)]
-    .every((match) => roleApplies(match[1], ctx.tools)));
+    .every((match) => roleApplies(match[1], ctx.tools) && (ctx.linked ? ctx.linked(match[1]) : true)));
   return lines.join('\n').replace(/\{\{([^{}]+)\}\}/g, (_match, token: string) => {
     if (token === 'project.name') return ctx.projectName;
     if (token === 'cli') return ctx.cli;
@@ -353,6 +355,33 @@ function writeMissing(root: string, config: SdlcConfig, opts: { dryRun?: boolean
     }
   }
   return { created, kept };
+}
+
+const GUIDE_ROLES: readonly string[] = ['agents-guide', 'claude-guide'];
+
+/**
+ * 0.32.0: `sdlc init` without a layout action creates the missing agent guides only - AGENTS.md, and the thin
+ * CLAUDE.md for Claude Code - with links only to documents the project has. Never overwrites.
+ */
+export function writeAgentGuides(root: string, config: SdlcConfig): string[] {
+  const report = detectLayout(root, config.layout, config.tools);
+  const present = new Set([...GUIDE_ROLES, ...report.roles.filter((r) => r.status !== 'missing').map((r) => r.role)]);
+  const paths = Object.fromEntries(LAYOUT_ROLES.map((role) => {
+    const found = report.roles.find((r) => r.role === role.id);
+    return [role.id, found?.path ?? role.path];
+  })) as Record<LayoutRoleId, string>;
+  const ctx: TemplateContext = { projectName: projectNameFromManifest(root), paths,
+    verifyCommands: config.verify.commands, cli: config.cli, tools: config.tools, linked: (id) => present.has(id) };
+  const created: string[] = [];
+  for (const role of LAYOUT_ROLES.filter((r) => GUIDE_ROLES.includes(r.id) && roleApplies(r.id, config.tools))) {
+    const found = report.roles.find((r) => r.role === role.id);
+    const target = path.resolve(root, role.path);
+    if (found?.status !== 'missing' || fs.existsSync(target) || !isWithin(root, target)) continue;
+    fs.writeFileSync(target, renderLayoutTemplate(readAsset('project', role.template), role.path, ctx),
+      { encoding: 'utf8', flag: 'wx' });
+    created.push(role.path);
+  }
+  return created;
 }
 
 /** Creates every missing role at its canonical path from its template. Never overwrites. */

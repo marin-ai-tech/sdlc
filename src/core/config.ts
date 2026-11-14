@@ -372,6 +372,10 @@ export function parseConfig(raw: Raw, file = 'openspec/sdlc.yaml'): SdlcConfig {
   if (issues) config.issues = issues;
   const team = parseTeamConfig(raw.team, where, (config.mcp?.servers ?? []).map((server) => server.name));
   if (team) config.team = team;
+  const cliServers = new Set([...events.map((receiver) => receiver.server), team?.registry]);
+  for (const server of config.mcp?.servers ?? []) {
+    if (cliServers.has(server.name) && !server.agentsExplicit) server.agents = false;
+  }
   const packs = parsePacksConfig(raw.packs, where);
   if (packs.length > 0) config.packs = packs;
   const context = asObject(raw.context, where('context'));
@@ -703,6 +707,7 @@ export const CONFIG_HEADER = `# SDLC harness configuration (https://github.com/m
 # Gates follow Anthropic's AI-native SDLC playbook: intent -> spec -> plan -> verify -> review -> release.
 # gates.<gate>.auto_waive: { kinds: [docs], tracks: [lite] } waives the gate when the kind OR the track matches.
 # enforcement.mode: off | warn (remind, never block) | block (hooks deny actions that skip a gate).
+# enforcement.test_paths: edits lock during a bug fix only while \`sdlc tests lock\` is on.
 # license.type: community (free: noncommercial use and open source projects) | commercial (paid, royalties).
 # See LICENSE and COMMERCIAL-LICENSE.md in the sdlc package; change it with \`sdlc license set\`.
 `;

@@ -2,7 +2,7 @@ import { generatedNotice } from '../core/license.js';
 import type { RoleFile } from '../team/role-file.js';
 import { agentNames, roleBody, subagentName } from '../team/render.js';
 import { AGENT_IDS, loadAgent, loadWorkflow, WORKFLOW_IDS, type WorkflowId } from './assets.js';
-import { appendNotice, renderBody, yamlString } from './render.js';
+import { appendNotice, renderBody, sourceMarkerLine, yamlString } from './render.js';
 import { roleSkillInstructions } from './role-skills.js';
 import { skillFile, type SkillTarget } from './skills.js';
 import { stageResources, stageSection } from './stage-resources.js';
@@ -23,11 +23,13 @@ interface FamilyAgent {
   name: string;
   description: string;
   readonly: boolean;
+  marker?: RoleFile['marker'];
 }
 
 function agentFile(family: Family, agent: FamilyAgent, body: string, notice: string): GeneratedFile {
   const lines = ['---', `name: ${agent.name}`, `description: ${yamlString(agent.description)}`];
   if (agent.readonly) lines.push('disallowedTools: [write_file, edit]');
+  lines.push(...sourceMarkerLine(agent.marker));
   lines.push('---', '', body);
   return {
     path: `${family.dir}/agents/${agent.name}.md`,
@@ -52,6 +54,7 @@ function agents(family: Family, ctx: RenderContext, notice: string): GeneratedFi
       name: subagentName(role),
       description: role.description,
       readonly: role.readonly,
+      marker: role.marker,
     };
     files.push(agentFile(family, agent, roleSkillInstructions(role, roleBody(role, ctx)), notice));
   }

@@ -675,6 +675,15 @@ empty word, and a file argument set to it is refused as an empty path.
 Text after a `#` is read like any other command text, so a path named in a comment can be refused; keep comments
 out of commands.
 
+Every line of a here-document body (`<<EOF`, `<<-EOF`) is read as a command by every check, the write check too.
+A body that bash runs, or a write after a partly quoted delimiter such as `<<'E'OF`, can therefore not hide a write.
+The price is that a harmless body can be refused, for example Markdown with a backtick code span or a script with
+`rm` in a word. Write such a file with the editor tool instead of a here-document. `apply_patch` still reads its
+body as a patch.
+
+In an inline `node -e` script, an event name, a compared value, a `case` label and an object key are not files it
+writes. A write whose path the hook cannot read from such a script is still refused. Put the script in a file.
+
 What it does not follow:
 
 - an assignment in an earlier shell call, or an export read by a script;
@@ -1287,6 +1296,9 @@ and returns OpenSpec-style diagnostics (`{severity, code, message, fix}`) on fai
 | Skills | `.claude/skills/` | read from `.claude/skills/` (written to `.opencode/skills/` only for OpenCode-only projects, to avoid duplicate names) |
 | Subagents | `.claude/agents/sdlc-{verifier,reviewer,researcher,simplifier,health,advocate}.md` | `.opencode/agents/sdlc-*.md` (`mode: subagent`, `permission` map) |
 | Guardrails | hooks merged into `.claude/settings.json` | `.opencode/plugins/sdlc.js` |
+
+OpenCode's `permission` map gives read-only agents `edit: deny`, `bash: allow`, and `webfetch: deny`.
+An ordinary file write through bash is not refused; the sdlc plugin checks writes that matter.
 
 Cursor, Codex CLI, Qwen Code and GigaCode get the same workflows and subagents in their own folders, with their own
 hooks and rules: see [Cursor](15-cursor.md), [Codex CLI](16-codex.md) and

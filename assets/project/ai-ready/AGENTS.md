@@ -53,6 +53,14 @@ Run the project verify commands before claiming a change is done:
 7. Change `openspec/sdlc.yaml` and `openspec/roles.yaml` only through a settings proposal:
    `sdlc config propose` and the `sdlc-config` workflow. A person applies the proposal.
 
+<!-- sdlc:rules:start -->
+## Team rules
+
+No team rules are accepted yet (`sdlc team sync`, then a person runs
+`sdlc team accept --rule <id>`).
+
+<!-- sdlc:rules:end -->
+
 ## Definition of done
 
 A change is done when:

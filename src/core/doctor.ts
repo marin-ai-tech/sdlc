@@ -33,6 +33,8 @@ import { referencedVariables } from '../mcp/registry.js';
 import { pluginReports } from '../plugins/catalog.js';
 import { writerLockFindings } from './doctor-locks.js';
 import { toDiagnostic } from './errors.js';
+import { readTeam } from '../team/record.js';
+import { agentsGuidePath, generalRules, rulesBlockState } from '../team/rules-block.js';
 
 /**
  * The checks of `sdlc doctor`, as a function `sdlc health` reuses (config.doctor). Same checks in the same order,
@@ -268,6 +270,28 @@ function mcpVariablesCheck(out: Checks, config: SdlcConfig, env: NodeJS.ProcessE
   out.add('mcp variables', missing.length === 0 ? 'ok' : 'warn', message);
 }
 
+/** 0.32.0: the team rules block of AGENTS.md says what the accepted rules say; only with accepted general rules. */
+function rulesBlockCheck(out: Checks, root: string, config: SdlcConfig): void {
+  const rules = readTeam(root).rules ?? {};
+  if (generalRules(rules).length === 0) return;
+  const state = rulesBlockState(root, config, rules);
+  if (state === 'ok') return;
+  const file = agentsGuidePath(config);
+  out.add('team rules', 'warn', out.tt('doctor.rulesBlock', { path: file }), out.tt('doctor.fix.rulesBlock', {}));
+}
+
+function mcpAgentExposureCheck(out: Checks, config: SdlcConfig): void {
+  const cliServers = new Set([
+    ...(config.events ?? []).map((receiver) => receiver.server),
+    config.team?.registry,
+  ]);
+  for (const server of config.mcp?.servers ?? []) {
+    if (!cliServers.has(server.name) || !server.agents || !server.agentsExplicit) continue;
+    out.add(`mcp ${server.name}`, 'warn', out.tt('doctor.mcpAgents', { server: server.name }),
+      out.tt('doctor.fix.mcpAgents', { server: server.name }));
+  }
+}
+
 function projectConfigChecks(
   out: Checks,
   root: string,
@@ -289,6 +313,8 @@ function projectConfigChecks(
   out.add('project log', 'ok', logMessage);
   out.list.push(...writerLockFindings(root, config.cli));
   mcpVariablesCheck(out, config, env);
+  mcpAgentExposureCheck(out, config);
+  rulesBlockCheck(out, root, config);
   try {
     const raw = readYamlObject(paths.sdlcConfig);
     for (const key of integrationUnknownKeys(raw ?? {})) out.add(key, 'warn', `Unknown key: ${key}`);

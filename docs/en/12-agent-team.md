@@ -173,6 +173,37 @@ The registry is an [MCP](glossary.md) server with four tools:
 - A newer version of an accepted role arrives as a draft. It never replaces the accepted one silently.
 - After sync, `sdlc team check --json` reports each draft role's skills as installable, waiting for a person, or
   refused. It does not install them.
+- `get_role` may also return `marker: { key, value }`. It is one front matter line that names the role's source in the
+  registry, such as `skillforge-source: agent/analyst@1.2.0`. sdlc writes it into the role's subagent for OpenCode,
+  Claude Code, Cursor, Qwen Code and GigaCode. A new accepted version updates it. Codex gets no marker, and neither
+  does a built-in or pack role.
+- sdlc checks the marker before it writes it. The key must be lowercase kebab-case and end in `-source`, such as
+  `skillforge-source`, so it can never set up the agent. The value must be one plain line of at most 200 characters.
+  A marker that fails is not written. The role is still accepted, and `sdlc team sync` warns.
+
+### Rules from the registry
+
+A registry may also serve the team's rules. A rule is a short Markdown text that agents follow on every turn, or only
+for some files.
+
+- The two tools are `list_rules` and `get_rule`. `get_rule { id }` returns `{ id, version, description, paths?, tags,
+  body, checksum }`. The checksum is `sha256:` of the body, and a rule whose checksum does not match is refused. A
+  registry without these tools simply has no rules.
+- `sdlc team sync` proposes the rules that fit the project. A rule is proposed when it has the tag `sdlc`, when one of
+  its tags is a stack that `sdlc adopt` finds, or when one of its `paths` matches a file of the project. Every other
+  rule is listed as not proposed. The JSON answer has `rules: { proposed, other }`.
+- A person accepts a rule with `sdlc team accept --rule <id>`. An agent is refused. `openspec/.sdlc/team.json`
+  records the rule with its checksum and text.
+
+### Where accepted rules go
+
+- **A rule without `paths`** goes into a block of `AGENTS.md`. The block sits between `<!-- sdlc:rules:start -->` and
+  `<!-- sdlc:rules:end -->`. When the markers are missing, sdlc adds them at the end of the file.
+- **A rule with `paths`** goes into the subagents of the roles whose stages include build, test or deploy, with the
+  paths it applies to. For Claude Code it is also written to `.claude/rules/<id>.md` with `paths` in its front matter.
+  It is not written into the `AGENTS.md` block.
+- **The block is sdlc's, the rest of the file is yours.** `sdlc update` rewrites the block from `team.json`, and
+  `sdlc doctor` reports an edit inside it. sdlc never changes the text outside the markers.
 
 ## 12.5. Packs from git or npm
 
@@ -234,6 +265,9 @@ Check where they go and what a person must accept separately.
   refusal remains in force.
 - **Installed role skills reach the work.** The role's generated subagent names them, and workflows for stages the
   role owns list them after configured stage skills. Skills waiting for acceptance, refused, or missing are omitted.
+- **A stage with skills asks for them first.** Its workflow tells the agent to load those skills by name before any
+  stage work. It also asks the final report to name the skills loaded, and why any was not. A stage without skills
+  gets no such step. This is guidance: an agent may still skip it, and its report then shows that.
 - **`sdlc team check`** lists every skill with:
   - its source and version;
   - whether the checksum matches;
@@ -275,6 +309,7 @@ Use these commands to sync, inspect and accept team roles and skills.
 | `sdlc team check [--json]` | anyone | the skills of the accepted roles, vetted |
 | `sdlc team accept <role>` / `--skill <id>` | a person | accept a role, or a skill with any file other than Markdown |
 | `sdlc team accept --pack <name>` | a person | accept the lenses, workflows and checks of a pack |
+| `sdlc team accept --rule <id>` | a person | accept a rule of the registry and place it for the agents |
 | `/sdlc:team` (`/sdlc-team`) | the agent | sync, learn the project, draft the project's rules |
 
 ## 12.9. Limits we accept
@@ -285,6 +320,11 @@ Keep these limits in mind when reviewing a role or its source.
 - **A Project rules section is as good as what the agent found.** A person reads it before accepting.
 - **The registry and packs are trusted sources the team chose.** The checksum proves that the content did not change
   on the way, not that the content is good.
+- **OpenCode has no path scoping.** A rule with `paths` reaches only the role subagents there. The main agent sees it
+  only when it hands the work to such a subagent.
+- **Qwen Code and GigaCode read their own files, not `AGENTS.md`.** General rules reach them only through their role
+  subagents.
+- **The source marker is the registry's claim.** sdlc checks its form, not whether the role really came from there.
 
 ## 📚 Terms
 

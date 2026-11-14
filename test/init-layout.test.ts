@@ -70,16 +70,20 @@ describe('init in an empty folder makes it AI-ready', () => {
 });
 
 describe('init in an existing project: diagnosis first', () => {
-  it('without --layout it reports what differs from the AI-ready layout and changes no document', () => {
+  // Changed requirement (owner, 2026-11-14, OpenSpec change team-rules-reach-the-agents): without --layout, init
+  // creates the missing AGENTS.md (the agents' guide that carries the team rules block) and no other document.
+  it('without --layout it reports what differs from the AI-ready layout and creates only AGENTS.md', () => {
     const root = existingProject();
     const r = cliIn(root)(['init', '--tools', 'none', '--json']);
     expect(r.code, r.stderr + r.stdout).toBe(0);
     const layout = r.json().layout;
     expect(layout).toMatchObject({ folder: 'existing', action: 'none' });
-    expect(layout.diagnosis.missing).toContain('agents-guide');
+    expect(layout.diagnosis.missing).not.toContain('agents-guide');
     expect(layout.diagnosis.aliases).toContainEqual({ role: 'architecture', path: 'ARCHITECTURE.md' });
     expect(layout.diagnosis.missing).not.toContain('architecture');
-    expect(exists(root, 'AGENTS.md')).toBe(false);
+    expect(exists(root, 'AGENTS.md')).toBe(true);
+    expect(exists(root, 'docs/architecture.md')).toBe(false);
+    expect(read(path.join(root, 'AGENTS.md'))).not.toMatch(/\]\(docs\/architecture\.md\)/);
     const text = cliIn(existingProject())(['init', '--tools', 'none']).stdout;
     expect(text).toContain('ARCHITECTURE.md');
     expect(text).toContain('--layout worktree');
@@ -238,13 +242,14 @@ describe('the init wizard', () => {
     expect(exists(root, 'openspec')).toBe(false);
   }, 180000);
 
-  it('negative: choosing to skip leaves the documents as they are', async () => {
+  it('negative: choosing to skip leaves the documents as they are (AGENTS.md is still created when missing)', async () => {
     const root = existingProject();
     const s = scripted({ layout: 'none' });
     quiet();
     await initCommand(root, { hooks: true }, wizardDeps(s.prompter));
     expect(exists(root, 'openspec/sdlc.yaml')).toBe(true);
-    expect(exists(root, 'AGENTS.md')).toBe(false);
+    expect(exists(root, 'AGENTS.md')).toBe(true);
     expect(exists(root, 'ARCHITECTURE.md')).toBe(true);
+    expect(exists(root, 'docs/architecture.md')).toBe(false);
   }, 120000);
 });

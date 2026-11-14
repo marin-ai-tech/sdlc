@@ -4,6 +4,8 @@ import { readText, writeTextAtomic } from '../core/fs-utils.js';
 import { sha256 } from '../integrations/manifest.js';
 import type { PackSource } from './pack-config.js';
 import { ROLE_ID } from './role-file.js';
+import { vetMarker, type SourceMarker } from './vetting.js';
+import { ruleChecksum, RULES_END, RULES_START } from './rules.js';
 
 /**
  * Where the agent team lives (B69, B70, B71, B74): accepted roles in `docs/agents/<role>.md`, drafts in
@@ -29,6 +31,7 @@ export interface TeamEntry {
   version?: string;
   server?: string;
   checksum?: string;
+  marker?: SourceMarker;
   pack?: PackSource;
   by: string;
   at: string;
@@ -58,6 +61,7 @@ export interface DraftRecord {
   server?: string;
   version?: string;
   checksum?: string;
+  marker?: SourceMarker;
   /** The draft as sdlc wrote it. */
   text: string;
 }
@@ -73,6 +77,20 @@ export interface PackEntry {
   at: string;
 }
 
+/** A team rule a person accepted (0.32.0): the registry's text, bound to its checksum. */
+export interface RuleEntry {
+  version: string;
+  checksum: string;
+  server: string;
+  description: string;
+  tags: string[];
+  /** Globs of the files the rule is for; absent for a rule of the whole project (the AGENTS.md block). */
+  paths?: string[];
+  text: string;
+  by: string;
+  at: string;
+}
+
 export interface TeamRecord {
   version: 1;
   roles: Record<string, TeamEntry>;
@@ -80,6 +98,8 @@ export interface TeamRecord {
   drafts: Record<string, DraftRecord>;
   /** Absent in a record without accepted packs. */
   packs?: Record<string, PackEntry>;
+  /** Absent in a record without accepted rules. */
+  rules?: Record<string, RuleEntry>;
 }
 
 export function acceptedPath(id: string): string {
@@ -112,6 +132,11 @@ function optional(raw: Raw, key: string): Record<string, string> {
   return typeof raw[key] === 'string' ? { [key]: raw[key] as string } : {};
 }
 
+function markerField(value: unknown): { marker?: SourceMarker } {
+  const vetted = value === undefined ? undefined : vetMarker(value);
+  return vetted && 'ok' in vetted ? { marker: vetted.ok } : {};
+}
+
 const PACK_KEYS = ['pack', 'git', 'npm', 'ref', 'commit', 'version', 'integrity'];
 
 function packField(value: unknown): { pack?: PackSource } {
@@ -130,6 +155,7 @@ function entry(value: unknown): TeamEntry | undefined {
     ...optional(raw, 'version'),
     ...optional(raw, 'server'),
     ...optional(raw, 'checksum'),
+    ...markerField(raw.marker),
     ...packField(raw.pack),
     by: typeof raw.by === 'string' ? raw.by : '',
     at: typeof raw.at === 'string' ? raw.at : '',
@@ -168,7 +194,7 @@ function draftRecord(value: unknown): DraftRecord | undefined {
   if (!raw || typeof raw.text !== 'string' || !kinds.includes(String(raw.kind))) return undefined;
   const kind = raw.kind as DraftRecord['kind'];
   return { kind, ...packField(raw.pack), ...optional(raw, 'server'), ...optional(raw, 'version'),
-    ...optional(raw, 'checksum'), text: raw.text };
+    ...optional(raw, 'checksum'), ...markerField(raw.marker), text: raw.text };
 }
 
 function strings(value: unknown): string[] {
@@ -182,6 +208,18 @@ function packEntry(value: unknown): PackEntry | undefined {
   const text = (key: string) => (typeof raw[key] === 'string' ? (raw[key] as string) : '');
   return { digest: raw.digest, source, lenses: strings(raw.lenses), workflows: strings(raw.workflows),
     checks: strings(raw.checks), by: text('by'), at: text('at') };
+}
+
+/** A rule read back is checked again: its text still has its checksum and no rules-block marker (0.32.0). */
+function ruleEntry(value: unknown): RuleEntry | undefined {
+  const raw = object(value);
+  if (!raw || typeof raw.text !== 'string' || typeof raw.checksum !== 'string') return undefined;
+  if (raw.checksum !== ruleChecksum(raw.text)) return undefined;
+  if (raw.text.includes(RULES_START) || raw.text.includes(RULES_END)) return undefined;
+  const text = (key: string) => (typeof raw[key] === 'string' ? (raw[key] as string) : '');
+  const paths = strings(raw.paths);
+  return { version: text('version'), checksum: raw.checksum, server: text('server'), description: text('description'),
+    tags: strings(raw.tags), ...(paths.length > 0 ? { paths } : {}), text: raw.text, by: text('by'), at: text('at') };
 }
 
 function entries<T>(value: unknown, parse: (item: unknown) => T | undefined): Record<string, T> {
@@ -201,8 +239,10 @@ export function readTeam(root: string): TeamRecord {
   try {
     const raw = object(JSON.parse(text)) ?? {};
     const packs = entries(raw.packs, packEntry);
+    const rules = entries(raw.rules, ruleEntry);
     return { version: 1, roles: entries(raw.roles, entry), skills: entries(raw.skills, skillEntry),
-      drafts: entries(raw.drafts, draftRecord), ...(Object.keys(packs).length > 0 ? { packs } : {}) };
+      drafts: entries(raw.drafts, draftRecord), ...(Object.keys(packs).length > 0 ? { packs } : {}),
+      ...(Object.keys(rules).length > 0 ? { rules } : {}) };
   } catch {
     return team;
   }
@@ -216,7 +256,8 @@ export function writeTeam(root: string, team: TeamRecord): void {
   const skills = Object.keys(team.skills).length > 0 ? { skills: sorted(team.skills) } : {};
   const drafts = Object.keys(team.drafts).length > 0 ? { drafts: sorted(team.drafts) } : {};
   const packs = team.packs && Object.keys(team.packs).length > 0 ? { packs: sorted(team.packs) } : {};
-  const record = { version: 1, roles: sorted(team.roles), ...skills, ...drafts, ...packs };
+  const rules = team.rules && Object.keys(team.rules).length > 0 ? { rules: sorted(team.rules) } : {};
+  const record = { version: 1, roles: sorted(team.roles), ...skills, ...drafts, ...packs, ...rules };
   writeTextAtomic(path.join(root, TEAM_PATH), `${JSON.stringify(record, null, 2)}\n`);
 }
 

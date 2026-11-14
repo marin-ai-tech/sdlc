@@ -30,6 +30,15 @@ export interface RenderContext {
   root?: string;
   /** Accepted roles; their `skills` contain only team.json-installed skills (B240). */
   team?: RoleFile[];
+  /** Accepted team rules with `paths` (0.32.0), sorted by id: the code roles and Claude Code's rules carry them. */
+  pathRules?: PathRule[];
+}
+
+export interface PathRule {
+  id: string;
+  description: string;
+  paths: string[];
+  text: string;
 }
 
 export interface ToolAdapter {

@@ -1,7 +1,8 @@
 import { generatedNotice } from '../core/license.js';
+import type { RoleFile } from '../team/role-file.js';
 import { agentNames, roleBody, subagentName } from '../team/render.js';
 import { AGENT_IDS, loadAgent, loadWorkflow, WORKFLOW_IDS } from './assets.js';
-import { appendNotice, renderBody, yamlString } from './render.js';
+import { appendNotice, renderBody, sourceMarkerLine, yamlString } from './render.js';
 import { allowedToolsFor } from './skills.js';
 import { stageAllowedTools, stageResources, stageSection } from './stage-resources.js';
 import type { GeneratedFile, RenderContext, ToolAdapter } from './types.js';
@@ -17,7 +18,7 @@ const CLAUDE_TOOL_NAMES: Record<string, string> = {
 
 /** A subagent file `.claude/agents/<name>.md`: name, description and Claude tool names in the front matter. */
 function agentFile(agent: { name: string; description: string; tools: string[]; skills?: string[] },
-  body: string, notice: string) {
+  body: string, notice: string, marker?: RoleFile['marker']) {
   const tools = agent.tools.map((t) => CLAUDE_TOOL_NAMES[t] ?? t).join(', ');
   const content = appendNotice([
     '---',
@@ -25,6 +26,7 @@ function agentFile(agent: { name: string; description: string; tools: string[]; 
     `description: ${yamlString(agent.description)}`,
     `tools: ${tools}`,
     ...(agent.skills?.length ? ['skills:', ...agent.skills.map((id) => `  - ${yamlString(id)}`)] : []),
+    ...sourceMarkerLine(marker),
     '---',
     '',
     body,
@@ -47,7 +49,7 @@ function agentFiles(ctx: RenderContext, notice: string): GeneratedFile[] {
   }
   for (const role of team) {
     const agent = { name: subagentName(role), description: role.description, tools: role.tools, skills: role.skills };
-    files.push(agentFile(agent, roleBody(role, ctx), notice));
+    files.push(agentFile(agent, roleBody(role, ctx), notice, role.marker));
   }
   return files;
 }
@@ -90,6 +92,24 @@ export const claudeAdapter: ToolAdapter = {
       }
     }
     files.push(...agentFiles(ctx, notice));
+    files.push(...ruleFiles(ctx, notice));
     return files;
   },
 };
+
+/** The team rules with paths as Claude Code rules (0.32.0): `.claude/rules/<id>.md`, loaded for matching files. */
+function ruleFiles(ctx: RenderContext, notice: string): GeneratedFile[] {
+  return (ctx.pathRules ?? []).map((rule) => {
+    const content = appendNotice([
+      '---',
+      `description: ${yamlString(rule.description || rule.id)}`,
+      'paths:',
+      ...rule.paths.map((glob) => `  - ${yamlString(glob)}`),
+      '---',
+      '',
+      rule.text.trim(),
+      '',
+    ].join('\n'), notice);
+    return { path: `.claude/rules/${rule.id}.md`, content, tool: 'claude' as const, kind: 'rule' as const };
+  });
+}

@@ -6,6 +6,7 @@ import { harnessVersion } from '../core/version.js';
 import { assetsDir } from '../integrations/assets.js';
 import { builtinDraft, withoutSource } from './draft.js';
 import type { PackSource } from './pack-config.js';
+import type { SourceMarker } from './vetting.js';
 
 /**
  * Where drafts of roles come from. The built-in roles ship in `assets/roles/<locale>/<role>.md`; the team registry
@@ -19,6 +20,7 @@ export interface RoleDraft {
   version?: string;
   server?: string;
   checksum?: string;
+  marker?: SourceMarker;
   /** The pack a draft of a pack came from. */
   pack?: PackSource;
 }

@@ -16,6 +16,7 @@ import {
   detectLayout,
   planConversion,
   scaffoldLayout,
+  writeAgentGuides,
   type ConvertMove,
   type LayoutMapping,
   type LayoutRoleId,
@@ -280,6 +281,7 @@ export async function initWithLayout<T extends { config: SdlcConfig }>(
     const created = applyLayoutHere(root, outcome.config, request.action);
     return { outcome, layout: { folder: folder.kind, action: request.action, created } };
   }
+  writeAgentGuides(root, outcome.config);
   if (folder.kind === 'empty') return { outcome, layout: { folder: 'empty', action: 'none' } };
   const diagnosis = diagnoseLayout(root, outcome.config.layout);
   return { outcome, layout: { folder: 'existing', action: 'none', diagnosis } };

@@ -67,6 +67,11 @@ function safeDirectory(root: string, relative: string): boolean {
   return isWithin(fs.realpathSync(root), fs.realpathSync(directory));
 }
 
+/** The stacks the project's top-level files show; team rules are proposed by these ids (0.32.0). */
+export function stackIds(root: string): string[] {
+  return stack(root).map((entry) => entry.id);
+}
+
 function stack(root: string): { id: string; evidence: string[] }[] {
   const files = fs.readdirSync(root);
   const rules: [string, string[]][] = [

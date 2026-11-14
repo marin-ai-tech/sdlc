@@ -24,6 +24,7 @@ Pick the part of the process you need today.
 - [Integrations and MCP](10-integrations.md) — connect checks, context and events.
 - [MCP use cases](11-mcp-use-cases.md) — see who can connect and what they can do.
 - [Agent team](12-agent-team.md) — create and accept role agents.
+- [sdlc and SkillForge](35-sdlc-and-skillforge.md) — keep the team's roles, skills and rules in a registry.
 - [Process health](13-process-health.md) — spot friction and plan improvements.
 - [Traceability and audit](14-traceability.md) — follow requirements and decisions.
 

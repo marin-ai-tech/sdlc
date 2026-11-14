@@ -2,31 +2,20 @@ import { generatedNotice } from '../core/license.js';
 import type { RoleFile } from '../team/role-file.js';
 import { agentNames, roleBody, runsChecks, subagentName } from '../team/render.js';
 import { AGENT_IDS, loadAgent, loadWorkflow, readAsset, WORKFLOW_IDS } from './assets.js';
-import { appendNotice, renderBody, yamlString } from './render.js';
+import { appendNotice, renderBody, sourceMarkerLine, yamlString } from './render.js';
 import { roleSkillInstructions } from './role-skills.js';
 import { stageResources, stageSection } from './stage-resources.js';
 import type { GeneratedFile, RenderContext, ToolAdapter } from './types.js';
 
 type Access = 'checks' | 'read' | 'write' | 'nobash';
 
-/** The OpenCode `permission` map: a verifier runs any check, a reader runs read-only commands, a writer edits. */
-function permission(access: Access, cli: string): string[] {
-  if (access === 'checks') return ['permission:', '  edit: deny', '  bash: allow', '  webfetch: deny'];
+/** The OpenCode `permission` map: readers can run shell commands but cannot use the edit tool. */
+function permission(access: Access): string[] {
+  if (access === 'checks' || access === 'read') {
+    return ['permission:', '  edit: deny', '  bash: allow', '  webfetch: deny'];
+  }
   if (access === 'write') return ['permission:', '  edit: allow', '  bash: allow', '  webfetch: deny'];
-  if (access === 'nobash') return ['permission:', '  edit: deny', '  bash: deny', '  webfetch: deny'];
-  return [
-    'permission:',
-    '  edit: deny',
-    '  webfetch: deny',
-    '  bash:',
-    '    "*": ask',
-    '    "git *": allow',
-    `    "${cli} *": allow`,
-    '    "grep *": allow',
-    '    "rg *": allow',
-    '    "ls *": allow',
-    '    "cat *": allow',
-  ];
+  return ['permission:', '  edit: deny', '  bash: deny', '  webfetch: deny'];
 }
 
 /** A role's access from its front matter: `readonly` and `tools`; the tester runs checks like the verifier. */
@@ -36,12 +25,14 @@ function roleAccess(role: RoleFile): Access {
   return runsChecks(role) ? 'checks' : 'read';
 }
 
-function agentFile(name: string, description: string, access: Access, body: string, ctx: RenderContext) {
+function agentFile(name: string, description: string, access: Access, body: string, ctx: RenderContext,
+  marker?: RoleFile['marker']) {
   const content = appendNotice([
     '---',
     `description: ${yamlString(description)}`,
     'mode: subagent',
-    ...permission(access, ctx.cli),
+    ...permission(access),
+    ...sourceMarkerLine(marker),
     '---',
     '',
     body,
@@ -63,7 +54,7 @@ function agentFiles(ctx: RenderContext): GeneratedFile[] {
   }
   for (const role of team) {
     const body = roleSkillInstructions(role, roleBody(role, ctx));
-    files.push(agentFile(subagentName(role), role.description, roleAccess(role), body, ctx));
+    files.push(agentFile(subagentName(role), role.description, roleAccess(role), body, ctx, role.marker));
   }
   return files;
 }

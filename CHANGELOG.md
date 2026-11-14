@@ -2,6 +2,58 @@
 
 All notable changes to sdlc. Versions follow [Semantic Versioning](https://semver.org/); while the major version is 0, a minor version may change behavior.
 
+## 0.32.0 — 2026-11-14
+
+Field findings from running sdlc on OpenCode with a team registry. Two ways to hide a write behind a here-document
+are closed. Team rules from the registry reach the agents. Read Changed, Compatibility and Known limits before you
+update.
+
+### Fixed
+- A here-document whose delimiter is partly quoted, such as `<<'E'OF`, hid every later line of the command from the
+  plan gate, locked tests and protected paths.
+- A here-document body that bash runs, as in `bash <<'EOF'` or `cat <<'EOF' | bash`, was not checked by the write
+  check. Every line of a body is now read as a command by every check.
+- Before the plan gate, string literals of a read-only `node -e` script, such as the event names of
+  `process.stdin.on('data')` and compared values, were taken for files it writes. They are not any more.
+- A refusal for an empty path named no file. It now says the path is empty.
+
+### Added
+- Team rules. A registry may serve `list_rules` and `get_rule`. `sdlc team sync` proposes the rules that fit the
+  project, and a person accepts one with `sdlc team accept --rule <id>`. A rule without paths goes into a block of
+  `AGENTS.md` that sdlc owns. A rule with paths goes into the code roles' subagents and, for Claude Code, into
+  `.claude/rules/<id>.md`.
+- `sdlc init` creates `AGENTS.md` when the project has none, and the thin `CLAUDE.md` for Claude Code.
+- A registry role may carry a source marker, `marker: { key, value }`. sdlc checks it and writes it into the role's
+  subagents, so the registry can tie them to their source.
+- A workflow of a stage with skills asks the agent to load them first and to name the loaded skills in its report.
+- New hook rule `mcp-events`: an agent's call to the tool an `events` entry names is refused, in block and in warn.
+
+### Changed
+- A server named by `team.registry` or by `events` defaults to `agents: false`, so agents no longer see it. An
+  explicit `agents: true` is kept, and `sdlc doctor` warns about it.
+- Read-only subagents on OpenCode get `edit: deny`, `bash: allow` and `webfetch: deny`, as on Claude Code. A headless
+  run no longer fails a review on the first `echo`. Writes that matter still meet the plugin's checks.
+- The team rules of Claude Code (`.claude/rules/`) are guard files: an agent cannot rewrite them.
+- A registry's source marker is accepted only under a key that ends in `-source`.
+- The role facts and the `sdlc.yaml` header say that test paths lock only during a bug fix with `sdlc tests lock`.
+
+### Compatibility
+- Run `sdlc update`. It removes the registry and events servers that sdlc wrote into the agents' MCP files, and
+  regenerates the OpenCode subagents and the stage workflows.
+- `openspec/.sdlc/team.json` gains `rules` and the role marker. Older files read as before. No other stored format
+  changed.
+
+### Known limits
+- Every line of a here-document body is read as a command, so a harmless body can be refused, for example Markdown
+  with a backtick code span or a script with `rm` in a word. Write such a file with the editor tool instead.
+- An agent can edit the team rules block of `AGENTS.md`. `sdlc doctor` reports the edit and `sdlc update` restores it.
+- Roles accepted before this version get the registry's source marker with their next accepted version.
+- A multi-line `node -e` script that writes through a variable is still refused. Put the script in a file.
+- The `mcp-events` rule governs MCP calls only. An agent that can read the registry's token can still call the
+  registry's own API. Keep the token where only the CLI reads it.
+- OpenCode has no path scoping. A rule with paths reaches only the role subagents there.
+- The load-the-skills step is guidance. An agent may skip it, and its final report then shows that.
+
 ## 0.31.1 — 2026-11-13
 
 ### Fixed

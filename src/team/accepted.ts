@@ -25,7 +25,9 @@ export function acceptedRoles(root: string): RoleFile[] {
   const roles: RoleFile[] = [];
   for (const id of roleIdsIn(root, AGENTS_DIR)) {
     if (roleStatus(root, id, team) !== 'accepted') continue;
-    roles.push(parseRoleFile(id, readText(path.join(root, acceptedPath(id))) ?? ''));
+    const role = parseRoleFile(id, readText(path.join(root, acceptedPath(id))) ?? '');
+    const entry = team.roles[id];
+    roles.push({ ...role, ...(entry.source === 'registry' && entry.marker ? { marker: entry.marker } : {}) });
   }
   return roles;
 }

@@ -17,6 +17,8 @@ export interface StdioServer {
   stages: string[];
   /** When false, the CLI uses the server; agents' MCP configs do not (B97). Default true. */
   agents: boolean;
+  /** Whether agents was set in the server's configuration. */
+  agentsExplicit: boolean;
 }
 
 export interface HttpServer {
@@ -27,6 +29,8 @@ export interface HttpServer {
   stages: string[];
   /** When false, the CLI uses the server; agents' MCP configs do not (B97). Default true. */
   agents: boolean;
+  /** Whether agents was set in the server's configuration. */
+  agentsExplicit: boolean;
 }
 
 export type McpServer = StdioServer | HttpServer;
@@ -128,7 +132,8 @@ function parseServer(name: string, value: unknown, where: string): McpServer {
   const raw = mapping(value, where) ?? {};
   const type = raw.type ?? 'stdio';
   const agents = agentsFlag(raw.agents, `${where}.agents`);
-  const common = { name, stages: stages(raw.stages, `${where}.stages`), agents };
+  const agentsExplicit = typeof raw.agents === 'boolean';
+  const common = { name, stages: stages(raw.stages, `${where}.stages`), agents, agentsExplicit };
   if (type === 'http') {
     const url = text(raw.url, `${where}.url`);
     return { ...common, type, url, headers: stringMap(raw.headers, `${where}.headers`) };

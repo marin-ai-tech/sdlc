@@ -8,6 +8,8 @@ import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { CallToolRequestSchema, ListToolsRequestSchema } from '@modelcontextprotocol/sdk/types.js';
 
+// With `rules: [{ id, version, title, description, paths, tags, body, checksum }]` in the file it also answers
+// list_rules and get_rule (0.32.0, team rules); without it the tool list is the same as before.
 const data = JSON.parse(fs.readFileSync(process.env.FAKE_REGISTRY_FILE, 'utf-8'));
 const object = (properties = {}) => ({ type: 'object', properties });
 const tools = [
@@ -15,6 +17,10 @@ const tools = [
   { name: 'get_role', description: 'One role', inputSchema: object({ id: { type: 'string' }, locale: { type: 'string' } }) },
   { name: 'list_skills', description: 'Skills of the team', inputSchema: object() },
   { name: 'get_skill', description: 'One skill', inputSchema: object({ id: { type: 'string' } }) },
+  ...(data.rules ? [
+    { name: 'list_rules', description: 'Rules of the team', inputSchema: object() },
+    { name: 'get_rule', description: 'One rule', inputSchema: object({ id: { type: 'string' } }) },
+  ] : []),
 ];
 
 function answer(value) {
@@ -28,7 +34,11 @@ function call(name, args) {
   if (name === 'list_skills') {
     return answer({ skills: data.skills.map(({ id, version, title, checksum }) => ({ id, version, title, checksum })) });
   }
-  const list = name === 'get_role' ? data.roles : name === 'get_skill' ? data.skills : undefined;
+  if (name === 'list_rules' && data.rules) {
+    return answer({ rules: data.rules.map(({ id, version, tags, paths, checksum }) => ({ id, version, tags, paths, checksum })) });
+  }
+  const lists = { get_role: data.roles, get_skill: data.skills, get_rule: data.rules };
+  const list = lists[name];
   const item = list?.find((entry) => entry.id === args?.id);
   if (!item) return { isError: true, content: [{ type: 'text', text: `not found: ${args?.id}` }] };
   return answer(item);

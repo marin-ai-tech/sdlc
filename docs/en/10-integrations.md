@@ -172,12 +172,17 @@ stdio as `{ command, args, env }`, http as `{ httpUrl, headers }`, secrets as `$
 sdlc remembers which entries it wrote. A server removed from the registry disappears on the next `update`, and a
 server someone added by hand is never touched.
 
-Set `agents: false` on a registry server used only by the CLI, such as an event receiver or a
-verification or release check target. The default is `true`. The CLI can still call it for events, checks and
-`sdlc mcp check`, but sdlc omits it from agent MCP settings and stage workflow text. If you change an existing
+Servers named by `team.registry` or `events` default to `agents: false`. Other registry servers default to `true`.
+Set `agents: false` on another server used only by the CLI, such as a verification or release check target.
+An explicit `agents: true` keeps a server available to agents, and `sdlc doctor` warns when it serves the team
+registry or events. The CLI can still call servers with `agents: false` for events, checks and `sdlc mcp check`,
+but sdlc omits them from agent MCP settings and stage workflow text. If you change an existing
 server to `agents: false`, `sdlc update` removes entries sdlc wrote in `.mcp.json`, `opencode.json`,
 `.cursor/mcp.json` and `.codex/config.toml`; entries added by a person stay. `stages: []` still means the
-`mcp-stage` rule does not check it; use `agents: false` to keep the server away from agents.
+`mcp-stage` rule does not check it. The `mcp-events` hook rule denies agent calls to an event receiver's named
+tool in both `block` and `warn` mode.
+These rules govern MCP calls only. An agent that can read the registry's token can still call the registry's own API.
+Keep that token where only the CLI reads it, such as an environment variable the agent session does not get.
 
 **Secrets only as references.** A literal key or token in `env` or `headers` is a configuration error
 (`mcp_secret_literal`). Nothing is written, and the message names the server and the key, never the value.

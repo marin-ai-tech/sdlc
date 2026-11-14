@@ -162,6 +162,18 @@ export function appendNotice(content: string, notice: string): string {
 
 /** YAML scalar that is always safe in frontmatter (quotes when needed). */
 export function yamlString(value: string): string {
+  // A whole value YAML reads as a boolean, null or number is quoted, so it stays a string (0.32.0).
+  const ambiguous = /^(?:true|false|null|yes|no|on|off|~|[-+]?\d+(?:\.\d+)?(?:e[-+]?\d+)?|[-+]?\.(?:inf|nan))$/i;
+  if (ambiguous.test(value)) return JSON.stringify(value);
   if (/^[A-Za-z0-9][A-Za-z0-9 ,.()'/_-]*$/.test(value) && !/:\s/.test(value) && !value.endsWith(':')) return value;
   return JSON.stringify(value);
+}
+
+/** The optional registry provenance line for a generated role agent. */
+export function sourceMarkerLine(marker?: { key: string; value: string }): string[] {
+  if (!marker) return [];
+  const plain = /^[A-Za-z0-9][A-Za-z0-9 ,.()'/_@-]*$/.test(marker.value);
+  const ambiguous = /^(?:true|false|null|[-+]?(?:\d|\.inf|\.nan))/i.test(marker.value);
+  const value = ambiguous ? JSON.stringify(marker.value) : plain ? marker.value : yamlString(marker.value);
+  return [`${marker.key}: ${value}`];
 }

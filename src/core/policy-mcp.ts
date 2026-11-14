@@ -20,6 +20,22 @@ export function mcpServerOf(tool: string, servers: McpServer[]): McpServer | und
   return prefixed.sort((a, b) => b.name.length - a.name.length)[0];
 }
 
+/** Agents cannot call a tool reserved for delivery of sdlc's own events, even in warn mode. */
+export function mcpEventsDecision(tool: string, config: SdlcConfig): Decision | undefined {
+  if (config.enforcement.mode === 'off') return undefined;
+  const server = mcpServerOf(tool, config.mcp?.servers ?? []);
+  if (!server) return undefined;
+  const receiver = (config.events ?? []).find((event) =>
+    event.server === server.name && (tool === `mcp__${server.name}__${event.tool}`
+      || tool === `${server.name}_${event.tool}`));
+  if (!receiver) return undefined;
+  return {
+    decision: 'deny',
+    rule: 'mcp-events',
+    reason: t('hook.mcpEvents', { server: server.name, tool: receiver.tool }),
+  };
+}
+
 /**
  * The decision for an MCP tool call; undefined when the rule has nothing to say. `stages` gives the active
  * changes' stages and is called only for a governed server.
