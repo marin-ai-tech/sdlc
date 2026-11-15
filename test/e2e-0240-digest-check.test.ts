@@ -26,8 +26,10 @@ type Json = Record<string, any>;
 const DIGEST = /^sha256:[0-9a-f]{64}$/;
 const OLD_GATE_KEYS = ['id', 'required', 'status'];
 const OLD_QUEUE_KEYS = ['action', 'change', 'cli', 'gate', 'message'];
-const OLD_EVENT_KEYS = ['id', 'project', 'event', 'change', 'gate', 'at', 'sdlc', 'by', 'agent', 'waitingFor',
-  'summary'];
+// `stage` was added on purpose by change events-carry-the-stage (owner, 2026-11-15; project-log requirement
+// "Older entries and events stay as they are" modified there); `digest` must still never appear.
+const OLD_EVENT_KEYS = ['id', 'project', 'event', 'change', 'gate', 'stage', 'at', 'sdlc', 'by', 'agent',
+  'waitingFor', 'summary'];
 const FAKE = path.join(REPO_ROOT, 'test/fixtures/mcp/fake-server.mjs').replace(/\\/g, '/');
 
 const INTENT_LINES = ['# Intent: x', '', 'Author: Pat. Status: draft. Source: idea', '', '## Problem', 'P.', '',

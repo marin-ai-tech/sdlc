@@ -1,7 +1,8 @@
 import { createHash } from 'node:crypto';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import type { SdlcConfig } from '../core/config.js';
+import type { GateId, SdlcConfig } from '../core/config.js';
+import { GATE_STAGE, type StageId } from '../core/stages.js';
 import { projectNameFromManifest } from '../core/project-name.js';
 import { git } from '../core/git.js';
 import type { LogEntry } from '../core/log.js';
@@ -15,9 +16,9 @@ import { eventMessage, peopleNames } from './event-message.js';
  * The event queue (B45): a log entry that some receiver wants is written to `<git dir>/sdlc/outbox/<id>.json`
  * when it is appended to the project log, and delivered after the command (src/mcp/events.ts). The queue lives in
  * the git directory, so it never reaches a commit; outside a git repository nothing is queued. An event carries
- * the entry's name, change, gate, time, sdlc version, the person id of its identity (roles.yaml) and, for a waiting
- * gate, the ids of the people it waits for. Never an email, never command text or output, and never the entry's
- * detail, with one opt-in exception (0.16.1): the detail of `gate.<g>.rejected` and `gate.<g>.rework` is the note,
+ * the entry's name, change, gate, the gate's stage, time, sdlc version, the person id of its identity (roles.yaml)
+ * and, for a waiting gate, the ids of the people it waits for. Never an email, never command text or output, and
+ * never the entry's detail, with one opt-in exception (0.16.1): the detail of `gate.<g>.rejected` and `gate.<g>.rework` is the note,
  * and when at least one receiver of the event has `include_note: true` the queue stores it once, cleaned (one line,
  * at most 200 characters, secrets masked) next to the event, never inside it; delivery hands it only to the
  * receivers that opted in (src/mcp/events.ts).
@@ -50,6 +51,8 @@ export interface EventBody {
   event: string;
   change?: string;
   gate?: string;
+  /** The lifecycle stage of the gate (`test` for `verify.*`), so a receiver need not map gate ids to stages. */
+  stage?: StageId;
   at: string;
   sdlc: string;
   /** The person id from roles.yaml; absent without roles.yaml or when the identity is no person. */
@@ -93,6 +96,7 @@ export interface QueuedFile {
 export type QueueConfig = Partial<Pick<SdlcConfig, 'events' | 'project'>>;
 
 const GATE_EVENT = /^gate\.([^.]+)\./;
+const VERIFY_EVENT = /^verify\.[^.]+$/;
 const WAIT_EVENT = /^gate\.[^.]+\.(awaiting|overdue)$/;
 const EMAIL_IN_IDENTITY = /<([^>]+)>/;
 const NOTE_EVENT = /^gate\.[^.]+\.(rejected|rework)$/;
@@ -173,9 +177,17 @@ function personId(root: string, by: string | undefined): string | undefined {
   }
 }
 
+/** The stage an event belongs to: the stage of its gate, `test` for a verify event, none for anything else. */
+export function eventStage(event: string): StageId | undefined {
+  if (VERIFY_EVENT.test(event)) return 'test';
+  const gate = GATE_EVENT.exec(event)?.[1];
+  return gate !== undefined && Object.hasOwn(GATE_STAGE, gate) ? GATE_STAGE[gate as GateId] : undefined;
+}
+
 /** The body a receiver gets for one log entry. */
 export function eventBody(root: string, config: QueueConfig, entry: LogEntry): EventBody {
   const gate = GATE_EVENT.exec(entry.event)?.[1];
+  const stage = eventStage(entry.event);
   const by = personId(root, entry.by);
   const project = config.project?.name ?? projectNameFromManifest(root);
   const idProject = config.project?.name;
@@ -188,6 +200,7 @@ export function eventBody(root: string, config: QueueConfig, entry: LogEntry): E
     event: entry.event,
     ...(entry.change ? { change: entry.change } : {}),
     ...(gate ? { gate } : {}),
+    ...(stage ? { stage } : {}),
     at: entry.ts,
     sdlc: entry.sdlc,
     ...(by ? { by } : {}),

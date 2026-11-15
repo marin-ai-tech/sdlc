@@ -4,7 +4,7 @@ import { agentNames, roleBody, subagentName } from '../team/render.js';
 import { AGENT_IDS, loadAgent, loadWorkflow, WORKFLOW_IDS } from './assets.js';
 import { appendNotice, renderBody, sourceMarkerLine, yamlString } from './render.js';
 import { allowedToolsFor } from './skills.js';
-import { stageAllowedTools, stageResources, stageSection } from './stage-resources.js';
+import { stageAllowedTools, stageInjection, stageResources, stageSection } from './stage-resources.js';
 import type { GeneratedFile, RenderContext, ToolAdapter } from './types.js';
 
 const CLAUDE_TOOL_NAMES: Record<string, string> = {
@@ -86,30 +86,16 @@ export const claudeAdapter: ToolAdapter = {
           `allowed-tools: ${stageAllowedTools(allowedToolsFor(ctx.cli), resources)}`,
           '---',
           '',
-          renderBody(wf.body, { surface: 'claude-command', cli: ctx.cli, agents }) + stageSection(resources),
+          stageInjection(resources, ctx.cli)
+            + renderBody(wf.body, { surface: 'claude-command', cli: ctx.cli, agents })
+            + stageSection(resources, { inject: true }),
         ].join('\n'), notice);
         files.push({ path: `.claude/commands/sdlc/${id}.md`, content, tool: 'claude', kind: 'command' });
       }
     }
     files.push(...agentFiles(ctx, notice));
-    files.push(...ruleFiles(ctx, notice));
+    // Since 0.32.1 (B317) no `.claude/rules/<id>.md`: SkillForge installs registry rules. The manifest removes the
+    // files 0.32.0 wrote on the next update, unless they changed since.
     return files;
   },
 };
-
-/** The team rules with paths as Claude Code rules (0.32.0): `.claude/rules/<id>.md`, loaded for matching files. */
-function ruleFiles(ctx: RenderContext, notice: string): GeneratedFile[] {
-  return (ctx.pathRules ?? []).map((rule) => {
-    const content = appendNotice([
-      '---',
-      `description: ${yamlString(rule.description || rule.id)}`,
-      'paths:',
-      ...rule.paths.map((glob) => `  - ${yamlString(glob)}`),
-      '---',
-      '',
-      rule.text.trim(),
-      '',
-    ].join('\n'), notice);
-    return { path: `.claude/rules/${rule.id}.md`, content, tool: 'claude' as const, kind: 'rule' as const };
-  });
-}

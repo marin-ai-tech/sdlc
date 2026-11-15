@@ -68,6 +68,9 @@ mcp:
 `sdlc mcp check` lists tools and warns about file writers. Outside a server's `stages`, hooks deny in block
 mode or remind in warn mode. `stages.<stage>.skills` and `.agents` name stage resources.
 
+Servers named by `team.registry` or `events` default to `agents: false`. With SkillForge both are its `/mcp`
+address: the registry with an ordinary MCP token, the events server with an integration token.
+
 `verify.mcp` runs during `sdlc verify`; `release.mcp` runs at release approval or `sdlc release check`.
 Outside-session results wait in `sdlc inbox list`. Event deliveries retry with `sdlc events flush`.
 

@@ -3,7 +3,6 @@ import type { RenderContext } from '../integrations/types.js';
 import { artifactsBlock } from './artifacts.js';
 import { projectBlock } from './facts.js';
 import type { RoleFile } from './role-file.js';
-import { ruleTitle } from './rules-block.js';
 import { teamLocale } from './sources.js';
 import { readAsset, splitFrontmatter } from '../integrations/assets.js';
 
@@ -40,22 +39,6 @@ function fill(body: string, placeholder: string, block: string): string {
   return body.split(placeholder).join(`\n${block}\n`);
 }
 
-/** The stages whose roles write or check code: they carry the team rules for files (0.32.0). */
-const CODE_STAGES = ['build', 'test', 'deploy'];
-
-/** The team rules with paths, as a section of a code role's body; empty for other roles or without such rules. */
-export function pathRulesSection(role: RoleFile, ctx: RenderContext): string {
-  const rules = ctx.pathRules ?? [];
-  if (rules.length === 0 || !role.stages.some((stage) => CODE_STAGES.includes(stage))) return '';
-  const lines = ['## Team rules for files', '', 'Follow each rule when you work on files that match its paths.', ''];
-  for (const rule of rules) {
-    const globs = rule.paths.map((glob) => `\`${glob}\``).join(', ');
-    const { title, body } = ruleTitle(rule.text, rule.id);
-    lines.push(`### ${title}`, '', `Applies to: ${globs}`, '', body, '');
-  }
-  return lines.join('\n');
-}
-
 /** The subagent body of an accepted role: placeholders filled, `sdlc` commands in the project's CLI prefix. */
 export function roleBody(role: RoleFile, ctx: RenderContext): string {
   const locale = teamLocale(ctx.config);
@@ -65,7 +48,6 @@ export function roleBody(role: RoleFile, ctx: RenderContext): string {
   const out = project ? fill(withArtifacts, '{{project}}', project) : withArtifacts.split('{{project}}').join('');
   const builtIn = REPLACES[role.id];
   const instructions = builtIn ? splitFrontmatter(readAsset('agents', `${builtIn}.md`)).body : '';
-  const rules = pathRulesSection(role, ctx);
-  const tail = [instructions.trim(), rules.trim()].filter(Boolean).map((part) => `\n${part}\n`).join('');
+  const tail = instructions.trim() ? `\n${instructions.trim()}\n` : '';
   return `${out.replace(/\n{3,}/g, '\n\n').trimEnd()}\n${tail}`;
 }

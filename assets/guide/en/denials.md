@@ -50,6 +50,8 @@ Only a person edits the executor registry `openspec/executors.yaml`.
 Have a person edit the registry; change board state through `sdlc board`.
 Reads with stderr redirected to `/dev/null`, `nul` or `$null`, or with a descriptor duplicated or closed, remain reads.
 An uncertain copy names its unresolved source or destination; use a literal path to make the target inspectable.
+A variable set once, plainly, before the copy and used in double quotes (`BASE=/tmp/r; cp a "$BASE/"`) counts as a
+literal path. A pipe, `&&`, a group or an unquoted `$BASE` undoes that: quote it, or run the copy as its own command.
 An inline script string that could match state only as a glob names that string. Put the script in a file to avoid the
 inline string scan.
 

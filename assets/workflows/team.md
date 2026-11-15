@@ -17,7 +17,10 @@ Set up the agent team of this project: roles that fit the project, drafted by yo
 1. **Bring the roles.** Run `sdlc team sync --json`. It writes drafts to `docs/agents/drafts/` from the team registry
    (when `team.registry` is configured) and fills the gaps from the built-in roles; it never replaces an accepted
    role. Report what came from where, and anything refused (a checksum mismatch is a warning to pass on, not to work
-   around).
+   around). If it fails with `registry_tools_missing`, the server answered without the role tools: stop and pass on
+   the fix it prints (on SkillForge, a person enables the plugin `sdlc-registry`); do not fall back to built-ins.
+   A draft listed in `markerOnly` differs from the accepted role only by the registry's source marker; include it in
+   the hand-over.
 2. **Check the draft skills.** Run `sdlc team check --json` after sync. Report which skills will wait for a person
    and which were refused before the hand-over. This check installs nothing.
 3. **Learn the project.**
@@ -42,5 +45,7 @@ Set up the agent team of this project: roles that fit the project, drafted by yo
 6. **Hand over to the person.** List the drafts with what you added and why, then give the exact commands for their own
    terminal: `sdlc team accept <role>` for each role, and `sdlc team accept --skill <id>` for skills with any
    non-Markdown file (JSON and YAML are reported as data, not scripts)
-   (`sdlc team check --json` shows them). Accepting is a person's decision: never run it, and never edit an accepted
+   (`sdlc team check --json` shows them). Registry rules are not accepted in sdlc: pass on the
+   `skillforge sync --type rule --runtime <tool>` lines that `team sync` printed, for the person to run.
+   Accepting is a person's decision: never run it, and never edit an accepted
    role in `docs/agents/` (the hook will refuse; change the draft and ask for a new acceptance instead).

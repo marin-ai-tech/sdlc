@@ -599,6 +599,13 @@ export function applyUpdate(
   return { result, gitHook };
 }
 
+/** B317 review F1: registry rules sdlc had placed are gone; SkillForge installs them from now on. */
+function printRulesMoved(install: string[] | undefined): void {
+  if (!install) return;
+  line(t('update.rulesMoved'));
+  for (const command of install) line(`  ${command}`);
+}
+
 export async function updateCommand(target: string | undefined, opts: UpdateOptions): Promise<void> {
   try {
     const root = findProjectRoot(path.resolve(target ?? process.cwd()));
@@ -631,12 +638,15 @@ export async function updateCommand(target: string | undefined, opts: UpdateOpti
       const hook = gitHookJson(root, gitHook);
       const dryRun = !!opts.dryRun;
       const cursor = cursorHooksJson(result);
-      printJson({ root, tools, dryRun, files, claudeHooks, ...cursor, ...mcpJson(result), ...hook, harness: stamp });
+      const rules = result.rulesMoved ? { rulesMoved: { install: result.rulesMoved } } : {};
+      printJson({ root, tools, dryRun, files, claudeHooks, ...cursor, ...mcpJson(result), ...hook, ...rules,
+        harness: stamp });
       return;
     }
     line(c.bold(t(opts.dryRun ? 'update.would' : 'update.done', { root })) + c.dim(` (${stampTextLocalized(stamp)})`));
     printGitHookInstall(root, gitHook);
     printInstall(result, config);
+    printRulesMoved(result.rulesMoved);
   } catch (error) {
     reportFailure(error, opts.json);
   }

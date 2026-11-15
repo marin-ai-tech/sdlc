@@ -56,8 +56,7 @@ Run the project verify commands before claiming a change is done:
 <!-- sdlc:rules:start -->
 ## Team rules
 
-No team rules are accepted yet (`sdlc team sync`, then a person runs
-`sdlc team accept --rule <id>`).
+Registry rules are installed by SkillForge (`skillforge sync --type rule --runtime <agent>`), not in this block.
 
 <!-- sdlc:rules:end -->
 

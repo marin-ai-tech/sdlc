@@ -23,7 +23,8 @@ import { renderSkills } from './skills.js';
 import { renderTeamSkills } from './team-skills.js';
 import { acceptedRoles } from '../team/accepted.js';
 import { readTeam } from '../team/record.js';
-import { applyRulesBlock } from '../team/rules-block.js';
+import { applyRulesBlock, rulesInBlock } from '../team/rules-block.js';
+import { installLines } from '../team/rules.js';
 import { roleSkills } from './role-skills.js';
 import { TOOL_IDS, type GeneratedFile, type RenderContext, type ToolAdapter, type ToolId } from './types.js';
 
@@ -81,10 +82,7 @@ export function renderContext(config: SdlcConfig, tools: ToolId[], root?: string
   if (root === undefined) return base;
   const record = readTeam(root);
   const installed = new Set(Object.keys(record.skills));
-  const pathRules = Object.entries(record.rules ?? {}).filter(([, rule]) => rule.paths && rule.paths.length > 0)
-    .sort(([a], [b]) => a.localeCompare(b))
-    .map(([id, rule]) => ({ id, description: rule.description, paths: rule.paths ?? [], text: rule.text }));
-  return { ...base, root, team: roleSkills(acceptedRoles(root), installed), pathRules };
+  return { ...base, root, team: roleSkills(acceptedRoles(root), installed) };
 }
 
 export function renderAll(ctx: RenderContext): GeneratedFile[] {
@@ -109,6 +107,8 @@ export interface InstallResult {
   mcp: Record<string, McpChange>;
   /** The registry's servers (B10) per file; only files where an entry was added, updated, removed or kept. */
   servers: Record<string, ServerChanges>;
+  /** B317: present when the update removed registry rules sdlc had placed; the SkillForge lines that install them. */
+  rulesMoved?: string[];
 }
 
 export function installIntegrations(
@@ -127,8 +127,11 @@ export function installIntegrations(
     version: ctx.version,
     license: ctx.stamp.license,
   });
-  // 0.32.0: the team rules block of AGENTS.md follows the accepted rules; the text around it stays the person's.
-  if (!options.dryRun) applyRulesBlock(root, config, readTeam(root).rules ?? {});
+  // B317: the rules block of AGENTS.md holds no registry rule (SkillForge installs them); the text around it stays
+  // the person's. Review F1: when this update took rules away, the result says how SkillForge puts them back.
+  const hadRules = rulesInBlock(root, config).length > 0;
+  if (!options.dryRun) applyRulesBlock(root, config);
+  const rulesMoved = hadRules || report.removed.some((rel) => rel.startsWith('.claude/rules/'));
   const wantHooks = tools.includes('claude') && options.hooks !== false;
   const claudeHooks = tools.includes('claude') || fs.existsSync(path.join(root, '.claude', 'settings.json'))
     ? mergeClaudeHooks(root, config.cli, wantHooks, options.dryRun)
@@ -143,7 +146,7 @@ export function installIntegrations(
   const mcp = applyMcpRegistration(root, config, tools, options.dryRun);
   const servers = applyRegistryServers(root, config.mcp?.servers ?? [], tools, options.dryRun);
   return { tools, files: report, claudeHooks, cursorHooks, codexHooks, qwenHooks, gigacodeHooks,
-    statusLine, mcp, servers };
+    statusLine, mcp, servers, ...(rulesMoved ? { rulesMoved: installLines(config) } : {}) };
 }
 
 function applyFamilySettings(root: string, cli: string, id: 'qwen' | 'gigacode', tools: ToolId[],

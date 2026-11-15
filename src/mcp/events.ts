@@ -7,7 +7,7 @@ import { resolveEventArgs } from './event-args.js';
 import { receiverKey, type EventReceiver } from './event-config.js';
 import { eventMessage, peopleNames, withNote } from './event-message.js';
 import {
-  readOutbox, settleCalls, settleQueued, type EventBody, type QueuedCall, type QueuedFile,
+  eventStage, readOutbox, settleCalls, settleQueued, type EventBody, type QueuedCall, type QueuedFile,
 } from './outbox.js';
 import type { McpServer } from './registry.js';
 import { dropStaleWaits } from './stale-waits.js';
@@ -147,7 +147,9 @@ type DeliveredEvent = EventBody & { note?: string; waitingForChat?: string[] };
  */
 function eventFor(event: EventBody, note: string | undefined, chat: ChatPart | undefined): DeliveredEvent {
   const handles = chat ? { waitingForChat: [...chat.handles] } : {};
-  return { ...event, ...(note ? { note } : {}), ...handles };
+  // An event queued by an older sdlc has no stage; it gets one here, in memory, like the text and the chat parts.
+  const stage = event.stage ?? eventStage(event.event);
+  return { ...event, ...(stage ? { stage } : {}), ...(note ? { note } : {}), ...handles };
 }
 
 /**

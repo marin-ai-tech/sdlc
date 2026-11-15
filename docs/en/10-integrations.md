@@ -183,6 +183,8 @@ server to `agents: false`, `sdlc update` removes entries sdlc wrote in `.mcp.jso
 tool in both `block` and `warn` mode.
 These rules govern MCP calls only. An agent that can read the registry's token can still call the registry's own API.
 Keep that token where only the CLI reads it, such as an environment variable the agent session does not get.
+The team registry and the event receiver may be the same address with two tokens, as with SkillForge; see
+[sdlc and SkillForge](35-sdlc-and-skillforge.md).
 
 **Secrets only as references.** A literal key or token in `env` or `headers` is a configuration error
 (`mcp_secret_literal`). Nothing is written, and the message names the server and the key, never the value.
@@ -317,6 +319,9 @@ of accepted roles that own the stage, its subagents and MCP servers. A role's in
 generated subagent, which loads them before starting. Resources of other stages are omitted. The MCP servers of a
 stage come from the registry's `stages`, so they are written down only
 once. The Claude Code skill also pre-allows the tools of those servers (`allowed-tools: Bash(sdlc *), mcp__build__*`).
+In the commands of Claude Code and OpenCode, the section prints the stage's skill texts instead of asking the agent to
+load them: `sdlc team skills --stage <stage>` runs when the command starts. Other surfaces keep the load step; the
+[agent team](12-agent-team.md#126-skills-that-reach-the-agents) page gives the limits.
 Projects without `stages` and without servers get exactly the files they had before.
 
 The list is guidance for the agent. The servers are also enforced:

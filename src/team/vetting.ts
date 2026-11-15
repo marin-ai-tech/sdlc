@@ -172,7 +172,7 @@ export function vetRole(answer: unknown, id: string, listed?: unknown): Vetted<R
 
 function vetFiles(value: unknown): Vetted<SkillFile[]> {
   if (!Array.isArray(value) || value.length === 0) return { reason: 'files missing' };
-  if (value.length > LIMITS.files) return { reason: `more than ${LIMITS.files} files` };
+  if (value.length > LIMITS.files) return { reason: `more than ${LIMITS.files} files (the limit of a skill)` };
   const files: SkillFile[] = [];
   for (const item of value) {
     const raw = record(item);

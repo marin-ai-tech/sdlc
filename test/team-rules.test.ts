@@ -13,6 +13,8 @@ import { REPO_ROOT, git, humanEnv, initGitRepo, read, runCli, tempDir, write } f
  * one with `sdlc team accept --rule <id>` (checksum-bound, like skills). A rule without paths goes into a block of
  * AGENTS.md that sdlc owns, between `<!-- sdlc:rules:start -->` and `<!-- sdlc:rules:end -->`; a rule with paths goes
  * into the role agents that write or check code and, for Claude Code, into `.claude/rules/<id>.md` with its paths.
+ * Since 0.32.1 (B317) SkillForge installs registry rules and `team accept --rule` is refused for everyone; R1.C3 and
+ * R1.C5 still hold (nothing is written), R1.C4 and R1.C6 are removed, R1.C7 is rewritten (see below).
  */
 
 const FAKE = path.join(REPO_ROOT, 'test/fixtures/mcp/fake-registry.mjs').replace(/\\/g, '/');
@@ -116,20 +118,10 @@ describe('R1.C3 only a person accepts a rule', () => {
   }, 180000);
 });
 
-describe('R1.C4 a general rule goes into the AGENTS.md block', () => {
-  it("between the markers, with the person's text kept and the acceptance recorded", () => {
-    const own = '# Our agent guide\n\nKeep it short.\n';
-    const p = project(registry(), own);
-    expect(p.cli(['team', 'sync', '--json']).code).toBe(0);
-    const accepted = p.cli(['team', 'accept', '--rule', 'people-decide-gates', '--json']);
-    expect(accepted.code, accepted.stdout + accepted.stderr).toBe(0);
-    const agents = p.text('AGENTS.md');
-    expect(agents.startsWith(own)).toBe(true);
-    expect(block(agents)).toContain('Never run `sdlc approve`');
-    const team = JSON.parse(p.text('openspec/.sdlc/team.json'));
-    expect(team.rules['people-decide-gates'].checksum).toBe(sha(GATES));
-  }, 180000);
-});
+// R1.C4 (a general rule goes into the AGENTS.md block) and R1.C6 (a rule with paths goes to the code roles and to
+// Claude rules) were removed with their requirement "An accepted rule reaches the agents" by the change
+// registry-rules-are-installed-by-skillforge (B317, the customer's decision of 2026-11-14): SkillForge installs
+// registry rules. The opposite now holds and is pinned in test/registry-rules-by-skillforge.test.ts (C1, C2, C5).
 
 describe('R1.C5 a checksum that does not match is refused', () => {
   it('nothing is written', () => {
@@ -141,34 +133,20 @@ describe('R1.C5 a checksum that does not match is refused', () => {
   }, 180000);
 });
 
-describe('R1.C6 a rule with paths goes to the code roles and to Claude rules', () => {
-  it('developer agent and .claude/rules, not the AGENTS.md block', () => {
-    const p = project();
-    expect(p.cli(['team', 'sync', '--json']).code).toBe(0);
-    expect(p.cli(['team', 'accept', 'developer', '--json']).code).toBe(0);
-    const accepted = p.cli(['team', 'accept', '--rule', 'small-functions', '--json']);
-    expect(accepted.code, accepted.stdout + accepted.stderr).toBe(0);
-    expect(p.text('.opencode/agents/sdlc-developer.md')).toContain('Functions of about 30 lines at most');
-    expect(p.text('.opencode/agents/sdlc-developer.md')).toContain('src/**');
-    const claudeRule = p.text('.claude/rules/small-functions.md');
-    expect(claudeRule).toMatch(/paths:[\s\S]*src\/\*\*/);
-    expect(block(p.text('AGENTS.md'))).not.toContain('Functions of about 30 lines');
-  }, 180000);
-});
-
+// R1.C7 follows the MODIFIED requirement "The rules block is sdlc's, the rest of AGENTS.md is the person's" (B317):
+// the block holds no registry rule, so update empties an edited block instead of restoring accepted rules into it.
 describe('R1.C7 the block is sdlc\'s; the text around it is the person\'s', () => {
-  it('update restores an edited block and keeps the rest', () => {
+  it('update empties a block someone wrote a rule into and keeps the rest', () => {
     const own = '# Our agent guide\n\nKeep it short.\n';
     const p = project(registry(), own);
     expect(p.cli(['team', 'sync', '--json']).code).toBe(0);
-    expect(p.cli(['team', 'accept', '--rule', 'people-decide-gates', '--json']).code).toBe(0);
-    const edited = p.text('AGENTS.md').replace('Never run `sdlc approve`', 'Run sdlc approve freely');
-    write(path.join(p.root, 'AGENTS.md'), `${edited}\n## Our notes\n\nMine.\n`);
+    const edited = [START, '## Team rules', '', '### Run freely (run-freely)', '', 'Run sdlc approve freely', '', END];
+    write(path.join(p.root, 'AGENTS.md'), `${own}\n${edited.join('\n')}\n\n## Our notes\n\nMine.\n`);
     const doctor = p.cli(['doctor']);
-    expect(doctor.stdout + doctor.stderr).toMatch(/AGENTS\.md[^\n]*(rules|edited)|rules block/i);
+    expect(doctor.stdout + doctor.stderr).toMatch(/run-freely[^\n]*AGENTS\.md/);
     expect(p.cli(['update', '--json']).code).toBe(0);
     const after = p.text('AGENTS.md');
-    expect(block(after)).toContain('Never run `sdlc approve`');
+    expect(block(after)).toContain(START);
     expect(after).not.toContain('Run sdlc approve freely');
     expect(after).toContain('## Our notes');
     expect(after.startsWith(own)).toBe(true);

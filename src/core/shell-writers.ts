@@ -1,4 +1,5 @@
 import * as path from 'node:path';
+import { gnuCopyWrites } from './gnu-copy-args.js';
 import { gitGlobal, toolTargets, type ToolContext } from './policy-shell-tools.js';
 import { shellWords, type ShellCommand, type ShellWord } from './shell-words.js';
 import { programLocation } from './shell-program.js';
@@ -98,15 +99,9 @@ function copyTargets(args: string[], rename: boolean, move = false): string[] {
   return destination === undefined ? [old] : [old, path.posix.join(path.posix.dirname(old), destination)];
 }
 
-function shellCopyTargets(args: string[], move = false): string[] {
-  const inline = args.find((arg) => arg.startsWith('--target-directory='));
-  if (inline !== undefined) return [inline.slice('--target-directory='.length),
-    ...(move ? args.filter(arg => !arg.startsWith('-') && arg !== inline) : [])];
-  const at = args.findIndex((arg) => arg === '-t' || arg === '--target-directory');
-  if (at >= 0) return args[at + 1] === undefined ? [] : [args[at + 1],
-    ...(move ? args.slice(at + 2).filter(arg => !arg.startsWith('-')) : [])];
-  const operands = args.filter((arg) => !arg.startsWith('-'));
-  return operands.length < 2 ? [] : move ? operands : [operands[operands.length - 1]];
+/** The destination of cp, mv, install, ln and link as GNU getopt reads their arguments (B323). */
+function shellCopyTargets(verb: string, args: string[]): string[] {
+  return gnuCopyWrites(verb, args, /^mv$/i.test(verb)) ?? [];
 }
 
 /** Command openers and execution wrappers are not the writer's program. */
@@ -185,7 +180,7 @@ const WRITERS: Array<[RegExp, Writer]> = [
   [CONTENT, (verb, args) => files(contentTargets(args, verb))],
   [COPY, (verb, args) => files(copyTargets(args, false, /^(?:Move-Item|mi|move)$/i.test(verb)), true)],
   [RENAME, (_verb, args) => files(copyTargets(args, true), true)],
-  [/^(?:cp|mv|install|ln|link)$/i, (verb, args) => files(shellCopyTargets(args, /^mv$/i.test(verb)), true)],
+  [/^(?:cp|mv|install|ln|link)$/i, (verb, args) => files(shellCopyTargets(verb, args), true)],
   [/^(?:tee|Tee-Object)$/i, (_verb, args) => files(teeTargets(args))],
   [FILE_METHOD, (_verb, args) => files(args.slice(0, 1))],
   [/^(?:touch|truncate)$/i, (verb, args) => files(touchTargets(verb, args))],

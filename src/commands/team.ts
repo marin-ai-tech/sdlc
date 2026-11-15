@@ -12,8 +12,10 @@ import { acceptPack, type PackAcceptResult } from '../team/pack-accept.js';
 import type { PackContentsReport } from '../team/pack-effect.js';
 import { listPacks, type PackListItem } from '../team/pack-list.js';
 import { acceptRole, listTeam, syncTeam, type SyncResult, type TeamListRole } from '../team/team.js';
-import { acceptRule } from '../team/rules-accept.js';
-import { syncRules, type RulesSync } from '../team/rules.js';
+import { STAGE_IDS, type StageConfigId } from '../core/stage-config.js';
+import { assertRegistryTools } from '../team/registry-client.js';
+import { stageSkillTexts } from '../team/stage-skill-text.js';
+import { checkRules, syncRules, type RuleCheck, type RulesSync } from '../team/rules.js';
 import { assertHuman } from './gates.js';
 
 /** `sdlc team sync | accept | list | check` (B69, B71, B72, B74): the agent team of the project. */
@@ -53,16 +55,26 @@ function printSync(result: SyncResult): void {
     line(`${t('label.warning')}: ${t('team.sync.invalidMarker', { id: item.id, reason: item.reason })}`);
   }
   for (const file of result.created) line(t('team.sync.created', { path: file }));
+  for (const id of result.markerOnly ?? []) line(t('team.sync.markerOnly', { id }));
   for (const kept of result.kept) line(t(`team.sync.kept.${kept.reason}`, { id: kept.id }));
   if (result.created.length > 0) line(t('team.sync.next', { dir: DRAFTS_DIR }));
 }
 
-/** 0.32.0: the registry's rules that fit the project, and the others, with the command a person runs. */
+const pathsText = (paths: string[] | undefined) => (paths ? ` (${paths.join(', ')})` : '');
+
+/** B317: every rule of the registry, whether it fits, and the SkillForge lines a person runs to install them. */
 function printRules(rules: RulesSync | undefined): void {
   if (!rules) return;
   if (rules.error) line(t('team.sync.rulesError', { server: rules.server ?? '', error: rules.error }));
-  for (const item of rules.proposed) line(t('team.sync.ruleProposed', { id: item.id, reason: item.reason }));
-  if (rules.other.length > 0) line(t('team.sync.rulesOther', { list: rules.other.map((item) => item.id).join(', ') }));
+  const fits = new Map(rules.proposed.map((item) => [item.id, item.reason]));
+  for (const rule of rules.rules) {
+    const reason = fits.get(rule.id);
+    const fit = reason ? t('team.sync.ruleFits', { reason }) : t('team.sync.ruleOther');
+    line(t('team.sync.rule', { id: rule.id, version: rule.version, paths: pathsText(rule.paths), fit }));
+  }
+  if (rules.install.length === 0) return;
+  line(t('team.sync.rulesInstall'));
+  for (const command of rules.install) line(`  ${command}`);
 }
 
 export async function teamSyncCommand(opts: Options): Promise<void> {
@@ -107,6 +119,7 @@ async function acceptRoleWithSkills(role: string, opts: Options): Promise<void> 
   assertHuman(ctx.config, 'team accept');
   assertDecisionRole(ctx.root, 'team accept');
   const by = identity(ctx.root);
+  await assertRegistryTools(ctx.config);
   const result = acceptRole(ctx.root, ctx.config, role, by);
   const skills = await installRoleSkills(ctx.root, ctx.config, result.skills, by);
   if (opts.json) return printJson({ ...result, skillStatus: skills });
@@ -122,6 +135,7 @@ async function acceptSkillCommand(id: string, opts: Options): Promise<void> {
   const ctx = loadProject();
   assertHuman(ctx.config, 'team accept');
   assertDecisionRole(ctx.root, 'team accept');
+  await assertRegistryTools(ctx.config);
   const result = await acceptSkill(ctx.root, ctx.config, id, identity(ctx.root));
   if (opts.json) return printJson(result);
   const where = result.dirs.join(', ');
@@ -151,22 +165,19 @@ function acceptPackCommand(name: string, opts: Options): void {
 
 type AcceptOptions = Options & { skill?: string; pack?: string; rule?: string };
 
-/** 0.32.0: a person accepts a team rule of the registry; refused like `team accept` for an agent. */
-async function acceptRuleCommand(id: string, opts: Options): Promise<void> {
-  const ctx = loadProject();
-  assertHuman(ctx.config, 'team accept');
-  assertDecisionRole(ctx.root, 'team accept');
-  const result = await acceptRule(ctx.root, ctx.config, id, identity(ctx.root));
-  if (opts.json) return printJson(result);
-  const where = result.placed === 'agents-md' ? result.agentsGuide ?? 'AGENTS.md' : (result.paths ?? []).join(', ');
-  const key = result.placed === 'agents-md' ? 'team.acceptRule.agents' : 'team.acceptRule.roles';
-  line(t(key, { id: result.rule, version: result.version, where, team: result.team }));
+/**
+ * B317: registry rules are installed by SkillForge. The option stays so a 0.32.0 script gets this answer instead of
+ * "unknown option"; it is refused for everyone, before any decision check, and writes nothing.
+ */
+function refuseRuleAccept(): never {
+  throw new SdlcError('rule_by_skillforge', { key: 'error.team_rule_by_skillforge' },
+    { key: 'fix.team_rule_by_skillforge' });
 }
 
 /** A person's command: refused in an agent session (`agent_cannot_approve`), like a gate decision. */
 export async function teamAcceptCommand(role: string | undefined, opts: AcceptOptions): Promise<void> {
   try {
-    if (opts.rule !== undefined) return await acceptRuleCommand(opts.rule, opts);
+    if (opts.rule !== undefined) refuseRuleAccept();
     if (opts.pack !== undefined) return acceptPackCommand(opts.pack, opts);
     if (opts.skill !== undefined) return await acceptSkillCommand(opts.skill, opts);
     if (role === undefined) throw new SdlcError('usage', { key: 'error.team_accept_what' });
@@ -263,14 +274,44 @@ function printCheck(skills: SkillCheck[], drafts: DraftCheck[], warnings: string
   for (const warning of warnings) line(`${t('label.warning')}: ${warning}`);
 }
 
+/** `sdlc team skills --stage <stage> [--json]` (B319): the stage's skill texts that its commands inject. Read-only. */
+export function teamSkillsCommand(opts: Options & { stage: string }): void {
+  try {
+    const ctx = loadProject();
+    if (!(STAGE_IDS as readonly string[]).includes(opts.stage)) {
+      const params = { stage: opts.stage, list: STAGE_IDS.join(', ') };
+      throw new SdlcError('usage', { key: 'error.team_skills_stage', params });
+    }
+    const result = stageSkillTexts(ctx.root, ctx.config, opts.stage as StageConfigId);
+    if (opts.json) return printJson({ stage: result.stage, skills: result.skills });
+    if (result.skills.length === 0) return line(t('team.skills.none', { stage: result.stage }));
+    process.stdout.write(result.text);
+  } catch (error) {
+    reportFailure(error, opts.json);
+  }
+}
+
+/** B317: each registry rule with its checksum state; SkillForge installs them. */
+function printRuleChecks(rules: RuleCheck[], error: string | undefined): void {
+  if (error) line(t('team.check.rulesError', { error }));
+  for (const rule of rules) {
+    const state = rule.checksumOk ? t('team.check.ruleOk') : t('team.check.ruleRefused', { reason: rule.reason ?? '' });
+    line(t('team.check.rule', { id: rule.id, version: rule.version, paths: pathsText(rule.paths), state }));
+  }
+}
+
 /** `sdlc team check [--json]`: the skills of the team, what they may do, and whether they are still as checked. */
 export async function teamCheckCommand(opts: Options): Promise<void> {
   try {
     const ctx = loadProject();
+    await assertRegistryTools(ctx.config);
     const result = await checkTeamSkills(ctx.root, ctx.config);
-    if (opts.json) return printJson(result);
+    const rules = await checkRules(ctx.config);
+    const rulesError = rules.error ? { rulesError: rules.error } : {};
+    if (opts.json) return printJson({ ...result, rules: rules.rules, ...rulesError });
     printCheck(result.skills, result.drafts, result.warnings);
     if (result.error) line(t('team.check.registryError', { error: result.error }));
+    printRuleChecks(rules.rules, rules.error);
   } catch (error) {
     reportFailure(error, opts.json);
   }

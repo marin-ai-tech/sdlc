@@ -33,8 +33,7 @@ import { referencedVariables } from '../mcp/registry.js';
 import { pluginReports } from '../plugins/catalog.js';
 import { writerLockFindings } from './doctor-locks.js';
 import { toDiagnostic } from './errors.js';
-import { readTeam } from '../team/record.js';
-import { agentsGuidePath, generalRules, rulesBlockState } from '../team/rules-block.js';
+import { teamRulesFindings } from './doctor-rules.js';
 
 /**
  * The checks of `sdlc doctor`, as a function `sdlc health` reuses (config.doctor). Same checks in the same order,
@@ -270,14 +269,12 @@ function mcpVariablesCheck(out: Checks, config: SdlcConfig, env: NodeJS.ProcessE
   out.add('mcp variables', missing.length === 0 ? 'ok' : 'warn', message);
 }
 
-/** 0.32.0: the team rules block of AGENTS.md says what the accepted rules say; only with accepted general rules. */
+/** B317: the team rules findings (src/core/doctor-rules.ts), all warnings. */
 function rulesBlockCheck(out: Checks, root: string, config: SdlcConfig): void {
-  const rules = readTeam(root).rules ?? {};
-  if (generalRules(rules).length === 0) return;
-  const state = rulesBlockState(root, config, rules);
-  if (state === 'ok') return;
-  const file = agentsGuidePath(config);
-  out.add('team rules', 'warn', out.tt('doctor.rulesBlock', { path: file }), out.tt('doctor.fix.rulesBlock', {}));
+  for (const finding of teamRulesFindings(root, config)) {
+    const fix = finding.fix ? out.tt(finding.fix, {}) : undefined;
+    out.add('team rules', 'warn', out.tt(finding.key, finding.params), fix);
+  }
 }
 
 function mcpAgentExposureCheck(out: Checks, config: SdlcConfig): void {

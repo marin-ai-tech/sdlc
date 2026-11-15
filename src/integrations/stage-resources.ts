@@ -33,6 +33,8 @@ const ROLE_STAGE: Record<ExecutionRole, StageConfigId> = {
 export interface StageResources {
   stage: StageConfigId;
   skills: string[];
+  /** The skills `sdlc team skills --stage` prints: the configured ones, then the accepted roles' (B319). */
+  stageSkills: string[];
   agents: string[];
   /** Registry server names, in the registry's order. */
   servers: string[];
@@ -55,6 +57,11 @@ function simplifies(config: SdlcConfig, workflow: string): boolean {
 function stageAgents(configured: string[], stage: StageConfigId, team: readonly RoleFile[]): string[] {
   const roles = team.filter((role) => role.stages.includes(stage)).map((role) => `sdlc-${role.id}`);
   return [...new Set([...configured, ...roles])];
+}
+
+/** The skills of a stage, without the solo execution role's: configured first, then the accepted roles' (B319). */
+export function stageSkillIds(config: SdlcConfig, stage: StageConfigId, team: readonly RoleFile[]): string[] {
+  return [...new Set([...(config.stages[stage]?.skills ?? []), ...stageRoleSkills(team, stage)])];
 }
 
 /** The resources of a workflow's stage; undefined when the workflow has no stage or the stage has none. */
@@ -80,7 +87,8 @@ export function stageResources(
   const configured = [...(own?.agents ?? []), ...(simplify ? [SIMPLIFIER] : [])];
   const agents = stageAgents(configured, stage, team);
   if (skills.length + agents.length + servers.length === 0) return undefined;
-  return { stage, skills, agents, servers, simplify, ...(executionRole ? { executionRole } : {}) };
+  const stageSkills = stageSkillIds(config, stage, team);
+  return { stage, skills, stageSkills, agents, servers, simplify, ...(executionRole ? { executionRole } : {}) };
 }
 
 /** `allowed-tools` of a Claude Code skill or command: the CLI, then the stage's MCP tools. */
@@ -93,11 +101,47 @@ function list(values: string[]): string {
   return values.map((value) => `\`${value}\``).join(', ');
 }
 
+/**
+ * B319: on a command that runs `!` lines (Claude Code, OpenCode), the stage's skill texts are printed into the
+ * command itself; the skills it cannot print (the solo execution role's) are still loaded by name.
+ */
+function injectedStep(resources: StageResources): string[] {
+  const rest = resources.skills.filter((skill) => !resources.stageSkills.includes(skill));
+  return [
+    "- First step, before any stage work: follow the stage's skills printed at the start of this command. Load the"
+      + ` skills ${list(resources.stageSkills)} by name only when their text is missing there.`,
+    ...(rest.length > 0 ? [`- Also load the skills ${list(rest)} by name.`] : []),
+  ];
+}
+
+/**
+ * B319, review F8: the head of a stage command that runs `!` lines; the texts of the stage's skills are printed
+ * there when the command starts. Empty for a stage without skills.
+ */
+export function stageInjection(resources: StageResources | undefined, cli: string): string {
+  if (!resources || resources.stageSkills.length === 0) return '';
+  const command = `${cli} team skills --stage ${resources.stage}`;
+  return [
+    `## Skills of this stage (${resources.stage})`,
+    '',
+    `!\`${command}\``,
+    `If the output above is missing, run \`${command}\`.`,
+    '',
+    '',
+  ].join('\n');
+}
+
+/** How a surface takes the stage's skills: `inject` for commands that run `!` lines (see `stageInjection`). */
+export interface SectionOptions {
+  inject?: boolean;
+}
+
 /** The section appended to the workflow body; empty without resources. */
-export function stageSection(resources: StageResources | undefined): string {
+export function stageSection(resources: StageResources | undefined, options: SectionOptions = {}): string {
   if (!resources) return '';
   const lines = ['', `## Stage resources (${resources.stage})`, ''];
-  if (resources.skills.length > 0) {
+  if (options.inject && resources.stageSkills.length > 0) lines.push(...injectedStep(resources));
+  else if (resources.skills.length > 0) {
     lines.push(`- First step, before any stage work: load the skills ${list(resources.skills)} by name.`);
   }
   if (resources.executionRole) {

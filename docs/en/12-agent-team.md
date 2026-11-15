@@ -167,6 +167,11 @@ The registry is an [MCP](glossary.md) server with four tools:
 
 - `sdlc team sync` takes roles from it first and fills the gaps from the built-ins. Each item is checked against its
   checksum, and a mismatch is refused.
+- A registry that does not answer leaves the team to the built-ins, and sync says so. A server that answers without
+  `list_roles` or `get_role` is not a registry: `team sync`, `team accept` and `team check` stop with exit code 1 and
+  write nothing. On SkillForge this means its plugin `sdlc-registry` is off. The
+  [SkillForge page](35-sdlc-and-skillforge.md) shows the setup.
+- A skill has at most 64 files. A larger skill is refused, even when a person accepts it.
 - A draft records the server, the version and the checksum.
 - A registry role's optional description (up to 500 characters) becomes the draft description. Without one, its title
   is used.
@@ -177,6 +182,9 @@ The registry is an [MCP](glossary.md) server with four tools:
   registry, such as `skillforge-source: agent/analyst@1.2.0`. sdlc writes it into the role's subagent for OpenCode,
   Claude Code, Cursor, Qwen Code and GigaCode. A new accepted version updates it. Codex gets no marker, and neither
   does a built-in or pack role.
+- A role accepted without the registry's marker, or with another one, gets a draft that carries the marker, even when
+  version and checksum are the same. `sdlc team sync` names the role and the command `sdlc team accept <role>`. Only
+  that person's command records the marker.
 - sdlc checks the marker before it writes it. The key must be lowercase kebab-case and end in `-source`, such as
   `skillforge-source`, so it can never set up the agent. The value must be one plain line of at most 200 characters.
   A marker that fails is not written. The role is still accepted, and `sdlc team sync` warns.
@@ -189,21 +197,28 @@ for some files.
 - The two tools are `list_rules` and `get_rule`. `get_rule { id }` returns `{ id, version, description, paths?, tags,
   body, checksum }`. The checksum is `sha256:` of the body, and a rule whose checksum does not match is refused. A
   registry without these tools simply has no rules.
-- `sdlc team sync` proposes the rules that fit the project. A rule is proposed when it has the tag `sdlc`, when one of
-  its tags is a stack that `sdlc adopt` finds, or when one of its `paths` matches a file of the project. Every other
-  rule is listed as not proposed. The JSON answer has `rules: { proposed, other }`.
-- A person accepts a rule with `sdlc team accept --rule <id>`. An agent is refused. `openspec/.sdlc/team.json`
-  records the rule with its checksum and text.
+- `sdlc team sync` lists every rule with its version and paths, and says which fit the project. A rule fits when it
+  has the tag `sdlc`, when one of its tags is a stack that `sdlc adopt` finds, or when one of its `paths` matches a
+  file of the project. The JSON answer has `rules: { rules, proposed, other, install }`.
+- `sdlc team check` reads each rule and shows whether its checksum matches. It writes nothing.
 
-### Where accepted rules go
+### Who installs registry rules
 
-- **A rule without `paths`** goes into a block of `AGENTS.md`. The block sits between `<!-- sdlc:rules:start -->` and
-  `<!-- sdlc:rules:end -->`. When the markers are missing, sdlc adds them at the end of the file.
-- **A rule with `paths`** goes into the subagents of the roles whose stages include build, test or deploy, with the
-  paths it applies to. For Claude Code it is also written to `.claude/rules/<id>.md` with `paths` in its front matter.
-  It is not written into the `AGENTS.md` block.
-- **The block is sdlc's, the rest of the file is yours.** `sdlc update` rewrites the block from `team.json`, and
-  `sdlc doctor` reports an edit inside it. sdlc never changes the text outside the markers.
+SkillForge installs registry rules, and sdlc writes no rule text anywhere. If both placed them, an agent would read
+every rule twice.
+
+- **SkillForge installs them.** `team sync` prints the line a person runs for each configured tool SkillForge serves:
+  `skillforge sync --type rule --runtime claude`, `cursor` or `opencode`. SkillForge keeps a lock file, updates and
+  removes its rules, and checks local edits.
+- **`sdlc team accept --rule <id>` is refused** for everyone, with exit code 1 and that hint. Nothing is written.
+- **Rules sdlc placed earlier.** `sdlc update` empties the rules block of `AGENTS.md`, drops the rules section from
+  the role subagents and removes the `.claude/rules/<id>.md` files sdlc wrote. A file changed since sdlc wrote it
+  stays.
+  Run `skillforge sync --type rule` once after that update. team.json `rules` is kept, so a downgrade restores them.
+- **The block between `<!-- sdlc:rules:start -->` and `<!-- sdlc:rules:end -->` stays sdlc's** and holds no registry
+  rule. `sdlc doctor` names each rule still in it. sdlc never changes the text outside the markers.
+- **Codex, Qwen Code and GigaCode** get no registry rules from SkillForge yet. With a team registry, `sdlc doctor`
+  says so for each of them. sdlc has no Gemini CLI integration, so doctor does not name it.
 
 ## 12.5. Packs from git or npm
 
@@ -265,9 +280,16 @@ Check where they go and what a person must accept separately.
   refusal remains in force.
 - **Installed role skills reach the work.** The role's generated subagent names them, and workflows for stages the
   role owns list them after configured stage skills. Skills waiting for acceptance, refused, or missing are omitted.
-- **A stage with skills asks for them first.** Its workflow tells the agent to load those skills by name before any
-  stage work. It also asks the final report to name the skills loaded, and why any was not. A stage without skills
-  gets no such step. This is guidance: an agent may still skip it, and its report then shows that.
+- **A stage command carries its skills.** In Claude Code and OpenCode, the command of a stage with skills, such as
+  `/sdlc-build`, runs `sdlc team skills --stage <stage>` when it starts. The texts of the stage's SKILL.md files are
+  then part of the command, at its start and without their front matter. The command is read-only and prints the
+  texts up to 48 KiB. The skill that does not fit and every skill after it are only named, and so is a skill that is
+  not installed, so the agent loads them by name. A SKILL.md that resolves outside the project is not read. A skill
+  whose text changed is current at the next command, without `sdlc update`.
+- **Other surfaces ask for the skills first.** Codex, Cursor, Qwen Code, GigaCode and the Claude Code skills tell the
+  agent to load the skills by name before any stage work. Every surface asks the final report to name the skills
+  loaded, and why any was not. A stage without skills gets neither step. A stage started in plain words, without its
+  command, gets no printed texts either.
 - **`sdlc team check`** lists every skill with:
   - its source and version;
   - whether the checksum matches;
@@ -307,9 +329,10 @@ Use these commands to sync, inspect and accept team roles and skills.
 | `sdlc team sync [--json]` | anyone | drafts from the registry, packs and built-ins |
 | `sdlc team list [--json]` | anyone | roles, sources, status: draft, accepted, changed |
 | `sdlc team check [--json]` | anyone | the skills of the accepted roles, vetted |
+| `sdlc team skills --stage <stage> [--json]` | anyone | the texts of a stage's skills, as its commands print them |
 | `sdlc team accept <role>` / `--skill <id>` | a person | accept a role, or a skill with any file other than Markdown |
 | `sdlc team accept --pack <name>` | a person | accept the lenses, workflows and checks of a pack |
-| `sdlc team accept --rule <id>` | a person | accept a rule of the registry and place it for the agents |
+| `sdlc team accept --rule <id>` | nobody | refused: SkillForge installs registry rules |
 | `/sdlc:team` (`/sdlc-team`) | the agent | sync, learn the project, draft the project's rules |
 
 ## 12.9. Limits we accept
@@ -320,10 +343,9 @@ Keep these limits in mind when reviewing a role or its source.
 - **A Project rules section is as good as what the agent found.** A person reads it before accepting.
 - **The registry and packs are trusted sources the team chose.** The checksum proves that the content did not change
   on the way, not that the content is good.
-- **OpenCode has no path scoping.** A rule with `paths` reaches only the role subagents there. The main agent sees it
-  only when it hands the work to such a subagent.
-- **Qwen Code and GigaCode read their own files, not `AGENTS.md`.** General rules reach them only through their role
-  subagents.
+- **Registry rules depend on SkillForge.** Codex, Qwen Code and GigaCode get none until SkillForge installs rules
+  for them. A `.claude/rules/<id>.md` that SkillForge wrote with exactly the text sdlc once wrote there is removed by
+  the next update; `skillforge sync --type rule` puts it back.
 - **The source marker is the registry's claim.** sdlc checks its form, not whether the role really came from there.
 
 ## 📚 Terms

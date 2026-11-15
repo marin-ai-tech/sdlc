@@ -38,21 +38,33 @@ decides". Nothing an agent does in sdlc can approve a gate, and nothing a regist
 
 sdlc talks to the registry over MCP. The server named by `team.registry` must answer `list_roles`, `get_role`,
 `list_skills` and `get_skill`, and may answer `list_rules` and `get_rule`. The [agent team](12-agent-team.md) page
-gives the exact contract. SkillForge's own MCP server offers search and read tools, so you write a small adapter that
-maps them to this contract. Neither sdlc nor SkillForge ships one.
+gives the exact contract. Since SkillForge 0.5.10, its plugin `sdlc-registry` serves this contract on SkillForge's
+own `/mcp` endpoint. No adapter is needed. An administrator enables the plugin in `/admin/plugins`.
+
+Connect SkillForge as two servers on the same address, each with its own token:
+
+- `skillforge` uses an ordinary MCP token and is the team registry.
+- `skillforge-events` uses an integration token and receives sdlc's events. Create it on SkillForge's token page with
+  "For an integration, not an agent". Only such a token sees the `report_outcome` tool.
 
 ```yaml
 # openspec/sdlc.yaml
 mcp:
   servers:
     skillforge:
-      type: stdio
-      command: [node, tools/skillforge-registry.mjs]
-      env:
-        SKILLFORGE_URL: http://127.0.0.1:8796
-        SKILLFORGE_TOKEN_FILE: ${SKILLFORGE_TOKEN_FILE}
+      type: http
+      url: https://skillforge.example/mcp
+      headers:
+        Authorization: Bearer ${SF_MCP_TOKEN}
+      agents: false
+    skillforge-events:
+      type: http
+      url: https://skillforge.example/mcp
+      headers:
+        Authorization: Bearer ${SF_EVENTS_TOKEN}
+      agents: false
 events:
-  - server: skillforge
+  - server: skillforge-events
     tool: report_outcome
     on: [gate.*, verify.*]
 team:
@@ -60,11 +72,18 @@ team:
   registry: skillforge
 ```
 
+Write the headers in block style, as above. A header map on one line, such as `{ Authorization: Bearer ${X} }`, is
+not valid YAML without quotes.
+
+When the plugin is off, SkillForge still answers but has no `list_roles` or `get_role`. Then `team sync`,
+`team accept` and `team check` stop with exit code 1, name the missing tools and write nothing. A registry that does
+not answer at all is different: `team sync` says so and the built-in roles fill the team.
+
 A server named by `team.registry` or by `events` serves the CLI only, unless you set `agents: true` on it. sdlc does
 not lay it out for the agents, and the hook refuses an agent's MCP call to the events tool. That rule covers MCP calls
-only: the CLI delivers events with the environment of the command that runs, and an agent can also start the adapter
-from its shell. Set `SKILLFORGE_TOKEN_FILE` only in people's terminals, not in the agent's environment. Events from an
-agent's command then wait until a person's command delivers them.
+only: the CLI delivers events with the environment of the command that runs. Set `SF_MCP_TOKEN` and
+`SF_EVENTS_TOKEN` only in people's terminals, not in the agent's environment. Events from an agent's command then
+wait until a person's command delivers them.
 
 ## 35.3. Bring the team in
 
@@ -75,21 +94,23 @@ sdlc team sync
 sdlc team check
 ```
 
-`team sync` writes role drafts to `docs/agents/drafts/` and proposes the rules that fit the project. A rule fits when
-it has the tag `sdlc`, a tag of the project's stack, or a path that matches a project file. `team check` shows which
-skills will install, which wait for a person and which are refused.
+`team sync` writes role drafts to `docs/agents/drafts/` and lists the registry's rules, saying which fit the project.
+A rule fits when it has the tag `sdlc`, a tag of the project's stack, or a path that matches a project file.
+`team check` shows which skills will install, which wait for a person and which are refused, and each rule's
+checksum.
 
-The maintainer reads the drafts, adds the project's own rules to them, and accepts:
+The maintainer reads the drafts, adds the project's own rules to them, and accepts. SkillForge installs the
+registry's rules; `team sync` prints the line for each tool:
 
 ```bash
 sdlc team accept analyst
 sdlc team accept --skill plan-mode
-sdlc team accept --rule people-decide-gates
+skillforge sync --type rule --runtime opencode
 ```
 
 A skill with only Markdown installs with its role. A skill with any other file waits for `--skill`. A skill over the
-limits is refused even when a person asks; in the run, a 150-file skill was refused this way. Each accepted item is
-bound to its checksum in `openspec/.sdlc/team.json`.
+limits is refused even when a person asks. A skill has at most 64 files; in the run, a 150-file skill was refused
+this way. Each accepted role and skill is bound to its checksum in `openspec/.sdlc/team.json`.
 
 ## 35.4. What lands where
 
@@ -97,13 +118,14 @@ bound to its checksum in `openspec/.sdlc/team.json`.
 |---|---|---|
 | A role | `.claude/agents/sdlc-<role>.md` with its skills preloaded | `.opencode/agents/sdlc-<role>.md`, a subagent |
 | A skill | `.claude/skills/<id>/` | `.opencode/skills/<id>/`, or `.claude/skills/<id>/` when Claude Code is also configured |
-| A rule without paths | The team rules block of `AGENTS.md` | The team rules block of `AGENTS.md` |
-| A rule with paths | `.claude/rules/<id>.md` and the code roles' subagents | The code roles' subagents |
+| A registry rule | `.claude/rules/`, written by `skillforge sync` | `.opencode/rules/`, written by `skillforge sync` |
 | The registry source | The registry's `marker`, for example `skillforge-source:`, in the role's front matter | The same |
 
 The `CLAUDE.md` that sdlc creates imports `AGENTS.md`; an existing `CLAUDE.md` needs an `@AGENTS.md` line. sdlc owns
-only the block between `<!-- sdlc:rules:start -->` and `<!-- sdlc:rules:end -->`. The rest of `AGENTS.md` is the
-team's. Install rules through sdlc or through SkillForge's own `sync`, not both, or agents read them twice.
+only the block between `<!-- sdlc:rules:start -->` and `<!-- sdlc:rules:end -->`, and since sdlc 0.32.1 that block
+holds no registry rule. With sdlc 0.32.0 both tools placed the rules, and agents read each one twice. After the first
+`sdlc update` on 0.32.1, run `skillforge sync --type rule` once: the update removes what 0.32.0 placed. For Codex,
+Qwen Code and GigaCode SkillForge installs no rules yet, and `sdlc doctor` says so.
 
 ## 35.5. A change from intent to archive
 
@@ -133,20 +155,27 @@ scripts; see the limits below.
 
 ## 35.6. What goes back to SkillForge
 
-sdlc sends `gate.*` and `verify.*` events to the events server. An adapter can turn them into SkillForge usage
-records for the skills of the stage's roles. sdlc knows that a skill was assigned, not that it was loaded or helped.
-SkillForge's `record_usage` asks how often a skill helped even for an assigned skill, so do not send it until that
-field is optional. With SkillForge 0.5.9 or later, `skillforge agent scan` ties the role agents to their registry
-source through the marker line. A role accepted before sdlc 0.32.0 gets that line with its next accepted version.
+sdlc sends `gate.*` and `verify.*` events to `skillforge-events`. Each event names its stage in `stage`: the intent
+gate is `plan`, spec is `design`, plan is `build`, verify is `test`, review and release are `deploy`. The plugin turns
+each stage outcome into usage records with the basis `assigned` for the skills of the roles that have that stage.
+A plugin that matches the gate id in the event name against the roles' stages instead credits the wrong roles; it
+must read `stage`. Those records do not count
+towards SkillForge's transfer rate. sdlc knows that a skill was assigned, not that it was loaded or helped, so it
+never calls `record_usage`. Real use comes from the agents' sessions: `skillforge sessions import` reads them, for
+OpenCode from the files of `opencode export`. With SkillForge 0.5.9 or later, `skillforge agent scan` ties the role
+agents to their registry source through the marker line. For a role accepted before sdlc 0.32.0, `sdlc team sync`
+keeps a draft with the marker and names the `sdlc team accept` command that records it. Codex role agents are TOML
+files and carry no marker, so SkillForge cannot tie them to their source.
 
 ## 35.7. Limits
 
-- On OpenCode a role's skills reach a subagent only as a line in its text. The workflow asks the main agent to load
-  the stage's skills first and to name them in its report. An agent can still skip them, and the report then shows
-  it.
-- OpenCode has no path scoping. A rule with paths reaches only the subagents of roles with a build, test or deploy
-  stage. The main agent does not get it, and in the run the main agent did the build itself.
-- An agent can edit the team rules block of `AGENTS.md`. `sdlc doctor` reports it and `sdlc update` restores it.
+- On OpenCode a role's skills reach a subagent only as a line in its text. Since sdlc 0.32.1 the stage command, such
+  as `/sdlc-build`, prints the texts of the stage's skills itself, up to 48 KiB. A stage started in plain words
+  gets only the step that asks the agent to load them, and its report then shows what it loaded.
+- Registry rules reach an agent only as SkillForge installs them. For Codex, Qwen Code and GigaCode it installs none
+  yet.
+- An agent can edit the team rules block of `AGENTS.md`. `sdlc doctor` names any rule in it, and `sdlc update`
+  empties it again.
 - Every line of a here-document body is read as a command. Write a helper file with the editor tool instead.
 - A `node -e` script that writes through a variable is refused. Put the script in a file.
 - A headless OpenCode run cannot answer a permission prompt. Since sdlc 0.32.0, read-only subagents run shell
@@ -155,11 +184,11 @@ source through the marker line. A role accepted before sdlc 0.32.0 gets that lin
 
 ## 35.8. Checklist
 
-1. The registry server answers the contract, and `sdlc team check` lists the skills you expect.
+1. The plugin `sdlc-registry` is on, and `sdlc team check` lists the skills you expect.
 2. `team.registry` and `events` name servers the agents do not see, so `opencode.json` has no registry entry.
-3. The registry's token is set only in people's terminals.
-4. A person accepted every role, every skill with scripts and every rule.
-5. `sdlc doctor` is green, including the team rules block.
+3. Both tokens are set only in people's terminals, and only the events server has the integration token.
+4. A person accepted every role and every skill with scripts, and ran `skillforge sync --type rule` for each tool.
+5. `sdlc doctor` names no rule in the team rules block.
 6. Each gate has a different person where `roles.yaml` says so.
 
 ## 📚 See also

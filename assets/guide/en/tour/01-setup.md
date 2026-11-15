@@ -25,6 +25,8 @@ What to notice:
 - `openspec/roles.yaml` (optional) names the people, their roles and the separation rules; with it, approvals can be
   signed.
 - The hooks see every edit of the agent. `enforcement.mode: block` denies what skips a gate; `warn` only says so.
+- A team with a registry, such as SkillForge, brings its roles and skills with `sdlc team sync` and `sdlc team check`;
+  a person accepts each one. See `sdlc guide team`.
 
 In your session the agent learns at the start which change it is on and who acts next. You can always ask it how
 the process works: it answers from `sdlc guide`.

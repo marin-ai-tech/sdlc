@@ -6,7 +6,8 @@ import { t } from './i18n.js';
 import { clearsAgentMarker, clearedAgentMarkers } from './policy-markers.js';
 import { removesSdlcCli } from './policy-cli.js';
 import { shellWords } from './shell-words.js';
-import { commandSpellings, copyDecision, firstDecision, pathSpellings, stateWriteDenial } from './policy-spellings.js';
+import { commandSpellings, firstDecision, pathSpellings, stateWriteDenial } from './policy-spellings.js';
+import { exactCopyDecision } from './policy-exact-copy.js';
 import { shellCliProblem } from './shell-cli.js';
 import { launcherDecision } from './launcher-targets.js';
 import { guardDenial, shellGuardWrites } from './policy-guard.js';
@@ -62,7 +63,8 @@ function inspectSpellings(command: string, cmd: string, ctx: PolicyContext, env:
   const state = first(spellings, (spelled) => stateWriteDenial(spelled, ctx.paths.root, cwd), deadline);
   if (state) return state;
   if (writtenPass) {
-    const copy = copyDecision(command, ctx.paths.root, cwd);
+    // B318: a copy through exact values is judged on its values; any other copy it cannot read stays refused.
+    const copy = exactCopyDecision(command, ctx.paths.root, cwd);
     if (copy) return copy;
     const execution = shellCliProblem(command);
     if (execution) return refusal(execution);

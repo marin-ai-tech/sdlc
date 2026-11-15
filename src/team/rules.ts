@@ -4,15 +4,17 @@ import * as path from 'node:path';
 import picomatch from 'picomatch';
 import { stackIds } from '../core/adopt.js';
 import type { SdlcConfig } from '../core/config.js';
-import { SdlcError } from '../core/errors.js';
-import { failure, listed, registryServer, RegistryItemError, withRegistry, type RegistryCall } from './registry-client.js';
+import {
+  failure, listed, registryServer, RegistryItemError, RegistryToolsMissing, withRegistry, type RegistryCall,
+} from './registry-client.js';
 import { ROLE_ID } from './role-file.js';
 
 /**
  * Team rules from the registry (0.32.0): `list_rules` -> `{ rules: [{ id, version, tags?, paths?, checksum }] }` and
  * `get_rule { id }` -> `{ id, version, title?, description, paths?, tags, body, checksum }`, checksum = `sha256:` of
- * the body. A registry without these tools has no rules. `team sync` proposes the rules that fit the project (tag
- * `sdlc`, a stack tag, a `paths` glob matching a file); a person accepts one with `team accept --rule`.
+ * the body. A registry without these tools has no rules. `team sync` lists them and says which fit the project (tag
+ * `sdlc`, a stack tag, a `paths` glob matching a file); `team check` checks each one. Since 0.32.1 (B317) SkillForge
+ * installs them (`skillforge sync --type rule --runtime <tool>`) and sdlc writes no rule text anywhere.
  */
 export const RULES_START = '<!-- sdlc:rules:start -->';
 export const RULES_END = '<!-- sdlc:rules:end -->';
@@ -32,6 +34,7 @@ export interface RegistryRule {
 
 export interface RuleListing {
   id: string;
+  version: string;
   tags: string[];
   paths?: string[];
 }
@@ -82,11 +85,17 @@ export function vetRule(raw: unknown, id: string): RegistryRule {
   };
 }
 
+/** Review F9: what the registry lists is printed to a person's terminal; control characters never reach it. */
+function printable(value: string, max: number): string {
+  return value.replace(/[\u0000-\u001f\u007f-\u009f]/g, '').slice(0, max);
+}
+
 function listing(item: Record<string, unknown>): RuleListing | undefined {
   const id = typeof item.id === 'string' ? item.id : '';
   if (!ROLE_ID.test(id)) return undefined;
-  const paths = strings(item.paths);
-  return { id, tags: strings(item.tags), ...(paths.length > 0 ? { paths } : {}) };
+  const paths = strings(item.paths).map((glob) => printable(glob, 200));
+  const version = typeof item.version === 'string' ? printable(item.version, 64) : '';
+  return { id, version, tags: strings(item.tags), ...(paths.length > 0 ? { paths } : {}) };
 }
 
 /** The rules the registry lists; none when it has no rules tools. */
@@ -148,35 +157,71 @@ export function proposeRules(root: string, rules: RuleListing[]): RuleProposals 
   return proposals;
 }
 
+/** The tools SkillForge installs rules for, with its `--runtime` name (B317). */
+const SKILLFORGE_RUNTIMES = ['claude', 'cursor', 'opencode'] as const;
+
+/** The line a person runs to install the registry's rules for each configured tool SkillForge serves. */
+export function installLines(config: SdlcConfig): string[] {
+  return SKILLFORGE_RUNTIMES.filter((tool) => config.tools.includes(tool))
+    .map((tool) => `skillforge sync --type rule --runtime ${tool}`);
+}
+
 export interface RulesSync {
   server?: string;
+  /** Every rule the registry lists, with id, version and paths. */
+  rules: RuleListing[];
   proposed: RuleProposals['proposed'];
   other: RuleProposals['other'];
+  /** B317: SkillForge installs the rules; sdlc writes none. */
+  install: string[];
   error?: string;
 }
 
-/** For `team sync`: the registry's rules sorted into proposed and other; nothing without a registry. */
+/** For `team sync`: the registry's rules, which fit the project, and the install lines; nothing without a registry. */
 export async function syncRules(root: string, config: SdlcConfig): Promise<RulesSync | undefined> {
   const server = registryServer(config);
   if (!server) return undefined;
+  const install = installLines(config);
   try {
     const rules = await withRegistry(server, listRules);
-    return { server: server.name, ...proposeRules(root, rules) };
+    return { server: server.name, rules, ...proposeRules(root, rules), install: rules.length > 0 ? install : [] };
   } catch (error) {
-    return { server: server.name, proposed: [], other: [], error: failure(error) };
+    if (error instanceof RegistryToolsMissing) throw error;
+    return { server: server.name, rules: [], proposed: [], other: [], install: [], error: failure(error) };
   }
 }
 
-/** One rule from the registry, checked; a person's `team accept --rule` reads it fresh. */
-export async function fetchRule(config: SdlcConfig, id: string): Promise<{ rule: RegistryRule; server: string }> {
-  const server = registryServer(config);
-  if (!server) {
-    throw new SdlcError('no_registry', { key: 'error.team_rule_no_registry', params: { rule: id } });
-  }
+export interface RuleCheck {
+  id: string;
+  version: string;
+  paths?: string[];
+  checksumOk: boolean;
+  reason?: string;
+}
+
+async function checkOne(call: RegistryCall, item: RuleListing): Promise<RuleCheck> {
+  const base = { id: item.id, version: item.version, ...(item.paths ? { paths: item.paths } : {}) };
   try {
-    const rule = await withRegistry(server, async (call) => vetRule(await call('get_rule', { id }), id));
-    return { rule, server: server.name };
+    vetRule(await call('get_rule', { id: item.id }), item.id);
+    return { ...base, checksumOk: true };
   } catch (error) {
-    throw new SdlcError('rule_refused', { key: 'error.team_rule_refused', params: { rule: id, reason: failure(error) } });
+    if (error instanceof RegistryItemError) return { ...base, checksumOk: false, reason: error.message };
+    throw error;
+  }
+}
+
+/** For `team check`: each registry rule read and checked (B317); writes nothing. Empty without a registry. */
+export async function checkRules(config: SdlcConfig): Promise<{ rules: RuleCheck[]; error?: string }> {
+  const server = registryServer(config);
+  if (!server) return { rules: [] };
+  try {
+    return await withRegistry(server, async (call) => {
+      const out: RuleCheck[] = [];
+      for (const item of await listRules(call)) out.push(await checkOne(call, item));
+      return { rules: out };
+    });
+  } catch (error) {
+    if (error instanceof RegistryToolsMissing) throw error;
+    return { rules: [], error: failure(error) };
   }
 }

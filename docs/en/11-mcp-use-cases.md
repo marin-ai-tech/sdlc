@@ -472,8 +472,10 @@ gates:
   plan: { overdue_hours: 24 }        # optional: a plan approval waiting longer raises gate.plan.overdue
 ```
 
-- After a command, sdlc calls the tool with `event: { id, project, event, change, gate, at, sdlc, by, waitingFor }`
-  and the static `args`.
+- After a command, sdlc calls the tool with `event: { id, project, event, change, gate, stage, at, sdlc, by,
+  waitingFor }` and the static `args`.
+- `stage` is the lifecycle stage of the gate: `plan` for intent, `design` for spec, `build` for plan, `test` for
+  verify, qa and every `verify.*` event, `deploy` for review and release. Other events have no `stage`.
 - `waitingFor` names the people from `roles.yaml` who may take a waiting gate, so the receiver can ping them.
 - `id` is stable, so a receiver can drop repeats.
 - A wait (`gate.<g>.awaiting`, `gate.<g>.overdue`) has the same id in every clone and in CI: it comes

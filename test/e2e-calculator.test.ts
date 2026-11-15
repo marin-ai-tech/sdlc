@@ -493,6 +493,8 @@ describe('demo: a team builds a calculator with sdlc (every command)', { timeout
     step('team-accept', 'visibility', 'alice', ['team', 'accept', 'tester'], 'Alice, the maintainer, accepts the tester: the subagent sdlc-tester gets this project\'s checks and takes over from sdlc-verifier.');
     step('team-list', 'visibility', 'bob', ['team', 'list'], 'The team: the tester is accepted, the other roles are still drafts.');
     step('team-check', 'visibility', 'bob', ['team', 'check'], 'The skills of the accepted roles, checked: checksums, scripts and tool grants; the built-in tester lists none.');
+    // 0.32.1 (B319): what the stage commands of Claude Code and OpenCode print at their start; read-only.
+    step('team-skills', 'visibility', 'agent', ['team', 'skills', '--stage', 'test'], 'The texts of the test stage\'s skills, as /sdlc-verify prints them; this stage lists none yet.');
     // 0.20.0 (B18): the company's pack brings a review lens; nothing of it counts before a person accepts the pack.
     const pack = tempDir('sdlc-demo-pack-');
     initGitRepo(pack);

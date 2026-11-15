@@ -331,8 +331,15 @@ describe('B248.U1 to U3: a target with no known value stays as it is', () => {
     expectAllowed('mktemp');
   });
 
-  it.each(['cp a "$T"', 'T=/tmp/x; cp a "$T"'])('U3: a variable copy keeps its refusal: %s', (command) => {
+  it.each(['cp a "$T"', 'T=/tmp/x && cp a "$T"'])('U3: a variable copy keeps its refusal: %s', (command) => {
     expect(decide(command), command).toEqual({ decision: 'deny', rule: 'state-integrity' });
+  });
+
+  // B318 (change a-copy-to-an-exact-variable-meets-the-guards, MODIFIED requirement "A target with no known value
+  // stays as it is"): `T=/tmp/x; cp a "$T"` moved here from the refused list above, as a recorded requirement change.
+  // An exact value is judged as its plain form; the full cases are in test/copy-exact-variable.test.ts.
+  it('U3: a copy through an exact value outside the project is judged as its plain form', () => {
+    expect(decide('T=/tmp/x; cp a "$T"')).toEqual(decide('cp a "/tmp/x"'));
   });
 });
 

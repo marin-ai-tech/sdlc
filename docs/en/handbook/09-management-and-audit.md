@@ -642,8 +642,8 @@ The daily summary is an event too, `summary.daily`, so the same receiver deliver
    configuration above, the first line names `telegram/send_message` and lists `summary.daily` too.
 
 2. Know what the tool receives. Without `message`, sdlc calls the tool after a command with your static `args` plus
-   one `event` object: `{ id, project, event, change, gate, at, sdlc, by, waitingFor }`. `waitingFor` names the
-   people from `roles.yaml` who may take a waiting gate. `id` is stable, so a bot can drop repeats. The
+   one `event` object: `{ id, project, event, change, gate, stage, at, sdlc, by, waitingFor }`. `waitingFor` names
+   the people from `roles.yaml` who may take a waiting gate. `id` is stable, so a bot can drop repeats. The
    id of `gate.<g>.awaiting` and `gate.<g>.overdue` comes from `project.name` (when set), the change, the gate, the
    event and the digest the gate waits on, not from the time. Every clone and CI send the same id for the same wait,
    so the bot keeps one message. With

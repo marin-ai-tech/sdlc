@@ -7,6 +7,7 @@ import { hiddenTargetHits } from './shell-hidden-targets.js';
 import { namedPart } from './state-reasons.js';
 import { stateReason } from './state-reasons.js';
 import { literalValueSpellings } from './shell-literal-values.js';
+import { exactValues } from './shell-exact-values.js';
 import { shellStateWrites, shellStateInlineGlobPart, shellWriteTargets } from './policy-shell.js';
 import { hardLinkedFiles, hardLinkedStateFiles } from './policy-hardlink.js';
 import { pluginStateFiles } from '../plugins/activation.js';
@@ -27,7 +28,10 @@ export function commandSpellings(command: string, deadline?: number): {
   spellings: string[]; writeSpellings: string[]; exceeded: boolean; timedOut: boolean
 } {
   const literal = literalValueSpellings(command, 0, {}, deadline);
-  const writeSpellings = [...new Set([command, ...literal.spellings])];
+  // B318: the spelling with exact values written out is always checked, whatever the literal values above make of
+  // the command, since the copy check lets a copy through on that spelling.
+  const exact = exactValues(command)?.spelling;
+  const writeSpellings = [...new Set([command, ...literal.spellings, ...(exact ? [exact] : [])])];
   return { spellings: [...new Set(writeSpellings.flatMap((spelling) => pathSpellings(spelling)))],
     writeSpellings, exceeded: literal.exceeded, timedOut: literal.timedOut };
 }

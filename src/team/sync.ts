@@ -8,11 +8,11 @@ import { registryDraft } from './draft.js';
 import { packDrafts, type PackReport } from './packs.js';
 import { acceptedPath, draftPath, readTeam, writeTeam, type TeamEntry, type TeamRecord } from './record.js';
 import {
-  failure, listed, RegistryItemError, registryServer, withRegistry, type RegistryCall,
+  failure, listed, RegistryItemError, registryServer, RegistryToolsMissing, withRegistry, type RegistryCall,
 } from './registry-client.js';
 import { ROLE_ID } from './role-file.js';
 import { builtinSource, builtinVersion, teamLocale, type RoleDraft } from './sources.js';
-import { vetMarker, vetRole } from './vetting.js';
+import { vetMarker, vetRole, type SourceMarker } from './vetting.js';
 
 /**
  * `sdlc team sync` (B69, B71, B76): the roles of the team registry first (in the project's locale), then those of
@@ -38,6 +38,8 @@ export interface SyncResult {
   kept: Array<{ id: string; reason: KeptReason }>;
   refused: Refused[];
   warnings?: Refused[];
+  /** B316: accepted roles whose draft differs only by the registry's source marker. */
+  markerOnly?: string[];
   registry?: { server: string; reachable: boolean; roles: string[]; error?: string };
   packs?: PackReport[];
 }
@@ -102,6 +104,7 @@ async function registryDrafts(config: SdlcConfig, locale: Locale, result: SyncRe
     result.registry = { server: server.name, reachable: true, roles: drafts.map((draft) => draft.id) };
     return drafts;
   } catch (error) {
+    if (error instanceof RegistryToolsMissing) throw error;
     result.registry = { server: server.name, reachable: false, roles: [], error: failure(error) };
     return [];
   }
@@ -116,40 +119,72 @@ function packSources(root: string, config: SdlcConfig, locale: Locale, result: S
   return found.drafts;
 }
 
-/** True when the accepted role is what the draft would bring: a built-in, or the same version of its source. */
-function acceptedCovers(entry: TeamEntry | undefined, draft: RoleDraft): boolean {
-  if (draft.source === 'builtin') return true;
+/** True when the accepted role is the same version of the draft's source, whatever its marker. */
+function sameVersion(entry: TeamEntry | undefined, draft: RoleDraft): boolean {
   const same = entry?.version === draft.version && entry?.checksum === draft.checksum;
   return entry?.source === draft.source && same;
+}
+
+/** B316: the registry gives a marker the accepted role does not have (accepted before 0.32.0, or another one). */
+function markerDiffers(entry: { marker?: SourceMarker } | undefined, draft: RoleDraft): boolean {
+  if (!draft.marker) return false;
+  return entry?.marker?.key !== draft.marker.key || entry?.marker?.value !== draft.marker.value;
+}
+
+/** True when the accepted role is what the draft would bring: a built-in, or the same version and marker. */
+function acceptedCovers(entry: TeamEntry | undefined, draft: RoleDraft): boolean {
+  if (draft.source === 'builtin') return true;
+  return sameVersion(entry, draft) && !markerDiffers(entry, draft);
 }
 
 /** Why an existing draft stays: the same version, someone's edits, or a draft sdlc did not record. */
 function keepDraft(team: TeamRecord, draft: RoleDraft, current: string): KeptReason | undefined {
   const record = team.drafts[draft.id];
   if (!record) return draft.source !== 'builtin' && builtinVersion(draft.id, current) ? undefined : 'draft';
-  const same = record.kind === draft.source && record.version === draft.version && record.checksum === draft.checksum;
+  const sameItem = record.kind === draft.source && record.version === draft.version
+    && record.checksum === draft.checksum;
+  const same = sameItem && !markerDiffers(record, draft);
   if (same || (record.kind !== 'builtin' && draft.source === 'builtin')) return 'draft';
   return normalizeNewlines(record.text) === normalizeNewlines(current) ? undefined : 'edited';
 }
 
 function placeDraft(root: string, team: TeamRecord, draft: RoleDraft, result: SyncResult): boolean {
   const accepted = fs.existsSync(path.join(root, acceptedPath(draft.id)));
-  if (accepted && acceptedCovers(team.roles[draft.id], draft)) {
+  const entry = team.roles[draft.id];
+  if (accepted && acceptedCovers(entry, draft)) {
     result.kept.push({ id: draft.id, reason: 'accepted' });
     return false;
   }
+  const markerOnly = accepted && sameVersion(entry, draft);
+  const placed = markerOnly ? markerOnlyDraft(root, draft) : draft;
   const current = readText(path.join(root, draftPath(draft.id)));
-  const keep = current === undefined ? undefined : keepDraft(team, draft, current);
+  const keep = current === undefined ? undefined : keepDraft(team, placed, current);
   if (keep) {
     result.kept.push({ id: draft.id, reason: keep });
+    // Review F2: a kept draft is marker-only only when it already carries the registry's marker.
+    if (markerOnly && keep === 'draft' && !markerDiffers(team.drafts[draft.id], draft)) markOnly(result, draft.id);
     return false;
   }
-  writeTextAtomic(path.join(root, draftPath(draft.id)), draft.text);
-  const { server, version, checksum, marker } = draft;
-  const pack = draft.pack ? { pack: draft.pack } : {};
-  team.drafts[draft.id] = { kind: draft.source, ...pack, server, version, checksum, marker, text: draft.text };
+  writeTextAtomic(path.join(root, draftPath(draft.id)), placed.text);
+  const { server, version, checksum, marker } = placed;
+  const pack = placed.pack ? { pack: placed.pack } : {};
+  team.drafts[draft.id] = { kind: placed.source, ...pack, server, version, checksum, marker, text: placed.text };
   result.created.push(draftPath(draft.id));
+  if (markerOnly) markOnly(result, draft.id);
   return true;
+}
+
+function markOnly(result: SyncResult, id: string): void {
+  (result.markerOnly ??= []).push(id);
+}
+
+/**
+ * Review F1: a draft that differs only by the marker is the accepted role's own text, so accepting it keeps what a
+ * person added (its project rules) and changes only the marker that team.json records.
+ */
+function markerOnlyDraft(root: string, draft: RoleDraft): RoleDraft {
+  const own = readText(path.join(root, acceptedPath(draft.id)));
+  return own === undefined ? draft : { ...draft, text: own };
 }
 
 /** Writes the drafts; never overwrites an accepted role, a draft of the same version or an edited draft. */

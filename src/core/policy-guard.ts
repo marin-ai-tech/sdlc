@@ -46,7 +46,7 @@ const GENERATED_NAMES = [
   String.raw`\.(?:opencode|cursor|qwen|gigacode)/commands/sdlc-[^/\s'"]+\.md`,
   // Cursor (B80): the rule every agent reads.
   String.raw`\.cursor/rules/sdlc\.mdc`,
-  // 0.32.0: the team rules a person accepted, as Claude Code rules.
+  // The team's Claude Code rules, installed by a person's `skillforge sync --type rule` (B317); agents never edit them.
   String.raw`\.claude/rules/[^/\s'"]+\.md`,
   // Codex CLI (B82): its subagents, the skills it reads and its command rules.
   String.raw`\.codex/agents/sdlc-[^/\s'"]+\.toml`,

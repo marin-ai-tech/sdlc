@@ -2,6 +2,63 @@
 
 All notable changes to sdlc. Versions follow [Semantic Versioning](https://semver.org/); while the major version is 0, a minor version may change behavior.
 
+## 0.32.1 — 2026-11-15
+
+SkillForge is the team registry through its own plugin. Registry rules are installed by SkillForge, not by sdlc. The
+stage commands of Claude Code and OpenCode print their stage's skills. Read Changed and Compatibility before you
+update a project that accepted rules on 0.32.0.
+
+### Fixed
+- A registry that answers without `list_roles` or `get_role`, such as SkillForge with its plugin `sdlc-registry` off,
+  was read as unreachable: `team sync` exited 0 and filled the team with built-in roles. `team sync`, `team accept`
+  and `team check` now exit 1, name the missing tools and the plugin, and write nothing. A registry that does not
+  answer keeps the fallback.
+- A role accepted before the registry gave its source marker never got it. `team sync` now keeps a draft with the
+  marker and names the `sdlc team accept` command that records it (`markerOnly` in JSON).
+- A copy through a variable with an exact value, such as `BASE=/tmp/r; cp -r src "$BASE/"`, was refused. It is now
+  judged as the same copy with the path written out. A copy inside the project gets the refusal that really applies
+  (guard-config, protected-path, tests-locked, plan-gate) instead of state-integrity. The value counts only where
+  it is used inside double quotes.
+- `cp`, `mv`, `install` and `ln` with a value glued to its option (`cp a -t.claude`), an option after the operands
+  (`install a .claude/settings.json -m 644`), `install -d`, or a one-operand `ln` could write a guarded file without
+  a refusal. The hook now reads their destination as GNU tools read their arguments.
+- The refusal of a skill with too many files names the limit of 64.
+
+### Added
+- `sdlc team skills --stage <stage>` prints the SKILL.md texts of a stage's skills, read-only, at most 48 KiB. The
+  stage commands of Claude Code and OpenCode run it at their start.
+- `sdlc team check` shows the registry's rules with their checksums. `sdlc team sync` lists every rule and the
+  `skillforge sync --type rule --runtime <tool>` line for Claude Code, Cursor and OpenCode.
+- `sdlc doctor` names each registry rule still in the AGENTS.md block, and says for Codex, Qwen Code and GigaCode
+  that registry rules are not connected.
+- An event of a gate names the stage of that gate in `stage` (intent `plan`, spec `design`, plan `build`, verify
+  and qa `test`, review and release `deploy`); a `verify.*` event names `test`. An event queued by an older sdlc
+  gets it when it is delivered.
+
+### Changed
+- **BREAKING for projects that accepted rules on 0.32.0.** sdlc writes no registry rule. `sdlc update` empties the
+  rules block of AGENTS.md, drops the rules section from role subagents and removes the `.claude/rules/<id>.md`
+  files sdlc wrote, unless they changed since. Run `skillforge sync --type rule --runtime <tool>` after it.
+  `sdlc team accept --rule` is refused for everyone.
+- The SkillForge page describes the plugin and the two-server setup (registry and events, two tokens) instead of an
+  adapter, and says that sdlc never calls `record_usage`.
+
+### Compatibility
+- team.json `rules` is kept and read, so going back to 0.32.0 and running its `sdlc update` restores the block.
+- A registry that serves skills but not roles now fails.
+- A receiver that lists the event's keys gets one more, `stage`, on gate and verify events.
+
+### Known limits
+- Codex, Qwen Code and GigaCode get no registry rules until SkillForge installs rules for them.
+- A `.claude/rules/<id>.md` that SkillForge wrote with exactly sdlc's 0.32.0 text is removed by the first update;
+  `skillforge sync --type rule` restores it.
+- An inline `node -e` script with a regular expression can still be refused.
+- A copy through a variable stays refused when the command also has a pipe, `&&` or a group anywhere, even a read
+  such as `ls "$BASE" | head`. Run the copy as its own command.
+- SkillForge 0.5.13's plugin still matches the gate id against the roles' stages; it credits the right roles once
+  it reads `stage`.
+- A stage started in plain words, without its command, gets the load step but no printed skill texts.
+
 ## 0.32.0 — 2026-11-14
 
 Field findings from running sdlc on OpenCode with a team registry. Two ways to hide a write behind a here-document

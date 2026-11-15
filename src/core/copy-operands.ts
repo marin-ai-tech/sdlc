@@ -1,5 +1,6 @@
 import type { ShellCommand, ShellWord, ShellContext } from './shell-words.js';
 import { programAt } from './shell-cli.js';
+import { gnuCopyArgs } from './gnu-copy-args.js';
 
 export interface CopyOperands {
   program: string;
@@ -89,36 +90,15 @@ function powershellOperands(command: ShellCommand, args: ShellWord[], context: S
     recursive: args.some((arg) => /^-r(?:e(?:c(?:u(?:r(?:s(?:e)?)?)?)?)?)?$/i.test(arg.value)) };
 }
 
-function copyOption(value: string) {
-  if (value.startsWith('--')) return { recursive: /^--(?:recursive|archive)$/.test(value) };
-  const cluster = value.slice(1);
-  const takesValue = cluster.search(/[St]/);
-  const flags = takesValue < 0 ? cluster : cluster.slice(0, takesValue);
-  return { recursive: /[rRa]/.test(flags),
-    uncertain: takesValue >= 0 && cluster[takesValue] === 'S',
-    target: takesValue >= 0 && cluster[takesValue] === 't' ? cluster.slice(takesValue + 1) : undefined };
-}
-
+/** cp's operands as GNU getopt reads them (B323): glued values, long prefixes and options after the operands. */
 function posixOperands(args: ShellWord[]) {
-  const positional: ShellWord[] = [];
-  let destination: string | undefined;
-  let options = true;
-  let recursive = false;
-  let uncertain = false;
-  for (let i = 0; i < args.length; i += 1) {
-    const value = args[i].value;
-    if (options && value === '--') options = false;
-    else if (options && value === '--target-directory') destination = args[++i]?.value;
-    else if (options && value.startsWith('--target-directory=')) destination = value.slice(19);
-    else if (options && value.startsWith('-')) {
-      const option = copyOption(value);
-      recursive ||= option.recursive;
-      uncertain ||= option.uncertain ?? false;
-      if (option.target !== undefined) destination = option.target || args[++i]?.value;
-    } else positional.push(args[i]);
-  }
+  const parsed = gnuCopyArgs('cp', args.map((word) => word.value))!;
+  const positional = parsed.operands.map((index) => args[index]);
+  const destination = parsed.target;
   const sources = destination === undefined ? positional.slice(0, -1) : positional;
-  return { sources: sources.map((word) => word.value), uncertain: uncertain || sources.some((word) => word.pattern),
+  const recursive = parsed.options.some((option) => /^(?:[rRa]|recursive|archive)$/.test(option));
+  return { sources: sources.map((word) => word.value),
+    uncertain: parsed.uncertain || sources.some((word) => word.pattern),
     destinations: destination === undefined ? positional.slice(-1).map((word) => word.value) : [destination],
     recursive };
 }

@@ -60,5 +60,17 @@ folders and the log, nothing from outside openspec/. The release notes come from
 **How much of the code did agents commit?**
 Commits made in an agent session carry `SDLC-Agent: <agent>` (a git hook sdlc installs); `sdlc audit` counts them.
 
+**`team sync` says the server is not a team registry.**
+On SkillForge, an administrator enables the plugin `sdlc-registry` in `/admin/plugins` (`sdlc guide team`).
+
+**How do the team's rules reach the agents?**
+SkillForge installs them: run the `skillforge sync --type rule` line `sdlc team sync` prints, after `sdlc update`.
+
+**Does the agent get the skills of its stage?**
+In Claude Code and OpenCode the stage command prints them (`sdlc team skills --stage <stage>`).
+
+**Does sdlc tell SkillForge that a skill helped?**
+No: stage events count as assigned; `skillforge sessions import` records real use.
+
 **I am new. Where do I start?**
 `sdlc guide tour`: seven short steps through the calculator demo.

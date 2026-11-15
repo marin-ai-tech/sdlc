@@ -110,6 +110,8 @@ async function registrySkills(config: SdlcConfig, ids: string[]): Promise<SkillF
     const origins = Object.fromEntries(ids.map((id) => [id, origin]));
     return { server: server.name, skills, origins };
   } catch (error) {
+    // Review F6: the commands refuse a registry without the role tools before they write (assertRegistryTools); a
+    // server that changes later makes the skills unavailable instead of failing after the role is written.
     const reason = `registry ${server.name} did not answer: ${failure(error)}`;
     return { server: server.name, skills: {}, origins: {}, error: reason };
   }

@@ -4,7 +4,7 @@ import { agentNames, roleBody, runsChecks, subagentName } from '../team/render.j
 import { AGENT_IDS, loadAgent, loadWorkflow, readAsset, WORKFLOW_IDS } from './assets.js';
 import { appendNotice, renderBody, sourceMarkerLine, yamlString } from './render.js';
 import { roleSkillInstructions } from './role-skills.js';
-import { stageResources, stageSection } from './stage-resources.js';
+import { stageInjection, stageResources, stageSection } from './stage-resources.js';
 import type { GeneratedFile, RenderContext, ToolAdapter } from './types.js';
 
 type Access = 'checks' | 'read' | 'write' | 'nobash';
@@ -89,13 +89,15 @@ export const opencodeAdapter: ToolAdapter = {
       // With skills-only delivery OpenCode exposes each skill as `/sdlc-<id>` itself.
       for (const id of WORKFLOW_IDS) {
         const wf = loadWorkflow(id);
-        const section = stageSection(stageResources(ctx.config, id, ctx.team));
+        const resources = stageResources(ctx.config, id, ctx.team);
+        const section = stageSection(resources, { inject: true });
         const content = appendNotice([
           '---',
           `description: ${yamlString(wf.commandDescription)}`,
           '---',
           '',
-          renderBody(wf.body, { surface: 'opencode-command', cli: ctx.cli, agents }) + section,
+          stageInjection(resources, ctx.cli)
+            + renderBody(wf.body, { surface: 'opencode-command', cli: ctx.cli, agents }) + section,
         ].join('\n'), notice);
         files.push({ path: `.opencode/commands/sdlc-${id}.md`, content, tool: 'opencode', kind: 'command' });
       }

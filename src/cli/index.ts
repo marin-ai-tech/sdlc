@@ -39,7 +39,9 @@ import {
 import { backlogImportIssues } from '../commands/backlog-import.js';
 import { rolesCheck, rolesMigrate, rolesWho } from '../commands/roles.js';
 import { ciInitCommand } from '../commands/ci.js';
-import { teamAcceptCommand, teamCheckCommand, teamListCommand, teamSyncCommand } from '../commands/team.js';
+import {
+  teamAcceptCommand, teamCheckCommand, teamListCommand, teamSkillsCommand, teamSyncCommand,
+} from '../commands/team.js';
 import { adoptCommand } from '../commands/adopt.js';
 import { proposeConfig, showConfig, applyConfig, dismissConfig } from '../commands/config-proposals.js';
 import { traceCommand } from '../commands/trace.js';
@@ -147,12 +149,15 @@ export function buildProgram(): Command {
   team.command('accept [role]').description(cmdDesc('cmd.team.accept'))
     .option('--skill <id>', 'accept a skill of the team registry, scripts included (human only)')
     .option('--pack <name>', 'accept the lenses, workflows and checks of a pack (human only)')
-    .option('--rule <id>', 'accept a team rule of the registry (human only)')
+    .option('--rule <id>', 'refused: SkillForge installs registry rules (skillforge sync --type rule)')
     .option('--json', 'output JSON').action((role, opts) => teamAcceptCommand(role, opts));
   team.command('list').description(cmdDesc('cmd.team.list'))
     .option('--json', 'output JSON').action((opts) => teamListCommand(opts));
   team.command('check').description(cmdDesc('cmd.team.check'))
     .option('--json', 'output JSON').action((opts) => teamCheckCommand(opts));
+  team.command('skills').description(cmdDesc('cmd.team.skills'))
+    .requiredOption('--stage <stage>', 'plan, design, build, test, deploy or maintain')
+    .option('--json', 'output JSON').action((opts) => teamSkillsCommand(opts));
   const backlog = program.command('backlog').description(cmdDesc('cmd.backlog'));
   const epic = backlog.command('epic').description(cmdDesc('cmd.backlog.epic'));
   epic.command('add <title>').description(cmdDesc('cmd.backlog.epic.add'))

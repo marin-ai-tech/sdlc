@@ -57,6 +57,7 @@ const EXAMPLES: Record<string, string> = {
   answer: 'sdlc answer 1 --change add-export --text "Cashiers at the till"',
   'team list': 'sdlc team list --json',
   'team check': 'sdlc team check --json',
+  'team skills': 'sdlc team skills --stage build',
   'task executors token': 'sdlc task executors token swarm-a',
   'board list': 'sdlc board list --json',
   'board dispatch': 'sdlc board dispatch --change add-export --task 1.2 --executor swarm-a --json',

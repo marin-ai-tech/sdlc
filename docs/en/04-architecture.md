@@ -244,7 +244,16 @@ One engine (`src/core/policy.ts`) and one dispatcher (`sdlc hook pre-tool | sess
 action and `sdlc doctor` reports the problem.
 
 A read with a null or descriptor redirect remains allowed when the command has no other write. An unresolved copy
-source or destination is denied with the operand named; a found state copy takes priority. An inline string matching
+source or destination is denied with the operand named; a found state copy takes priority.
+
+The destination of `cp`, `mv`, `install`, `ln` and `link` is read as GNU tools read their arguments:
+
+- a value glued to its option counts, so `cp a -t.claude` is `cp a -t .claude`;
+- an unambiguous prefix of a long option is that option, so `--targ` is `--target-directory`;
+- options may stand after the operands, so in `install a dest -m 644` the destination is `dest`, not `644`;
+- `--` ends the options.
+
+An option the hook does not know, or an ambiguous prefix, makes it treat every word as a possible destination. An inline string matching
 state only as a glob is denied with the string named and a suggestion to put the script in a file.
 
 #### Limits of a static reading
@@ -278,6 +287,23 @@ A body that bash runs, or a write after a partly quoted delimiter such as `<<'E'
 The price is that a harmless body can be refused, for example Markdown with a backtick code span or a script with
 `rm` in a word. Write such a file with the editor tool instead of a here-document. `apply_patch` still reads its
 body as a patch.
+
+A copy through a variable is refused when the hook cannot tell its source or destination, with one exception: every
+variable of the copy has an exact value. A value is exact when one plain assignment of a literal stands before every
+use, at the top level, separated only by `;` or a new line, and nothing assigns, unsets or declares the variable
+again. Then the copy is judged as if the value were written out, so `BASE=/tmp/r; cp -r src "$BASE/"` is allowed and
+the same copy into `.claude` gets the refusal of `cp -r src .claude/`. The copy stays refused when a value outside
+the project resolves into it through a link or a junction. A command with any of these has no exact values:
+
+- a pipe, `&&`, `||` or `&`;
+- a group, a subshell, a function or a compound command;
+- a backslash, a substitution or a default such as `${T:-x}`;
+- a `cd` or a command that makes a link;
+- a use of the variable outside double quotes, such as `$BASE/x`, because bash splits and globs it;
+- a PowerShell or cmd assignment.
+
+So `BASE=/tmp/r; cp -r src "$BASE/"; find "$BASE" | sort` stays refused because of the pipe at its end, even though
+the pipe only reads. Run the copy as its own command and the listing as another.
 
 In an inline `node -e` script, an event name, a compared value, a `case` label and an object key are not files it
 writes. A write whose path the hook cannot read from such a script is still refused. Put the script in a file.
