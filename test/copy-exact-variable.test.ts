@@ -153,13 +153,15 @@ describe('B318.C4 review round 2: an unquoted use is split and globbed by bash',
   // Independent review lead (2026-11-15): with IFS=@ bash splits an unquoted $BASE into two words, so
   // `cp a $BASE` with BASE=<out>@--target-directory=.claude copies into .claude, while the written-out spelling
   // names one path outside the project. Git Bash split it as [cp][a][/tmp/out][--target-directory=.claude].
+  // The values are quoted, so the only thing that is not exact is the unquoted use: an unquoted value is not exact
+  // by itself when the temporary folder holds a `~`, as `C:/Users/RUNNER~1/...` does on GitHub's Windows runners.
   const T = `${OUTSIDE}/t`;
   it.each([
-    `IFS=@; BASE=${T}@--target-directory=.claude; cp a $BASE`,
-    `IFS=@; BASE=${T}@.claude/settings.json; cp a $BASE`,
-    `IFS=/; BASE=${T}/x; cp a $BASE`,
-    `BASE=${T}; cp a $BASE/x`,
-    `BASE=${T}; cp a "$BASE"/x $BASE`,
+    `IFS=@; BASE="${T}@--target-directory=.claude"; cp a $BASE`,
+    `IFS=@; BASE="${T}@.claude/settings.json"; cp a $BASE`,
+    `IFS=/; BASE="${T}/x"; cp a $BASE`,
+    `BASE="${T}"; cp a $BASE/x`,
+    `BASE="${T}"; cp a "$BASE"/x $BASE`,
   ])('%s', (command) => {
     const result = decide(command);
     expect(result.decision, command).toBe('deny');
@@ -168,8 +170,8 @@ describe('B318.C4 review round 2: an unquoted use is split and globbed by bash',
 
   it('the same values used inside double quotes stay exact', async () => {
     const { exactValues } = await import('../src/core/shell-exact-values.js');
-    expect(exactValues(`IFS=@; BASE=${T}@x; cp a "$BASE"`)?.values.BASE).toBe(`${T}@x`);
-    expect(exactValues(`BASE=${T}; cp a $BASE/x`)).toBeUndefined();
+    expect(exactValues(`IFS=@; BASE="${T}@x"; cp a "$BASE"`)?.values.BASE).toBe(`${T}@x`);
+    expect(exactValues(`BASE="${T}"; cp a $BASE/x`)).toBeUndefined();
   });
 });
 
