@@ -1,4 +1,5 @@
 import * as path from 'node:path';
+import { randomBytes } from 'node:crypto';
 import type { SdlcConfig, VerifyCommand } from './config.js';
 import {
   provenance, type ChangeState, type VerifyCommandRecord, type VerifyMcpRecord, type VerifyRecord,
@@ -30,6 +31,8 @@ export interface McpCheckOutcome extends VerifyMcpRecord {
 }
 
 export interface VerificationRun {
+  id: string;
+  started_at: string;
   status: 'passed' | 'failed';
   at: string;
   commit?: string;
@@ -50,7 +53,8 @@ function runCheck(root: string, check: VerifyCommand, timeoutSeconds: number, ou
 export async function runVerification(
   root: string,
   config: SdlcConfig,
-  options: { only?: string[]; onCheck?: (check: VerifyCommand) => void } = {}
+  options: { only?: string[]; onCheck?: (check: VerifyCommand) => void;
+    onStart?: (run: Pick<VerificationRun, 'id' | 'started_at' | 'fingerprint' | 'commit'>) => void } = {}
 ): Promise<VerificationRun> {
   const selected = options.only && options.only.length > 0
     ? config.verify.commands.filter((c) => options.only!.includes(c.name))
@@ -60,6 +64,9 @@ export async function runVerification(
   const fingerprint = worktreeFingerprint(root, FINGERPRINT_EXCLUDES);
   const commit = headCommit(root);
   const dirty = isDirty(root, FINGERPRINT_EXCLUDES);
+  const id = randomBytes(6).toString('hex');
+  const started_at = new Date().toISOString();
+  options.onStart?.({ id, started_at, fingerprint, commit });
   const checks: CheckOutcome[] = [];
   for (const check of selected) {
     options.onCheck?.(check);
@@ -72,6 +79,8 @@ export async function runVerification(
     ? 'failed' : 'passed';
   const reason = fingerprintFailureReason({ status, fingerprint, checks }, partial);
   return {
+    id,
+    started_at,
     // A partial run is evidence, never a pass for the gate.
     status,
     at: new Date().toISOString(),
@@ -85,6 +94,8 @@ export async function runVerification(
 
 export function toVerifyRecord(run: VerificationRun): VerifyRecord {
   return {
+    id: run.id,
+    started_at: run.started_at,
     status: run.status,
     at: run.at,
     ...(run.commit ? { commit: run.commit } : {}),

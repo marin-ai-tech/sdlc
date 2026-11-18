@@ -278,7 +278,8 @@ async function preTool(agent: Agent, input: HookInput, project: HookProject): Pr
 function sessionStart(agent: Agent, project: HookProject): void {
   const { root, paths, config } = project;
   if (!config.enforcement.sessionContext) return;
-  const overview = sessionSummary({ paths, config }, (view) => recordAwaiting(root, config, view));
+  const overview = sessionSummary({ paths, config },
+    (view) => recordAwaiting(root, config, view, undefined, { hook: true }));
   if (!overview) return;
   // B67: one line only while a bad health finding exists (light evaluation; never fails the hook).
   const health = sessionHealthLine(root, paths, config);
@@ -286,7 +287,10 @@ function sessionStart(agent: Agent, project: HookProject): void {
 }
 
 async function stop(agent: Agent, input: HookInput, project: HookProject): Promise<void> {
-  const message = input.stop_hook_active ? undefined : stopCheck({ paths: project.paths, config: project.config });
+  const message = input.stop_hook_active ? undefined : stopCheck(
+    { paths: project.paths, config: project.config },
+    (view) => recordAwaiting(project.root, project.config, view, undefined, { hook: true }),
+  );
   if (message) { writeStop(agent, message); return; }
   if (project.config.enforcement.mode === 'off') return;
   try { await pluginBoundary(project, 'stop', { repeated: input.stop_hook_active === true }); }

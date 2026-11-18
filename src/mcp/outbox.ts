@@ -123,10 +123,12 @@ function shortHash(source: string): string {
 /** The id of a wait: the same in every clone; project.name when set, else change/gate/event/digest only. */
 export function waitId(
   projectName: string | undefined,
-  entry: Pick<LogEntry, 'event' | 'change' | 'detail'>,
+  entry: Pick<LogEntry, 'event' | 'change' | 'detail' | 'approvals'>,
   gate: string,
 ): string {
-  const shared = [entry.change ?? '', gate, entry.event, entry.detail ?? ''];
+  // A later approver's wait (B181) gets its own id; the first wait keeps the id it had before.
+  const later = entry.approvals ? [`approvals:${entry.approvals}`] : [];
+  const shared = [entry.change ?? '', gate, entry.event, entry.detail ?? '', ...later];
   const parts = projectName ? ['wait', projectName, ...shared] : ['wait', ...shared];
   return shortHash(parts.join('\n'));
 }

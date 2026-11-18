@@ -45,6 +45,7 @@ import {
 import { adoptCommand } from '../commands/adopt.js';
 import { proposeConfig, showConfig, applyConfig, dismissConfig } from '../commands/config-proposals.js';
 import { traceCommand } from '../commands/trace.js';
+import { timelineCommand } from '../commands/timeline.js';
 import {
   taskCheckResultCommand, taskExecutorTokenCommand, taskExecutorsCommand, taskExportCommand,
 } from '../commands/task.js';
@@ -754,6 +755,12 @@ export function buildProgram(): Command {
     .description(cmdDesc('cmd.trace'))
     .option('--json', 'output JSON')
     .action((change, opts) => traceCommand(change, opts));
+
+  program
+    .command('timeline <change>')
+    .description(cmdDesc('cmd.timeline'))
+    .option('--json', 'output JSON')
+    .action((change, opts) => timelineCommand(change, opts));
 
   program
     .command('hook <event>')

@@ -19,6 +19,7 @@ import { parse } from 'yaml';
 import { allChanges } from '../core/approval-signatures.js';
 import { exportApprovals } from '../core/evidence-export.js';
 import { projectPaths } from '../core/project.js';
+import { parseLoops } from '../core/loop-budget.js';
 
 interface Options { json?: boolean; target?: string; set?: string[]; file?: string; reason?: string; yes?: boolean;
   note?: string }
@@ -105,11 +106,34 @@ function warnings(root: string, proposal: ConfigProposal): string[] {
     return result;
   }
   const content = parse(proposal.content) as Record<string, unknown>;
+  const beforeConfig = parseLoops(parse(current) as Record<string, unknown>);
+  const afterConfig = parseLoops(content);
+  const beforeLoops = beforeConfig.budget;
+  const afterLoops = afterConfig.budget;
+  const loopWarnings = (['reviewRounds', 'verifyRuns'] as const).flatMap((field) => {
+    const before = beforeLoops[field];
+    const after = afterLoops[field];
+    if (before === undefined || (after !== undefined && after <= before)) return [];
+    const key = field === 'reviewRounds' ? 'loops.review_rounds' : 'loops.verify_runs';
+    return [`${key} is higher or removed`];
+  });
+  const beforeSplit = beforeConfig.split;
+  const afterSplit = afterConfig.split;
+  if (beforeSplit.verifyMinutes !== undefined && (afterSplit.verifyMinutes === undefined
+    || afterSplit.verifyMinutes > beforeSplit.verifyMinutes)) {
+    loopWarnings.push('loops.verify_minutes is higher or removed');
+  }
+  if (afterSplit.comparableMin > beforeSplit.comparableMin) {
+    loopWarnings.push('loops.comparable_min is higher or removed');
+  }
   return [...weakeningWarnings(parseConfig(parse(current)), parseConfig(content)),
-    ...integrationEmptyWarnings(content)];
+    ...integrationEmptyWarnings(content), ...loopWarnings];
 }
 
 function localizedWarning(warning: string): string {
+  const loop = /^(loops\.(?:review_rounds|verify_runs|verify_minutes|comparable_min)) is higher or removed$/
+    .exec(warning);
+  if (loop) return t('config.warning.loopBudget', { key: loop[1] });
   if (warning === 'enforcement mode is lower') return t('config.warning.enforcement');
   if (warning === 'signing is lower') return t('config.warning.signing');
   if (warning === 'signing_since is later or newly added') return t('config.warning.signingSince');

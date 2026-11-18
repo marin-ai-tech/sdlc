@@ -8,6 +8,7 @@ import { SdlcError } from './errors.js';
 import { writeTextAtomic } from './fs-utils.js';
 import { editYamlText } from './yaml-text-edit.js';
 import { integrationUnknownKeys } from './config-integration-findings.js';
+import { isLoopsKey, loopsMinimum, parseLoops } from './loop-budget.js';
 export { unifiedDiff } from './line-diff.js';
 
 export type ConfigTarget = 'sdlc' | 'roles';
@@ -55,7 +56,7 @@ export function validateContent(text: string, target: ConfigTarget): void {
     : ['version', 'schema', 'cli', 'statusline', 'stages', 'project', 'mcp', 'events', 'issues',
       'team', 'packs', 'board', 'context', 'tools', 'delivery', 'gates', 'roles', 'verify',
       'review', 'release', 'enforcement', 'license', 'log', 'rework', 'health', 'questions',
-      'design', 'locale', 'layout', 'plugins', 'plugin_policies'];
+      'design', 'locale', 'layout', 'plugins', 'plugin_policies', 'loops'];
   for (const key of Object.keys(value)) {
     if (!keys.includes(key)) {
       throw new SdlcError('invalid_config', { key: 'config.error.unknownKey', params: { key } });
@@ -63,6 +64,11 @@ export function validateContent(text: string, target: ConfigTarget): void {
   }
   validateKnownFields(value as Record<string, unknown>, target);
   if (target === 'sdlc') {
+    const invalid = parseLoops(value as Record<string, unknown>).invalid[0];
+    if (invalid) {
+      const key = isLoopsKey(invalid) ? 'config.error.loopsValue' : 'config.error.unknownKey';
+      throw new SdlcError('invalid_config', { key, params: { key: invalid, minimum: loopsMinimum(invalid) } });
+    }
     const unknown = integrationUnknownKeys(value as Record<string, unknown>)[0];
     if (unknown) {
       throw new SdlcError('invalid_config', { key: 'config.error.unknownKey', params: { key: unknown } });

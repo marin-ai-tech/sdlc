@@ -42,6 +42,8 @@ import { SdlcError } from '../core/errors.js';
 import { isFile, isWithin } from '../core/fs-utils.js';
 import { formatIdentity, gitIdentity } from '../core/git.js';
 import { evaluateChange, sharedFingerprint, type LifecycleView } from '../core/lifecycle.js';
+import { loopBudgetWarnings } from '../core/loop-budget.js';
+import { splitProposalWarnings } from '../core/split-estimate.js';
 import { approvalAvailabilityWarnings } from '../core/approval-availability.js';
 import { recordAwaiting } from '../core/awaiting.js';
 import { mergedTaskHint } from '../core/merged-task-hint.js';
@@ -178,7 +180,9 @@ function overlapsFor(ctx: ProjectContext): Overlap[] {
 
 /** Extra, cross-cutting warnings for one change (base drift, overlaps). */
 function changeWarnings(ctx: ProjectContext, view: LifecycleView, overlaps: Overlap[]): string[] {
-  const warnings = [...view.warnings, ...approvalAvailabilityWarnings(ctx.root, ctx.config, view)];
+  const warnings = [...view.warnings, ...approvalAvailabilityWarnings(ctx.root, ctx.config, view),
+    ...loopBudgetWarnings(ctx.root, view), ...splitProposalWarnings(ctx.root,
+      { id: view.change, dir: view.dir, archived: view.archived })];
   const state = readChangeState(view.dir);
   const base = state.gates.spec?.approvals?.at(-1)?.base;
   for (const cap of changedBases(ctx.paths, base)) {
@@ -370,7 +374,8 @@ export async function nextCommand(opts: { change?: string; json?: boolean }): Pr
     const view = evaluateChange(ctx.root, ref, ctx.config);
     view.next = mergedTaskHint(ctx.root, ref, view.next);
     const warnings = [...view.warnings, ...approvalAvailabilityWarnings(ctx.root, ctx.config, view),
-      ...rootArtifactHints(ctx.root, ref)];
+      ...rootArtifactHints(ctx.root, ref), ...loopBudgetWarnings(ctx.root, view),
+      ...splitProposalWarnings(ctx.root, ref)];
     recordAwaiting(ctx.root, ctx.config, view, ctx.stamp);
     if (opts.json) {
       printJson({ change: view.change, stage: view.stage, stageTitle: view.stageTitle,

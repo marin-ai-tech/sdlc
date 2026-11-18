@@ -123,7 +123,13 @@ function logged(entries: LogEntry[], change: string, gate: string): boolean {
 type LogConfig = Parameters<typeof appendLog>[1];
 
 /** Appends `gate.<g>.auto_waived` the first time a view shows a policy waiver. Never throws. */
-export function recordAutoWaived(root: string, config: LogConfig, views: LifecycleView[], stamp?: HarnessStamp): void {
+export function recordAutoWaived(
+  root: string,
+  config: LogConfig,
+  views: LifecycleView[],
+  stamp?: HarnessStamp,
+  options: { hook?: boolean } = {},
+): void {
   const waived = views.flatMap((view) => view.gates
     .filter((gate) => gate.reasonKey === 'gate.autoWaived' && !view.archived)
     .map((gate) => ({
@@ -132,7 +138,8 @@ export function recordAutoWaived(root: string, config: LogConfig, views: Lifecyc
   if (waived.length === 0) return;
   try {
     // Recorded from a person's commands only: an agent's session (or its hook) must not make the policy permanent.
-    if (!agentEnvironment()) {
+    // A hook says so itself; the agent markers in the environment are not a reliable sign of one.
+    if (!options.hook && !agentEnvironment()) {
       for (const item of waived) recordOnChange(item.dir, item.gate, item.policy, stamp);
     }
     if (!config.log.enabled) return;

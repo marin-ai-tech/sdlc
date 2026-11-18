@@ -6,6 +6,7 @@ import type { ReleaseCheckRecord } from '../core/change-state.js';
 import type { StampAttempt } from '../core/stamp.js';
 import { t } from '../core/i18n.js';
 import { evaluateChange, type GateEvaluation } from '../core/lifecycle.js';
+import { splitProposalWarnings } from '../core/split-estimate.js';
 import type { ValidationIssue } from '../core/validate-change.js';
 import type { ApprovalWork } from './gates.js';
 
@@ -15,15 +16,17 @@ export function presentGateApproval(work: ApprovalWork, warnings: ValidationIssu
   const status = after.gates.find((item) => item.id === gate)!;
   const next = resolveNext(ctx, ref.id);
   const commitMessage = approvalCommitMessage(ref.id, gate, digest);
+  const splitWarnings = gate === 'plan' ? splitProposalWarnings(ctx.root, ref) : [];
   if (opts.json) {
     printJson({ change: ref.id, gate, role: work.role, by: work.identity, status: status.status,
       missingRoles: status.missingRoles, ...(checks ? { checks } : {}),
-      warnings: warnings.map((issue) => issue.message), commitMessage, ...(next ? { next } : {}),
+      warnings: [...warnings.map((issue) => issue.message), ...splitWarnings],
+      commitMessage, ...(next ? { next } : {}),
       ...(work.replacedRoles?.length ? replacementDetails(work, status) : {}),
       ...(work.stamping ? { stamping: work.stamping } : {}) });
     return;
   }
-  presentText(work, status, warnings, commitMessage);
+  presentText(work, status, warnings, splitWarnings, commitMessage);
 }
 
 function replacementDetails(work: ApprovalWork, status: GateEvaluation) {
@@ -33,10 +36,12 @@ function replacementDetails(work: ApprovalWork, status: GateEvaluation) {
   return { replacedRoles: work.replacedRoles, remainingAuthority: { roles, people } };
 }
 
-function presentText(work: ApprovalWork, status: GateEvaluation, warnings: ValidationIssue[], commitMessage: string) {
+function presentText(work: ApprovalWork, status: GateEvaluation, warnings: ValidationIssue[],
+  splitWarnings: string[], commitMessage: string) {
   const { ctx, ref, gate, role, identity, digest } = work;
   line(`${c.green(t('gate.approvedLine', { gate, identity, role }))} ${c.dim(`(${shortDigest(digest)})`)}`);
   for (const issue of warnings) warn(issue.message);
+  for (const warning of splitWarnings) warn(warning);
   if (status.status !== 'approved') line(`  ${t('gate.stillNeeded', { roles: stillNeeded(status) })}`);
   if (work.replacedRoles?.length) presentReplacement(work, status);
   presentStamping(work.stamping);

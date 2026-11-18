@@ -84,6 +84,9 @@ export interface ReportChange {
   movedInPeriod: boolean;
   /** People's decisions the track plans against what happened (B63). */
   participation: Participation;
+  /** Verify runs for this change, including totals and source fingerprints (B182). */
+  verifyRuns: ChangePage['verifyRuns'];
+  reviewRounds: number;
   /** The dashboard page of the change: timeline, waits, reworks, trace gaps, who acts now. */
   page: ChangePage;
 }
@@ -238,6 +241,8 @@ function toReportChange(ref: ChangeRef, view: LifecycleView, state: ChangeState,
     ...(ageHours !== undefined && Number.isFinite(ageHours) && ageHours >= 0 ? { ageHours } : {}),
     movedInPeriod: !since || state.history.some((event) => event.at >= since),
     participation: page.participation,
+    verifyRuns: page.verifyRuns,
+    reviewRounds: page.reviewRounds,
     page,
   };
 }

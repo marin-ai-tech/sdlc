@@ -361,28 +361,64 @@ export function sessionSummary(ctx: PolicyContext, observe?: (view: LifecycleVie
   return withGuideLine(lines);
 }
 
+function observeStopView(observe: ((view: LifecycleView) => void) | undefined, view: LifecycleView): void {
+  try {
+    observe?.(view);
+  } catch {
+    // Observations never change the stop decision.
+  }
+}
+
+/**
+ * With the stop check off, the observer still needs the fingerprint: the review and release gates' digests hold it,
+ * so without it those gates have no digest and their wait would start only at the next command.
+ */
+function observeActiveAtStop(ctx: PolicyContext, observe: (view: LifecycleView) => void): void {
+  try {
+    const fingerprint = sharedFingerprint(ctx.paths.root);
+    // Every active change: a wait that starts late is a wrong measurement, and Stop has a 120 s budget.
+    for (const ref of listActiveChanges(ctx.paths)) {
+      try {
+        const view = evaluateChange(ctx.paths.root, ref, ctx.config, { fingerprint });
+        observeStopView(observe, view);
+      } catch {
+        // One change's evaluation must not prevent observing the others.
+      }
+    }
+  } catch {
+    // Listing changes is only an observation here.
+  }
+}
+
 /** Stop-time check: a change whose tasks are all done must carry fresh verification evidence. */
-export function stopCheck(ctx: PolicyContext): string | undefined {
-  if (!ctx.config.enforcement.verifyBeforeStop || ctx.config.enforcement.mode === 'off') return undefined;
+export function stopCheck(ctx: PolicyContext, observe?: (view: LifecycleView) => void): string | undefined {
+  if (!ctx.config.enforcement.verifyBeforeStop || ctx.config.enforcement.mode === 'off') {
+    if (observe) observeActiveAtStop(ctx, observe);
+    return undefined;
+  }
   const fingerprint = sharedFingerprint(ctx.paths.root);
+  let message: string | undefined;
   for (const ref of listChangeFolders(ctx.paths)) {
     try {
       const view = evaluateChange(ctx.paths.root, ref, ctx.config, { fingerprint });
+      observeStopView(observe, view);
       const verify = view.gates.find((g) => g.id === 'verify');
       const planOk = gateOk(view, 'plan');
       if (planOk && view.tasks.total > 0 && view.tasks.remaining === 0
-        && verify && verify.status !== 'passed' && verify.required) {
-        return t(folderKey(ref.id, 'hook.verifyBeforeStop', 'hook.verifyBeforeStopFolder'), {
+        && verify && verify.status !== 'passed' && verify.required && !message) {
+        message = t(folderKey(ref.id, 'hook.verifyBeforeStop', 'hook.verifyBeforeStopFolder'), {
           change: folderLabel(ref.id),
           detail: verify.reason ?? verify.status,
         });
       }
     } catch (error) {
-      return t('hook.stopEvaluationError', {
+      if (message) continue;
+      message = t('hook.stopEvaluationError', {
         change: isValidChangeId(ref.id) ? JSON.stringify(ref.id) : folderLabel(ref.id),
         code: toDiagnostic(error).code,
       });
     }
+    if (message && !observe) return message;
   }
-  return undefined;
+  return message;
 }

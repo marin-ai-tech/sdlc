@@ -23,6 +23,10 @@ import { packLenses, reviewLenses, withPackChecks } from '../team/pack-effect.js
 import { reviewSuggest } from './review-suggest.js';
 import { t } from '../core/i18n.js';
 import { completeVerifyTasks } from '../core/verify-tasks.js';
+import { branchChange } from '../core/change-branch.js';
+import { appendLog, readLog } from '../core/log.js';
+import { finishedRunFacts, skipsChecks, verifyTrigger, type VerifyTrigger } from '../core/verify-runs.js';
+import { recordReviewRound } from '../core/review-rounds.js';
 
 export interface VerifyOptions {
   change?: string;
@@ -136,7 +140,7 @@ export async function verifyCommand(opts: VerifyOptions): Promise<void> {
     // The checks of the accepted packs (B18) run after the project's own, each as an agent.
     const ctx = withPackChecks(loadProject());
     if (opts.list) return listChecks(ctx, opts.json);
-    const ref = resolveChange(ctx.paths, opts.change);
+    const ref = resolveChange(ctx.paths, opts.change ?? branchChange(ctx.root, ctx.paths));
     if (opts.check) {
       const coverage = uncoveredScenarioReport(ref.dir);
       if (opts.json) {
@@ -160,13 +164,25 @@ export async function verifyCommand(opts: VerifyOptions): Promise<void> {
     );
     }
     const only = opts.only ? opts.only.split(',').map((s) => s.trim()).filter(Boolean) : undefined;
+    let trigger: VerifyTrigger = 'first';
     const commands = await runVerification(ctx.root, ctx.config, {
       only,
+      onStart: (start) => {
+        trigger = verifyTrigger(readLog(ctx.root).filter((entry) => entry.change === ref.id),
+          start.started_at, start.fingerprint);
+        appendLog(ctx.root, ctx.config, {
+          event: 'verify.started', change: ref.id,
+          run: { id: start.id, started_at: start.started_at,
+            ...(start.fingerprint ? { fingerprint: start.fingerprint } : {}),
+            ...(start.commit ? { commit: start.commit } : {}) },
+        }, ctx.stamp, { outbox: false, strict: true });
+      },
       onCheck: (check) => {
         if (!opts.json) process.stderr.write(c.dim(`${t('verify.running', { name: check.name, run: check.run })}\n`));
       },
     });
     const run = await withMcp(ctx, ref.id, commands, { only, json: opts.json });
+    run.at = new Date().toISOString();
     const extras = evidenceExtras(ctx, ref.dir);
     const template = readAsset('records', 'verification.md');
     const file = writeEvidence(ref.dir, run, ref.id, template, ctx.stamp, extras);
@@ -174,7 +190,8 @@ export async function verifyCommand(opts: VerifyOptions): Promise<void> {
     applyVerifyToState(state, run, ctx.stamp);
     const mcpDetail = (run.mcp ?? []).map((m) => `${m.name}=${m.ok ? 'ok' : 'failed'}`);
     recordChangeEvent(ctx, ref, state, `verify.${run.status}`, formatIdentity(gitIdentity(ctx.root)),
-      [...run.checks.map((ch) => `${ch.name}=${ch.exit_code ?? 'timeout'}`), ...mcpDetail].join(' '));
+      [...run.checks.map((ch) => `${ch.name}=${ch.exit_code ?? 'timeout'}`), ...mcpDetail].join(' '),
+      { run: finishedRunFacts(run, trigger, skipsChecks(ctx.config, only)) });
     if (run.status === 'passed' && !only) completeVerifyTasks(ref.dir);
     // Outside an agent session the MCP results are also kept for the agent (the inbox).
     keepForAgent(ctx.root, ref.id, run);
@@ -214,7 +231,8 @@ export async function reviewCommand(action: string, opts: { change?: string; bas
       throw new SdlcError('invalid_action', { key: 'error.use_sdlc_review_context_or_sdlc_review_check' });
     }
     const ctx = loadProject();
-    const ref = resolveChange(ctx.paths, opts.change);
+    const ref = resolveChange(ctx.paths, action === 'check'
+      ? opts.change ?? branchChange(ctx.root, ctx.paths) : opts.change);
     // The lenses of the accepted packs (B18) are required and listed like the configured ones.
     const lenses = packLenses(ctx.root, ctx.config);
     if (action === 'check') {
@@ -266,6 +284,11 @@ export async function reviewCommand(action: string, opts: { change?: string; bas
         }
       }
       if (summary.blocking.length > 0 || deferred.missing.length > 0 || (coverage.enforced && (coverage.missing.length > 0 || coverage.unchecked.length > 0))) process.exitCode = 1;
+      try {
+        recordReviewRound(ctx.root, ctx.config, ref.id, content, summary);
+      } catch {
+        // Recording is an observation; the check's output and verdict are already decided.
+      }
       return;
     }
     const base = changeBase(ctx, ref, opts.base ?? ctx.config.review.base);

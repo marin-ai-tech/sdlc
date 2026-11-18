@@ -7,8 +7,10 @@ import { parseManifest } from '../dist/plugins/manifest.js';
 import { manifest } from './fixtures/plugin-modules.js';
 import { REPO_ROOT } from './helpers.js';
 
+// `review` joined with `review.round` (B226, 2026-11-16); it was already reserved as a command name.
 const coreEvents = ['adopt', 'backlog', 'change', 'config', 'deferred', 'executor', 'exploration',
-  'gate', 'harness', 'health', 'hook', 'layout', 'license', 'question', 'summary', 'task', 'tests', 'track', 'verify'];
+  'gate', 'harness', 'health', 'hook', 'layout', 'license', 'question', 'review', 'summary', 'task', 'tests', 'track',
+  'verify'];
 const Ajv = createRequire(import.meta.url)('ajv/dist/2020');
 const schema = JSON.parse(fs.readFileSync(path.join(REPO_ROOT, 'schemas/contracts/plugin-manifest.schema.json'), 'utf8'));
 const validManifest = new Ajv({ strict: false }).compile(schema);

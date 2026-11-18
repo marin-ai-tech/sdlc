@@ -2,6 +2,64 @@
 
 All notable changes to sdlc. Versions follow [Semantic Versioning](https://semver.org/); while the major version is 0, a minor version may change behavior.
 
+## 0.33.0 — 2026-11-17
+
+sdlc now records where a change's time goes: every verify run, every review round and every wait for a person. A
+loop budget turns a long run of agent steps into a person's decision, `sdlc timeline` shows a change over time, and a
+large change gets a split proposal before its build. No gate and no answer of the hook changes.
+
+### Added
+- Every `sdlc verify` run leaves a start and a finish entry in the project log with the same run id. The finish
+  records the duration, the source fingerprint and commit, why the run happened (`first`, `repeat`, `after_review`,
+  `after_rework`, `changed`) and each check's duration and exit code, never command text or output. A killed run
+  stays visible as unfinished. The start entry stays out of the change history and the event outbox, so receivers
+  still get one event per run.
+- `sdlc audit --json` sums each change's runs and minutes per source fingerprint (`metrics.verifyLog`), and the
+  change page of `sdlc report` shows them under "Verify runs".
+- In a worktree on branch `change/<id>`, `sdlc verify` without `--change` records the run on that change.
+- The `ci-green` MCP check keeps the CI provider's own run time (`provider_ms`) when the answer gives it.
+- `sdlc audit --json` reports each approver's wait (`metrics.approverWaits`): a gate that needs several approvals
+  starts a new wait after each one, with the number of approvals it already holds (`approvals` on the entry and in
+  the event id from the second wait on).
+- `sdlc review check` records each review round in the project log (`review.round`): the round number, the source
+  fingerprint, a digest of review.md and the finding counts, never finding text. A repeated check on the same code
+  and review.md is not a new round, and a failed write never changes the check's result. `sdlc audit`
+  (`metrics.reviewRounds`) and the change page of `sdlc report` show the rounds per change.
+- A loop budget per change in a new `loops:` section of `sdlc.yaml`: `review_rounds` and `verify_runs`. When one is
+  reached and the next step would be the agent's, `sdlc next` and `sdlc status` give a person's step
+  (`loop-budget`) with three choices: split the change, accept the known limits, or extend the budget. A person's
+  own step stays and gets a warning. `sdlc health` reports `discipline.loop_budget`, and `sdlc audit` prints the
+  verify runs repeated on unchanged code. A bad value is ignored and reported by `sdlc doctor`; the hook keeps
+  working.
+- `sdlc health` warns about a source verified three times or more (`quality.repeat_runs`) and about three review
+  rounds or more on one change (`quality.review_rounds`). `loops.repeat_runs` and `loops.round_warn` tune them.
+- `sdlc timeline <change> [--json]` shows a change over time: stages between gate approvals, waits for people,
+  verify runs and review rounds. Overlapping spans are not summed, the command writes nothing, and its trace and
+  span ids stay the same on every run. Plugins can no longer use the name `timeline`.
+- A split proposal before a large change's build: with `loops.verify_minutes` set, a change covering two or more
+  backlog items gets an estimate of its full-verification minutes from archived ones (median minutes per run times
+  median runs per change). Above the budget, `sdlc status`, `sdlc next` and `sdlc approve plan` name the inputs and
+  a `sdlc backlog epic edit` command for a person. Below `loops.comparable_min` archived changes (default 3) no
+  number is given.
+
+### Compatibility
+- Once `sdlc.yaml` has a `loops:` section, `sdlc config propose` of an older sdlc refuses it as an unknown key. Older
+  versions still read the file and run the hook, and ignore the section.
+- `timeline` is now a command name: a plugin that registered `timeline` no longer loads.
+
+### Known limits
+- The verify fingerprint hashes the files through a copy of git's index. Where git compares file times in whole
+  seconds, an edit that keeps a file's size and lands in the second the index was written can be missed. A verify
+  result can then be bound to the code before that edit. A fix is planned.
+- The split proposal prints `sdlc backlog epic edit` for a person, but an agent can run that command too: an epic's
+  granularity is not a gated decision.
+- `sdlc timeline` reads the change's state and the project log as `sdlc status` and `sdlc trace` do, following links.
+
+### Fixed
+- A wait for a person started at the next sdlc command, often seconds before the approval, so the audit reported
+  hours of waiting as seconds. The Stop and session-start hooks now record `gate.<g>.awaiting` when the agent's turn
+  ends, without changing the hook's answer. OpenCode has no Stop hook, so there a wait starts at session start.
+
 ## 0.32.1 — 2026-11-15
 
 SkillForge is the team registry through its own plugin. Registry rules are installed by SkillForge, not by sdlc. The

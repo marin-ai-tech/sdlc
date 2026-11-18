@@ -8,7 +8,7 @@ const semver = createRequire(import.meta.url)('semver') as {
 export const RESERVED = new Set(('adopt config roles ci team backlog defer layout init update uninstall new '
   + 'explore import status explain help guide next gate approve reject waive rework drop track takeover '
   + 'release-control tests verify judge review task board mcp context inbox report dashboard log license doctor '
-  + 'health plugin plugins trace hook openspec core sdlc setup change summary statusline events triage '
+  + 'health plugin plugins trace timeline hook openspec core sdlc setup change summary statusline events triage '
   + 'release approvals instructions validate archive audit changelog answer '
   + 'deferred executor exploration harness question').split(' '));
 

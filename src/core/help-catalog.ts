@@ -41,6 +41,7 @@ const EXAMPLES: Record<string, string> = {
   'import bmad': 'sdlc import bmad _bmad-output/epic-1 --to-backlog --dry-run --json',
   explore: 'sdlc explore checkout-flow --json',
   trace: 'sdlc trace add-export --json',
+  timeline: 'sdlc timeline add-export --json',
   health: 'sdlc health --json',
   changelog: 'sdlc changelog --change add-export',
   explain: 'sdlc explain --change add-export --json',

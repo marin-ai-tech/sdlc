@@ -30,6 +30,9 @@ export interface ChangePage {
   /** Seconds each approval gate waited for a person (B6). */
   waits: Array<{ gate: string; seconds: number }>;
   reworks: ChangeMetrics['reworks'];
+  /** Full, partial, and unfinished verify runs, grouped by source fingerprint. */
+  verifyRuns: ChangeMetrics['verifyLog'];
+  reviewRounds: number;
   /** People's decisions the track plans against what happened (B63). */
   participation: Participation;
   /** The gaps of `sdlc trace`. */
@@ -99,6 +102,8 @@ export function buildChangePage(input: ChangePageInput): ChangePage {
     history: input.state.history.map(pageEvent),
     waits,
     reworks: input.metrics.reworks,
+    verifyRuns: input.metrics.verifyLog,
+    reviewRounds: input.metrics.reviewRounds,
     participation: input.metrics.participation,
     gaps: traceGaps(input.root, input.ref),
     now: nowOf(input.view),
@@ -151,6 +156,43 @@ function reworksBlock(page: ChangePage): string {
   return block(t('report.html.pageReworks'), items, t('report.html.pageNoReworks'));
 }
 
+function displayMinutes(minutes: number): number {
+  return Math.round(minutes * 10) / 10;
+}
+
+function verifyRunsBlock(page: ChangePage): string {
+  const runs = page.verifyRuns;
+  if (runs.bySource.length === 0) {
+    return block(t('report.html.pageVerifyRuns'), [], t('report.html.pageNoVerifyRuns'));
+  }
+  const totals = t('report.html.pageVerifyRunTotals', {
+    finished: runs.finished,
+    passed: runs.passed,
+    failed: runs.failed,
+  });
+  const other = t('report.html.pageVerifyRunOther', {
+    unfinished: runs.unfinished,
+    partial: runs.partial,
+    minutes: displayMinutes(runs.minutes),
+  });
+  const items = [`<li>${e(totals)} ${e(other)}</li>`];
+  for (const source of runs.bySource) {
+    const text = t('report.html.pageVerifyRunSource', {
+      fingerprint: source.fingerprint,
+      runs: source.runs,
+      minutes: displayMinutes(source.minutes),
+    });
+    items.push(`<li>${e(text)}</li>`);
+  }
+  return block(t('report.html.pageVerifyRuns'), items, t('report.html.pageNoVerifyRuns'));
+}
+
+function reviewRoundsBlock(page: ChangePage): string {
+  const items = page.reviewRounds > 0
+    ? [`<li>${e(t('report.html.pageReviewRoundCount', { count: page.reviewRounds }))}</li>`] : [];
+  return block(t('report.html.pageReviewRounds'), items, t('report.html.pageNoReviewRounds'));
+}
+
 /** What the track planned for people and what they did: one line each. */
 function participationBlock(page: ChangePage): string {
   const params = participationParams(page.participation);
@@ -195,7 +237,8 @@ export function renderChangePage(change: { id: string; page: ChangePage }): stri
     + `<h3 id="${anchor}-title">${e(t('report.html.pageTitle', { change: change.id }))}</h3>`
     + `<div class="page-grid">${nowBlock(change.page)}${waitsBlock(change.page)}`
     + `${participationBlock(change.page)}`
-    + `${reworksBlock(change.page)}${gapsBlock(change.page)}${historyBlock(change.page)}</div>`
+    + `${reworksBlock(change.page)}${verifyRunsBlock(change.page)}${reviewRoundsBlock(change.page)}`
+    + `${gapsBlock(change.page)}${historyBlock(change.page)}</div>`
     + `</section>`;
 }
 

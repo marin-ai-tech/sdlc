@@ -22,6 +22,8 @@ Gates protect decisions, but the team also needs to see friction around them. Us
 |---|---|
 | Rework with no revision | Re-approval of unchanged content after rework needs `--note`. |
 | Rework loops | After `rework.max_cycles`, `next` asks a person to take over or review scope. |
+| Verify and review loops | At a `loops:` budget, `next` hands the step to a person; `discipline.loop_budget`. |
+| Repeated runs and rounds | `quality.repeat_runs` and `quality.review_rounds` warn at three; `loops.*` tunes them. |
 | Approval trace | `sdlc approve` proposes an `SDLC-Approval` commit trailer; `approvals verify` finds it. |
 | Evidence limits | `verification.md` names "Not run / limits", untouched planned files and attachments. |
 | Policy waiver | `auto_waive` matches kind or track for intent, spec or plan. |

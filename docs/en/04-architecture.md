@@ -76,7 +76,7 @@ These files hold project configuration, change records and generated state.
 | File | Owner | Contents |
 |---|---|---|
 | `openspec/config.yaml` | OpenSpec | default schema, `context`, `rules`; the harness respects them and passes them into the instructions |
-| `openspec/sdlc.yaml` | harness | gates (with `min_approvals`, `auto_waive`), `rework.reasons` and `max_cycles`, roles, verification commands, review policy, release commands, enforcement, `questions`, `design` (debate lens), `health` thresholds, `cli`, `tools` (claude, opencode, cursor, codex, qwen, gigacode), `issues`, `context.sources`, `mcp`, `events`, `stages`, `board.market`, `team.mode`, `plugins` and `plugin_policies` |
+| `openspec/sdlc.yaml` | harness | gates (with `min_approvals`, `auto_waive`), `rework.reasons` and `max_cycles`, roles, verification commands, review policy, release commands, enforcement, `questions`, `design` (debate lens), `health` thresholds, `cli`, `tools` (claude, opencode, cursor, codex, qwen, gigacode), `issues`, `context.sources`, `mcp`, `events`, `stages`, `board.market`, `team.mode`, `plugins`, `plugin_policies` and `loops` (budgets) |
 | `openspec/explorations/<slug>.md` | agent + people | optional research and pressure test before intent; a change cites it with `--source-type exploration --source-ref openspec/explorations/<slug>.md` |
 | `openspec/deferred-work.md` | team | registry of deferred decisions and findings (`D<n>`) |
 | `openspec/roles.yaml` | people (maintainers) | optional: people (emails, SSH signing keys, chat handles per channel), roles, separation rules, signing mode; agents cannot edit it |
@@ -162,6 +162,22 @@ Mechanics:
   `fingerprint_unavailable` (`src/core/verify-reason.ts`). The rule holds when every required check and required MCP
   check passed, the run was not partial and at least one check ran. JSON, the stored record, the text, the verify
   gate, the stop-hook detail and the next hint then name the fingerprint instead of asking to fix the code.
+- **Verify run records** (`src/core/verify-runs.ts`). Every `sdlc verify` run appends `verify.started` before its
+  first check and `verify.passed` or `verify.failed` after its last, both with the same `run.id`. The start goes to
+  the project log only, not to the change history in `.sdlc.yaml` and not to the event outbox. Receivers and the
+  run count of `sdlc audit` still see one event per run. The finishing entry's `run` holds the start and end time,
+  `duration_ms`, the fingerprint, the commit, `trigger`, `partial` and, per check, the name, duration, exit code and
+  timeout flag. It never holds command text or output. `trigger` is `first`, `repeat` (same fingerprint as the
+  previous finished run), `after_review`, `after_rework` or `changed`. A start without a finish counts as an
+  unfinished run. Without `--change`, a run on branch `change/<id>` belongs to the active change `<id>`. The
+  `ci-green` MCP check also keeps the provider's own run time as `provider_ms` when the answer gives it.
+- **Review round records** (`src/core/review-rounds.ts`). `sdlc review check` appends `review.round` when it sees a
+  new pair of source fingerprint and review.md digest for the change. The entry's `round` holds the number `n`, the
+  fingerprint, the digest (sha256 of review.md with line endings normalized) and the counts `total`, `open`,
+  `blocking` and `open_by_severity`. Severity keys are only `important`, `nit`, `pre-existing` and the
+  `review.block_on` values; any other word counts under `other`, so no text of review.md reaches the log. The entry
+  is written after the check's verdict; a failed write leaves the output and the exit code as they are. `review.*`
+  is not in the default event patterns, so a receiver gets rounds only when it asks for them.
 - **Check runtime and containment.** Windows requires PowerShell with `Add-Type` and a kill-on-close Job Object.
   Its absolute executable path and private startup readiness protocol separate the 30000 ms initialization
   ceiling from the real command deadline. Missing PowerShell, execution policy, Constrained Language and
@@ -194,6 +210,14 @@ Mechanics:
   (`src/core/auto-waive.ts`; not for verify, review, release, nor for a kind chosen in an agent session, recorded as
   `kind_by_agent`); the rework record counts its `cycle`, and at `rework.max_cycles` the next action becomes a person's
   `review-scope` (`src/core/rework-limit.ts`); approvals propose a commit with an `SDLC-Approval` trailer.
+- **Loop budget:** the optional top-level `loops:` section of `sdlc.yaml` sets `review_rounds` and `verify_runs` per
+  change (`src/core/loop-budget.ts`). The module reads the section itself, so `parseConfig` and the hook never see it.
+  - A bad value gives no budget of that kind; `sdlc doctor` reports it and `sdlc status` warns.
+  - When a budget is reached and the step would be the agent's, the step becomes a person's `loop-budget`.
+  - It wraps the whole advice chain, so an agent step made by the judge, debate or draft-intent rules is caught too.
+  - `verify_minutes` and `comparable_min` feed a split proposal (`src/core/split-estimate.ts`): an estimate from
+    archived packages shown as a warning in status, next and the plan approval; it never changes the next step.
+  - A person's own step stays and gets a warning; `sdlc health` reports `discipline.loop_budget`.
 - **Answers:** `sdlc answer` (human-only, in HUMAN_COMMANDS) writes the answer into the artifact and an `answers` entry
   into `.sdlc.yaml` (artifact, exact question text, answer, who, when, `seq`); `sdlc approve intent|spec` refuses with
   `open_questions` while a question of intent.md, proposal.md or design.md has no matching entry (`src/core/answers.ts`,
@@ -382,6 +406,13 @@ OpenCode has no Stop hook, so `verify_before_stop` does not apply there.
   `.codex/config.toml`, `.qwen/settings.json` and `.gigacode/settings.json`, for the configured tools. Entries written
   by sdlc are tracked in the manifest. Secrets are only `${VAR}` references, checked with the patterns of the
   `secret-in-edit` rule.
+- **When a wait is recorded** (`src/core/awaiting.ts`, `src/core/policy.ts` `stopCheck`): the session-start and Stop
+  hooks record `gate.<g>.awaiting` for every active change whose next step is a person approving `<g>`, unless the
+  log holds that wait already. The entry carries `approvals`, the approvals the gate holds for the digest; a gate
+  that still waits after an approval gets a new entry with the higher number. The hooks pass `hook: true`, so the
+  recording writes the log only and never a policy waiver into `.sdlc.yaml`. A failed write leaves the hook's
+  answer unchanged. `sdlc audit` reports each approver's wait in `metrics.approverWaits`
+  (`src/core/approver-waits.ts`).
 - **Events and the outbox** (`src/mcp/events.ts`, `src/mcp/outbox.ts`): an event is queued in `.git/sdlc/outbox/` and
   delivered to the receivers whose `on` matches; what fails waits for the next command or `sdlc events flush`. a wait
   (`gate.<g>.awaiting`, `gate.<g>.overdue`) gets its id from `project.name` (when set), the change, the gate, the event

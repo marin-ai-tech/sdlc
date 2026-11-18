@@ -7,6 +7,7 @@ import type { McpCheckOutcome, VerificationRun } from '../core/verify.js';
 import { fingerprintFailureReason } from '../core/verify-reason.js';
 import { McpTimeout, parseAnswer, withServer, type ToolAnswer } from './client.js';
 import { expandedSecrets, type McpCheck, type McpServer } from './registry.js';
+import { providerDurationMs } from './ci-duration.js';
 
 /**
  * `verify.mcp` (B12): `sdlc verify` calls each check's tool itself, with the SDK client, so the answer comes from
@@ -218,7 +219,10 @@ async function runCheck(check: McpCheck, servers: McpServer[], vars: CheckVars):
   const secrets = server ? expandedSecrets(server, process.env) : [];
   const base = { name: check.name, server: check.server, tool: check.tool, required: check.required, ok: verdict.ok };
   const reason = verdict.reason === undefined ? {} : { reason: maskText(verdict.reason, secrets) };
-  return { ...base, ...reason, duration_ms: Date.now() - started, result: maskSecrets(verdict.result, secrets) };
+  const result = maskSecrets(verdict.result, secrets);
+  const provider_ms = providerDurationMs(check.tool, result);
+  return { ...base, ...reason, duration_ms: Date.now() - started, result,
+    ...(provider_ms === undefined ? {} : { provider_ms }) };
 }
 
 /** The checks `--only` selects (all without it), in the file's order. */

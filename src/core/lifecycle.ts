@@ -25,6 +25,7 @@ import { nameApprovers, type NamedApprover } from './named-approvers.js';
 import { effectiveGates, markReworks, revisedGates } from './rework.js';
 import { markAutoWaived, withAutoWaive } from './auto-waive.js';
 import { reworkLimitNext } from './rework-limit.js';
+import { loopBudgetNext as budgetNext } from './loop-budget.js';
 import { questionsNext } from './questions-next.js';
 import { draftIntentNext } from './draft-intent-next.js';
 import { debateNext } from './debate-next.js';
@@ -101,7 +102,7 @@ export interface NextAction {
     /** A person took the change over (`sdlc takeover`); it is theirs until `sdlc release-control`. */
     | 'taken-over'
     /** A gate reached `rework.max_cycles` (B61): a person takes the change over or reviews its scope. */
-    | 'review-scope'
+    | 'review-scope' | 'loop-budget'
     /** Open questions of the intent or spec gate wait for a person's answer (B62): `sdlc answer`. */
     | 'answer-questions'
     | 'none';
@@ -286,9 +287,9 @@ export function evaluateChange(
   const held = ref.archived ? undefined : takeoverNext(state, ref.id);
   const limit = held ? undefined : reworkLimitNext(root, config, view, state, options.skipPeople);
   const advice = nextAction(view, config, mapping, state);
-  const next = held ?? limit ?? questionsNext(view, config, state,
+  const next = held ?? limit ?? budgetNext(root, config, view, state, questionsNext(view, config, state,
     judgeNext(view, config, state,
-      debateNext(view, config, draftIntentNext(view, verifyBehaviourNext(view, advice)))));
+      debateNext(view, config, draftIntentNext(view, verifyBehaviourNext(view, advice))))), options.skipPeople);
   view.next = configureNext(held || options.skipPeople ? next : nameApprovers(root, config, view, state, next), config);
   // A rejection at the current stage is already in the hint itself; only the others are added.
   const inHint = (note: string) => view.next.message.includes(note.slice(note.indexOf(': ') + 2));

@@ -145,7 +145,8 @@ Read these limits when interpreting the agent marker and the debate record.
 
 ## 14.4. Trace gaps without task trailers
 
-`sdlc trace` reports missing task links and mismatched review coverage.
+`sdlc trace` reports missing task links and mismatched review coverage. It says what links to what, not when:
+`sdlc timeline` shows the same change over time.
 
 When a change has tasks but no commit names any of them with an `SDLC-Task` trailer, `sdlc trace` reports one
 `tasks-without-trailers` gap with the task count. Once a commit names a task, unnamed tasks are listed individually.

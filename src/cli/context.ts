@@ -32,7 +32,7 @@ export function recordChangeEvent(
   event: string,
   by?: string,
   detail?: string,
-  fields: Pick<LogInput, 'digest'> = {},
+  fields: Pick<LogInput, 'digest' | 'run'> = {},
 ): void {
   appendHistory(state, event, by, detail, ctx.stamp);
   writeChangeState(ref.dir, state, ctx.stamp);

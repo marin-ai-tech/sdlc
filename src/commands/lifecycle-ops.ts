@@ -16,6 +16,8 @@ import { openspecFailure, runOpenSpecJson } from '../core/openspec.js';
 import { isFile, readText, writeTextAtomic } from '../core/fs-utils.js';
 import { stampText, stampTextLocalized } from '../core/license.js';
 import { appendLog, readLog } from '../core/log.js';
+import { verifyRepeats } from '../core/loop-budget.js';
+import { summarizeVerifyRuns } from '../core/verify-runs.js';
 import { filterLog } from '../core/log-filter.js';
 import { changeMarkdown, tryStampArtifacts } from '../core/stamp.js';
 import { presentStamping } from './gate-approval-output.js';
@@ -247,7 +249,7 @@ function printChangeCommits(audit: ChangeAudit, change: string, events: ReturnTy
 }
 
 /** Lead times, verify runs, flow and participation of one change. */
-function printChangeMetrics(metrics: ReturnType<typeof changeMetrics>): void {
+function printChangeMetrics(metrics: ReturnType<typeof changeMetrics>, entries: ReturnType<typeof readLog>): void {
   const lt = metrics.leadTimeHours;
   line(c.bold(`  ${t('audit.leadTimes')}`));
   line(`  ${t('audit.leadLine', {
@@ -261,6 +263,9 @@ function printChangeMetrics(metrics: ReturnType<typeof changeMetrics>): void {
     runs: metrics.verifyRuns, first, rejections: metrics.rejections, waivers: metrics.waivers,
     policy: metrics.policyWaivers,
   })}`);
+  const repeats = verifyRepeats(summarizeVerifyRuns(entries));
+  const roundsText = t('audit.reviewRounds', { count: metrics.reviewRounds });
+  line(`  ${roundsText}; ${t('audit.verifyRepeats', { count: repeats })}`);
   printChangeFlow(metrics);
   printChangeParticipation(metrics.participation);
 }
@@ -270,7 +275,8 @@ function auditOneChange(ctx: ProjectContext, id: string, since: string | undefin
   const ref = resolveChange(ctx.paths, id, { allowArchived: true });
   const audit = auditChange(ctx.paths, ref, since);
   const state = audit.state;
-  const metrics = changeMetrics(state, changeLog(readLog(ctx.root), ref.id), ctx.config);
+  const entries = changeLog(readLog(ctx.root), ref.id);
+  const metrics = changeMetrics(state, entries, ctx.config);
   const events = agentEvents(ctx.root, since, ref.id);
   if (json) {
     printJson({
@@ -290,7 +296,7 @@ function auditOneChange(ctx: ProjectContext, id: string, since: string | undefin
     line(`  ${h.at}  ${h.event.padEnd(26)} ${h.by ?? ''}${h.detail ? c.dim(` - ${h.detail}`) : ''}${stampSuffix(h)}`);
   }
   printChangeCommits(audit, ref.id, events);
-  printChangeMetrics(metrics);
+  printChangeMetrics(metrics, entries);
 }
 
 /** The per-change rows of the project audit and the sdlc versions and licenses their histories recorded. */

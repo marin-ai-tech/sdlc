@@ -11,6 +11,8 @@ import { appendLogRecords, logFile, withLogWriter } from './log-write.js';
 import type { Json } from '../plugins/api.js';
 import { deferObservation, isPreparation } from '../plugins/evaluation.js';
 import { drainLocalLog } from './log-recovery.js';
+import type { VerifyRunFacts } from './verify-runs.js';
+import type { ReviewRoundFacts } from './review-rounds.js';
 
 /**
  * Append-only project log: one JSON object per line in
@@ -30,12 +32,15 @@ export interface LogEntry {
   change?: string;
   by?: string;
   detail?: string;
+  run?: VerifyRunFacts;
+  round?: ReviewRoundFacts;
   /** The version a gate decision was about. */
   digest?: string;
   /** Agent integration that triggered the entry (hook decisions). */
   agent?: string;
   /** Person ids from roles.yaml a waiting gate waits for (`gate.<g>.awaiting`, `gate.<g>.overdue`; B54). */
   waitingFor?: string[];
+  approvals?: number;
   /** Counts for `summary.daily` only (B99); queued onto EventBody.summary. */
   summary?: EventSummary;
   /** Task number of a `task.exported` entry (B116). */
@@ -67,9 +72,12 @@ function logEntry(config: Pick<SdlcConfig, 'license'>, input: LogInput, stamp: H
     ...(input.change ? { change: input.change } : {}),
     ...(input.by ? { by: input.by } : {}),
     ...(input.detail ? { detail: input.detail } : {}),
+    ...(input.run ? { run: input.run } : {}),
+    ...(input.round ? { round: input.round } : {}),
     ...(input.digest ? { digest: input.digest } : {}),
     ...(agent ? { agent } : {}),
     ...(input.waitingFor ? { waitingFor: input.waitingFor } : {}),
+    ...(input.approvals !== undefined ? { approvals: input.approvals } : {}),
     ...(input.summary ? { summary: input.summary } : {}),
     ...(input.task ? { task: input.task } : {}),
     ...(input.executor ? { executor: input.executor } : {}),
@@ -118,10 +126,11 @@ export function appendLog(
   root: string,
   config: Pick<SdlcConfig, 'license' | 'log'> & QueueConfig,
   input: LogInput,
-  stamp: HarnessStamp = harnessStamp(config)
+  stamp: HarnessStamp = harnessStamp(config),
+  options: { outbox?: boolean; strict?: boolean } = {},
 ): void {
   if (isPreparation(root) || !config.log.enabled) return;
-  if (deferObservation(root, () => appendLog(root, config, structuredClone(input), stamp))) return;
+  if (deferObservation(root, () => appendLog(root, config, structuredClone(input), stamp, options))) return;
   const file = path.join(root, LOG_PATH);
   try {
     const entry = logEntry(config, input, stamp);
@@ -133,8 +142,9 @@ export function appendLog(
       drainHookLog(root, file);
       appendLogRecords(file, [entry]);
     });
-    queueEvent(root, config, entry);
+    if (options.outbox !== false) queueEvent(root, config, entry);
   } catch (error) {
+    if (options.strict) throw error;
     logDiagnostic(error);
   }
 }

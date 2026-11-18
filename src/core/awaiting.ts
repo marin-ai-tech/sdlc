@@ -1,4 +1,5 @@
 import { recordAutoWaived } from './auto-waive.js';
+import { readChangeState } from './change-state.js';
 import type { HarnessStamp } from './license.js';
 import type { LifecycleView } from './lifecycle.js';
 import { appendLocalLog, readLog, type LogEntry } from './log.js';
@@ -7,7 +8,8 @@ import { recordOverdue, type WaitConfig } from './overdue.js';
 /**
  * Waits for a person (B6): whenever the CLI computes a change's next action and an approval gate waits for a
  * person, the project log gets `gate.<g>.awaiting` with the digest that person would sign in the detail - once
- * per change, gate and digest, so a changed artifact (a new digest) starts a new wait. The audit measures how
+ * per change, gate, digest and approval count. A changed artifact or another needed approval starts a new wait.
+ * The audit measures how
  * long each gate waited from the first such entry to the approval of that digest. The entry names the people who
  * may take the gate now (`waitingFor`, the `next.people` ids; B54), and a wait past `gates.<g>.overdue_hours` gets
  * one `gate.<g>.overdue` entry (B55, src/core/overdue.ts).
@@ -21,6 +23,7 @@ export interface AwaitedGate {
   change: string;
   gate: string;
   digest: string;
+  approvals: number;
   /** Person ids of `next.people`, when the view names them (roles.yaml). */
   people?: string[];
 }
@@ -32,13 +35,16 @@ export function awaitedGate(view: LifecycleView): AwaitedGate | undefined {
   if (next.actor !== 'human' || next.action !== 'approve-gate' || !next.gate) return undefined;
   const digest = view.gates.find((g) => g.id === next.gate)?.digest;
   if (!digest) return undefined;
+  const state = readChangeState(view.dir);
+  const approvals = state.gates[next.gate]?.approvals?.filter((approval) => approval.digest === digest).length ?? 0;
   const people = next.people?.map((person) => person.id);
-  return { change: view.change, gate: next.gate, digest, ...(people ? { people } : {}) };
+  return { change: view.change, gate: next.gate, digest, approvals, ...(people ? { people } : {}) };
 }
 
 function alreadyLogged(entries: LogEntry[], waiting: AwaitedGate): boolean {
   const event = `gate.${waiting.gate}.awaiting`;
-  return entries.some((e) => e.event === event && e.change === waiting.change && e.detail === waiting.digest);
+  return entries.some((e) => e.event === event && e.change === waiting.change && e.detail === waiting.digest
+    && (e.approvals ?? 0) === waiting.approvals);
 }
 
 function logAwaiting(
@@ -49,14 +55,16 @@ function logAwaiting(
   stamp?: HarnessStamp,
 ): void {
   const people = waiting.people ? { waitingFor: waiting.people } : {};
-  const input = { event: `gate.${waiting.gate}.awaiting`, change: waiting.change, detail: waiting.digest, ...people };
+  const approvals = waiting.approvals > 0 ? { approvals: waiting.approvals } : {};
+  const input = { event: `gate.${waiting.gate}.awaiting`, change: waiting.change,
+    detail: waiting.digest, ...approvals, ...people };
   appendLocalLog(root, config, input, stamp);
   entries.push({ ts: new Date().toISOString(), sdlc: '', license: '', ...input });
 }
 
 /**
  * Appends `gate.<g>.awaiting` for every view whose next step is a person approving a gate, unless the log already
- * has it for that change, gate and digest; a wait logged before is checked against its overdue threshold. Never
+ * has it for that change, gate, digest and approval count; a wait logged before is checked for overdue. Never
  * throws: the log is a record, not a gate.
  */
 export function recordAwaiting(
@@ -64,10 +72,12 @@ export function recordAwaiting(
   config: WaitConfig,
   views: LifecycleView | LifecycleView[],
   stamp?: HarnessStamp,
+  options: { hook?: boolean } = {},
 ): void {
   const list = Array.isArray(views) ? views : [views];
-  // The same call sites record the gates an auto_waive policy waived (B59), on the change too (B78).
-  recordAutoWaived(root, config, list, stamp);
+  // The same call sites record the gates an auto_waive policy waived (B59), on the change too (B78), unless a hook
+  // calls: a hook never makes a policy waiver permanent.
+  recordAutoWaived(root, config, list, stamp, options);
   if (!config.log.enabled) return;
   try {
     const waiting = list.map(awaitedGate);

@@ -4,6 +4,9 @@ import { AUTO_WAIVED_EVENT } from './auto-waive.js';
 import type { LogEntry } from './log.js';
 import { defaultConfig, type SdlcConfig } from './config.js';
 import { participationOf, sumParticipation, type Participation, type ParticipationTotals } from './participation.js';
+import { summarizeVerifyRuns, type VerifyLogSummary } from './verify-runs.js';
+import { approverWaitsOf, type ApproverWaits } from './approver-waits.js';
+import { countReviewRounds } from './review-rounds.js';
 
 interface Milestones {
   created?: string;
@@ -27,6 +30,8 @@ export interface ChangeMetrics {
     createdToArchived?: number;
   };
   verifyRuns: number;
+  reviewRounds: number;
+  verifyLog: VerifyLogSummary;
   verifyFirstPass?: boolean;
   rejections: number;
   waivers: number;
@@ -34,6 +39,7 @@ export interface ChangeMetrics {
   policyWaivers: number;
   /** Per approval gate: seconds from the first `awaiting` with the approved digest to the latest approval. */
   waits: Record<string, { seconds: number }>;
+  approverWaits: ApproverWaits;
   /** Every rework (`gate.<g>.rework`) with its reason category, oldest first. */
   reworks: Array<{ gate: string; reason: string; at: string }>;
   /** How many times each gate was approved. */
@@ -133,11 +139,14 @@ export function changeMetrics(state: ChangeState, log: LogEntry[] = [], config?:
       createdToArchived: hours(m.created, m.archived),
     },
     verifyRuns: verifyRuns.length,
+    reviewRounds: countReviewRounds(log),
+    verifyLog: summarizeVerifyRuns(log),
     verifyFirstPass: firstRun === undefined ? undefined : firstRun === 'verify.passed',
     rejections: state.history.filter((h) => /^gate\.\w+\.rejected$/.test(h.event)).length,
     waivers: state.history.filter((h) => /^gate\.\w+\.waived$/.test(h.event)).length,
     policyWaivers: log.filter((e) => AUTO_WAIVED_EVENT.test(e.event)).length,
     waits,
+    approverWaits: approverWaitsOf(state, log),
     reworks: reworksOf(state.history),
     approvals: approvalsOf(state.history),
     verifyAttemptsToPass: attemptsToPass(verifyRuns),

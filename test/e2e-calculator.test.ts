@@ -420,6 +420,7 @@ describe('demo: a team builds a calculator with sdlc (every command)', { timeout
     step('approvals-verify', 'release', 'bob', ['approvals', 'verify'], "Signed approvals check (warn mode): Alice and Carol sign; Bob's plan approval is unsigned, reported but not blocking.");
     step('archive', 'release', 'alice', ['archive', 'basic-arithmetic', '--yes'], 'The delta merges into the living spec; B1 closes.');
     step('trace', 'release', 'bob', ['trace', 'basic-arithmetic'], 'From intent to evidence: requirements, scenarios, tasks, commits, findings, and the gaps.');
+    step('timeline', 'release', 'bob', ['timeline', 'basic-arithmetic'], 'The same change over time: stages, waits for people, verify runs and review rounds.');
     commit('alice', 'Archive basic arithmetic');
     git(root, ['checkout', '-q', 'main']);
     git(root, ['merge', '-q', '--no-ff', '--no-edit', 'basic-arithmetic']);

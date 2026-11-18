@@ -468,6 +468,13 @@ deferred links. The review gate uses that result. `review.require_lens_coverage:
 `sdlc init` writes it for new projects. In a config without the key, missing coverage only warns. An accepted extension pack adds its lenses as `<pack>-<id>`, and their
 coverage is required in the same way ([Extension packs](#extension-packs)).
 
+Each check on a new state of the code or of review.md is a review round. The check records it in the project log as
+`review.round`, with the round number and the finding counts, never the findings' text. Running the check again on
+the same code and review.md adds nothing. `sdlc audit --change <id>` prints the count ("review rounds N"; JSON
+`metrics.reviewRounds`), and the change page of `sdlc report` shows it under "Review rounds". The count is a lower
+bound: a round without a check is not counted, and an edit of review.md between checks adds a round. In a worktree
+on branch `change/<id>`, `sdlc review check` without `--change` checks that change.
+
 ### Defer a finding
 
 Record postponed work with `sdlc defer add <title> --why <text> [--change <id>] [--finding <F-id>] [--revisit <text>]`,
@@ -498,6 +505,52 @@ It refuses files with uncommitted edits and does not undo external actions.
 If nothing changed since the earlier approval, approving again needs `--note` to explain why.
 `--preview` shows `unchangedSinceRework`. After `rework.max_cycles` reworks of one gate (default 3),
 `sdlc next` asks a person to take over or review the scope.
+
+A loop can also run without any rework: verify, review, fix, verify again. The owner can set a budget for it in
+`sdlc.yaml`, through `sdlc config propose`:
+
+```yaml
+loops:
+  review_rounds: 3   # recorded review rounds of one change
+  verify_runs: 10    # full sdlc verify runs of one change, finished or not; --only runs do not count
+```
+
+When a budget is reached and the next step would be the agent's, `sdlc next` and `sdlc status` show a person's step
+(`action: loop-budget`) instead. It names the counts, the runs repeated on unchanged code and the people of the open
+gate. It offers three choices:
+
+- split the change: `sdlc backlog add`, then `sdlc takeover --change <id>`;
+- accept the known limits: `sdlc defer add` for what stays open, then the gate's approval;
+- extend the budget: the `sdlc config propose` command the step prints, applied by a person.
+
+A person's own step, such as an approval, stays first; `sdlc next` adds a warning instead. The step is a signal like
+the rework limit: it approves, refuses and waives nothing. A bad value in `loops:` is ignored, `sdlc doctor` reports
+it, and the hook keeps working. `sdlc audit --change <id>` prints the verify repeats next to the review rounds.
+
+Without any budget, `sdlc health` still warns about loops inside its window:
+
+- `quality.repeat_runs`: one source verified `loops.repeat_runs` times or more (default 3), with passed and failed;
+- `quality.review_rounds`: `loops.round_warn` review rounds or more on one change (default 3).
+
+Both thresholds are whole numbers of at least 2 and change through `sdlc config propose`.
+
+The cost of a large change can be weighed before its build starts. The owner sets a budget of full-verification
+minutes per change:
+
+```yaml
+loops:
+  verify_minutes: 300   # full sdlc verify minutes one change may cost
+  comparable_min: 3     # archived changes an estimate needs (default 3)
+```
+
+A change counts as a package when it covers two or more backlog items: its own item plus the item ids (`B12`) its
+intent, proposal, design, plan, tasks or specs name. Before its first finished verify run, sdlc looks at archived
+packages with recorded full runs and multiplies two medians: minutes per run and runs per change. When the estimate
+is above the budget, `sdlc status`, `sdlc next` and `sdlc approve plan` show a split proposal. It names the inputs
+and how many archived changes they come from ("one data point" for one). When all the items share an epic, it gives
+the command a person can run, `sdlc backlog epic edit <E> --granularity feature`. With fewer archived packages than
+`comparable_min`, the line says how many there are and gives no number. sdlc never splits, reorders or drops items
+itself. Raising or removing `verify_minutes`, or raising `comparable_min`, is a weakening.
 
 After a rework, `sdlc next` first asks the agent to revise. Once the agent has changed the gate's artifacts,
 the gate waits for a person again: `sdlc next` names them, `sdlc next --me` lists it, and the
@@ -639,6 +692,26 @@ hint then say that the fingerprint could not be computed, instead of asking you 
 project is in a git repository and that git works, then run `sdlc verify` again. A failing check or a partial run
 (`--only`) keeps the usual message and has no reason.
 
+Every run leaves two entries in the project log with the same run id. `verify.started` comes before the first check.
+`verify.passed` or `verify.failed` comes after the last and records:
+
+- the duration, the source fingerprint and the commit;
+- why the run happened: `first`, `repeat`, `after_review`, `after_rework` or `changed`;
+- how long each check took and its exit code.
+
+Command text and check output never reach the log. A run that was killed keeps its start entry and counts as
+unfinished. Event receivers get only the finishing entry, as before. In a worktree on branch `change/<id>`,
+`sdlc verify` without `--change` records the run on that change.
+
+`sdlc audit --change <id> --json` sums the runs in `metrics.verifyLog`, and the change page of `sdlc report` shows
+the same summary under "Verify runs":
+
+- full runs that passed and failed, unfinished runs and partial (`--only`) runs;
+- minutes;
+- the same per source fingerprint, with the longest streak of passed runs.
+
+Entries written before this version count as finished runs of an unknown source.
+
 An approval record that sdlc cannot parse never counts, but it stays in `.sdlc.yaml` unchanged, byte for byte, through
 unrelated writes, drop and archive. A decision on that gate is refused with `malformed_gate` before anything is
 written. `sdlc doctor` names each one with its change, gate and position, so a person can restore it from trusted
@@ -742,7 +815,15 @@ approval, a verification, an archive ([10.10](10-integrations.md#1010-several-pr
 
 - **One wait, one id.** `gate.<g>.awaiting` and `gate.<g>.overdue` get an id from `project.name` (when set), the
   change, the gate, the event and the digest the gate waits on, not from the time. Every clone of the project and CI
-  send the same id for the same wait, so a receiver keeps one. Other events keep an id of their own.
+  send the same id for the same wait, so a receiver keeps one. Other events keep an id of their own. A gate that
+  needs several approvals starts a new wait after each one: the entry carries `approvals`, the number the gate
+  already holds for that digest, and from the second wait on the id includes it, so the next approver's wait is
+  never dropped as a repeat.
+- **A wait starts when the work is ready.** The Stop hook records `gate.<g>.awaiting` when the agent's turn ends,
+  and session start records it too, so the wait no longer starts at the next sdlc command. Recording never changes
+  the hook's answer, with or without `verify_before_stop`. A hook records a policy waiver in the project log only,
+  never in the change's `.sdlc.yaml`.
+  OpenCode has no Stop hook: there a wait starts at session start or at the next sdlc command.
 - **Chat handles.** A receiver with `chat: <channel>`, for example `chat: telegram`, also gets `waitingForChat`: the
   handles on that channel of the people in `waitingFor`, from `people.<id>.chat` in `roles.yaml`
   ([Roles and separation of duties](#roles-and-separation-of-duties)). With `message`, its text mentions them. A
@@ -809,6 +890,21 @@ It names gaps:
 
 A commit belongs to a task through `SDLC-Change: <id>` and `SDLC-Task: <n.m>` trailers.
 `/sdlc:build` asks the agent to add them.
+
+### See where a change's time went
+
+`sdlc timeline <change> [--json]` shows an active or archived change over time. `trace` links work to evidence;
+`timeline` shows when each part happened. It reads what sdlc already records and writes nothing:
+
+- stages between the last approvals of the gates, for example `build-verify-review` from plan to review approval;
+- waits for a person, from the moment a gate was ready to its approval, or open;
+- verify runs with their result, short source fingerprint, reason and length; a killed run stays open;
+- review rounds.
+
+Spans that overlap stay overlapping. The summary gives the change's wall time and the time covered by runs and by
+waits, each counted once, never a sum and never "idle" time. The JSON gives a trace id and span ids derived from
+the change id, so they stay the same on every run. Changes recorded before verify runs, rounds and waits were logged
+show only their stages. Agent sessions are not in the timeline yet.
 
 ### Handing tasks to executors
 
@@ -1080,6 +1176,7 @@ context:
 questions: { required: true } # a person answers open questions before intent/spec approval (sdlc answer)
 design: { debate: false }     # the debate lens; debate_sides: [simplicity and speed, robustness and safety]
 rework: { max_cycles: 3 }     # also reasons: the categories of sdlc rework --reason (the defaults are in 5.3)
+loops: { review_rounds: 3 }   # budgets: review_rounds, verify_runs, verify_minutes; health: repeat_runs 3, round_warn 3
 team: { registry: team-roles } # the server of mcp.servers the roles and skills come from (chapter 12)
 packs:                        # from git or npm; pin a commit or an exact version for workflows and checks (12.5)
   - { name: corp, git: https://git.corp.example/sdlc-pack.git, ref: 0123456789abcdef0123456789abcdef01234567 }
@@ -1172,6 +1269,9 @@ Use `sdlc log --event hook.warned --json` to inspect warnings before switching e
 `--event` accepts `*` as any text, for example `hook.*` or `gate.*.approved`.
 `sdlc log --since <date>` filters by date; both filters work with `--change` and `--limit`.
 CLI log entries made in an agent session include an optional `agent` name alongside the person's git identity in `by`.
+`sdlc audit --change <id> --json` gives each approver's wait in `metrics.approverWaits`: per gate, a list of
+`{ approvals, seconds }`, from the wait recorded with that many approvals to the next approval. `metrics.waits` per
+gate stays as before. Waits recorded before this version count as `approvals: 0`.
 `sdlc audit --json` includes `agentEvents: { agent, total, byAgent }` counted from the log in the audited period;
 `agentCommits` remains the separate count of commits with an `SDLC-Agent` trailer.
 In JSON, `total` counts the filtered entries.
@@ -1260,6 +1360,7 @@ Use these tables to look up CLI commands and generated files.
 | `sdlc inbox list [--json]` / `inbox done <id>` | MCP check results from runs outside an agent session, for the agent |
 | `sdlc review suggest --change <id> [--json]` | propose a reviewer: roles, CODEOWNERS owners first, fewer open reviews, never an author |
 | `sdlc trace <change> [--json]` | from intent to evidence: requirements, scenarios, tasks, commits (trailers `SDLC-Change`, `SDLC-Task`), verification and review findings, with the gaps |
+| `sdlc timeline <change> [--json]` | the change over time: stages, waits for people, verify runs and review rounds; overlap is never summed |
 | `sdlc adopt [--apply] [--json]` | draft verify commands, protected paths and `roles.yaml` for an existing project; `--apply` writes them (human-only) |
 | `sdlc report [--format md\|json\|html] [--since] [--change] [--out]` / `sdlc dashboard [--since] [--change] [--out] [--watch [--serve <host:port>]]` | progress report and self-contained HTML dashboard (`--watch` rebuilds it when `openspec/` changes) |
 | `sdlc instructions <artifact> --change <id> --json` | artifact instructions (from OpenSpec for planning artifacts; from the harness for verification, review, release) |

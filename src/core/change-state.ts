@@ -116,11 +116,14 @@ export interface VerifyMcpRecord {
   ok: boolean;
   reason?: string;
   duration_ms: number;
+  provider_ms?: number;
 }
 
 export interface VerifyRecord extends Provenance {
   status: 'passed' | 'failed';
   at: string;
+  id?: string;
+  started_at?: string;
   commit?: string;
   fingerprint?: string;
   reason?: 'fingerprint_unavailable';

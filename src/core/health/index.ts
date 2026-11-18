@@ -6,6 +6,7 @@ import {
 } from './config-findings.js';
 import { loadHealthContext, type HealthContext, type HealthOptions } from './context.js';
 import { logGapsFinding } from './log-gaps.js';
+import { loopBudgetFinding, repeatRunsFinding, reviewRoundsFinding } from './loops.js';
 import {
   denialsFinding, forcedArchiveFinding, liteBehaviourFinding, restaleFinding, testLockFinding, waiversFinding,
 } from './discipline.js';
@@ -49,12 +50,15 @@ const COLLECTORS: CollectorEntry[] = [
   { id: 'quality.open_findings', run: openFindingsFinding, cost: 'normal' },
   { id: 'quality.plan_drift', run: planDriftFinding, cost: 'expensive' },
   { id: 'quality.trace', run: traceFinding, cost: 'expensive' },
+  { id: 'quality.repeat_runs', run: repeatRunsFinding, cost: 'normal' },
+  { id: 'quality.review_rounds', run: reviewRoundsFinding, cost: 'normal' },
   { id: 'discipline.waivers', run: waiversFinding, cost: 'normal' },
   { id: 'discipline.lite_behaviour', run: liteBehaviourFinding, cost: 'normal' },
   { id: 'discipline.forced_archive', run: forcedArchiveFinding, cost: 'normal' },
   { id: 'discipline.restale', run: restaleFinding, cost: 'normal' },
   { id: 'discipline.denials', run: denialsFinding, cost: 'normal' },
   { id: 'discipline.test_lock', run: testLockFinding, cost: 'normal' },
+  { id: 'discipline.loop_budget', run: loopBudgetFinding, cost: 'normal' },
   { id: 'discipline.log-gaps', run: logGapsFinding, cost: 'normal' },
   { id: 'config.no_verify', run: noVerifyFinding, cost: 'bad' },
   { id: 'config.enforcement', run: enforcementFinding, cost: 'bad' },
