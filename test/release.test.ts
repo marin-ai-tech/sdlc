@@ -140,7 +140,10 @@ describe('the release workflow', () => {
   it('a v* tag tests, packs and attaches the archive to the release as sdlc-<version>.tgz and sdlc.tgz', () => {
     expect(wf().on.push.tags).toEqual(['v*']);
     expect(wf().permissions.contents).toBe('write');
-    for (const re of [/npm ci/, /npm test/, /npm pack/, /sdlc\.tgz/, /gh release create/]) expect(script()).toMatch(re);
+    // B269: the release is created by scripts/release-publish.mjs (test/release-publish.test.ts) since E25.
+    for (const re of [/npm ci/, /npm test/, /npm pack/, /sdlc\.tgz/, /release-publish\.mjs release/]) {
+      expect(script()).toMatch(re);
+    }
   });
 
   it('B246.C1: the package.json is rewritten without prepare before the archive is packed', () => {
@@ -154,13 +157,15 @@ describe('the release workflow', () => {
 
   it('it updates the release branch with the built code through the same script', () => {
     expect(script()).toMatch(/node scripts\/release-branch\.mjs --in-place/);
-    expect(script()).toMatch(/git push (--force|-f) origin (HEAD:)?release/);
+    // B269: the push with retries lives in scripts/release-publish.mjs (test/release-publish.test.ts) since E25.
+    expect(script()).toMatch(/release-publish\.mjs branch/);
   });
 
   it('negative: a tag that does not match package.json stops the release before anything is published', () => {
     const text = fs.readFileSync(WORKFLOW, 'utf-8');
     expect(text).toMatch(/GITHUB_REF_NAME/);
-    expect(text.indexOf('GITHUB_REF_NAME')).toBeLessThan(text.indexOf('gh release create'));
+    expect(text.indexOf('release-publish.mjs release')).toBeGreaterThan(-1);
+    expect(text.indexOf('GITHUB_REF_NAME')).toBeLessThan(text.indexOf('release-publish.mjs release'));
     expect(text).toMatch(/exit 1/);
   });
 });

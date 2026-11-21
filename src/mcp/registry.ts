@@ -150,7 +150,7 @@ export function parseMcpServers(value: unknown, where: (key: string) => string):
   return Object.entries(raw).map(([name, item]) => parseServer(name, item, where(`mcp.servers.${name}`)));
 }
 
-function parseCheck(value: unknown, where: string, index: number): McpCheck {
+function parseCheck(value: unknown, where: string, name: string): McpCheck {
   const raw = mapping(value, where) ?? {};
   validatePattern(raw.expect, `${where}.expect`);
   validatePattern(raw.wait_while, `${where}.wait_while`);
@@ -161,7 +161,7 @@ function parseCheck(value: unknown, where: string, index: number): McpCheck {
     throw invalid('error.x_must_be_x', `${where}.wait_seconds`, { p2: 'an integer from 0 to 3600' });
   }
   return {
-    name: raw.name === undefined ? `mcp-${index + 1}` : text(raw.name, `${where}.name`),
+    name,
     server: text(raw.server, `${where}.server`),
     tool: text(raw.tool, `${where}.tool`),
     args: mapping(raw.args, `${where}.args`) ?? {},
@@ -173,10 +173,39 @@ function parseCheck(value: unknown, where: string, index: number): McpCheck {
 }
 
 /** `verify.mcp` (or `release.mcp`, B47, the same format): the checks the CLI calls; absent = none. */
-export function parseMcpChecks(value: unknown, where: (key: string) => string, key = 'verify.mcp'): McpCheck[] {
+export function parseMcpChecks(
+  value: unknown,
+  where: (key: string) => string,
+  key = 'verify.mcp',
+  commands: unknown = [],
+): McpCheck[] {
   if (value === undefined || value === null) return [];
   if (!Array.isArray(value)) throw invalid('error.x_must_be_a_list', where(key));
-  return value.map((item, index) => parseCheck(item, where(`${key}[${index}]`), index));
+  const commandNames = Array.isArray(commands) ? commands.flatMap((item) => {
+    if (item === null || typeof item !== 'object' || Array.isArray(item)) return [];
+    const name = (item as Raw).name;
+    return typeof name === 'string' ? [name] : [];
+  }) : [];
+  const explicit = value.flatMap((item, index) => {
+    if (item === null || typeof item !== 'object' || Array.isArray(item)) return [];
+    const name = (item as Raw).name;
+    return name === undefined ? [] : [text(name, `${where(`${key}[${index}]`)}.name`)];
+  });
+  const used = new Set([...commandNames, ...explicit]);
+  return value.map((item, index) => {
+    const raw = item as Raw | null;
+    const base = `mcp-${index + 1}`;
+    let name = raw?.name === undefined ? base : text(raw.name, `${where(`${key}[${index}]`)}.name`);
+    if (raw?.name === undefined) {
+      let suffix = 2;
+      while (used.has(name)) {
+        name = `${base}-${suffix}`;
+        suffix += 1;
+      }
+      used.add(name);
+    }
+    return parseCheck(item, where(`${key}[${index}]`), name);
+  });
 }
 
 /** The values a server is given through its configuration: `env` (stdio) or `headers` (http). */

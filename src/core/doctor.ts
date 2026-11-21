@@ -35,6 +35,7 @@ import { writerLockFindings } from './doctor-locks.js';
 import { toDiagnostic } from './errors.js';
 import { teamRulesFindings } from './doctor-rules.js';
 import { loopChecks } from './doctor-loops.js';
+import { verifyNameChecks } from './doctor-verify-names.js';
 
 /**
  * The checks of `sdlc doctor`, as a function `sdlc health` reuses (config.doctor). Same checks in the same order,
@@ -311,6 +312,7 @@ function projectConfigChecks(
   out.add('project log', 'ok', logMessage);
   out.list.push(...writerLockFindings(root, config.cli));
   out.list.push(...loopChecks(root));
+  out.list.push(...verifyNameChecks(root, config));
   mcpVariablesCheck(out, config, env);
   mcpAgentExposureCheck(out, config);
   rulesBlockCheck(out, root, config);

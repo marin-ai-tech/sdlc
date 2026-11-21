@@ -8,7 +8,7 @@ function refused(detail: string): never {
   throw new SdlcError('log_write', detail);
 }
 
-export function logFile(root: string, name: string): string {
+export function logDirectory(root: string): string {
   let dir = fs.realpathSync(root);
   for (const part of ['openspec', '.sdlc']) {
     dir = path.join(dir, part);
@@ -17,6 +17,11 @@ export function logFile(root: string, name: string): string {
     const stat = fs.lstatSync(dir);
     if (!stat.isDirectory() || stat.isSymbolicLink()) refused('Linked log storage is refused');
   }
+  return dir;
+}
+
+export function logFile(root: string, name: string): string {
+  const dir = logDirectory(root);
   if (!/^[a-zA-Z0-9.-]+$/.test(name)) refused('Invalid log filename');
   const file = path.join(dir, name);
   try {

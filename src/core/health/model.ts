@@ -28,6 +28,7 @@ export interface Finding {
 /** What a collector reports: the facts as catalog refs, rendered in a locale later. */
 export interface FindingDraft {
   id: string;
+  catalogKey?: string;
   area: HealthArea;
   level: HealthLevel;
   params?: FindingParams;
@@ -48,7 +49,7 @@ export function findingKey(id: string): string {
 
 /** The finding in a locale: English for JSON, the active locale for text. */
 export function renderFinding(draft: FindingDraft, locale: Locale): Finding {
-  const key = findingKey(draft.id);
+  const key = draft.catalogKey ?? findingKey(draft.id);
   const params = draft.params ?? {};
   const recommendation = draft.recommendation ?? { key: `${key}.recommendation`, params };
   return {

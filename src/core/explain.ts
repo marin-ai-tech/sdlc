@@ -319,12 +319,19 @@ function staleApprovals(gate: GateEvaluation): MessageRef[] {
   return [{ key: 'explain.fact.staleApprovals', params: { count: gate.staleApprovals.length, by } }];
 }
 
+/** A failed run whose remote gave no usable answer, or refused the tree, says nothing about the code. */
+const FAILED_FACTS: Record<string, string> = {
+  'gate.verifyRemoteUnavailable': 'explain.fact.verifyRemoteFailed',
+  'gate.verifyRemoteNoAnswer': 'explain.fact.verifyRemoteFailed',
+  'gate.verifyRemoteDirty': 'explain.fact.verifyRemoteDirty',
+};
+
 function verifyFacts(gate: GateEvaluation): MessageRef[] {
   if (gate.id !== 'verify') {
     return [];
   }
   if (gate.status === 'failed') {
-    return [{ key: 'explain.fact.verifyFailed' }];
+    return [{ key: FAILED_FACTS[gate.reasonKey ?? ''] ?? 'explain.fact.verifyFailed' }];
   }
   if (gate.status === 'stale') {
     return [{ key: 'explain.fact.verifyStale' }];

@@ -2,7 +2,7 @@ import type { SdlcConfig } from './config.js';
 import type { LogEntry } from './log.js';
 import type { VerificationRun } from './verify.js';
 
-export type VerifyTrigger = 'first' | 'repeat' | 'after_review' | 'after_rework' | 'changed';
+export type VerifyTrigger = 'first' | 'repeat' | 'after_review' | 'after_rework' | 'changed' | 'reuse';
 
 /** Log facts deliberately exclude commands, answers, output, and file paths. */
 export interface VerifyRunFacts {
@@ -13,6 +13,8 @@ export interface VerifyRunFacts {
   fingerprint?: string;
   commit?: string;
   trigger?: VerifyTrigger;
+  /** Set when the run is another change's passing run recorded instead of run (B183). */
+  reused_from?: { change: string; run_id: string };
   partial?: boolean;
   checks?: Array<{ name: string; duration_ms: number; exit_code: number | null; timed_out: boolean }>;
   mcp?: Array<{ name: string; ok: boolean; duration_ms: number; provider_ms?: number }>;
@@ -40,7 +42,9 @@ export interface VerifyLogSummary {
 
 export function verifyTrigger(entries: LogEntry[], startedAt: string, fingerprint?: string): VerifyTrigger {
   const earlier = entries.filter((entry) => entry.ts <= startedAt);
-  const finished = earlier.filter((entry) => /^verify\.(passed|failed)$/.test(entry.event));
+  // A reused record is no run (B183): the first real run after it is `first`, not a repeat.
+  const finished = earlier.filter((entry) => /^verify\.(passed|failed)$/.test(entry.event)
+    && entry.run?.trigger !== 'reuse');
   const previous = finished.sort((a, b) => b.ts.localeCompare(a.ts))[0];
   if (!previous) return 'first';
   if (fingerprint && previous.run?.fingerprint === fingerprint) return 'repeat';
@@ -97,6 +101,8 @@ export function summarizeVerifyRuns(entries: LogEntry[]): VerifyLogSummary {
   const finishedIds = new Set<string>();
   for (const entry of ordered) {
     if (!/^verify\.(passed|failed)$/.test(entry.event)) continue;
+    // A reused record is no run: no count, no minutes, no streak.
+    if (entry.run?.trigger === 'reuse') continue;
     const id = entry.run?.id;
     // The same finish twice (a re-applied or cherry-picked log line) is one run; old entries have no id.
     if (id && finishedIds.has(id)) continue;

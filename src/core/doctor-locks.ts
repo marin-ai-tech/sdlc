@@ -4,6 +4,8 @@ import type { DoctorCheck } from './doctor.js';
 import { inspectWriterCoordination, inspectWriterLock } from './writer-lock.js';
 import { storagePath } from '../plugins/activation.js';
 import { readStore } from '../plugins/store.js';
+import { spooledRecords, unreadableSpoolFiles } from './log-spool.js';
+import { t } from './i18n.js';
 
 function storageFindings(root: string): DoctorCheck[] | undefined {
   for (const relative of ['openspec', 'openspec/.sdlc']) {
@@ -67,12 +69,30 @@ function pluginFindings(root: string, cli: string): DoctorCheck[] {
   return checks;
 }
 
+function spoolFindings(root: string): DoctorCheck[] {
+  const checks: DoctorCheck[] = [];
+  try {
+    const count = spooledRecords(root).length;
+    if (count) checks.push({ check: 'log spool', status: 'warn', code: 'log_spool_pending',
+      message: t('doctor.logSpoolPending', { count }), fix: t('doctor.fix.logSpoolPending') });
+    for (const name of unreadableSpoolFiles(root)) {
+      checks.push({ check: 'log spool', status: 'error', code: 'log_spool_unreadable',
+        message: t('doctor.logSpoolUnreadable', { name }), fix: t('doctor.fix.logSpoolUnreadable') });
+    }
+  } catch {
+    checks.push({ check: 'log spool', status: 'error', code: 'log_spool_storage',
+      message: t('doctor.logSpoolStorage'), fix: t('doctor.fix.logSpoolUnreadable') });
+  }
+  return checks;
+}
+
 /** Observational only: no directories, locks, receipts or authority are written. */
 export function writerLockFindings(root: string, cli: string): DoctorCheck[] {
   const storage = storageFindings(root);
   if (storage) return storage;
   const base = path.join(root, 'openspec/.sdlc');
   const checks = ['board', 'log'].flatMap(name => finding(root, path.join(base, `${name}.lock`), name, cli));
+  checks.push(...spoolFindings(root));
   try { checks.push(...pluginFindings(root, cli)); }
   catch { checks.push({ check: 'plugin storage', status: 'warn', code: 'plugin_store',
     message: 'Plugin ownership or pending metadata cannot be safely inspected.',

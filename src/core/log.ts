@@ -8,6 +8,8 @@ import { agentEnvironment } from './agent-env.js';
 import { ensureLocalIgnore } from './local-ignore.js';
 import { parseLogEntry } from './log-record.js';
 import { appendLogRecords, logFile, withLogWriter } from './log-write.js';
+import { SdlcError } from './errors.js';
+import { drainLogSpool, spoolLogRecord, spooledRecords } from './log-spool.js';
 import type { Json } from '../plugins/api.js';
 import { deferObservation, isPreparation } from '../plugins/evaluation.js';
 import { drainLocalLog } from './log-recovery.js';
@@ -99,15 +101,25 @@ export function appendLocalLog(
 ): void {
   if (isPreparation(root) || !config.log.enabled) return;
   if (deferObservation(root, () => appendLocalLog(root, config, structuredClone(input), stamp))) return;
+  let entry: LogEntry | undefined;
+  let wrote = false;
   try {
-    const entry = logEntry(config, input, stamp);
+    entry = logEntry(config, input, stamp);
     withLogWriter(root, () => {
       const file = logFile(root, 'hook-log.jsonl');
       ensureLocalIgnore(root, ['hook-log.jsonl']);
       appendLogRecords(file, [entry]);
+      wrote = true;
     });
     queueEvent(root, config, entry);
   } catch (error) {
+    if (!wrote && entry && writerUnavailable(error, root)) {
+      try {
+        spoolLogRecord(root, entry);
+        queueEvent(root, config, entry);
+        return;
+      } catch (spoolError) { logDiagnostic(spoolError); return; }
+    }
     logDiagnostic(error);
   }
 }
@@ -122,6 +134,19 @@ function logDiagnostic(error: unknown): void {
   catch { /* Observation failures never alter a command or hook decision. */ }
 }
 
+function writerUnavailable(error: unknown, root: string): boolean {
+  if (error instanceof SdlcError && error.code === 'writer_locked') return true;
+  const failure = error as NodeJS.ErrnoException;
+  if (!['EPERM', 'EACCES', 'EBUSY'].includes(failure?.code ?? '')) return false;
+  if (typeof failure.path !== 'string') return false;
+  // The writer lock lives under the real path of the root (logDirectory), not under a short or linked spelling.
+  let real: string;
+  try { real = fs.realpathSync(root); }
+  catch { return false; }
+  const lock = path.join(real, 'openspec', '.sdlc', 'log.lock');
+  return failure.path.startsWith(`${lock}.writers${path.sep}`);
+}
+
 export function appendLog(
   root: string,
   config: Pick<SdlcConfig, 'license' | 'log'> & QueueConfig,
@@ -132,19 +157,32 @@ export function appendLog(
   if (isPreparation(root) || !config.log.enabled) return;
   if (deferObservation(root, () => appendLog(root, config, structuredClone(input), stamp, options))) return;
   const file = path.join(root, LOG_PATH);
+  let entry: LogEntry | undefined;
+  let wrote = false;
   try {
-    const entry = logEntry(config, input, stamp);
+    entry = logEntry(config, input, stamp);
     withLogWriter(root, () => {
       logFile(root, 'log.jsonl');
       ensureHookIgnore(root);
       const attributes = path.join(path.dirname(file), '.gitattributes');
       if (!isFile(attributes)) fs.writeFileSync(attributes, GITATTRIBUTES, 'utf-8');
-      drainHookLog(root, file);
+      try { drainHookLog(root, file); }
+      catch (error) { if (options.strict) throw error; logDiagnostic(error); }
+      try { drainLogSpool(root, file); }
+      catch (error) { if (options.strict) throw error; logDiagnostic(error); }
       appendLogRecords(file, [entry]);
+      wrote = true;
     });
     if (options.outbox !== false) queueEvent(root, config, entry);
   } catch (error) {
     if (options.strict) throw error;
+    if (!wrote && entry && writerUnavailable(error, root)) {
+      try {
+        spoolLogRecord(root, entry);
+        if (options.outbox !== false) queueEvent(root, config, entry);
+        return;
+      } catch (spoolError) { logDiagnostic(spoolError); return; }
+    }
     logDiagnostic(error);
   }
 }
@@ -153,7 +191,6 @@ export function appendLog(
 export function readLog(root: string): LogEntry[] {
   const text = [readText(path.join(root, LOG_PATH)), readText(path.join(root, HOOK_LOG_PATH))]
     .filter((part): part is string => part !== undefined).join('\n');
-  if (!text) return [];
   const entries: LogEntry[] = [];
   const pluginIds = new Set<string>();
   for (const line of text.split(/\r?\n/)) {
@@ -169,6 +206,14 @@ export function readLog(root: string): LogEntry[] {
     } catch {
       // skip
     }
+  }
+  let pending: LogEntry[] = [];
+  try { pending = spooledRecords(root); }
+  catch { /* Doctor reports unsafe spool storage; ordinary log reads remain available. */ }
+  for (const entry of pending) {
+    if (entry.plugin && pluginIds.has(entry.plugin.eventId)) continue;
+    if (entry.plugin) pluginIds.add(entry.plugin.eventId);
+    entries.push(entry);
   }
   return entries;
 }

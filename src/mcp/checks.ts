@@ -28,6 +28,8 @@ export interface CheckVars {
   change: string;
   /** B111: uncommitted changes outside openspec/, so the commit `${HEAD}` names is not the verified code. */
   dirty?: boolean;
+  /** Present only for verify checks, which bind `${HEAD}` to the recorded tree. */
+  treeBinding?: { fingerprint?: string; commitFingerprint?: string; files?: string[] };
 }
 
 const HEAD_VAR = '${HEAD}';
@@ -204,10 +206,30 @@ async function callCheck(check: McpCheck, server: McpServer, vars: CheckVars): P
   }
 }
 
-/** The check's verdict: not called for an unknown server or for `${HEAD}` with uncommitted code (B111). */
+/** The check's verdict, including the recorded-tree binding for verify's `${HEAD}` checks. */
 async function verdictFor(check: McpCheck, server: McpServer | undefined, vars: CheckVars): Promise<Verdict> {
   if (!server) return { ok: false, reason: t('verify.mcpUnknownServer', { server: check.server }), result: null };
-  if (vars.dirty && usesHead(check.args)) return { ok: false, reason: t('verify.mcpHeadDirty'), result: null };
+  const headCheck = usesHead(check.args);
+  const commit = vars.head ?? '';
+  if (headCheck && vars.treeBinding) {
+    if (!commit) return { ok: false, reason: t('verify.mcpHeadNoCommit'), result: null };
+    if (!vars.treeBinding.fingerprint) {
+      return { ok: false, reason: t('verify.mcpHeadNoFingerprint'), result: null };
+    }
+  }
+  if (vars.dirty && headCheck) return { ok: false, reason: t('verify.mcpHeadDirty'), result: null };
+  if (headCheck && vars.treeBinding) {
+    if (!vars.treeBinding.commitFingerprint) {
+      return { ok: false, reason: t('verify.mcpHeadTreeUnavailable'), result: null };
+    }
+    if (vars.treeBinding.fingerprint !== vars.treeBinding.commitFingerprint) {
+      const files = vars.treeBinding.files;
+      if (!files) return { ok: false, reason: t('verify.mcpHeadTreeUnavailable'), result: null };
+      const more = files.length > 10 ? `; ${files.length - 10} more` : '';
+      const params = { commit: commit.slice(0, 12), files: files.slice(0, 10).join(', '), more };
+      return { ok: false, reason: t('verify.mcpHeadTree', params), result: null };
+    }
+  }
   return callCheck(check, server, vars);
 }
 
@@ -221,7 +243,8 @@ async function runCheck(check: McpCheck, servers: McpServer[], vars: CheckVars):
   const reason = verdict.reason === undefined ? {} : { reason: maskText(verdict.reason, secrets) };
   const result = maskSecrets(verdict.result, secrets);
   const provider_ms = providerDurationMs(check.tool, result);
-  return { ...base, ...reason, duration_ms: Date.now() - started, result,
+  const commit = usesHead(check.args) && vars.head ? { commit: vars.head } : {};
+  return { ...base, ...reason, ...commit, duration_ms: Date.now() - started, result,
     ...(provider_ms === undefined ? {} : { provider_ms }) };
 }
 

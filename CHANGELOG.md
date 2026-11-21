@@ -2,6 +2,74 @@
 
 All notable changes to sdlc. Versions follow [Semantic Versioning](https://semver.org/); while the major version is 0, a minor version may change behavior.
 
+## 0.34.0 — 2026-11-20
+
+Verification you can trust and afford. A known unstable test fails only its own check and is rerun alone, a heavy
+suite can run on the project's own server, and a change on an already verified tree can reuse that evidence when a
+person allows it. The verify gate keeps its meaning: every configured check passed on the current code.
+
+### Added
+- `verify.unstable` in `sdlc.yaml` lists known unstable test files, each with the backlog item that fixes it and the
+  date it was listed. It changes only through a person's config proposal; adding a file is a weakening warning.
+  `sdlc verify` passes the list to every command in `SDLC_UNSTABLE_TESTS`, so a project's runner can run those files
+  in one required check of their own. sdlc never skips or loosens a check itself. `sdlc health` reports a file listed
+  longer than `health.unstable_days` (14 by default).
+- `sdlc verify --failed` reruns only the checks that did not pass, when the code and the commands are unchanged; it
+  is refused otherwise. Each result records the fingerprint, run id and attempt it ran with, and the evidence row
+  names a rerun's attempt.
+- A verify command marked `remote: true` runs on the project's own server through the project's own script. It runs
+  only when the files outside `openspec/` are the HEAD commit, gets `SDLC_VERIFY_COMMIT`, `SDLC_VERIFY_ANSWER` and
+  `SDLC_VERIFY_LOG`, and passes only on exit 0 with a JSON answer that names the same commit with status `passed`.
+  A busy or silent server fails with `remote_unavailable` or `remote_no_answer`, and a tree that is not the commit
+  with `remote_dirty`; the texts of `sdlc verify`, `sdlc next` and `sdlc explain` then point at the server or the
+  commit, not at the code. sdlc never retries. The full log stays in the change's `verification/remote/`, one file
+  per check, cut to its last 8 MiB. The guide gives a server wrapper that survives a lost connection.
+- `verify.reuse: true` (off by default; enabling it is a weakening warning) lets a full `sdlc verify` record another
+  change's passing run on the same code tree instead of running the checks. Every configured check, its command,
+  timeout and the unstable list must match, and each result must be confirmed by the source change's own logged run.
+  The record names `reused_from`, the terminal and the evidence name the source, and run summaries and metrics do not
+  count it as a run. `--no-reuse` always runs the checks; `--only` and `--failed` never reuse. Each command result
+  now records its timeout.
+- Verify checks without a name are named by what they run (`typecheck`, `test`, `lint`), not by the first word of the
+  command, and the names are distinct. Two equal explicit names stop `sdlc verify` and are a doctor error; an
+  unknown `--only` name stops verify before any check runs and lists the names there are. `sdlc verify --list`
+  shows the remote mark.
+- A plugin worker that closes after the cleanup budget no longer costs a finished result: the result is returned,
+  the worker stays quarantined, and `plugin_slow_close` names the plugin and the operation on standard error.
+
+### Changed
+- The verify gate passes when every configured check has a passed result on the current fingerprint with an
+  unchanged command, even when the results come from several runs on that fingerprint. Before, one run had to pass
+  every check, and a later `--only` run replaced a full pass. A partial run still never passes on its own, and an
+  archived change keeps the verify state it was archived with.
+- A `${HEAD}` MCP check such as `ci-green` counts only when the tree verify recorded is the tree of the commit it
+  asks about; otherwise the evidence names the changed files. Replacement objects behind HEAD are ignored.
+
+### Compatibility
+- An older sdlc refuses `verify.unstable` and `verify.reuse` as unknown keys, and its hooks then cannot read the
+  project's configuration. Upgrade every machine that runs the hooks before a person applies either key.
+- An older sdlc ignores `remote: true` and runs such a command as an ordinary check, with no commit check and no
+  answer check.
+- Verify records gain optional fields (per-result fingerprint, run id, attempt, timeout, remote fields, `reused_from`,
+  `unstable_digest`). An older sdlc ignores them and reads a record as one run.
+- Derived check names changed, so an `--only` selector written for an old derived name needs the new one.
+
+### Known limits
+- A project whose hooks run an older sdlc than the one that wrote `sdlc.yaml` can lock its agent out (see
+  Compatibility). A fix is planned.
+- With `enforcement.mode: off` an agent could plant both a passing record and its log entry, which reuse would then
+  trust. That mode already lets an agent write any record; reuse stays off unless a person enables it.
+- Under heavy load a plugin result that arrives after its deadline still fails as a timeout.
+
+### Fixed
+- The verify fingerprint no longer trusts git's cached file times and index flags: every tracked file on disk is read
+  again, so an edit that keeps the size within the same second, an assume-unchanged or skip-worktree file, or a
+  restored modification time changes the fingerprint. A sparse checkout gets a fingerprint.
+- A project log record that could not take a busy writer lock was lost. It is now kept in `openspec/.sdlc/log-spool`
+  and appended by the next writer; `sdlc doctor` names waiting spool files, and the hook refuses agent writes there.
+- The release workflow retries the push of the release branch and keeps an already published release on a re-run, so
+  installs from the release branch no longer stay on the previous version after a network error.
+
 ## 0.33.0 — 2026-11-17
 
 sdlc now records where a change's time goes: every verify run, every review round and every wait for a person. A

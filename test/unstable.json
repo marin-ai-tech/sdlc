@@ -1,0 +1,4 @@
+[
+  { "file": "test/plugin-mcp-contention.test.ts", "item": "B259", "since": "2026-11-19" },
+  { "file": "test/writer-contention.test.ts", "item": "B251", "since": "2026-11-19" }
+]

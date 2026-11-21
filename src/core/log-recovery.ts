@@ -14,7 +14,7 @@ function splitLines(bytes: Buffer): Buffer[] {
   return lines;
 }
 
-function acknowledged(file: string): Set<string> {
+export function acknowledged(file: string): Set<string> {
   try { return new Set(fs.readFileSync(file, 'utf8').split('\n').filter(Boolean)); }
   catch (error) { if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error; }
   return new Set();

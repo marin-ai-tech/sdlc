@@ -82,6 +82,8 @@ describe('sdlc.yaml config', () => {
     expect(() => parseConfig({ cli: 'sdlc; rm -rf /' })).toThrow(/may only contain/);
   });
   it('accepts verify commands written as plain strings', () => {
-    expect(parseConfig({ verify: { commands: ['make test'] } }).verify.commands).toEqual([{ name: 'make', run: 'make test', required: true }]);
+    // B298 (verify-check-names): a make command is named by its target, no longer by the program.
+    expect(parseConfig({ verify: { commands: ['make test'] } }).verify.commands)
+      .toEqual([{ name: 'test', run: 'make test', required: true }]);
   });
 });

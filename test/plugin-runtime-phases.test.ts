@@ -122,13 +122,13 @@ describe('Independent plugin runtime phase bounds', () => {
     await expect(call()).rejects.toMatchObject({ code: expect.stringMatching(/^plugin_(runtime|invalid)$/) });
   });
 
+  // Requirement change (B259, owner's E25 answer 6, 2026-11-18): a finished result is returned after a slow close;
+  // the worker stays quarantined, and a full quarantine still refuses admission until an actual exit.
   it('bounded cleanup releases logical capacity and finite quarantine refuses admission until actual exit', async () => {
     control.cleanupHangs = true;
     const { call } = await runtime();
     for (let index = 0; index < 2; index++) {
-      await expect(call()).rejects.toMatchObject({
-        code: 'plugin_timeout', message: expect.stringMatching(/cleanup/),
-      });
+      await expect(call()).resolves.toEqual({ output: 42 });
     }
     const started = performance.now();
     await expect(call()).rejects.toMatchObject({ code: 'plugin_busy' });

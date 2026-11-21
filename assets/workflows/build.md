@@ -25,6 +25,9 @@ Implement the approved plan - Stage 3 (Build). Every step checks its own work be
    - make the smallest change that satisfies it
    - run the most targeted check first (the test for this behavior), then the group's checks
    - fix the code until the checks pass - never skip, weaken or delete a test to get green
+   - a test that fails once and passes alone is unstable: never skip it or make it optional. Propose it for
+     `verify.unstable` in `openspec/sdlc.yaml` with the item that fixes it (`sdlc config propose`; a person
+     applies it). Rerun only the failed checks with `sdlc verify --failed --change <id>`
    - mark `- [ ]` -> `- [x]` only when the task's behavior is fully implemented and its check passed
    - when the implementation must depart from plan.md, stop and propose the plan.md change: a changed plan.md makes the plan approval stale, and the hook blocks code until the engineer approves the plan again; after approval only tick tasks.md boxes
    - end each commit message with the trailers `SDLC-Change: <id>` and `SDLC-Task: <n.m>` (the task number from tasks.md), so `sdlc trace <id>` links the task to its commit

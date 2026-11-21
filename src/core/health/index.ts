@@ -5,6 +5,7 @@ import {
   contextStaleFinding, doctorFinding, enforcementFinding, noVerifyFinding, signingFinding, singlePersonFinding,
 } from './config-findings.js';
 import { loadHealthContext, type HealthContext, type HealthOptions } from './context.js';
+import { unstableFindings } from './unstable.js';
 import { logGapsFinding } from './log-gaps.js';
 import { loopBudgetFinding, repeatRunsFinding, reviewRoundsFinding } from './loops.js';
 import {
@@ -97,6 +98,11 @@ export function runHealth(
     } catch {
       // Health never fails on the data it reads.
     }
+  }
+  if (!ctx.badOnly) {
+    const unstable = unstableFindings(ctx);
+    drafts.push(...unstable);
+    evaluated.push(...unstable.map((finding) => finding.id));
   }
   return { drafts: orderFindings(drafts), evaluated };
 }

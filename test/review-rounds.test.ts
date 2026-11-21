@@ -2,6 +2,7 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { parse, stringify } from 'yaml';
+import { readLog } from '../src/core/log.js';
 import { acquireWriterLock } from '../src/core/writer-lock.js';
 import { git, humanEnv, initGitRepo, read, runCli, tempDir, write } from './helpers.js';
 
@@ -162,13 +163,17 @@ describe('B226.P rounds carry counts only', () => {
 });
 
 describe('B226.F recording never changes the verdict', () => {
-  it('F1 with the writer lock held the check prints and exits the same, and leaves no entry', () => {
+  // B327 (log-record-never-lost) changed the requirement: a round recorded while the writer lock is held is no
+  // longer dropped but kept in the log spool, visible to readLog at once and counted once.
+  it('F1 with the writer lock held the check prints and exits the same, and the round is kept once', () => {
     const p = project();
     p.setReview('demo', twoOpen);
     const lease = acquireWriterLock(path.join(p.root, 'openspec/.sdlc/log.lock'), 1000);
     let locked;
     try {
       locked = p.check('demo');
+      const spooled = readLog(p.root).filter((e) => e.event === 'review.round' && e.change === 'demo');
+      expect(spooled.map((e) => e.round?.n)).toEqual([1]);
     } finally {
       lease.release();
     }
@@ -176,7 +181,8 @@ describe('B226.F recording never changes the verdict', () => {
     const free = p.check('demo');
     expect(locked.code).toBe(free.code);
     expect(locked.stdout).toBe(free.stdout);
-    expect(p.rounds('demo').map((e) => e.round.n)).toEqual([1]);
+    const kept = readLog(p.root).filter((e) => e.event === 'review.round' && e.change === 'demo');
+    expect(kept.map((e) => e.round?.n)).toEqual([1]);
   }, SLOW);
 
   it('F2 the check exit code is unchanged by recording: blocking findings exit 1, none exit as before', () => {

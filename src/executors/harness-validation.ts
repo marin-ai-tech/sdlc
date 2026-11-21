@@ -1,6 +1,7 @@
 import type { SdlcConfig } from '../core/config.js';
 import { recordObject } from '../core/record-values.js';
 import type { VerificationRun } from '../core/verify.js';
+import { commandPassed } from '../core/verify-reason.js';
 
 /** Run in a disposable credential-free OS/container boundary, never in the provider client process. */
 export interface HarnessValidationRequest {
@@ -27,7 +28,7 @@ function completeChecks(value: unknown, config: SdlcConfig['verify']): boolean {
       || check.required !== expected.required) return false;
     if (check.timed_out !== undefined && typeof check.timed_out !== 'boolean') return false;
     if (check.exit_code !== null && !Number.isInteger(check.exit_code)) return false;
-    return !expected.required || (check.exit_code === 0 && check.timed_out !== true);
+    return !expected.required || commandPassed(check as Parameters<typeof commandPassed>[0]);
   });
 }
 

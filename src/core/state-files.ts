@@ -14,6 +14,7 @@ export const STATE_FILES = [
   ...WRITER_COORDINATION_DIRS.map(dir => `${dir}/**`),
   'openspec/backlog.md', 'openspec/roles.yaml', 'openspec/executors.yaml', 'openspec/.sdlc/log.jsonl',
   'openspec/.sdlc/hook-log.jsonl', 'openspec/.sdlc/log.lock',
+  'openspec/.sdlc/log-spool/**',
   'openspec/.sdlc/team.json', 'openspec/.sdlc/board.json', 'openspec/.sdlc/board.lock',
 ];
 

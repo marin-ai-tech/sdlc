@@ -9,13 +9,16 @@ import { readChangeDeltas } from '../core/deltas.js';
 import { readDeferred } from '../core/deferred.js';
 import { SdlcError } from '../core/errors.js';
 import { isFile, readText } from '../core/fs-utils.js';
-import { defaultBaseRef, formatIdentity, git, gitIdentity, headCommit } from '../core/git.js';
+import {
+  defaultBaseRef, formatIdentity, git, gitIdentity, headCommit, isDirty, worktreeFingerprint,
+} from '../core/git.js';
+import { commitFingerprint, treeDifference } from '../core/tree-commit.js';
 import { computePlanDrift } from '../core/plan-drift.js';
 import { checkCoverage, parseCoverage, parseFindings, summarizeFindings } from '../core/review.js';
 import { applyVerifyToState, runVerification, writeEvidence, type VerificationRun } from '../core/verify.js';
 import { uncoveredScenarioReport } from '../core/verify-behaviour.js';
 import { untouchedPlanned, verificationAttachments, type EvidenceExtras } from '../core/verify-extras.js';
-import { runMcpChecks, selectedChecks, uncommittedCode, withMcpChecks } from '../mcp/checks.js';
+import { runMcpChecks, selectedChecks, uncommittedCode, usesHead, withMcpChecks } from '../mcp/checks.js';
 import { keepForAgent } from '../mcp/inbox.js';
 import { readAsset } from '../integrations/assets.js';
 import { readManifest } from '../integrations/manifest.js';
@@ -27,10 +30,19 @@ import { branchChange } from '../core/change-branch.js';
 import { appendLog, readLog } from '../core/log.js';
 import { finishedRunFacts, skipsChecks, verifyTrigger, type VerifyTrigger } from '../core/verify-runs.js';
 import { recordReviewRound } from '../core/review-rounds.js';
+import { duplicateCheckNames } from '../core/verify-names.js';
+import { assertKnownCheckNames } from '../core/verify-only.js';
+import { failedSelection, mergeVerification } from '../core/verify-merge.js';
+import { commandPassed } from '../core/verify-reason.js';
+import { FINGERPRINT_EXCLUDES } from '../core/lifecycle.js';
+import { findReuseSource, reuseHistoryDetail, reusedRun, reusedRunFacts } from '../core/verify-reuse.js';
 
 export interface VerifyOptions {
   change?: string;
   only?: string;
+  failed?: boolean;
+  /** Commander sets this to false for `--no-reuse`. */
+  reuse?: boolean;
   list?: boolean;
   check?: boolean;
   strict?: boolean;
@@ -52,9 +64,41 @@ async function withMcp(
   for (const { name, server, tool } of opts.json ? [] : checks) {
     process.stderr.write(c.dim(`${t('verify.runningMcp', { name, server, tool })}\n`));
   }
-  const vars = { head: run.commit, change, dirty: uncommittedCode(ctx.root, checks) };
+  const needsTree = checks.some((check) => usesHead(check.args));
+  const committedTree = needsTree && run.commit && run.fingerprint
+    ? commitFingerprint(ctx.root, run.commit, FINGERPRINT_EXCLUDES) : undefined;
+  const files = committedTree && run.fingerprint && committedTree !== run.fingerprint
+    ? treeDifference(ctx.root, run.fingerprint, committedTree) : undefined;
+  const treeBinding = needsTree
+    ? { fingerprint: run.fingerprint, commitFingerprint: committedTree, files } : undefined;
+  const vars = { head: run.commit, change, dirty: uncommittedCode(ctx.root, checks), treeBinding };
   const mcp = await runMcpChecks(ctx.config, checks, vars);
   return withMcpChecks(run, ctx.config, mcp);
+}
+
+/** B183: the reused run, if any, and the fingerprint taken for the lookup (a miss runs the checks on it). */
+interface ReuseAttempt {
+  run?: VerificationRun;
+  fingerprint?: string;
+}
+
+/** B183: another change's passing run on this tree, when `verify.reuse` is on and this is a full run. */
+function reusedVerification(
+  ctx: ProjectContext,
+  change: string,
+  opts: VerifyOptions,
+  requestedOnly: string[] | undefined,
+): ReuseAttempt {
+  if (!ctx.config.verify.reuse || opts.reuse === false || opts.failed || requestedOnly !== undefined) {
+    return {};
+  }
+  const fingerprint = worktreeFingerprint(ctx.root, FINGERPRINT_EXCLUDES);
+  if (!fingerprint) return {};
+  const source = findReuseSource(ctx.paths, ctx.root, ctx.config, { change, fingerprint });
+  if (!source) return { fingerprint };
+  const dirty = isDirty(ctx.root, FINGERPRINT_EXCLUDES);
+  const tree = { fingerprint, commit: headCommit(ctx.root), dirty };
+  return { run: reusedRun(source, tree, ctx.config), fingerprint };
 }
 
 /** B57, B58: planned files nobody touched since the verify base and the `verification/` attachments. */
@@ -70,8 +114,9 @@ function evidenceExtras(ctx: ProjectContext, changeDir: string): EvidenceExtras 
 /** The JSON answer's `mcp`: each check with the server's answer. */
 function mcpJson(run: VerificationRun): Record<string, unknown> {
   if (!run.mcp) return {};
-  const shape = run.mcp.map(({ name, server, tool, ok, reason, result }) =>
-    ({ name, server, tool, ok, ...(reason === undefined ? {} : { reason }), result }));
+  const shape = run.mcp.map(({ name, server, tool, ok, reason, result, commit }) =>
+    ({ name, server, tool, ok, ...(reason === undefined ? {} : { reason }), result,
+      ...(commit ? { commit } : {}) }));
   return { mcp: shape };
 }
 
@@ -87,6 +132,7 @@ interface ListedCommand {
   name: string;
   run: string;
   required: boolean;
+  remote?: true;
 }
 
 interface ListedMcpCheck {
@@ -98,7 +144,12 @@ interface ListedMcpCheck {
 
 /** `--list`: the commands of `verify.commands` as configured. */
 function listedCommands(ctx: ProjectContext): ListedCommand[] {
-  return ctx.config.verify.commands.map((v) => ({ name: v.name, run: v.run, required: v.required }));
+  return ctx.config.verify.commands.map((v) => ({
+    name: v.name,
+    run: v.run,
+    required: v.required,
+    ...(v.remote ? { remote: true as const } : {}),
+  }));
 }
 
 /** `--list`: the MCP checks of `verify.mcp` as configured; no server is called. */
@@ -113,7 +164,9 @@ function printListedCommands(commands: ListedCommand[]): void {
     return;
   }
   for (const cmd of commands) {
-    line(`${cmd.name.padEnd(10)} ${cmd.run}${cmd.required ? '' : c.dim(t('verify.optional'))}`);
+    const optional = cmd.required ? '' : c.dim(t('verify.optional'));
+    const remote = cmd.remote ? c.dim(t('verify.listRemote')) : '';
+    line(`${cmd.name.padEnd(10)} ${cmd.run}${optional}${remote}`);
   }
 }
 
@@ -135,11 +188,34 @@ function listChecks(ctx: ProjectContext, json?: boolean): void {
   printListedMcpChecks(mcp);
 }
 
+/** The closing line of a failed run: a busy or silent remote is not a code defect. */
+function failedLineKey(reason: VerificationRun['reason']): string {
+  if (reason === 'fingerprint_unavailable') return 'verify.fingerprintUnavailable';
+  if (reason === 'remote_unavailable') return 'verify.failedRemoteUnavailable';
+  if (reason === 'remote_no_answer') return 'verify.failedRemoteNoAnswer';
+  if (reason === 'remote_dirty') return 'verify.failedRemoteDirty';
+  return 'verify.failed';
+}
+
+/** One check in the event detail: its exit code, the reason of a refused remote check, or `timeout`. */
+function checkDetail(check: { name: string; exit_code: number | null; reason?: string }): string {
+  if (check.exit_code !== null) return `${check.name}=${check.exit_code}`;
+  const refused = check.reason === 'remote_dirty' || check.reason === 'remote_no_commit';
+  return `${check.name}=${refused ? check.reason : 'timeout'}`;
+}
+
 export async function verifyCommand(opts: VerifyOptions): Promise<void> {
   try {
     // The checks of the accepted packs (B18) run after the project's own, each as an agent.
     const ctx = withPackChecks(loadProject());
     if (opts.list) return listChecks(ctx, opts.json);
+    const duplicates = duplicateCheckNames(ctx.config.verify);
+    if (duplicates.length > 0) {
+      const { name, keys } = duplicates[0];
+      throw new SdlcError('duplicate_check_names',
+        { key: 'error.duplicate_check_names', params: { name, keys: keys.join(', ') } },
+        { key: 'fix.duplicate_check_names' });
+    }
     const ref = resolveChange(ctx.paths, opts.change ?? branchChange(ctx.root, ctx.paths));
     if (opts.check) {
       const coverage = uncoveredScenarioReport(ref.dir);
@@ -156,6 +232,13 @@ export async function verifyCommand(opts: VerifyOptions): Promise<void> {
       if (opts.strict && coverage.missing.length > 0) process.exitCode = 1;
       return;
     }
+    const requestedOnly = opts.only === undefined
+      ? undefined : opts.only.split(',').map((s) => s.trim()).filter(Boolean);
+    const previous = readChangeState(ref.dir).verify;
+    const only = opts.failed
+      ? failedSelection(previous, ctx.config, worktreeFingerprint(ctx.root, FINGERPRINT_EXCLUDES), requestedOnly)
+      : requestedOnly;
+    assertKnownCheckNames(ctx.config.verify, only);
     if (ctx.config.verify.commands.length === 0 && (ctx.config.verify.mcp ?? []).length === 0) {
       throw new SdlcError(
       'no_verify_commands',
@@ -163,10 +246,13 @@ export async function verifyCommand(opts: VerifyOptions): Promise<void> {
       { key: 'fix.add_them_under_verify_commands_in_openspec_sdlc_' }
     );
     }
-    const only = opts.only ? opts.only.split(',').map((s) => s.trim()).filter(Boolean) : undefined;
+    const attempt = reusedVerification(ctx, ref.id, opts, requestedOnly);
+    const reused = attempt.run;
     let trigger: VerifyTrigger = 'first';
-    const commands = await runVerification(ctx.root, ctx.config, {
+    const commands = reused ?? await runVerification(ctx.root, ctx.config, {
       only,
+      ...(attempt.fingerprint ? { fingerprint: attempt.fingerprint } : {}),
+      changeDir: ref.dir,
       onStart: (start) => {
         trigger = verifyTrigger(readLog(ctx.root).filter((entry) => entry.change === ref.id),
           start.started_at, start.fingerprint);
@@ -181,40 +267,49 @@ export async function verifyCommand(opts: VerifyOptions): Promise<void> {
         if (!opts.json) process.stderr.write(c.dim(`${t('verify.running', { name: check.name, run: check.run })}\n`));
       },
     });
-    const run = await withMcp(ctx, ref.id, commands, { only, json: opts.json });
-    run.at = new Date().toISOString();
+    const executed = reused ?? await withMcp(ctx, ref.id, commands, { only, json: opts.json });
+    if (!reused) executed.at = new Date().toISOString();
+    const run = reused ?? mergeVerification(executed, previous, ctx.config);
     const extras = evidenceExtras(ctx, ref.dir);
     const template = readAsset('records', 'verification.md');
-    const file = writeEvidence(ref.dir, run, ref.id, template, ctx.stamp, extras);
+    const file = writeEvidence(ref.dir, run, ref.id, template, ctx.stamp, extras, ctx.config);
     const state = readChangeState(ref.dir);
     applyVerifyToState(state, run, ctx.stamp);
-    const mcpDetail = (run.mcp ?? []).map((m) => `${m.name}=${m.ok ? 'ok' : 'failed'}`);
+    const mcpDetail = (executed.mcp ?? []).map((m) => `${m.name}=${m.ok ? 'ok' : 'failed'}`);
+    const detail = reused?.reusedFrom ? reuseHistoryDetail(reused.reusedFrom)
+      : [...executed.checks.map(checkDetail), ...mcpDetail].join(' ');
+    const facts = reused ? reusedRunFacts(reused)
+      : finishedRunFacts(executed, trigger, skipsChecks(ctx.config, only));
     recordChangeEvent(ctx, ref, state, `verify.${run.status}`, formatIdentity(gitIdentity(ctx.root)),
-      [...run.checks.map((ch) => `${ch.name}=${ch.exit_code ?? 'timeout'}`), ...mcpDetail].join(' '),
-      { run: finishedRunFacts(run, trigger, skipsChecks(ctx.config, only)) });
+      detail, { run: facts });
     if (run.status === 'passed' && !only) completeVerifyTasks(ref.dir);
     // Outside an agent session the MCP results are also kept for the agent (the inbox).
-    keepForAgent(ctx.root, ref.id, run);
+    if (!reused) keepForAgent(ctx.root, ref.id, executed);
     const next = resolveNext(ctx, ref.id);
     if (opts.json) {
       printJson({ change: ref.id, status: run.status, ...(run.reason ? { reason: run.reason } : {}),
-        at: run.at, commit: run.commit, dirty: run.dirty, checks: run.checks,
-        ...mcpJson(run), planDrift: { untouched: extras.untouched }, attachments: extras.attachments,
+        ...(run.reusedFrom ? { reused_from: run.reusedFrom } : {}),
+        at: run.at, commit: run.commit, dirty: run.dirty, checks: executed.checks,
+        ...mcpJson(executed), planDrift: { untouched: extras.untouched }, attachments: extras.attachments,
         evidence: file, harness: ctx.stamp, ...(next ? { next } : {}) });
     } else {
-      for (const check of run.checks) {
-        const ok = check.exit_code === 0 && !check.cleanup_failed && !check.cancelled;
+      if (run.reusedFrom) {
+        const from = { change: run.reusedFrom.change, run: run.reusedFrom.run_id };
+        line(c.yellow(t('verify.reusedNotice', from)));
+      }
+      for (const check of executed.checks) {
+        const ok = commandPassed(check);
         const timeout = check.timed_out ? c.red(t('verify.timedOut')) : '';
         line(`${ok ? c.green('✓') : c.red('✗')} ${check.name} ${c.dim(`(${(check.duration_ms / 1000).toFixed(1)}s)`)}${timeout}`);
         if (!ok && check.output) line(c.dim(check.output.split('\n').map((l) => `    ${l}`).join('\n')));
       }
-      printMcpChecks(run);
+      printMcpChecks(executed);
       if (extras.untouched.length > 0) {
         line(c.yellow(t('verify.untouchedPlanned', { list: extras.untouched.join(', ') })));
       }
       line(run.status === 'passed'
         ? c.green(t('verify.passed', { file: path.relative(process.cwd(), file) }))
-        : c.red(t(run.reason ? 'verify.fingerprintUnavailable' : 'verify.failed')));
+        : c.red(t(failedLineKey(run.reason))));
       if (only) line(c.dim(t('verify.partial')));
       emitNextHint(ctx, ref.id);
     }

@@ -22,6 +22,9 @@ import { capturePackage } from '../dist/plugins/package.js';
 import { readRegistry } from '../dist/plugins/trust.js';
 import { FILES } from './farewell-fixture.js';
 import { BIN, git, humanEnv, initGitRepo, read, REPO_ROOT, tempDir, write } from './helpers.js';
+import { SDLC_STEP_MS, TEST_MS, timedStep } from './fixtures/step-bounds.js';
+
+const STEPS = 'plugin-harness-report';
 import { immutableBoardProject, reportBoardProject } from './fixtures/immutable-board-project.js';
 
 const fixturePhases: Array<Record<string, unknown>> = [];
@@ -54,11 +57,12 @@ function demoPackage(root: string, guard?: 'deny' | 'fault') {
 function sourceAt(root: string, env: NodeJS.ProcessEnv, scope = 'host') {
   const cli = (args: string[]) => {
     const started = performance.now();
-    const result = spawnSync(process.execPath, [BIN, ...args, '--json'], {
-      cwd: root, env, encoding: 'utf8', timeout: 20000,
-    });
+    const result = timedStep(STEPS, `sdlc ${args[0]}`, SDLC_STEP_MS, () =>
+      spawnSync(process.execPath, [BIN, ...args, '--json'], {
+        cwd: root, env, encoding: 'utf8', timeout: SDLC_STEP_MS,
+      }), (r) => r.status);
     const error = result.error as NodeJS.ErrnoException | undefined;
-    const phase = { command: args, scope, root, elapsedMs: performance.now() - started, boundMs: 20000,
+    const phase = { command: args, scope, root, elapsedMs: performance.now() - started, boundMs: SDLC_STEP_MS,
       status: result.status, signal: result.signal,
       error: error ? { name: error.name, code: error.code, message: error.message } : null };
     fixturePhases.push(phase);
@@ -182,10 +186,11 @@ function provisionWarm(p: ReturnType<typeof project>, sandbox: string) {
   git(sandbox, ['clone', '--no-local', p.root, checkout]);
   initGitRepo(checkout);
   git(checkout, ['switch', '-c', p.claim.item.result.branch, p.claim.item.base.commit!]);
-  const accepted = spawnSync(process.execPath, [BIN, 'plugins', 'accept', 'demo',
-    '--expect-digest', p.config.plugins!.demo.digest, '--json'], {
-    cwd: checkout, env: p.env, encoding: 'utf8', timeout: 20000,
-  });
+  const accepted = timedStep(STEPS, 'sdlc plugins accept', SDLC_STEP_MS, () =>
+    spawnSync(process.execPath, [BIN, 'plugins', 'accept', 'demo',
+      '--expect-digest', p.config.plugins!.demo.digest, '--json'], {
+      cwd: checkout, env: p.env, encoding: 'utf8', timeout: SDLC_STEP_MS,
+    }), (r) => r.status);
   expect(accepted.status, accepted.stdout + accepted.stderr).toBe(0);
   expect(inspectGit(checkout, ['rev-parse', 'HEAD']).stdout).toBe(p.claim.item.base.commit);
   expect(inspectGit(checkout, ['symbolic-ref', '--short', 'HEAD']).stdout).toBe(p.claim.item.result.branch);
@@ -198,9 +203,10 @@ function runtime(p: ReturnType<typeof project>, sandbox: string) {
   return { exec: vi.fn(async (_session: string, argv: string[], input = '', workdir = '/workspace') => {
     const executable = argv[0] === 'node' || argv[0] === 'sdlc' ? process.execPath : argv[0];
     const args = argv[0] === 'sdlc' ? [BIN, ...argv.slice(1)] : argv.slice(1).map(map);
-    const result = spawnSync(executable, args, {
-      cwd: map(workdir), env: p.env, input, encoding: 'utf8', timeout: 20000,
-    });
+    const result = timedStep(STEPS, `${path.basename(argv[0])} ${argv[1] ?? ''}`, SDLC_STEP_MS, () =>
+      spawnSync(executable, args, {
+        cwd: map(workdir), env: p.env, input, encoding: 'utf8', timeout: SDLC_STEP_MS,
+      }), (r) => r.status);
     return { exitCode: result.status, stdout: result.stdout ?? '', stderr: result.stderr ?? '' };
   }) };
 }
@@ -309,7 +315,7 @@ describe('structured Harness candidate reports', () => {
       const hooks = demoPackage(tempDir('sdlc-harness-report-hooks-'), guard).manifest.hooks;
       expect(Object.keys(hooks)).toEqual(guard ? ['result_accept'] : []);
     }
-  }, 120000);
+  }, TEST_MS['plugin-harness-report']);
 
   it('prepares a person-provisioned warm worker without accepting or copying host trust', async () => {
     const p = project({ demo: { a: 1, b: [1, 2] } });
@@ -329,7 +335,7 @@ describe('structured Harness candidate reports', () => {
     expect(transport.exec.mock.calls.some(([, argv]) => argv[0] === 'git' && argv.includes('clone'))).toBe(false);
     expect(pluginBytes(p.root)).toEqual(source);
     expect(pluginBytes(checkout)).toEqual(worker);
-  }, 120000);
+  }, TEST_MS['plugin-harness-report']);
 
   it('refuses a fresh worker with unaccepted plugins instead of granting it host trust', async () => {
     const p = project({ demo: { a: 1, b: [1, 2] } });
@@ -346,7 +352,7 @@ describe('structured Harness candidate reports', () => {
       .toEqual([expect.objectContaining({ check: 'plugin demo', message: expect.stringContaining('human acceptance') })]);
     expect(fs.existsSync(path.join(sandbox, 'project/openspec/.sdlc/plugins/registry.json'))).toBe(false);
     expect(pluginBytes(p.root)).toEqual(source);
-  }, 120000);
+  }, TEST_MS['plugin-harness-report']);
 
   it('reports every distinct session and preserves success-only candidates', async () => {
     const p = project();
@@ -363,14 +369,14 @@ describe('structured Harness candidate reports', () => {
     expect(report[3].problems).toEqual([{ code: 'harness_verification_failed' }]);
     expect(JSON.stringify(report)).not.toContain('private');
     expect(await adapter.candidates(['bad', 'good', 'good'], p.claim.item)).toEqual([{ session: 'good', branch: 'good' }]);
-  }, 120000);
+  }, TEST_MS['plugin-harness-report']);
 
   it('retains exact core problems and does not reach the validator', async () => {
     const p = await prepared({ forbidden: true, guard: 'deny' });
     const result = await p.host.verify('local', p.claim.item);
     expect(result).toMatchObject({ passed: false, problems: [{ code: 'forbidden_path', file: 'openspec/executors.yaml' }] });
     expect(p.check).not.toHaveBeenCalled();
-  }, 120000);
+  }, TEST_MS['plugin-harness-report']);
 
   it.each([{ task: '1.2' }, { agent: 'hosted/claude' }])('reports exact claim identity failure: %j', async (identity) => {
     const p = await prepared(identity);
@@ -378,7 +384,7 @@ describe('structured Harness candidate reports', () => {
     expect(result.passed).toBe(false);
     expect(result.problems).toContainEqual(expect.objectContaining({ code: 'harness_identity', sha: expect.any(String) }));
     expect(p.check).not.toHaveBeenCalled();
-  }, 120000);
+  }, TEST_MS['plugin-harness-report']);
 
   it('reports ancestry failure before core and validator acceptance', async () => {
     const p = await prepared();
@@ -390,7 +396,7 @@ describe('structured Harness candidate reports', () => {
       passed: false, problems: [{ code: 'harness_ancestry' }],
     });
     expect(p.check).not.toHaveBeenCalled();
-  }, 120000);
+  }, TEST_MS['plugin-harness-report']);
 
   it('propagates missing validator without touching source or transport', async () => {
     const p = project();
@@ -400,7 +406,7 @@ describe('structured Harness candidate reports', () => {
     await expect(adapter.candidateReport(['missing'], p.claim.item))
       .rejects.toMatchObject({ code: 'harness_validator_missing' });
     expect(transport.exec).not.toHaveBeenCalled();
-  }, 120000);
+  }, TEST_MS['plugin-harness-report']);
 
   it.each([
     { validate: async () => ({ passed: true }), code: 'harness_validator_failed' },
@@ -410,7 +416,7 @@ describe('structured Harness candidate reports', () => {
     const result = await p.host.verify('local', p.claim.item);
     expect(result).toMatchObject({ passed: false, problems: [{ code }] });
     expect(JSON.stringify(result)).not.toContain('provider-secret');
-  }, 120000);
+  }, TEST_MS['plugin-harness-report']);
 
   it('offers a candidate only after actual complete independent fixture checks pass', async () => {
     const p = await prepared();
@@ -419,7 +425,7 @@ describe('structured Harness candidate reports', () => {
     expect(result.problems ?? []).toEqual([]);
     expect(p.check).toHaveBeenCalledOnce();
     expect(read(path.join(p.root, 'src/greet.js'))).toBe('// original\n');
-  }, 120000);
+  }, TEST_MS['plugin-harness-report']);
 
   it.each(['deny', 'fault'] as const)('retains the real result hook %s after isolated validation', async (guard) => {
     const p = await prepared({ guard });
@@ -431,7 +437,7 @@ describe('structured Harness candidate reports', () => {
     expect(p.check).toHaveBeenCalledOnce();
     expect(readBoard(p.root).claims.find((entry) => entry.id === p.claim.claim.id)?.state).toBe('held');
     if (guard === 'fault') expect(state()).toEqual(before);
-  }, 120000);
+  }, TEST_MS['plugin-harness-report']);
 
   it('compares extension object keys canonically while retaining type and array order', async () => {
     const ext = { demo: { a: 1, b: [1, 2] } };
@@ -446,5 +452,5 @@ describe('structured Harness candidate reports', () => {
       await expect(p.host.verify('local', { ...original, ext })).rejects.toMatchObject({ code: 'harness_refused' });
     }
     expect(p.check).toHaveBeenCalledOnce();
-  }, 120000);
+  }, TEST_MS['plugin-harness-report']);
 });

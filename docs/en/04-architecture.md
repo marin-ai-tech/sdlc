@@ -155,6 +155,8 @@ Mechanics:
 - **The worktree fingerprint for verify, review and release** is the git tree id of all files (tracked + untracked,
   excluding ignored files and `openspec/`). It is computed in a temporary index and does not depend on commits:
   committing verified code does not make the verification stale, while any change to the content does.
+  Git reads every file: the temporary index trusts no cached stat data, `assume-unchanged` or `skip-worktree` bit
+  of a file on disk, file monitor or `core.ignoreStat` (`src/core/fingerprint-index.ts`).
   Failed/empty index-path metadata or an unreadable index yields no fingerprint; it must not silently construct an
   unseeded tree that omits tracked ignored files. A legitimately absent index before staging and the relative
   index-path fallback for older Git remain supported. A run without a fingerprint, for example outside a git

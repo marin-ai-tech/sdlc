@@ -9,6 +9,8 @@ import { writeTextAtomic } from './fs-utils.js';
 import { editYamlText } from './yaml-text-edit.js';
 import { integrationUnknownKeys } from './config-integration-findings.js';
 import { isLoopsKey, loopsMinimum, parseLoops } from './loop-budget.js';
+import { unstableWeakeningWarnings } from './verify-unstable.js';
+import { reuseWeakeningWarnings } from './verify-reuse.js';
 export { unifiedDiff } from './line-diff.js';
 
 export type ConfigTarget = 'sdlc' | 'roles';
@@ -109,7 +111,7 @@ function validateKnownFields(raw: Record<string, unknown>, target: ConfigTarget)
   }
   const fields: Record<string, string[]> = {
     project: ['name'], context: ['sources'], mcp: ['serve', 'servers'],
-    verify: ['commands', 'mcp', 'timeout_seconds', 'output_lines', 'require_behaviour'],
+    verify: ['commands', 'mcp', 'timeout_seconds', 'output_lines', 'require_behaviour', 'unstable', 'reuse'],
     review: ['policy', 'base', 'block_on', 'passes', 'lenses', 'require_lens_coverage'],
     release: ['commands', 'mcp'],
     enforcement: ['mode', 'require_approved_plan', 'exempt_paths', 'protected_paths', 'secret_allow',
@@ -205,6 +207,8 @@ export function nextProposalId(root: string): string {
 
 export function weakeningWarnings(before: SdlcConfig, after: SdlcConfig): string[] {
   const warnings: string[] = [];
+  warnings.push(...unstableWeakeningWarnings(before.verify.unstable, after.verify.unstable));
+  warnings.push(...reuseWeakeningWarnings(before.verify.reuse, after.verify.reuse));
   const rank = { off: 0, warn: 1, block: 2 };
   if (rank[after.enforcement.mode] < rank[before.enforcement.mode]) warnings.push('enforcement mode is lower');
   for (const [name, gate] of Object.entries(before.gates)) {

@@ -1,3 +1,4 @@
+import * as path from 'node:path';
 import { parseMinApprovals } from './approval-quorum.js';
 import { parseAutoWaive, type AutoWaive } from './auto-waive.js';
 import { SdlcError } from './errors.js';
@@ -22,6 +23,9 @@ import { assertCliValue } from './cli-value.js';
 import { parsePlugins, parsePluginPolicies, type PluginPolicy } from '../plugins/config.js';
 import type { PluginSetting } from '../plugins/api.js';
 import { settingsWrite } from '../plugins/activation.js';
+import { nameChecks } from './verify-names.js';
+import { parseReuse, serializeReuse } from './verify-reuse.js';
+import { parseUnstable, serializeUnstable, type UnstableTest } from './verify-unstable.js';
 export { assertCliValue } from './cli-value.js';
 
 export const APPROVAL_GATES = ['intent', 'spec', 'plan', 'qa', 'review', 'release'] as const;
@@ -76,6 +80,8 @@ export interface VerifyCommand {
   required: boolean;
   /** Set for a pack's check only (B18): `SDLC_AGENT=pack-<name>`, so it runs as an agent. Never read from sdlc.yaml. */
   env?: Record<string, string>;
+  /** `remote: true`: the command runs the suite on a server, on the committed tree only (verify-remote.ts). */
+  remote?: boolean;
 }
 
 export interface SdlcConfig {
@@ -95,6 +101,9 @@ export interface SdlcConfig {
   roles: Record<string, string[]>;
   verify: {
     commands: VerifyCommand[];
+    unstable: UnstableTest[];
+    /** B183: record another change's passing run on the same tree instead of running the checks. */
+    reuse?: boolean;
     timeoutSeconds: number;
     outputLines: number;
     /** MCP checks the CLI calls during `sdlc verify` (B12); absent when sdlc.yaml has none. */
@@ -256,7 +265,7 @@ export function defaultConfig(): SdlcConfig {
       release: { required: false, approvers: ['release-manager'], highRiskApprovers: [] },
     },
     roles: {},
-    verify: { commands: [], timeoutSeconds: 900, outputLines: 40, requireBehaviour: false },
+    verify: { commands: [], unstable: [], timeoutSeconds: 900, outputLines: 40, requireBehaviour: false },
     review: { policy: 'REVIEW.md', blockOn: ['important'], passes: ['bugs', 'security', 'compliance'], lenses: ['adversarial', 'edge-cases', 'verification-gaps'], requireLensCoverage: true },
     release: { commands: [...DEFAULT_RELEASE_COMMANDS] },
     enforcement: {
@@ -439,13 +448,15 @@ export function parseConfig(raw: Raw, file = 'openspec/sdlc.yaml'): SdlcConfig {
 
   const verify = asObject(raw.verify, where('verify'));
   if (verify) {
+    config.verify.unstable = parseUnstable(verify.unstable, path.resolve(path.dirname(file), '..'), where);
+    config.verify.reuse = parseReuse(verify.reuse, where);
     config.verify.timeoutSeconds =
       asNumber(verify.timeout_seconds, where('verify.timeout_seconds')) ?? config.verify.timeoutSeconds;
     config.verify.outputLines =
       asNumber(verify.output_lines, where('verify.output_lines')) ?? config.verify.outputLines;
     config.verify.requireBehaviour =
       asBool(verify.require_behaviour, where('verify.require_behaviour')) ?? config.verify.requireBehaviour;
-    const checks = parseMcpChecks(verify.mcp, where);
+    const checks = parseMcpChecks(verify.mcp, where, 'verify.mcp', verify.commands);
     if (checks.length > 0) config.verify.mcp = checks;
     if (verify.commands !== undefined && verify.commands !== null) {
       if (!Array.isArray(verify.commands)) {
@@ -454,10 +465,10 @@ export function parseConfig(raw: Raw, file = 'openspec/sdlc.yaml'): SdlcConfig {
           { key: 'error.x_must_be_a_list', params: { p1: where('verify.commands') } }
         );
       }
-      config.verify.commands = verify.commands.map((entry, index) => {
+      config.verify.commands = nameChecks(verify.commands.map((entry, index) => {
         const key = `verify.commands[${index}]`;
         if (typeof entry === 'string') {
-          return { name: entry.split(/\s+/)[0] ?? `check-${index + 1}`, run: entry, required: true };
+          return { run: entry, required: true };
         }
         const item = asObject(entry, where(key));
         const run = asString(item?.run, where(`${key}.run`));
@@ -465,16 +476,17 @@ export function parseConfig(raw: Raw, file = 'openspec/sdlc.yaml'): SdlcConfig {
           'invalid_config',
           { key: 'error.x_is_required', params: { p1: where(`${key}.run`) } }
         );
+        const remote = asBool(item?.remote, where(`${key}.remote`));
         return {
-          name: asString(item?.name, where(`${key}.name`)) ?? `check-${index + 1}`,
+          name: asString(item?.name, where(`${key}.name`)),
           run,
           timeoutSeconds: asNumber(item?.timeout_seconds, where(`${key}.timeout_seconds`)),
           required: asBool(item?.required, where(`${key}.required`)) ?? true,
+          ...(remote ? { remote: true } : {}),
         };
-      });
+      }), checks.map((check) => check.name));
     }
   }
-
   const review = asObject(raw.review, where('review'));
   config.review.requireLensCoverage = false;
   if (review) {
@@ -655,11 +667,14 @@ export function serializeConfig(config: SdlcConfig): Record<string, unknown> {
     gates,
     roles: config.roles,
     verify: {
+      ...serializeUnstable(config.verify.unstable),
+      ...serializeReuse(config.verify.reuse),
       commands: config.verify.commands.map((c) => ({
         name: c.name,
         run: c.run,
         ...(c.timeoutSeconds ? { timeout_seconds: c.timeoutSeconds } : {}),
         ...(c.required ? {} : { required: false }),
+        ...(c.remote ? { remote: true } : {}),
       })),
       timeout_seconds: config.verify.timeoutSeconds,
       output_lines: config.verify.outputLines,

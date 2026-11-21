@@ -107,10 +107,10 @@ describe('B225.S a verification-cost estimate from comparable changes', () => {
     const approve = approved.stdout + approved.stderr;
     for (const text of [p.said(), approve]) {
       expect(text).toContain('loops.verify_minutes');
-      expect(text, 'the estimate: median 60.2 min x 11 runs').toContain('663');
-      expect(text, 'minutes per run').toContain('60');
-      expect(text, 'runs per change').toContain('11');
-      expect(text, 'covered items').toContain(String(ITEMS));
+      // Numbers are matched inside their sentence: the JSON also holds temp paths, hashes and times.
+      expect(text, 'the estimate: median 60.2 min x 11 runs').toContain('estimated at 663 min');
+      expect(text, 'minutes and runs').toContain('median 60.2 min per run x 11 runs per change');
+      expect(text, 'covered items').toContain(`these ${ITEMS} backlog items`);
       expect(text).toMatch(/one data point/i);
       expect(text).toContain('sdlc backlog epic edit E1 --granularity feature');
     }
@@ -124,7 +124,7 @@ describe('B225.S a verification-cost estimate from comparable changes', () => {
     const text = p.said();
     expect(text).toContain('loops.verify_minutes');
     expect(text).toMatch(/1 of 3/);
-    expect(text).not.toContain('663');
+    expect(text).not.toMatch(/estimated at \d+ min/);
     expect(text).not.toContain('backlog epic edit');
   }, SLOW);
 
@@ -193,7 +193,7 @@ describe('B225.S review round 1 (findings F3, F4)', () => {
     p.pkg(range(1, ITEMS));
     const text = p.said();
     expect(text).not.toMatch(/NaN/);
-    expect(text, 'the E20 runs alone give the estimate').toContain('663');
+    expect(text, 'the E20 runs alone give the estimate').toContain('estimated at 663 min');
   }, SLOW);
 
   it('S8 a linked specs folder outside the change is not read', () => {
@@ -219,7 +219,7 @@ describe('B225.S the budget is protected configuration', () => {
     p.archivedE20();
     p.setLoops({ verify_minutes: 0, comparable_min: 1 });
     p.pkg(range(1, ITEMS));
-    expect(p.said()).not.toContain('663');
+    expect(p.said()).not.toMatch(/estimated at \d+ min/);
     expect(p.said()).not.toContain('backlog epic edit');
     expect(JSON.stringify(p.cli(['doctor', '--json']).json<Json>())).toContain('loops.verify_minutes');
     const zero = p.cli(['config', 'propose', '--set', 'loops.verify_minutes=0', '--reason', 'r', '--json']);

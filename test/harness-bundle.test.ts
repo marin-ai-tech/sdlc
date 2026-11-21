@@ -19,6 +19,9 @@ import type { HarnessRuntime } from '../src/executors/harness-runtime.js';
 import type { HarnessValidationRequest } from '../src/executors/harness-validation.js';
 import { FILES } from './farewell-fixture.js';
 import { git, humanEnv, initGitRepo, read, runCli, tempDir, write } from './helpers.js';
+import { RUN_CLI_MS, TEST_MS, TOOL_STEP_MS, timedStep } from './fixtures/step-bounds.js';
+
+const STEPS = 'harness-bundle';
 
 function project(prefix = '') {
   const top = tempDir('sdlc-harness-host-');
@@ -75,12 +78,14 @@ function localRuntime(p: ReturnType<typeof project>, sandbox: string, remoteCall
   return { exec: async (_session: string, argv: string[], stdin = '', workdir = '/workspace') => {
     remoteCalls.push(JSON.stringify({ argv, stdin }));
     if (argv[0] === 'sdlc') {
-      const result = runCli(argv.slice(1), mapPath(workdir), p.env);
+      const result = timedStep(STEPS, `sdlc ${argv[1]}`, RUN_CLI_MS,
+        () => runCli(argv.slice(1), mapPath(workdir), p.env), (r) => r.code);
       return { exitCode: result.code, stdout: result.stdout, stderr: result.stderr };
     }
-    const result = spawnSync(argv[0] === 'node' ? process.execPath : argv[0], argv.slice(1).map(mapPath), {
-      cwd: mapPath(workdir), env: p.env, input: stdin, encoding: 'utf8', timeout: 15000,
-    });
+    const result = timedStep(STEPS, `${path.basename(argv[0])} ${argv[1] ?? ''}`, TOOL_STEP_MS, () =>
+      spawnSync(argv[0] === 'node' ? process.execPath : argv[0], argv.slice(1).map(mapPath), {
+        cwd: mapPath(workdir), env: p.env, input: stdin, encoding: 'utf8', timeout: TOOL_STEP_MS,
+      }), (r) => r.status);
     return { exitCode: result.status, stdout: result.stdout ?? '', stderr: result.stderr ?? '' };
   } };
 }
@@ -145,7 +150,7 @@ describe('B124: real git bundle round trip with a local sandbox transport', () =
     expect(result.problems).toContainEqual({ code: 'forbidden_path', file: changed });
     expect(validator).not.toHaveBeenCalled();
     expect(readLog(p.root).filter((entry) => entry.event === 'task.result_checked')).toHaveLength(1);
-  }, 180000);
+  }, TEST_MS['harness-bundle']);
   it('propagates an actual inactive host-bound claim before any runtime call', async () => {
     const p = project();
     const board = readBoard(p.root);
@@ -159,7 +164,7 @@ describe('B124: real git bundle round trip with a local sandbox transport', () =
     await expect(adapter.candidates(['one'], p.claim.item)).rejects.toMatchObject({ code: 'harness_refused' });
     expect(runtime.exec).not.toHaveBeenCalled();
     expect(validator).not.toHaveBeenCalled();
-  }, 180000);
+  }, TEST_MS['harness-bundle']);
   it('transfers only reviewed reachable HEAD history and keeps host-only credential refs/config private', async () => {
     const p = project();
     const privateHistory = privateHostHistory(p);
@@ -179,7 +184,7 @@ describe('B124: real git bundle round trip with a local sandbox transport', () =
     expect(calls.join('\n')).not.toContain(privateHistory.token);
     expect(calls.join('\n')).not.toContain(p.claim.claim.id);
     expect(readBoard(p.root).claims[0].state).toBe('held');
-  }, 180000);
+  }, TEST_MS['harness-bundle']);
   it.each(['core', 'validator'])('records a %s failure once and retains the independent candidate', async (kind) => {
     const p = project();
     const hosts = new Map<string, HarnessBundleHost>();
@@ -210,7 +215,7 @@ describe('B124: real git bundle round trip with a local sandbox transport', () =
     expect(observed.some((entry) => entry.detail?.includes(kind === 'core'
       ? 'missing_trailer' : 'harness_validator_failed'))).toBe(true);
     expect(observed.every((entry) => entry.change === 'add-farewell' && entry.executor === 'hosted')).toBe(true);
-  }, 180000);
+  }, TEST_MS['harness-bundle']);
   it('refuses unrelated history even with matching files, task trailers and passing commands', async () => {
     const p = project();
     const sandbox = tempDir('sdlc-harness-unrelated-');
@@ -231,7 +236,7 @@ describe('B124: real git bundle round trip with a local sandbox transport', () =
     git(checkout, ['update-ref', `refs/heads/${p.claim.item.result.branch}`, unrelated.stdout]);
     expect((await host.verify('local', p.claim.item)).passed).toBe(false);
     expect(validateCandidate).not.toHaveBeenCalled();
-  }, 120000);
+  }, TEST_MS['harness-bundle']);
 
   it.each([
     { task: '1.2', agent: 'hosted/codex', reason: 'another known task' },
@@ -259,7 +264,7 @@ describe('B124: real git bundle round trip with a local sandbox transport', () =
     } finally {
       vi.restoreAllMocks();
     }
-  }, 120000);
+  }, TEST_MS['harness-bundle']);
 
   it('checks returned commits and delegates bundles to the validator while preserving the source checkout', async () => {
     const p = project();
@@ -306,5 +311,5 @@ describe('B124: real git bundle round trip with a local sandbox transport', () =
     expect(remoteCalls.join('\n')).not.toContain(p.claim.claim.id);
     expect(fs.existsSync(path.join(checkout, 'openspec/.sdlc/board.json'))).toBe(false);
     vi.restoreAllMocks();
-  }, 120000);
+  }, TEST_MS['harness-bundle']);
 });

@@ -11,6 +11,7 @@ import type { TaskProgress } from './tasks.js';
 import { behaviourGapParams } from './verify-behaviour.js';
 import { lr, withLocalizedReason, type LocalizedReason } from './approval-gate.js';
 import type { GateEvaluation, GateStatus, LifecycleView } from './lifecycle.js';
+import { allChecksPassed } from './verify-merge.js';
 
 export interface VerifyGateInput {
   ref: ChangeRef;
@@ -28,6 +29,14 @@ export interface VerifyGateInput {
   upstreamOpen?: LocalizedReason;
 }
 
+/** The gate reason of a failed run by its record reason; a code failure has none. */
+const FAILED_KEYS: Record<string, string> = {
+  fingerprint_unavailable: 'gate.verifyFingerprintUnavailable',
+  remote_unavailable: 'gate.verifyRemoteUnavailable',
+  remote_no_answer: 'gate.verifyRemoteNoAnswer',
+  remote_dirty: 'gate.verifyRemoteDirty',
+};
+
 /** The verify-gate evaluation, the recorded run as the view shows it and the updated `upstreamOpen`. */
 export function evaluateVerifyGate(input: VerifyGateInput): {
   evaluation: GateEvaluation;
@@ -41,13 +50,17 @@ export function evaluateVerifyGate(input: VerifyGateInput): {
   if (state.verify) {
     const fresh = ref.archived
       || (!!input.fingerprint && !!state.verify.fingerprint && state.verify.fingerprint === input.fingerprint);
+    const fingerprint = input.skipFingerprint ? state.verify.fingerprint : input.fingerprint;
+    // An archived change keeps the verify state it was archived with: today's checks do not judge it (B330).
+    const passed = state.verify.status === 'passed'
+      && (ref.archived || allChecksPassed(state.verify, config, fingerprint, input.skipFingerprint));
     verification = {
-      status: state.verify.status === 'passed' ? (fresh ? 'passed' : 'stale') : 'failed',
+      status: passed ? (fresh ? 'passed' : 'stale') : state.verify.status === 'passed' ? 'stale' : 'failed',
       at: state.verify.at,
       ...(state.verify.commit ? { commit: state.verify.commit } : {}),
     };
-    // Fast mode cannot fingerprint the worktree; trust the last recorded result.
-    if (input.skipFingerprint && state.verify.status === 'passed') verification.status = 'passed';
+    // Fast mode cannot fingerprint the worktree; it still checks the configured command identities.
+    if (input.skipFingerprint && passed) verification.status = 'passed';
   }
   let status: GateStatus;
   let info: LocalizedReason | undefined;
@@ -73,8 +86,7 @@ export function evaluateVerifyGate(input: VerifyGateInput): {
     info = lr('gate.verifyStale');
   } else if (verification.status === 'failed') {
     status = 'failed';
-    info = lr(state.verify?.reason === 'fingerprint_unavailable'
-      ? 'gate.verifyFingerprintUnavailable' : 'gate.verifyFailed');
+    info = lr(FAILED_KEYS[state.verify?.reason ?? ''] ?? 'gate.verifyFailed');
   } else {
     status = 'pending';
     info = config.verify.commands.length === 0

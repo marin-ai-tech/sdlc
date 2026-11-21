@@ -45,6 +45,8 @@ step typecheck npm run typecheck
 for shard in 1/4 2/8 6/8 3/8 7/8 4/4; do
   step "test-${shard/\//-of-}" node scripts/test-shards.mjs --shard "$shard" --workers "$WORKERS"
 done
+# The files listed in test/unstable.json run apart from the shards, as a required stage of their own.
+step unstable node scripts/test-shards.mjs --unstable --workers "$WORKERS"
 
 echo "failed stages: ${failed[*]:-none}"
 [ "${#failed[@]}" -eq 0 ]

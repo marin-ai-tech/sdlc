@@ -2,6 +2,7 @@ import { spawnSync } from 'node:child_process';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
+import { addEveryFile, clearIndexFlags, NO_STAT_TRUST, seedFingerprintIndex } from './fingerprint-index.js';
 
 export interface GitResult {
   ok: boolean;
@@ -61,8 +62,9 @@ export function hasUncommittedChanges(cwd: string, excludePaths: string[] = []):
  *
  * It depends only on file contents, never on commit state, so committing
  * verified code does not make the verification stale, while any content
- * change does. Computed in a throwaway index seeded from the real one, so git
- * reuses its stat cache and only rehashes modified files.
+ * change does. Computed in a throwaway index seeded from the real one, which
+ * keeps tracked ignored files and file modes; git reads the content of every
+ * file and trusts no stat cache or index flag (B326, fingerprint-index.ts).
  */
 export function worktreeFingerprint(cwd: string, excludePaths: string[] = []): string | undefined {
   const top = git(cwd, ['rev-parse', '--show-toplevel']);
@@ -79,10 +81,12 @@ export function worktreeFingerprint(cwd: string, excludePaths: string[] = []): s
   if (!indexPath.stdout) return undefined;
   const tmpIndex = path.join(os.tmpdir(), `sdlc-index-${process.pid}-${Date.now()}-${Math.random().toString(36).slice(2)}`);
   try {
-    if (!copyFingerprintIndex(indexPath.stdout, tmpIndex)) return undefined;
+    if (!seedFingerprintIndex(indexPath.stdout, tmpIndex)) return undefined;
     const env = { ...process.env, GIT_INDEX_FILE: tmpIndex };
-    const run = (args: string[]) => spawnSync('git', args, { cwd: top.stdout, env, encoding: 'utf-8', maxBuffer: 64 * 1024 * 1024 });
-    if (run(['add', '-A', '--', '.']).status !== 0) return undefined;
+    const run = (args: string[], input?: string) => spawnSync('git', [...NO_STAT_TRUST, ...args],
+      { cwd: top.stdout, env, input, encoding: 'utf-8', maxBuffer: 64 * 1024 * 1024 });
+    if (!clearIndexFlags(run, top.stdout, tmpIndex)) return undefined;
+    if (!addEveryFile(run, top.stdout)) return undefined;
     for (const p of excludePaths) {
       const excluded = `${prefix.stdout}${p}`;
       if (run(['--literal-pathspecs', 'rm', '-r', '--cached', '-q', '--ignore-unmatch', '--', excluded])
@@ -99,16 +103,6 @@ export function worktreeFingerprint(cwd: string, excludePaths: string[] = []): s
     } catch {
       // best effort
     }
-  }
-}
-
-/** A missing index is legitimate before staging; unreadable index evidence must never become an empty seed. */
-function copyFingerprintIndex(source: string, target: string): boolean {
-  try {
-    fs.copyFileSync(source, target);
-    return true;
-  } catch (error) {
-    return (error as NodeJS.ErrnoException).code === 'ENOENT';
   }
 }
 

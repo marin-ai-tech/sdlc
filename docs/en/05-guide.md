@@ -619,6 +619,109 @@ a timeout; failure to clean up a required check still fails verification. The ac
 an already detached, reparented POSIX orphan outside the owned group may survive; unhandled `SIGKILL` has no
 cleanup guarantee.
 
+### Remote checks
+
+A suite that is too heavy for your machine can run on a server of the project.
+Mark its command with `remote: true` in `openspec/sdlc.yaml`.
+The command is the project's own script; it owns the transport: ssh, locks and retries.
+sdlc never connects to the server and never runs the check twice.
+
+```yaml
+verify:
+  commands:
+    - name: suite
+      run: node scripts/remote-suite.mjs
+      remote: true
+      timeout_seconds: 3600
+```
+
+A remote check runs only on a commit.
+Before it starts, the files on disk outside `openspec/` must be the commit at HEAD.
+Otherwise the check fails with `remote_dirty` and the output names up to ten files that differ.
+With no commit at all it fails with `remote_no_commit`.
+A refused check never starts.
+
+The script receives three variables:
+
+- `SDLC_VERIFY_COMMIT` is the full id of the commit to test.
+- `SDLC_VERIFY_ANSWER` is a path in a fresh temporary folder. The file does not exist when the script starts.
+- `SDLC_VERIFY_LOG` is a file under `verification/remote/` in the change folder. Write the full log there.
+
+The kept log is one file per check, named after the check.
+Each run overwrites it, so it always belongs to the recorded result.
+When it is larger than 8 MiB, sdlc keeps only its last 8 MiB and says so in its first line.
+The kept log may hold secrets of the server, such as keys or passwords.
+Your script must redact them before it writes the log.
+If the log folder is a link or cannot be created, the check still runs and no log is kept.
+
+sdlc sets them last, so an inherited value never reaches the script.
+When the script is done, it writes a JSON object to the answer path:
+
+```json
+{ "commit": "<the value of SDLC_VERIFY_COMMIT>", "status": "passed" }
+```
+
+The check passes only when the script exits 0 and the answer names the same `"commit"` with `"status"` `passed`.
+The answer must be a regular file of at most 64 KiB.
+It is UTF-8 JSON; a byte order mark at the start is tolerated.
+An answer about another commit, or with the status `failed`, fails the check like a code failure.
+Two outcomes are not about the code:
+
+- `remote_unavailable`: the answer names the commit with the status `busy` or `unavailable`.
+- `remote_no_answer`: there is no valid answer, or the check timed out.
+
+When every failed required check has one of these reasons, the run records it too.
+Then `sdlc verify`, `sdlc next` and `sdlc explain` tell you to check the server and the script log.
+When every failed required check was refused for its tree, the run records `remote_dirty`.
+Then the advice is to commit or revert the changes and run `sdlc verify` again.
+A code failure in another check keeps the usual advice to fix the code.
+The evidence row of a remote check names its kept log file, or says that no log was written.
+
+A connection can drop during a long run.
+Let the wrapper on the server start the run detached and write its answer when the run is done.
+After a drop, the client asks for that answer again instead of starting a second run.
+Here is a server wrapper, `/srv/ci/run-suite.sh`.
+It reads `start <commit>` or `answer <commit>` from the ssh command line:
+
+```bash
+#!/bin/sh
+set -eu
+set -- $SSH_ORIGINAL_COMMAND
+action=$1
+commit=$2
+case "$commit" in *[!0-9a-f]*|'') echo "bad commit" >&2; exit 2 ;; esac
+run="$HOME/runs/$commit"
+case "$action" in
+  start)
+    mkdir -p "$run"
+    if [ ! -e "$run/started" ]; then
+      touch "$run/started"
+      setsid sh -c "/srv/ci/test-commit.sh $commit > $run/log 2>&1; echo \$? > $run/exit" < /dev/null &
+    fi ;;
+  answer)
+    if [ ! -e "$run/exit" ]; then echo '{"status":"running"}'; exit 0; fi
+    status=failed
+    [ "$(cat "$run/exit")" = 0 ] && status=passed
+    printf '{"commit":"%s","status":"%s"}\n' "$commit" "$status" ;;
+  log) cat "$run/log" ;;
+  *) echo "unknown action" >&2; exit 2 ;;
+esac
+```
+
+The client script, the command in `sdlc.yaml`, sends `start`, then asks for `answer` every minute.
+A dropped connection only ends one request, so the next request reaches the same run.
+When the answer is no longer `running`, the client fetches the log into `SDLC_VERIFY_LOG`,
+writes the answer to `SDLC_VERIFY_ANSWER` and exits 0.
+When the server is busy, the client writes `{"commit": "...", "status": "busy"}` and exits.
+Give the key of the client one fixed command on the server, with a line like this in `authorized_keys`:
+
+```text
+command="/srv/ci/run-suite.sh",restrict ssh-ed25519 AAAA... verify-client
+```
+
+The `remote` field needs a version of sdlc that knows it on every machine that runs `sdlc verify`.
+An older version ignores the field and runs the command as an ordinary check: no commit check and no answer check.
+
 ### Open questions answered by a person
 
 Open questions under `## Open questions` in intent.md, proposal.md or design.md need a person's answer before the intent
@@ -1137,6 +1240,7 @@ verify:
   timeout_seconds: 900
   output_lines: 40
   require_behaviour: false    # true: the gate also needs the behavioural table, one row per scenario (0.18.0)
+  reuse: false                # true: record another change's passing run on the same tree instead of running the checks
 review:
   policy: REVIEW.md
   passes: [bugs, security, compliance]
@@ -1230,6 +1334,12 @@ not required, it does not appear. An agent can never approve it.
 `verify.require_behaviour: true` (default `false`) makes the verify gate also need the behavioural table
 of `verification.md`: one row per spec scenario, as `sdlc verify --check --strict` checks it. Without the rows the
 gate is not satisfied, its reason names the uncovered scenarios, and `sdlc next` asks the agent to fill the table.
+
+`verify.reuse: true` (default `false`) lets `sdlc verify` record a passing run of another change instead of running
+the checks. It does so only on the same code tree. Every configured check must have passed there with the same
+command, timeout and unstable list, and that change's log must confirm the run. No check runs, so enabling it is a
+weakening, and `sdlc config propose` warns about it. `sdlc verify --no-reuse` always runs the checks. An older sdlc
+refuses the key as invalid configuration.
 
 `issues: { server, repo }` links the backlog to GitHub Issues through the team's GitHub MCP server:
 `server` is a name in `mcp.servers`, and `repo` is `owner/name`. sdlc holds no token; the server has it. See

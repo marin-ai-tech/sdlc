@@ -27,6 +27,14 @@ function gate(view: LifecycleView, id: GateId): GateEvaluation {
   return view.gates.find((g) => g.id === id)!;
 }
 
+/** The next step after a failed run by its gate reason; a code failure has none. */
+const FAILED_NEXT: Record<string, string> = {
+  'gate.verifyFingerprintUnavailable': 'next.verifyFingerprintUnavailable',
+  'gate.verifyRemoteUnavailable': 'next.verifyRemoteUnavailable',
+  'gate.verifyRemoteNoAnswer': 'next.verifyRemoteNoAnswer',
+  'gate.verifyRemoteDirty': 'next.verifyRemoteDirty',
+};
+
 export function approveCli(change: string, gateId: GateId, role?: string): string {
   return `sdlc approve ${gateId} --change ${change}${role ? ` --as ${role}` : ''}`;
 }
@@ -104,9 +112,7 @@ export function nextAction(
       );
     }
     const verifyKey = verify.status === 'failed'
-      ? verify.reasonKey === 'gate.verifyFingerprintUnavailable'
-        ? 'next.verifyFingerprintUnavailable'
-        : 'next.verifyFailed'
+      ? FAILED_NEXT[verify.reasonKey ?? ''] ?? 'next.verifyFailed'
       : verify.status === 'stale'
         ? 'next.verifyStale'
         : 'next.verifyRun';

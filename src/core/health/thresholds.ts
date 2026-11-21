@@ -19,6 +19,7 @@ export interface HealthThresholds {
   rejections: number;
   denials: number;
   lockDays: number;
+  unstableDays: number;
 }
 
 type Kind = 'positive' | 'share' | 'count';
@@ -41,6 +42,7 @@ const FIELDS: Record<string, Field> = {
   rejections: { name: 'rejections', kind: 'count' },
   denials: { name: 'denials', kind: 'count' },
   lock_days: { name: 'lockDays', kind: 'positive' },
+  unstable_days: { name: 'unstableDays', kind: 'positive' },
 };
 
 export const HEALTH_KEYS = Object.keys(FIELDS);
@@ -57,6 +59,7 @@ export const DEFAULT_HEALTH: Readonly<HealthThresholds> = Object.freeze({
   rejections: 2,
   denials: 5,
   lockDays: 7,
+  unstableDays: 14,
 });
 
 function fits(value: unknown, kind: Kind): boolean {

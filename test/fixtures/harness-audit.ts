@@ -13,6 +13,9 @@ import * as verification from '../../src/core/verify.js';
 import type { HarnessValidationRequest } from '../../src/executors/harness-validation.js';
 import { FILES } from '../farewell-fixture.js';
 import { git, humanEnv, initGitRepo, read, runCli, tempDir, write } from '../helpers.js';
+import { RUN_CLI_MS, TOOL_STEP_MS, timedStep } from './step-bounds.js';
+
+const STEPS = 'harness-audit';
 import { immutableBoardProject, reportBoardProject } from './immutable-board-project.js';
 
 interface AuditSource {
@@ -67,7 +70,10 @@ function configure(root: string, cli: (args: string[]) => unknown): void {
   write(path.join(root, 'check.cjs'), [
     "const fs=require('fs');",
     "if(fs.readFileSync('src/greet.js','utf8').trim()!=='// candidate')process.exit(1);",
-    'process.stdout.write(process.cwd());',
+    // H9 keeps the very bytes written to stdout: one buffer goes to both, and an existing file is never replaced.
+    "const out=Buffer.from(process.cwd(),'utf8');",
+    "if(process.env.SDLC_H9_RAW)fs.writeFileSync(process.env.SDLC_H9_RAW,out,{flag:'wx'});",
+    'process.stdout.write(out);',
   ].join('\n'));
   write(path.join(root, 'openspec/executors.yaml'), stringify({ executors: {
     hosted: { type: 'harness', max_risk: 'medium' },
@@ -164,12 +170,14 @@ export function auditRuntime(p: AuditProject) {
     fs.mkdirSync(sandbox, { recursive: true });
     const map = (value: string) => value.replace(/^\/workspace(?=\/|$)/, sandbox);
     if (argv[0] === 'sdlc') {
-      const result = runCli(argv.slice(1), map(workdir), p.env);
+      const result = timedStep(STEPS, `sdlc ${argv[1]}`, RUN_CLI_MS,
+        () => runCli(argv.slice(1), map(workdir), p.env), (r) => r.code);
       return { exitCode: result.code, stdout: result.stdout, stderr: result.stderr };
     }
-    const result = spawnSync(argv[0] === 'node' ? process.execPath : argv[0], argv.slice(1).map(map), {
-      cwd: map(workdir), env: p.env, input: stdin, encoding: 'utf8', timeout: 15000,
-    });
+    const result = timedStep(STEPS, `${path.basename(argv[0])} ${argv[1] ?? ''}`, TOOL_STEP_MS, () =>
+      spawnSync(argv[0] === 'node' ? process.execPath : argv[0], argv.slice(1).map(map), {
+        cwd: map(workdir), env: p.env, input: stdin, encoding: 'utf8', timeout: TOOL_STEP_MS,
+      }), (r) => r.status);
     return { exitCode: result.status ?? 1, stdout: result.stdout ?? '', stderr: result.stderr ?? '' };
   });
   return { exec, directory };

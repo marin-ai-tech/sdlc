@@ -48,6 +48,7 @@ function finishedByChange(log: LogEntry[]): Map<string, LogEntry[]> {
   const result = new Map<string, LogEntry[]>();
   for (const entry of log) {
     if (entry.event !== 'verify.passed' && entry.event !== 'verify.failed') continue;
+    if (entry.run?.trigger === 'reuse') continue;
     const id = entry.run?.id;
     if (id && seen.has(id)) continue;
     if (id) seen.add(id);

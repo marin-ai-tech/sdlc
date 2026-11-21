@@ -5,6 +5,7 @@ import type { LogEntry } from './log.js';
 import { defaultConfig, type SdlcConfig } from './config.js';
 import { participationOf, sumParticipation, type Participation, type ParticipationTotals } from './participation.js';
 import { summarizeVerifyRuns, type VerifyLogSummary } from './verify-runs.js';
+import { isReusedHistory } from './verify-reuse.js';
 import { approverWaitsOf, type ApproverWaits } from './approver-waits.js';
 import { countReviewRounds } from './review-rounds.js';
 
@@ -57,6 +58,7 @@ export interface FlowAggregate {
 
 function milestones(history: HistoryEvent[], created: string): Milestones {
   const last = (event: string) => [...history].reverse().find((h) => h.event === event)?.at;
+  // A reused pass passes the gate (B183), so it marks `verified`; only the run counts skip it.
   const firstAfter = (event: string, after?: string) =>
     history.find((h) => h.event === event && (!after || h.at >= after))?.at;
   const plan = last('gate.plan.approved');
@@ -126,7 +128,7 @@ function attemptsToPass(runs: HistoryEvent[]): number | undefined {
  */
 export function changeMetrics(state: ChangeState, log: LogEntry[] = [], config?: SdlcConfig): ChangeMetrics {
   const m = milestones(state.history, state.created);
-  const verifyRuns = state.history.filter((h) => h.event.startsWith('verify.'));
+  const verifyRuns = state.history.filter((h) => h.event.startsWith('verify.') && !isReusedHistory(h));
   const firstRun = verifyRuns[0]?.event;
   const waits = waitsOf(state, log);
   return {

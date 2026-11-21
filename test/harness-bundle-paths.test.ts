@@ -16,6 +16,9 @@ import type { HarnessRuntime } from '../src/executors/harness-runtime.js';
 import type { HarnessValidationRequest } from '../src/executors/harness-validation.js';
 import { FILES } from './farewell-fixture.js';
 import { git, humanEnv, initGitRepo, read, runCli, tempDir, write } from './helpers.js';
+import { RUN_CLI_MS, TEST_MS, TOOL_STEP_MS, timedStep } from './fixtures/step-bounds.js';
+
+const STEPS = 'harness-bundle-paths';
 
 /**
  * B151 (review finding F9 of harness-runtime-prototype): the harness candidate check (B124) uses the same result
@@ -73,12 +76,14 @@ function localRuntime(p: ReturnType<typeof project>, sandbox: string) {
   const mapPath = (value: string) => value.replace(/^\/workspace(?=\/|$)/, sandbox);
   return { exec: async (_session: string, argv: string[], stdin = '', workdir = '/workspace') => {
     if (argv[0] === 'sdlc') {
-      const result = runCli(argv.slice(1), mapPath(workdir), p.env);
+      const result = timedStep(STEPS, `sdlc ${argv[1]}`, RUN_CLI_MS,
+        () => runCli(argv.slice(1), mapPath(workdir), p.env), (r) => r.code);
       return { exitCode: result.code, stdout: result.stdout, stderr: result.stderr };
     }
-    const result = spawnSync(argv[0] === 'node' ? process.execPath : argv[0], argv.slice(1).map(mapPath), {
-      cwd: mapPath(workdir), env: p.env, input: stdin, encoding: 'utf8', timeout: 15000,
-    });
+    const result = timedStep(STEPS, `${path.basename(argv[0])} ${argv[1] ?? ''}`, TOOL_STEP_MS, () =>
+      spawnSync(argv[0] === 'node' ? process.execPath : argv[0], argv.slice(1).map(mapPath), {
+        cwd: mapPath(workdir), env: p.env, input: stdin, encoding: 'utf8', timeout: TOOL_STEP_MS,
+      }), (r) => r.status);
     return { exitCode: result.status, stdout: result.stdout ?? '', stderr: result.stderr ?? '' };
   } };
 }
@@ -142,7 +147,7 @@ describe('B151: the harness candidate check sees renames and unreadable diffs', 
     } finally {
       vi.restoreAllMocks();
     }
-  }, 120000);
+  }, TEST_MS['harness-bundle-paths']);
 
   it('refuses a candidate when the result check reports diff_unavailable', async () => {
     // Guard, green before and after B151: the host already refuses any result that is not ok. A verified bundle
@@ -162,5 +167,5 @@ describe('B151: the harness candidate check sees renames and unreadable diffs', 
     } finally {
       vi.restoreAllMocks();
     }
-  }, 120000);
+  }, TEST_MS['harness-bundle-paths']);
 });

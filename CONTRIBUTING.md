@@ -14,8 +14,9 @@ Thank you for helping improve sdlc.
    `dist/` is build output and is not committed. Releases are built by CI on a
    version tag (`.github/workflows/release.yml`): the archive is attached to the
    GitHub release and the `release` branch gets the built code for installs from
-   git. After changing workflow, agent or hook templates,
-   regenerate the Claude Code plugin with
+   git. A failed branch push is retried, and re-running the failed job repeats
+   the branch step without replacing the published archive. After changing
+   workflow, agent or hook templates, regenerate the Claude Code plugin with
    `node bin/sdlc.js plugin build plugin --marketplace`.
 3. **Notices.** Keep the `Required Notice:` lines in the license files and in
    generated files.

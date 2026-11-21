@@ -25,6 +25,9 @@
   `SDLC-Change` / `SDLC-Task` trailers. Follow project rules for commit execution; where a person reserves commits,
   offer the commands for them to run or confirm and execute no commit. Respect project attribution policy;
   when the owner forbids AI attribution, add no AI attribution, `SDLC-Agent` or AI co-authorship commit trailers.
+- **Unstable tests**: a test that fails once and passes alone goes to `verify.unstable` in `openspec/sdlc.yaml`
+  with the backlog item that fixes it. Propose it with `sdlc config propose`; a person applies it. Never skip,
+  weaken or make such a test optional. After a failure, rerun only the failed checks: `sdlc verify --failed`.
 - OpenSpec is the specification subsystem: `sdlc openspec <args>` runs the bundled OpenSpec CLI (`list --specs`, `show`, `validate`, `instructions`). Change folders live in `openspec/changes/<id>/`.
 - **Change selection**: use the change named in the input. Otherwise run `sdlc status --json`; with exactly one active change use it, with several ask which one. Announce "Using change: <id>".
 - **Language**: talk to the person, and write notes and artifacts, in the person's language; when `locale:` is set in `openspec/sdlc.yaml`, use that language. Keep command names, file names, ids and the template headings as they are (sdlc and OpenSpec parse those headings).

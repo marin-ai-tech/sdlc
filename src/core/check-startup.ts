@@ -31,7 +31,8 @@ export function resolveCheckPowerShell(env: NodeJS.ProcessEnv = process.env): st
   throw new Error('PowerShell executable is missing. Windows verification requires PowerShell and Add-Type.');
 }
 
-export function startOwnedCheck(root: string, check: VerifyCommand): StartedCheck {
+export function startOwnedCheck(root: string, check: VerifyCommand, unstableTests = '',
+  remoteEnv: Record<string, string> = {}): StartedCheck {
   const windows = process.platform === 'win32';
   const executable = windows ? resolveCheckPowerShell() : check.run;
   const control = windows ? readyFile() : undefined;
@@ -39,7 +40,7 @@ export function startOwnedCheck(root: string, check: VerifyCommand): StartedChec
   const args = windows ? ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-File', wrapper] : [];
   try {
     const child = spawn(executable, args, { cwd: root, shell: !windows, detached: !windows, windowsHide: true,
-      stdio: ['ignore', 'pipe', 'pipe'], env: checkEnvironment(check, control) });
+      stdio: ['ignore', 'pipe', 'pipe'], env: checkEnvironment(check, control, unstableTests, remoteEnv) });
     const startup = control ? awaitReadiness(child, control) : { ready: Promise.resolve(), stop: () => {} };
     return { child, ready: startup.ready, dispose: () => {
       startup.stop();
@@ -56,10 +57,14 @@ function readyFile(): ReadyFile {
   return { dir, file: path.join(dir, 'started.json'), nonce: randomBytes(24).toString('hex') };
 }
 
-function checkEnvironment(check: VerifyCommand, control: ReadyFile | undefined): NodeJS.ProcessEnv {
+/** A remote check's three variables come last, so neither the parent nor a pack can plant them. */
+function checkEnvironment(check: VerifyCommand, control: ReadyFile | undefined,
+  unstableTests: string, remoteEnv: Record<string, string>): NodeJS.ProcessEnv {
   return { ...process.env, CI: process.env.CI ?? '1', FORCE_COLOR: '0', ...check.env,
+    SDLC_UNSTABLE_TESTS: unstableTests,
     ...(control ? { SDLC_VERIFY_COMMAND: check.run, SDLC_VERIFY_READY_FILE: control.file,
-      SDLC_VERIFY_READY_NONCE: control.nonce } : {}) };
+      SDLC_VERIFY_READY_NONCE: control.nonce } : {}),
+    ...remoteEnv };
 }
 
 function isReady(child: ChildProcess, control: ReadyFile): boolean {

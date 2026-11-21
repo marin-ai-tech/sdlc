@@ -5,6 +5,7 @@ import { SdlcError } from './errors.js';
 import { isFile } from './fs-utils.js';
 import type { HarnessStamp } from './license.js';
 import { readYamlObject } from './yaml-io.js';
+import { verifyOf } from './verify-record-parse.js';
 import { parseApprovalGatesWithRejected } from './approval-records.js';
 import { copyOpaqueDecisions, retainOpaqueDecisions, writeOpaqueDecisions } from './opaque-decisions.js';
 
@@ -105,7 +106,25 @@ export interface VerifyCommandRecord {
   duration_ms: number;
   required: boolean;
   timed_out?: boolean;
+  cleanup_failed?: boolean;
+  cancelled?: 'SIGINT' | 'SIGTERM';
+  fingerprint?: string;
+  run_id?: string;
+  attempt?: number;
+  /** The timeout the command ran under (B183): a reused run must match today's. */
+  timeout_seconds?: number;
+  /** A remote check (`remote: true`); absent for a local one. Part of the check's identity. */
+  remote?: true;
+  /** Why a remote check failed without saying anything about the code; absent for a code failure. */
+  reason?: CommandRemoteReason;
+  /** The remote check's kept log, relative to the change folder; absent when the script wrote none. */
+  log?: string;
+  /** A remote check that exited 0 but whose answer did not pass. */
+  answer_failed?: true;
 }
+
+export type CommandRemoteReason = 'remote_dirty' | 'remote_no_commit' | 'remote_unavailable' | 'remote_no_answer';
+export type RemoteRunReason = 'remote_unavailable' | 'remote_no_answer' | 'remote_dirty';
 
 /** An MCP check of `sdlc verify` (B12): the CLI called the tool itself; the answer stays in the evidence. */
 export interface VerifyMcpRecord {
@@ -117,6 +136,10 @@ export interface VerifyMcpRecord {
   reason?: string;
   duration_ms: number;
   provider_ms?: number;
+  args_digest?: string;
+  fingerprint?: string;
+  run_id?: string;
+  attempt?: number;
 }
 
 export interface VerifyRecord extends Provenance {
@@ -126,7 +149,11 @@ export interface VerifyRecord extends Provenance {
   started_at?: string;
   commit?: string;
   fingerprint?: string;
-  reason?: 'fingerprint_unavailable';
+  reason?: 'fingerprint_unavailable' | RemoteRunReason;
+  /** Set when this record reuses another change's passing run (B183). */
+  reused_from?: { change: string; run_id: string };
+  /** The digest of the unstable list the run used (B183); a record without it is never reused. */
+  unstable_digest?: string;
   results: VerifyCommandRecord[];
   /** The MCP checks of the run; absent when the project has none. */
   mcp?: VerifyMcpRecord[];
@@ -314,7 +341,7 @@ export function readChangeState(changeDir: string): ChangeState {
     ...answersOf(raw.answers),
     ...(isSeq(raw.seq) ? { seq: raw.seq } : {}),
     gates,
-    ...(raw.verify && typeof raw.verify === 'object' ? { verify: raw.verify as VerifyRecord } : {}),
+    ...verifyOf(raw.verify),
     history: Array.isArray(raw.history) ? (raw.history as HistoryEvent[]) : [],
   };
   keptApprovals.set(state, rejected);

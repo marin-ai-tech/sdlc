@@ -52,6 +52,9 @@ Run the project verify commands before claiming a change is done:
 6. Prefer small, reversible steps; do not invent scope.
 7. Change `openspec/sdlc.yaml` and `openspec/roles.yaml` only through a settings proposal:
    `sdlc config propose` and the `sdlc-config` workflow. A person applies the proposal.
+8. A test that fails once and passes alone goes to `verify.unstable` in `openspec/sdlc.yaml` with the backlog
+   item that fixes it, through `sdlc config propose`. Never skip, weaken or make it optional. After a failure,
+   rerun only the failed checks: `sdlc verify --failed --change <id>`.
 
 <!-- sdlc:rules:start -->
 ## Team rules

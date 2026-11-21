@@ -37,7 +37,8 @@ export { WRITE_OPS } from './shell-writers.js';
 // Case-insensitive: Windows and macOS file systems ignore case, so `OPENSPEC/Backlog.md` is the same file.
 export const STATE_FILE_WRITE =
   new RegExp(
-    '\\.sdlc\\.yaml|\\.sdlc\\/(?:hook-)?log\\.jsonl|\\.sdlc\\/log\\.lock|\\.sdlc\\/team\\.json|' +
+    '\\.sdlc\\.yaml|\\.sdlc\\/(?:hook-)?log\\.jsonl|\\.sdlc\\/log-spool(?:\\/|\\b)|' +
+    '\\.sdlc\\/log\\.lock|\\.sdlc\\/team\\.json|' +
     '\\.sdlc\\/board\\.(?:json|lock)|\\.sdlc\\/(?:inbox|plugins)(?:\\/|\\b)|' +
     'openspec\\/(?:roles\\.yaml|executors\\.yaml|backlog\\.md)', 'i',
   );
@@ -45,15 +46,17 @@ export const STATE_FILE = new RegExp(
   '(^|/)\\.sdlc\\.yaml$|^openspec/\\.sdlc/(?:hook-)?log\\.jsonl$|' +
     '^openspec/\\.sdlc/(?:log\\.lock|team\\.json|board\\.json|board\\.lock)$' +
     '|^openspec/\\.sdlc/(?:log|board)\\.lock\\.writers(?:/.*)?$' +
-    '|^openspec/\\.sdlc/plugins(?:/.*)?$|^openspec/\\.sdlc/inbox/[^/]+$' +
+    '|^openspec/\\.sdlc/plugins(?:/.*)?$|^openspec/\\.sdlc/log-spool(?:/.*)?$' +
+    '|^openspec/\\.sdlc/inbox/[^/]+$' +
     '|^openspec/(?:roles\\.yaml|executors\\.yaml|backlog\\.md)$',
   'i'
 );
 /** The backlog's order and removal are a person's decision; agents change the file through `sdlc backlog`. */
 export const BACKLOG_FILE = 'openspec/backlog.md';
 
-/** Folders that hold state files: openspec/, the change folders (active and archived), openspec/.sdlc, the inbox. */
-const STATE_FOLDER = /^openspec(?:\/changes(?:\/archive)?(?:\/[^/]+)?|\/\.sdlc(?:\/inbox|\/plugins(?:\/.*)?)?)?$/i;
+/** Folders that hold state files: openspec/, the change folders, openspec/.sdlc, the inbox, the log spool. */
+const STATE_FOLDER = new RegExp('^openspec(?:/changes(?:/archive)?(?:/[^/]+)?|' +
+  '/\\.sdlc(?:/inbox|/(?:log-spool|plugins)(?:/.*)?)?)?$', 'i');
 
 /** A root-relative path equal to or inside a protected state folder, including a trailing separator. */
 export function insideStateFolder(relative: string): boolean {
@@ -226,12 +229,13 @@ function stateCandidates(root: string, glob: string, folders: boolean): string[]
   if (literal === 'openspec' || literal.startsWith('openspec/')) dirs.add(literal);
   const pluginFiles = listFilesRecursive(path.join(root, 'openspec/.sdlc/plugins'))
     .map((name) => `openspec/.sdlc/plugins/${name}`);
+  const spoolDir = 'openspec/.sdlc/log-spool';
+  const spoolFiles = listFilesRecursive(path.join(root, spoolDir)).map(name => `${spoolDir}/${name}`);
   const files = [...FIXED_STATE_FILES, ...[...dirs].map((dir) => `${dir}/.sdlc.yaml`), ...inboxFiles(root),
-    ...pluginFiles, ...WRITER_COORDINATION_DIRS, ...writerCoordinationFiles(root)];
+    ...pluginFiles, spoolDir, ...spoolFiles, ...WRITER_COORDINATION_DIRS, ...writerCoordinationFiles(root)];
   if (!folders) return files;
   return [...files, 'openspec', 'openspec/changes', 'openspec/.sdlc', INBOX_DIR, ...dirs];
 }
-
 /** The state files and the folders that hold them. */
 const STATE_SET: ProtectedSet = { file: STATE_FILE, folder: STATE_FOLDER, candidates: stateCandidates };
 

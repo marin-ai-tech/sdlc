@@ -7,9 +7,9 @@ const CLEANUP_MS = 6500;
 const PIPE_DRAIN_MS = 250;
 
 export function runOwnedCheck(root: string, check: VerifyCommand, timeoutSeconds: number,
-  outputLines: number): Promise<CheckOutcome> {
+  outputLines: number, unstableTests = '', remoteEnv: Record<string, string> = {}): Promise<CheckOutcome> {
   return new Promise((resolve) => {
-    new CheckLifecycle(root, check, timeoutSeconds, outputLines, resolve).begin();
+    new CheckLifecycle(root, check, timeoutSeconds, outputLines, unstableTests, remoteEnv, resolve).begin();
   });
 }
 
@@ -34,11 +34,13 @@ class CheckLifecycle {
 
   constructor(private readonly root: string, private readonly check: VerifyCommand,
     private readonly timeoutSeconds: number, private readonly outputLines: number,
+    private readonly unstableTests: string,
+    private readonly remoteEnv: Record<string, string>,
     private readonly resolve: (result: CheckOutcome) => void) {}
 
   begin(): void {
     try {
-      this.prepared = startOwnedCheck(this.root, this.check);
+      this.prepared = startOwnedCheck(this.root, this.check, this.unstableTests, this.remoteEnv);
       const child = this.prepared.child;
       this.shell = checkShell(child);
       child.stdout?.on('data', (chunk: Buffer) => this.keep(chunk));
