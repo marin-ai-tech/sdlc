@@ -458,7 +458,9 @@ reach the agent through the inbox.
 - With `wait_while`, a queued or in-progress CI run is polled until it finishes or the wait limit expires.
 - Plain lists match item by item and by exact length. Use
   `expect: { workflow_runs: { $any: { conclusion: success } } }` to match a run in a list.
-- `sdlc verify --only ci-green` runs only that check. It records evidence but never passes the gate.
+- `sdlc verify --only ci-green` runs only that check. It records evidence, and it never passes on its own.
+  Its result joins the passed results of earlier runs on the same code, and then the gate can pass.
+  A `${HEAD}` check counts only when the tree verify recorded is the tree of that commit.
 - `sdlc verify --list` shows the MCP checks (name, server, tool, required) next to the commands.
 - The agent cannot edit the evidence or the inbox files: the hook denies it (`sdlc guide denials#state-integrity`).
 - When CI produces inbox results, CI has to commit them; the inbox travels by git.

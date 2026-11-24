@@ -23,6 +23,9 @@ sdlc health --json
   repeated hook denials of one rule, long test locks.
 - Configuration: no verification commands, enforcement off or warn, one person holding every role, signing off, stale
   context packs, `sdlc doctor` problems.
+- Configuration also reports a test file that has been on `verify.unstable` for longer than `unstable_days`.
+  The finding is a warning. It names the file, the backlog item and the days listed.
+  Fix the test and ask a person to remove the file with a config proposal. Nothing removes it by itself.
 - It always exits 0: it advises, it never blocks.
 
 Thresholds live under `health` in `openspec/sdlc.yaml`; every key has a default:
@@ -40,6 +43,7 @@ health:
   rejections: 2        # repeated rejections of one gate on one change
   denials: 5           # denials of one hook rule in the window
   lock_days: 7
+  unstable_days: 14    # a file listed in verify.unstable for longer is a finding
 ```
 
 When a `bad` finding appears, the agent's session start says so in one line, `health.degraded` is logged and sent to

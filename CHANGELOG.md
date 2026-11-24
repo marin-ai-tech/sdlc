@@ -2,6 +2,28 @@
 
 All notable changes to sdlc. Versions follow [Semantic Versioning](https://semver.org/); while the major version is 0, a minor version may change behavior.
 
+## 0.34.1 — 2026-11-24
+
+### Fixed
+- A verify check with `required: false` again fails neither `sdlc verify` nor the verify gate, as before 0.34.0. It
+  still runs and is recorded, and it still needs a result on the current code that was not cancelled; a changed
+  `required` flag makes older results stale. A required check must pass as before, and reusing another change's run
+  still needs every configured check passed. The 0.34.0 notes said the gate needs every configured check; it needs
+  every required one.
+- A 0.34.0 record that failed only on an optional check stays failed until `sdlc verify --failed` reruns that check;
+  no record is rewritten. A record of 0.34.1 that passed beside a failed optional check reads as stale in 0.34.0.
+
+### Changed
+- The reference guide, the architecture, the course and the handbook, and the `sdlc guide` pages on verify, config
+  and health describe the unstable group, failed-only reruns, remote checks, evidence reuse and the log spool.
+
+### Known limits
+- A config proposal that makes a required verify check optional gives no weakening warning.
+- Changing the `expect` or `wait_while` of an MCP verify check does not make its older results stale.
+- On Linux, a writer that reads another writer's lock ticket while that ticket is being deleted can stop with
+  `writer_locked` ("Unsafe writer ownership metadata") instead of waiting; running the command again succeeds. The
+  same race on Windows is the known `EPERM` case. Both exist since 0.30.0.
+
 ## 0.34.0 — 2026-11-20
 
 Verification you can trust and afford. A known unstable test fails only its own check and is rerun alone, a heavy

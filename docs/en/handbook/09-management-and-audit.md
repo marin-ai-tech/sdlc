@@ -243,7 +243,8 @@ into backlog items that Megan orders.
    - `stalled_days: 14` and `deferred_days: 30`;
    - `first_pass_rate: 0.5` and `waiver_share: 0.3`;
    - `reapprovals: 3` and `rejections: 2`;
-   - `denials: 5` and `lock_days: 7`.
+   - `denials: 5` and `lock_days: 7`;
+   - `unstable_days: 14`: a file listed in `verify.unstable` for longer than this is a warning.
 
    The report's Markdown lists the newest 20 events unless `--since` asks for the full period; JSON keeps the
    latest 200 events. The dashboard shows agent log events beside agent commits.

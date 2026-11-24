@@ -130,6 +130,10 @@ The findings cover four areas. A bad finding can add a session-start hint; a war
   It checks repeated gate approvals, repeated hook denials of one rule (with the guide article) and long test locks.
 - **Configuration:** no verification commands (bad), enforcement off (bad) or warn, and one person holding every role.
   It also checks signing off, stale context packs and `sdlc doctor` problems.
+  A test file that stays on the `verify.unstable` list longer than `health.unstable_days` (14 by default) is a warning.
+  The finding names the file, the backlog item that should fix it and the days it has been listed.
+  Health only reports it. It does not skip, retry or remove anything, and the list changes only by a person's
+  config proposal.
 
 The session start looks only at findings that can be bad because that check is cheap.
 The dashboard skips expensive doctor, plan drift and trace checks. `sdlc health` looks at everything.

@@ -955,7 +955,9 @@ behavioural verification, and let Grace confirm that every scenario was exercise
   for a check that uses `${HEAD}`: the check fails with a reason to commit (and push) first. Commit, push, let CI finish, then run
   `sdlc verify`.
 - `sdlc verify --list` shows the `verify.mcp` checks (name, server, tool, required) next to the commands.
-- `sdlc verify --only <names>` runs some checks for a quick look but never passes the gate.
+- `sdlc verify --only <names>` runs some checks for a quick look. An `--only` run that leaves out a check never passes on its own.
+  Its results join the passed results of earlier runs on the same code, and then the gate can pass.
+  `sdlc verify --failed` reruns only the checks that did not pass.
 - Editing the evidence block by hand changes nothing: the gate reads the result that `sdlc verify` stored in the
   change record (`.sdlc.yaml`, which only the CLI writes), and the next run rewrites the block.
 

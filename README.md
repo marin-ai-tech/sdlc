@@ -34,6 +34,7 @@ your `openspec/` folder stays a plain OpenSpec project, and `openspec` and `/ops
   people, and approvals can be required to arrive in signed commits.
 - **Evidence, not claims.** `sdlc verify` runs your real checks and ties their output to a fingerprint of the working
   tree; change the code and the evidence goes stale. Review findings are graded and tracked to their status.
+  `sdlc verify --failed` reruns only the failed checks, and a heavy suite can run on the project's own server.
 - **One process, six agents.** The same workflows, subagents and guards for every supported tool, so a team can mix
   tools.
 - **Everything in git.** The backlog, approvals, evidence and an append-only log live in the repository; the audit,

@@ -346,6 +346,10 @@ Find the symptom first, then check its cause and suggested next step.
 | The spec gate refuses with `debate_required` | `design.debate: true` and design.md has no full `## Debate` | the agent runs the debate in `/sdlc:spec` |
 | The verify gate cannot pass | no `verify.commands`, or a required check fails | add the commands (a person); fix the code; `sdlc verify` again |
 | Verify fails with `fingerprint_unavailable` although every check passed | no worktree fingerprint: the project is not in a git repository, or git cannot read its index | put the project in a git repository and check `git status`; `sdlc verify` again; do not change the code or the tests |
+| Verify fails with `remote_unavailable` | a `remote: true` check got the status `busy` or `unavailable` from the server | look at the server and the log in `verification/remote/`; run `sdlc verify --failed` when it is free; sdlc never retries |
+| Verify fails with `remote_no_answer` | the script left no valid answer file, or the check timed out | read the log in `verification/remote/`; fix the script or raise `timeout_seconds`; run `sdlc verify --failed` |
+| Verify fails with `remote_dirty` | files outside `openspec/` are not the HEAD commit, or there is no commit, so the remote check never started | commit or revert the files the output names; run `sdlc verify` again |
+| `sdlc verify --failed` is refused | `--only` was also given, there is no earlier run, the code or a check changed, or nothing failed | run `sdlc verify`; use `--failed` only on the same code |
 | The agent cannot stop: "Change … cannot be evaluated" | an artifact of that change is unreadable or links outside its folder | a person inspects the change named in the message and repairs or removes the artifact; `sdlc status` shows the error |
 | Verification became stale with no code change | a new file outside `openspec/` (a report, a dashboard, an export) or a regenerated agent file | add `reports/` to `.gitignore`; write exports outside the repository; run `sdlc verify` again |
 | The review gate stays blocked | open findings at a blocking severity, or lens coverage missing | `sdlc review check --change <id>`; fix or defer (`sdlc defer add`) |
@@ -525,7 +529,7 @@ Claude Code spelling; in Cursor, OpenCode, Qwen Code and GigaCode use `/sdlc-<na
 | Run in the terminal | Ask the agent |
 |---|---|
 | `sdlc verify --change <id> --check [--strict]` (scenarios without a verification row) | `/sdlc:verify` |
-| `sdlc verify --list`, `sdlc verify --only <names>` | `/sdlc:triage <failing build>` |
+| `sdlc verify --list`, `sdlc verify --only <names>`, `sdlc verify --failed` | `/sdlc:triage <failing build>` |
 | `sdlc trace <id>` (scenarios without evidence) | |
 | `sdlc tests unlock --change <id>` **(person)**, only when a locked test is really wrong | |
 | `sdlc defer add "<title>" --why "…" --change <id>` | |
@@ -748,7 +752,7 @@ commands also take `--json` and, with several active changes, `--change <id>`.
 | `sdlc track set full\|lite --change <id>` | a person | set the full or the lite track |
 | `sdlc tests lock --change <id>` | anyone | lock the test files of a bug fix |
 | `sdlc tests unlock --change <id>` | a person | unlock the test files |
-| `sdlc verify [--change <id>] [--check] [--list]` | anyone | run the configured checks and record literal evidence (the verify gate) |
+| `sdlc verify [--change <id>] [--check] [--list] [--only <names>] [--failed] [--no-reuse]` | anyone | run the configured checks and record literal evidence; `--only` and `--failed` run some checks, and the results of several runs on the same code make the gate |
 | `sdlc review context\|check --change <id>` | anyone | the review context (diff, policy, plan drift, lenses), or the open blocking findings |
 | `sdlc review suggest --change <id>` | anyone | suggest a reviewer, owners of the changed files first |
 | `sdlc release check --change <id>` | anyone | run the `release.mcp` checks without approving; writes nothing |

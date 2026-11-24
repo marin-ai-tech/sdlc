@@ -308,8 +308,9 @@ describe('B265: the tools in the repository', () => {
     expect(text).not.toMatch(/--privileged|--network host|\/var\/run\/docker\.sock/);
   });
 
-  it('the waits and the limit of one command fit inside the limit of a verify command', () => {
+  it('the waits and the limit of one command fit inside the limit of a verify command', async () => {
     const text = read(path.join(tools, 'test.sh'));
+    const runner = await import('../scripts/sandbox/remote-test.mjs');
     const seconds = (name: string): number => {
       const value = new RegExp(`^${name}=(\\d+)$`, 'm').exec(text)?.[1];
       expect(value, name).toBeDefined();
@@ -323,6 +324,12 @@ describe('B265: the tools in the repository', () => {
     const control = seconds('CONTROL_LIMIT_SECONDS');
     const afterTotal = control + seconds('LOG_LIMIT_SECONDS') + control;
     expect(seconds('TOTAL_LIMIT_SECONDS') + afterTotal, 'the kill, the logs and the removal after it').toBeLessThan(
+      VERIFY_LIMIT,
+    );
+    // B332: the copy of run.log by a second ssh runs after the server run, inside the same verify limit.
+    const copy: unknown = runner.LOG_COPY_SECONDS;
+    expect(typeof copy, 'remote-test.mjs exports LOG_COPY_SECONDS').toBe('number');
+    expect(seconds('TOTAL_LIMIT_SECONDS') + afterTotal + (copy as number), 'and the copy of the log').toBeLessThan(
       VERIFY_LIMIT,
     );
     expect(seconds('COMMAND_LIMIT_SECONDS'), 'the slowest shard took 1254 s').toBeGreaterThan(1254);

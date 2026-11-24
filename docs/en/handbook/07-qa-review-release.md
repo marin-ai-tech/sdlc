@@ -137,7 +137,16 @@ never evidence.
 ### Pitfalls
 
 - "Fix the code, not the test." In a bug fix the tests are locked (Chapter 6, [Section 6.7](06-developer.md#s6-7)).
-- `sdlc verify --only test` runs only the named checks. It never passes the gate.
+- `sdlc verify --only test` runs only the named checks. An `--only` run that leaves out a check never passes on its own.
+  Its results join the passed results of earlier runs on the same code, and then the gate can pass.
+  A changed file or command makes the older results stale.
+- `sdlc verify --failed` reruns only the checks that did not pass. It is refused with `--only`, with no earlier run,
+  after the code or a check changed, and when nothing failed.
+- A test file that fails now and then can be listed in `verify.unstable`, the unstable group.
+  Only a person changes the list, by a config proposal, and adding a file is a weakening warning.
+  `sdlc verify` gives the list to every command in `SDLC_UNSTABLE_TESTS`, one file per line.
+  The project's runner can run those files in one required check of their own, and `--failed` reruns that check alone.
+  sdlc never skips, retries or loosens a check. `sdlc health` reports a file listed longer than `health.unstable_days`.
 - With no checks configured, `sdlc verify` refuses. A person adds `verify.commands` to `openspec/sdlc.yaml`; the agent
   may only propose them (`[sdlc:guard-config]` denies its edit).
 - If `plan.md` lists files under "Files that change" that nobody touched, `sdlc verify` warns

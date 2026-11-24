@@ -7,36 +7,37 @@ summary: The main keys of openspec/sdlc.yaml and who may change them.
 ## Propose, review, apply
 
 Run `sdlc config propose --set enforcement.mode=warn --reason "Trial week"`. Use `--target roles` for
-`openspec/roles.yaml`, or `--file` for a complete proposed file. Propose validates without applying.
-Use `sdlc config show` to list proposals and `sdlc config show C1` for the diff and warnings.
-Use one proposal per change, with several `--set` options for related keys; `config apply` takes one id.
-Another open proposal for the file is named because applying either makes the other stale. The diff keeps
+`openspec/roles.yaml`, or `--file` for a whole file. Propose validates without applying.
+Use `sdlc config show` to list them and `sdlc config show C1` for the diff and warnings.
+Use one proposal per change, with several `--set` options for related keys.
+Another open proposal for the file is named: applying either makes the other stale. The diff keeps
 untouched lines and line endings. `signing_key` must be one OpenSSH public key line, not a path. Include
 `signing_since` when enabling signing to keep earlier approvals pre-signing; otherwise `config show` warns
-how many unsigned approvals will fail verification. This warning does not require `--yes`.
+how many unsigned approvals will fail verification. That warning needs no `--yes`.
 
 Only a person runs `sdlc config apply C1` or `sdlc config dismiss C1 --note "Not now"` in their own terminal.
 When `roles.yaml` exists, applying requires its `maintainer` role. A change to the target since the proposal makes
 it stale; propose again. A lower enforcement mode, a removed required gate or verify command, reduced protected or
 test paths, lite `auto_waive`, lower approval count, weaker signing or an empty role raises a warning and requires
-`--yes` to apply. Review the warning before deciding.
+`--yes` to apply.
 
-`openspec/sdlc.yaml` configures the process. **Only a person edits it**: the hook denies agent edits, because the file
-also controls the guard itself.
+`openspec/sdlc.yaml` configures the process. **Only a person edits it**: the hook denies agent edits, since the file
+also controls the guard.
 
-`log.hook_decisions: false` disables the local hook decision queue. With it enabled, the ignored
-`openspec/.sdlc/hook-log.jsonl` holds decisions until another CLI log write moves them to the shared log.
+`log.hook_decisions: false` disables the local hook decision queue (the ignored
+`openspec/.sdlc/hook-log.jsonl`, moved to the shared log by the next CLI log write).
 
 | Key | What it does |
 |---|---|
 | `gates.<gate>` | `required`, `approvers` (roles), `high_risk_approvers`, `min_approvals`, `auto_waive` (kinds, tracks; intent, spec, plan only; a kind an agent chose does not count) |
 | `rework.max_cycles` | reworks of one gate before `next` asks a person (default 3) |
-| `design.debate` | the debate lens: two advocates argue the key design decision before the spec gate (default off; `debate_sides`) |
-| `verify.commands` | the project's checks: `{ name, run, required }` |
+| `design.debate` | two advocates argue the key design decision before the spec gate (default off; `debate_sides`) |
+| `verify.commands` | the project's checks: `{ name, run, required }`; `remote: true` runs one on a server |
+| `verify.unstable`, `verify.reuse` | unstable test files; reuse of a passing run; adding a file or enabling reuse warns |
 | `verify.mcp`, `release.mcp` | checks the CLI calls on an MCP server, for the verify and the release gate |
 | `project.name` | the project's name in MCP and events (default: the folder name) |
 | `events` | receivers of process events: `{ server, tool, on, args }` |
-| `gates.<gate>.overdue_hours` | after how long a waiting gate raises an overdue event |
+| `gates.<gate>.overdue_hours` | hours before a waiting gate raises an overdue event |
 | `review` | `policy` (REVIEW.md), `passes`, `lenses`, `base`, `block_on` |
 | `release.commands` | regexes for production commands the agent may not run before the release approval |
 | `enforcement.mode` | `off`, `warn` (remind), `block` (deny process rules); hard rules apply in warn too |

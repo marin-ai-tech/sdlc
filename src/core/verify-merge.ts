@@ -45,7 +45,7 @@ function passed(result: CheckRecord): boolean {
   return 'command' in result ? commandPassed(result) : result.ok === true;
 }
 
-function configured(config: SdlcConfig): Array<{ name: string }> {
+function configured(config: SdlcConfig): Array<{ name: string; required: boolean }> {
   return [...config.verify.commands, ...(config.verify.mcp ?? [])];
 }
 
@@ -55,18 +55,43 @@ function resultFor(record: VerifyRecord, name: string): CheckRecord | undefined 
   return matches.length === 1 ? matches[0] : undefined;
 }
 
-export function allChecksPassed(record: VerifyRecord, config: SdlcConfig, fingerprint?: string,
-  skipFingerprint = false): boolean {
+function isCancelled(result: CheckRecord): boolean {
+  return 'cancelled' in result && result.cancelled !== undefined;
+}
+
+/**
+ * A check that must pass needs a passed result; any other needs a result that was not cancelled. The caller passes
+ * the flag from the configuration, never the one stored in the record.
+ */
+function outcomeOk(result: CheckRecord, mustPass: boolean): boolean {
+  if (mustPass) return passed(result);
+  return !isCancelled(result);
+}
+
+function checksPassed(record: VerifyRecord, config: SdlcConfig, fingerprint: string | undefined,
+  skipFingerprint: boolean, requirePassed: boolean): boolean {
   const checks = configured(config);
   if (checks.length === 0) return record.status === 'passed';
   if (!fingerprint && !skipFingerprint) return false;
-  return checks.every(({ name }) => {
+  return checks.every(({ name, required }) => {
     const result = resultFor(record, name);
     if (!result) return false;
     const fingerprintMatches = !fingerprint && skipFingerprint
       || fingerprintOf(result, record) === fingerprint;
-    return fingerprintMatches && sameIdentity(result, config) && passed(result);
+    const mustPass = requirePassed || required;
+    return fingerprintMatches && sameIdentity(result, config) && outcomeOk(result, mustPass);
   });
+}
+
+export function allChecksPassed(record: VerifyRecord, config: SdlcConfig, fingerprint?: string,
+  skipFingerprint = false): boolean {
+  return checksPassed(record, config, fingerprint, skipFingerprint, false);
+}
+
+/** Strict: every configured check passed. Reuse uses this so a failed optional is not a source. */
+export function allConfiguredChecksPassed(record: VerifyRecord, config: SdlcConfig, fingerprint?: string,
+  skipFingerprint = false): boolean {
+  return checksPassed(record, config, fingerprint, skipFingerprint, true);
 }
 
 function refuse(key: string, params?: Record<string, string>): never {

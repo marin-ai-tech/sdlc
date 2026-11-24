@@ -8,7 +8,7 @@ import { SdlcError } from './errors.js';
 import { t } from './i18n.js';
 import { readLog, type LogEntry } from './log.js';
 import type { ProjectPaths } from './project.js';
-import { allChecksPassed } from './verify-merge.js';
+import { allConfiguredChecksPassed } from './verify-merge.js';
 import type { VerificationRun } from './verify.js';
 import type { VerifyRunFacts } from './verify-runs.js';
 import { unstableDigest } from './verify-unstable.js';
@@ -122,7 +122,7 @@ function sameUnstable(record: VerifyRecord, config: SdlcConfig): boolean {
 function usable(record: VerifyRecord | undefined, config: SdlcConfig, fingerprint: string): record is VerifyRecord {
   return !!record && !!record.id && record.status === 'passed' && !record.reused_from
     && record.fingerprint === fingerprint
-    && allChecksPassed(record, config, fingerprint)
+    && allConfiguredChecksPassed(record, config, fingerprint)
     && sameTimeouts(record, config)
     && sameUnstable(record, config);
 }

@@ -12,17 +12,36 @@ missing deltas.
 
 ```bash
 sdlc verify --change add-export           # runs every check in verify.commands and verify.mcp
-sdlc verify --list                        # the configured checks
+sdlc verify --list                        # the checks; remote ones are marked
+sdlc verify --failed --change add-export  # only the failed checks
 sdlc verify --check --change add-export   # spec scenarios with no behavioural evidence
 ```
 
 ## What is recorded
 
-- The literal output of each command, in `verification.md`, with the exit code and the duration.
-- A fingerprint of the working tree. Committing keeps the evidence fresh; changing the code makes it stale, and the gate
-  waits for a new run.
+- The literal output of each command, in `verification.md`, with exit code and duration.
+- A fingerprint of the working tree. Committing keeps the evidence fresh; changing the code makes it stale.
 - MCP checks (`verify.mcp`): the CLI itself calls a tool of the team's MCP server (for example "is CI green for this
   commit?") and records the answer.
+
+## Several runs, one gate
+
+An `--only` run that leaves out a check never passes on its own.
+The gate passes when every required check has a passed result on this code, from any runs.
+`sdlc verify --failed` reruns only what did not pass.
+It is refused with `--only`, with no record, after a code or check change, or with nothing failed.
+
+## Unstable, remote and reused checks
+
+- `verify.unstable` lists unstable test files, passed in `SDLC_UNSTABLE_TESTS`.
+  sdlc never skips, retries or loosens a check.
+- `remote: true` runs a command on the project's server and can fail with `remote_unavailable`, `remote_no_answer`
+  or `remote_dirty`; its log is in `verification/remote/`.
+- `verify.reuse` is off by default. It records another change's passing run on the same code.
+  `sdlc verify --no-reuse` always runs the checks.
+- Unnamed checks get names like `test`.
+
+See also: `sdlc guide config`.
 
 ## What else the evidence says
 

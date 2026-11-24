@@ -92,6 +92,7 @@ These files hold project configuration, change records and generated state.
 | `openspec/.sdlc/manifest.json` | harness | sha256 of the generated files (edits by people are not overwritten), the sdlc version and the license they were created under |
 | `openspec/.sdlc/log.jsonl` | **CLI only** | project log: setup, gate decisions, verify runs, archives, license changes, hook denials; each line has `sdlc` (the version) and `license` |
 | `openspec/.sdlc/log.lock`, `board.lock` and their `.writers` folders | **CLI only** | writer locks and the shared ownership fence; kept out of Git through `.git/info/exclude` |
+| `openspec/.sdlc/log-spool/` | **CLI only** | log records that could not take a busy writer lock; the next writer appends them; kept out of Git; the hook refuses agent writes |
 | `openspec/.sdlc/plugins/` | **CLI only** | runtime plugin registry, acceptance records, per-plugin stores, receipts and pending events ([plugins](33-plugins.md)) |
 | `openspec/.sdlc/board.json`, `openspec/executors.yaml`, `openspec/.sdlc/team.json` | **CLI only** (the registry: a person) | the task board, the executor registry and the agent team record |
 | `docs/context/<name>.md` | people; `sdlc context pull` for `context.sources` | context packs with a header (owner, source, updated, fresh_days, stages); in git and reviewed like any file |
@@ -155,8 +156,10 @@ Mechanics:
 - **The worktree fingerprint for verify, review and release** is the git tree id of all files (tracked + untracked,
   excluding ignored files and `openspec/`). It is computed in a temporary index and does not depend on commits:
   committing verified code does not make the verification stale, while any change to the content does.
-  Git reads every file: the temporary index trusts no cached stat data, `assume-unchanged` or `skip-worktree` bit
-  of a file on disk, file monitor or `core.ignoreStat` (`src/core/fingerprint-index.ts`).
+  Every tracked file on disk is read again: the temporary index trusts no cached stat data, `assume-unchanged` or
+  `skip-worktree` bit of a file on disk, file monitor or `core.ignoreStat` (`src/core/fingerprint-index.ts`).
+  So an edit of the same size within the same second, or a restored modification time, changes the fingerprint.
+  A sparse checkout gets a fingerprint; a file that is absent from disk keeps its entry.
   Failed/empty index-path metadata or an unreadable index yields no fingerprint; it must not silently construct an
   unseeded tree that omits tracked ignored files. A legitimately absent index before staging and the relative
   index-path fallback for older Git remain supported. A run without a fingerprint, for example outside a git
@@ -173,6 +176,34 @@ Mechanics:
   previous finished run), `after_review`, `after_rework` or `changed`. A start without a finish counts as an
   unfinished run. Without `--change`, a run on branch `change/<id>` belongs to the active change `<id>`. The
   `ci-green` MCP check also keeps the provider's own run time as `provider_ms` when the answer gives it.
+- **Verify rules: merge, unstable, reuse, remote.** Each rule has its own module.
+  `src/commands/verify.ts` only joins them.
+  - `src/core/verify-merge.ts` merges the results of several runs by check name on the same fingerprint.
+    `allChecksPassed` is the gate: every required check has a passed result on the current fingerprint with an
+    unchanged identity (command, `required` flag, remote mark; server, tool and arguments for MCP checks).
+    An optional check needs a result there that was not cancelled; whether it passed does not count.
+    Reuse uses the strict `allConfiguredChecksPassed`: every configured check passed.
+    `mergeVerification` replaces only the checks that ran, so a partial run never passes alone.
+    `failedSelection` picks what `--failed` reruns and refuses it with `--only`, with no record, on another
+    fingerprint, after a check's identity changed and when nothing failed.
+  - `src/core/verify-unstable.ts` parses `verify.unstable`, builds `SDLC_UNSTABLE_TESTS` and the digest of the list.
+    It also gives the weakening warning for an added file. sdlc passes the list on and never skips a check.
+  - `src/core/verify-reuse.ts` finds another change's passing run on the same tree when `verify.reuse` is on.
+    It needs matching commands, timeouts and unstable digest, and a logged run that confirms each result.
+    `--no-reuse`, `--only` and `--failed` never reuse, and the reused run is not counted in run summaries.
+  - `src/core/verify-remote.ts` runs a `remote: true` command: a preflight on the HEAD tree, the three
+    `SDLC_VERIFY_*` variables, the judge of the answer file and the log cut to its last 8 MiB. It never retries.
+  - `src/core/verify-reason.ts` names the run reasons `remote_unavailable`, `remote_no_answer` and `remote_dirty`.
+  - `src/core/verify-record-parse.ts` reads the stored verify record and drops every optional field that is not
+    well formed, such as the per-result fingerprint, run id, attempt, timeout, remote log and `reused_from`.
+  - `src/core/verify-names.ts` derives names for checks that have none and finds equal explicit names.
+  - A `${HEAD}` MCP check (`src/mcp/checks.ts`) is called only when the recorded tree is the tree of HEAD.
+    The tree of the commit is read with replacement objects off (`src/core/tree-commit.ts`).
+- **Log spool** (`src/core/log-spool.ts`). A log record that cannot take a busy writer lock goes to its own file in
+  `openspec/.sdlc/log-spool`. The next writer under the lock appends the records and removes the files.
+  `sdlc doctor` counts the records that wait (`log_spool_pending`) and names any unreadable file.
+- **Plugin slow close** (`src/plugins/runtime.ts`). A worker that closes after the cleanup budget no longer costs a
+  finished result. The result is returned, the worker stays quarantined and `plugin_slow_close` goes to standard error.
 - **Review round records** (`src/core/review-rounds.ts`). `sdlc review check` appends `review.round` when it sees a
   new pair of source fingerprint and review.md digest for the change. The entry's `round` holds the number `n`, the
   fingerprint, the digest (sha256 of review.md with line endings normalized) and the counts `total`, `open`,
@@ -699,6 +730,12 @@ These are current limits of the integrations and command surface.
 - GitHub Issues are linked through the team's GitHub MCP server: an import into the backlog, and a comment and a close
   when the change is archived. Jira and ServiceNow still work through `--source-ref`/`--source-url`, the team's MCP
   registry and `verify.mcp` checks; there is no two-way sync of their tickets.
+- Limits left by the verification release:
+  - A project whose hooks run an older sdlc than the one that wrote `sdlc.yaml` can lock its agent out. The older
+    sdlc refuses `verify.unstable` and `verify.reuse` as unknown keys.
+  - With `enforcement.mode: off` an agent could plant both a passing record and its log entry, which reuse would trust.
+    That mode already lets an agent write any record, and reuse stays off unless a person enables it.
+  - Under heavy load a plugin result that arrives after its deadline still fails as a timeout.
 - Possible next steps: `sdlc eval`, checking code against living specs, a PR bot that uses `status --markdown`.
 
 ## 📚 Terms

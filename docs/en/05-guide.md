@@ -722,6 +722,109 @@ command="/srv/ci/run-suite.sh",restrict ssh-ed25519 AAAA... verify-client
 The `remote` field needs a version of sdlc that knows it on every machine that runs `sdlc verify`.
 An older version ignores the field and runs the command as an ordinary check: no commit check and no answer check.
 
+### Partial runs and the merged gate
+
+`sdlc verify --only <names>` runs only the named checks, with commas between the names.
+An unknown name stops verify before any check runs, and the message lists the names there are.
+The gate passes when every required check has a passed result on the current fingerprint with an unchanged command.
+A check with `required: false` runs and is recorded, but its failure does not stop the gate.
+It still needs a result on that fingerprint, and a cancelled run of it does not count.
+The results may come from several runs on that fingerprint.
+Each result keeps its own fingerprint, run id and attempt.
+A run replaces only the results of the checks it ran.
+Results of the same fingerprint and command stay, and the others are dropped.
+A run that leaves out a configured check is partial and never passes on its own.
+Its results join the passed results of earlier runs on the same code, and then the gate can pass.
+Changing a file, a command or a check's `required` flag makes the older results stale.
+The fingerprint reads every tracked file on disk again.
+It no longer trusts git's cached file times or index flags.
+So an edit of the same size within the same second, an `assume-unchanged` file or a restored modification time
+changes the fingerprint.
+A sparse checkout gets a fingerprint too.
+An archived change keeps the verify state it was archived with.
+
+### Rerun only what failed
+
+`sdlc verify --failed` reruns the checks that did not pass.
+It keeps the passed results of earlier runs on the same code.
+It is refused, and no check runs, in these cases:
+
+- it is combined with `--only`;
+- the change has no verify record;
+- the code is not the code of the record (the fingerprint differs);
+- a recorded check changed since: its command or `required` flag, or an MCP check's server, tool or arguments;
+- nothing failed, so there is nothing to run.
+
+A check that gained `remote: true` since the record is rerun, not refused.
+The result of a rerun records the attempt number, and the evidence row names it.
+The rerun gets a new run id and two log entries like any run.
+When the reruns make every required check pass on the same code, the gate can pass.
+A `sdlc verify` task in tasks.md is ticked only by a full run, so such a task still needs one.
+
+### The unstable group
+
+Some projects have a few test files that fail now and then for reasons outside the code.
+List them in `verify.unstable` in `openspec/sdlc.yaml`.
+Each entry has a `file` (a relative path inside the project with `/`, no pattern), an `item` (the backlog id that
+fixes it, such as `B12`) and `since` (the date it was listed, as `YYYY-MM-DD`).
+A file appears once.
+
+`sdlc verify` gives the list to every command in the variable `SDLC_UNSTABLE_TESTS`, one file per line.
+The project's runner decides what to do with it.
+A typical setup keeps those files out of the main test check and runs them in one required check of their own.
+Then a flaky file fails only its own check, and `sdlc verify --failed` reruns that check alone.
+sdlc never skips, retries or loosens a check itself, and the unstable check still has to pass.
+
+The list changes only by a person's config proposal.
+Adding a file to it is a weakening warning of `sdlc config show`, so it needs `--yes` to apply.
+Removing a file raises no warning.
+`sdlc health` reports a file that has been listed longer than `health.unstable_days` (14 by default).
+A reuse of evidence needs the same list on both sides, so a changed list never reuses an older run.
+An older sdlc refuses the key as unknown, and its hooks then cannot read the configuration.
+Upgrade every machine that runs the hooks before a person applies it.
+
+### Check names and `${HEAD}` MCP checks
+
+A command without a `name` is named by what it runs, for example `typecheck`, `test` or `lint`.
+The name comes from the script (`npm run build`), the tool (`npx eslint`),
+the file (`node scripts/lint.js`) or the target (`make test`).
+`npm test` is `test`. Any other command is named by its program.
+A name that is taken gets a number: `test`, `test-2`.
+Names written in the file and the names of `verify.mcp` checks are reserved first.
+The others are named in file order.
+Two equal explicit names, pack checks included, stop `sdlc verify`, and `sdlc doctor` reports them as an error.
+An `--only` selector written for an old derived name needs the new one. `sdlc verify --list` shows the names.
+
+A `${HEAD}` argument of a `verify.mcp` check, such as `ci-green`, is the last commit.
+The check is called only when the tree that verify recorded is the tree of that commit.
+With uncommitted code the check fails and asks you to commit (and push) first.
+When the recorded tree still differs from the commit, the check fails and the evidence names up to ten files.
+Replacement objects behind HEAD are ignored when the two trees are compared.
+
+### Plugin slow close
+
+A plugin worker has a cleanup budget to close after its operation.
+When a worker closes later than the budget, the finished result is still returned.
+The worker stays quarantined, and one line goes to standard error:
+
+```text
+plugin_slow_close: plugin "<name>", operation "<operation>": the worker did not exit within the cleanup budget ...
+```
+
+The line names the plugin and the operation.
+A result that arrives after its deadline still fails as a timeout, most often under heavy load.
+The older limit, a finished result lost because its worker closed late, no longer exists.
+
+### The log spool
+
+A log record must be appended under a writer lock.
+When a record cannot take a busy lock, sdlc no longer drops it.
+It writes the record to its own file in `openspec/.sdlc/log-spool`, and the next writer appends it to the log.
+The folder is ignored by git, and the hook refuses agent writes there.
+`sdlc doctor` reports how many spool records still wait, as a warning (`log_spool_pending`).
+An unreadable spool file or folder is a doctor error that names it.
+A spool file waits until a later log write appends it, so run any command that writes the log, then run doctor again.
+
 ### Open questions answered by a person
 
 Open questions under `## Open questions` in intent.md, proposal.md or design.md need a person's answer before the intent
@@ -892,7 +995,8 @@ What it does not follow:
 - **Discipline:** frequent waivers, lite changes to behaviour, forced archives, repeated approvals, repeated hook
   denials of one rule, and long test locks.
 - **Configuration:** missing verification commands, enforcement off or warn, one person in every role, signing off,
-  stale context packs, and `sdlc doctor` problems.
+  stale context packs, `sdlc doctor` problems, and a test file listed in `verify.unstable` longer than
+  `health.unstable_days` (default 14). Health only reports it; a person removes the file by a config proposal.
 
 Each finding has a level (`bad`, `warn`, `info`), facts, and a recommendation. There is no single score.
 The command always exits 0. `/sdlc:health` explains findings and drafts chosen improvements as backlog items
@@ -1241,6 +1345,8 @@ verify:
   output_lines: 40
   require_behaviour: false    # true: the gate also needs the behavioural table, one row per scenario (0.18.0)
   reuse: false                # true: record another change's passing run on the same tree instead of running the checks
+  unstable:                   # known unstable test files, passed in SDLC_UNSTABLE_TESTS (a list of file, item, since)
+    - { file: test/slow.test.ts, item: B12, since: 2026-11-01 }
 review:
   policy: REVIEW.md
   passes: [bugs, security, compliance]
@@ -1286,7 +1392,7 @@ packs:                        # from git or npm; pin a commit or an exact versio
   - { name: corp, git: https://git.corp.example/sdlc-pack.git, ref: 0123456789abcdef0123456789abcdef01234567 }
 health:                       # thresholds of sdlc health; every key has a default
   wait_hours: 48              # also: window_days 90, stalled_days 14, deferred_days 30, first_pass_rate 0.5,
-  rework_share: 0.5           #   waiver_share 0.3, reapprovals 3, rejections 2, denials 5, lock_days 7
+  rework_share: 0.5           #  waiver_share 0.3, reapprovals 3, rejections 2, denials 5, lock_days 7, unstable_days 14
 log:
   enabled: true               # log in openspec/.sdlc/log.jsonl
   hook_decisions: true        # queue hook denials and warnings locally until the next log write
@@ -1338,8 +1444,10 @@ gate is not satisfied, its reason names the uncovered scenarios, and `sdlc next`
 `verify.reuse: true` (default `false`) lets `sdlc verify` record a passing run of another change instead of running
 the checks. It does so only on the same code tree. Every configured check must have passed there with the same
 command, timeout and unstable list, and that change's log must confirm the run. No check runs, so enabling it is a
-weakening, and `sdlc config propose` warns about it. `sdlc verify --no-reuse` always runs the checks. An older sdlc
-refuses the key as invalid configuration.
+weakening, and `sdlc config propose` warns about it. `sdlc verify --no-reuse` always runs the checks.
+`--only` and `--failed` never reuse. A reused run is not counted as a run in summaries and metrics.
+Reuse trusts the source change's log. With `enforcement.mode: off` an agent could plant a record and its log entry,
+but that mode already lets an agent write any record. An older sdlc refuses the key as invalid configuration.
 
 `issues: { server, repo }` links the backlog to GitHub Issues through the team's GitHub MCP server:
 `server` is a name in `mcp.servers`, and `repo` is `owner/name`. sdlc holds no token; the server has it. See
@@ -1477,7 +1585,7 @@ Use these tables to look up CLI commands and generated files.
 | `sdlc approve \| reject \| waive <gate> --change <id> [--as <role>] [--note]` | human gate decisions (with `openspec/roles.yaml`: the person, the role and separation of duties are checked) |
 | `sdlc roles check [--change] \| who <gate> --change <id> \| migrate` | who holds which role and who may approve a gate; `migrate` (human-only) moves `roles:` from `sdlc.yaml` into `roles.yaml` |
 | `sdlc approvals verify [--mode off\|warn\|required]` | check that every approval arrived in a commit signed by the approver, and `roles.yaml` changes by a maintainer |
-| `sdlc verify [--list] [--check] [--only]` | run checks, record evidence, check scenario coverage |
+| `sdlc verify [--list] [--check] [--only] [--failed] [--no-reuse]` | run checks, record evidence, rerun only failed checks, check scenario coverage |
 | `sdlc review context \| check` | diff, policy and plan drift; open blocking findings |
 | `sdlc tests lock \| unlock` | bug-fix protocol (unlocking is human-only) |
 | `sdlc validate [--all]` | `openspec validate --strict`, delta target checks, overlaps |
