@@ -40,6 +40,9 @@ All notable changes to sdlc. Versions follow [Semantic Versioning](https://semve
 ### Known limits
 - A session opened in a project that lies inside another sdlc project is judged by the nearest project only; the
   outer project's rules do not reach the inner one's files. A later release lets every enclosing project judge.
+- An installed skill folder reached through a link or a junction from elsewhere in the project still counts as a
+  project of its own, so a config inside it governs commands run from that link, as in 0.34.1. A later release
+  follows the link to the skill root that holds it.
 - On Linux, a writer that reads another writer's lock ticket while that ticket is being deleted can stop with
   `writer_locked` ("Unsafe writer ownership metadata") instead of waiting; running the command again succeeds. The
   same race on Windows is the known `EPERM` case. Both exist since 0.30.0.
