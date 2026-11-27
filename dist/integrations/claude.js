@@ -1,0 +1,94 @@
+import { generatedNotice } from '../core/license.js';
+import { agentNames, roleBody, subagentName } from '../team/render.js';
+import { AGENT_IDS, loadAgent, loadWorkflow, WORKFLOW_IDS } from './assets.js';
+import { appendNotice, renderBody, sourceMarkerLine, yamlString } from './render.js';
+import { allowedToolsFor } from './skills.js';
+import { stageAllowedTools, stageInjection, stageResources, stageSection } from './stage-resources.js';
+const CLAUDE_TOOL_NAMES = {
+    read: 'Read',
+    grep: 'Grep',
+    glob: 'Glob',
+    bash: 'Bash',
+    edit: 'Edit',
+    write: 'Write',
+};
+/** A subagent file `.claude/agents/<name>.md`: name, description and Claude tool names in the front matter. */
+function agentFile(agent, body, notice, marker) {
+    const tools = agent.tools.map((t) => CLAUDE_TOOL_NAMES[t] ?? t).join(', ');
+    const content = appendNotice([
+        '---',
+        `name: ${agent.name}`,
+        `description: ${yamlString(agent.description)}`,
+        // B249: quoted when it is not plain, so no entry can end the line and add a key (the roles are parsed too).
+        `tools: ${yamlString(tools)}`,
+        ...(agent.skills?.length ? ['skills:', ...agent.skills.map((id) => `  - ${yamlString(id)}`)] : []),
+        ...sourceMarkerLine(marker),
+        '---',
+        '',
+        body,
+    ].join('\n'), notice);
+    return { path: `.claude/agents/${agent.name}.md`, content, tool: 'claude', kind: 'agent' };
+}
+/**
+ * The subagents: the built-in ones, then one per accepted role of the team (B70). A role named like a built-in
+ * subagent (`sdlc-reviewer`) takes its file; the others (`sdlc-verifier`) stay as aliases.
+ */
+function agentFiles(ctx, notice) {
+    const team = ctx.team ?? [];
+    const names = new Set(team.map(subagentName));
+    const files = [];
+    for (const id of AGENT_IDS) {
+        const agent = loadAgent(id);
+        if (names.has(agent.name))
+            continue;
+        files.push(agentFile(agent, renderBody(agent.body, { surface: 'claude-agent', cli: ctx.cli }), notice));
+    }
+    for (const role of team) {
+        const agent = { name: subagentName(role), description: role.description, tools: role.tools, skills: role.skills };
+        files.push(agentFile(agent, roleBody(role, ctx), notice, role.marker));
+    }
+    return files;
+}
+/**
+ * Claude Code integration:
+ * - skills (shared, see skills.ts) invoked as `/sdlc-<id>` or automatically;
+ * - namespaced commands `.claude/commands/sdlc/<id>.md` invoked as `/sdlc:<id>`
+ *   (the same shape as OpenSpec's `/opsx:<id>`);
+ * - subagents `.claude/agents/sdlc-<id>.md`;
+ * - hooks merged into `.claude/settings.json` (see settings.ts).
+ */
+export const claudeAdapter = {
+    id: 'claude',
+    name: 'Claude Code',
+    detectPaths: ['.claude', 'CLAUDE.md'],
+    invocation(workflow, ctx) {
+        return ctx.delivery === 'skills' ? `/sdlc-${workflow}` : `/sdlc:${workflow}`;
+    },
+    render(ctx) {
+        const files = [];
+        const notice = generatedNotice(ctx.stamp, 'markdown');
+        const agents = agentNames(ctx.team);
+        if (ctx.delivery !== 'skills') {
+            for (const id of WORKFLOW_IDS) {
+                const wf = loadWorkflow(id);
+                const resources = stageResources(ctx.config, id, ctx.team);
+                const content = appendNotice([
+                    '---',
+                    `description: ${yamlString(wf.commandDescription)}`,
+                    ...(wf.argumentHint ? [`argument-hint: ${yamlString(wf.argumentHint)}`] : []),
+                    `allowed-tools: ${stageAllowedTools(allowedToolsFor(ctx.cli), resources)}`,
+                    '---',
+                    '',
+                    stageInjection(resources, ctx.cli)
+                        + renderBody(wf.body, { surface: 'claude-command', cli: ctx.cli, agents })
+                        + stageSection(resources, { inject: true }),
+                ].join('\n'), notice);
+                files.push({ path: `.claude/commands/sdlc/${id}.md`, content, tool: 'claude', kind: 'command' });
+            }
+        }
+        files.push(...agentFiles(ctx, notice));
+        // Since 0.32.1 (B317) no `.claude/rules/<id>.md`: SkillForge installs registry rules. The manifest removes the
+        // files 0.32.0 wrote on the next update, unless they changed since.
+        return files;
+    },
+};
