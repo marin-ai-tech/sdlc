@@ -3,7 +3,9 @@ import * as path from 'node:path';
 import type { SdlcConfig } from '../core/config.js';
 import { normalizeNewlines, readText, writeTextAtomic } from '../core/fs-utils.js';
 import type { Locale } from '../core/i18n.js';
+import { shownValue } from '../core/shown-value.js';
 import { refreshPackWorkflows } from '../integrations/install.js';
+import { assertRolesReadable } from './accepted.js';
 import { registryDraft } from './draft.js';
 import { packDrafts, type PackReport } from './packs.js';
 import { acceptedPath, draftPath, readTeam, writeTeam, type TeamEntry, type TeamRecord } from './record.js';
@@ -71,6 +73,11 @@ async function fetchRole(call: RegistryCall, want: Wanted, warnings: Refused[]):
   }
 }
 
+/** A listed id as it is printed (B249 review F5): a role id as it is; anything else through `shownValue`. */
+function shownId(value: unknown): string {
+  return typeof value === 'string' && ROLE_ID.test(value) ? value : shownValue(value);
+}
+
 async function fetchRoles(
   call: RegistryCall,
   locale: Locale,
@@ -83,7 +90,7 @@ async function fetchRoles(
   for (const item of listed(await call('list_roles'), 'roles')) {
     const id = typeof item.id === 'string' && ROLE_ID.test(item.id) ? item.id : undefined;
     if (id === undefined || seen.has(id)) {
-      refused.push({ id: String(item.id).slice(0, 64), reason: id ? 'listed twice' : 'not a role id' });
+      refused.push({ id: shownId(item.id), reason: id ? 'listed twice' : 'not a role id' });
       continue;
     }
     seen.add(id);
@@ -189,6 +196,9 @@ function markerOnlyDraft(root: string, draft: RoleDraft): RoleDraft {
 
 /** Writes the drafts; never overwrites an accepted role, a draft of the same version or an edited draft. */
 export async function syncTeam(root: string, config: SdlcConfig): Promise<SyncResult> {
+  const packs = (config.packs ?? []).length > 0;
+  // With packs the sync ends with a refresh that reads the roles: a refused one stops it first (B249 review F3).
+  if (packs) assertRolesReadable(root);
   const locale = teamLocale(config);
   const result: SyncResult = { locale, created: [], kept: [], refused: [] };
   const team = readTeam(root);
@@ -202,6 +212,6 @@ export async function syncTeam(root: string, config: SdlcConfig): Promise<SyncRe
   for (const draft of drafts) wrote = placeDraft(root, team, draft, result) || wrote;
   if (wrote) writeTeam(root, team);
   // A new version of a pack is not in effect until accepted: the skills of its old workflows go (B18).
-  if (config.packs && config.packs.length > 0) refreshPackWorkflows(root, config);
+  if (packs) refreshPackWorkflows(root, config);
   return result;
 }

@@ -1,4 +1,5 @@
 import { generatedNotice, LICENSE_SUMMARY, LICENSOR } from '../core/license.js';
+import { TEAM_SKILL_ROOTS } from '../core/skill-root.js';
 import { loadWorkflow, WORKFLOW_IDS, type WorkflowId, type WorkflowTemplate } from './assets.js';
 import { appendNotice, renderBody, yamlString, type Surface } from './render.js';
 import { stageAllowedTools, stageResources, stageSection, type StageResources } from './stage-resources.js';
@@ -20,15 +21,8 @@ export function skillsRoot(tools: ToolId[]): string | undefined {
   return undefined;
 }
 
-/** Where each tool reads the skills of the agent team from (B86). */
-export const TEAM_SKILL_ROOTS: Readonly<Record<ToolId, string>> = {
-  claude: '.claude/skills',
-  opencode: '.opencode/skills',
-  cursor: '.cursor/skills',
-  codex: '.agents/skills',
-  qwen: '.qwen/skills',
-  gigacode: '.gigacode/skills',
-};
+/** Where each tool reads the skills of the agent team from (B86); the list lives in core, the walks use it (B249). */
+export { TEAM_SKILL_ROOTS };
 
 /** True when the tool reads its skills from a folder another configured tool's copy already fills. */
 function readsAnotherCopy(tool: ToolId, tools: readonly ToolId[]): boolean {

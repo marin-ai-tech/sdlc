@@ -64,7 +64,9 @@ Commits made in an agent session carry `SDLC-Agent: <agent>` (a git hook sdlc in
 On SkillForge, an administrator enables the plugin `sdlc-registry` in `/admin/plugins` (`sdlc guide team`).
 
 **How do the team's rules reach the agents?**
-SkillForge installs them: run the `skillforge sync --type rule` line `sdlc team sync` prints, after `sdlc update`.
+SkillForge installs them: run the `skillforge install rule/<id>` lines `sdlc team sync` prints, after `sdlc update`.
+`skillforge sync --type rule` installs every active rule instead. It refuses the MCP credential
+(`mcp_token_forbidden`): sign in with `skillforge login` first.
 
 **Does the agent get the skills of its stage?**
 In Claude Code and OpenCode the stage command prints them (`sdlc team skills --stage <stage>`).

@@ -20,10 +20,11 @@ export interface EvidenceExtras {
 /** True when there is a base to compare with that is not HEAD itself (work straight on the base branch). */
 function usableBase(root: string, base: string | undefined): base is string {
   if (!base) return false;
-  const ids = git(root, ['rev-parse', base, 'HEAD']);
-  if (!ids.ok) return false;
-  const [baseId, head] = ids.stdout.split(/\r?\n/);
-  return baseId !== head;
+  // `--verify` resolves one name each: without it rev-parse echoes `--end-of-options` back as an output line.
+  const baseId = git(root, ['rev-parse', '--verify', '--end-of-options', base]);
+  const head = git(root, ['rev-parse', '--verify', 'HEAD']);
+  if (!baseId.ok || !head.ok) return false;
+  return baseId.stdout !== head.stdout;
 }
 
 /**

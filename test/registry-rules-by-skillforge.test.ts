@@ -125,7 +125,8 @@ describe('B317.C1 sync lists the rules and the install lines', () => {
     expect(out).toContain('people-decide-gates');
     expect(out).toContain('small-functions');
     expect(out).toContain('skillforge sync --type rule --runtime opencode');
-    expect(out).toContain('skillforge sync --type rule --runtime claude');
+    // B337 (2026-11-25): SkillForge's runtime id for Claude Code is claude-code; `--runtime claude` is refused.
+    expect(out).toContain('skillforge sync --type rule --runtime claude-code');
     expect(out).not.toContain('--runtime codex');
     expect(out).not.toContain('--runtime cursor');
     expect(out).not.toContain('team accept --rule');
@@ -147,7 +148,7 @@ describe('B317.C2 a 0.32.0 project', () => {
     expect(update.code, update.stdout + update.stderr).toBe(0);
     // Review F1: the update says what it took away and how SkillForge puts it back.
     expect(update.stdout).toContain('skillforge sync --type rule --runtime opencode');
-    expect(update.stdout).toContain('skillforge sync --type rule --runtime claude');
+    expect(update.stdout).toContain('skillforge sync --type rule --runtime claude-code');
     const agentsMd = p.text('AGENTS.md');
     expect(block(agentsMd)).not.toMatch(/^### /m);
     expect(block(agentsMd)).not.toContain('Never run');
@@ -201,13 +202,14 @@ describe('B317.C3 negative: a file changed since sdlc wrote it stays', () => {
 });
 
 describe('B317.C4 agents without registry rules', () => {
-  it('doctor says for codex and qwen that registry rules are not connected', () => {
-    const p = project('claude,codex,qwen');
+  // Changed requirement (B337, 2026-11-25): SkillForge 0.5.12 and newer install rules for Codex (AGENTS.md block)
+  // and Qwen Code (QWEN.md block), seen on SkillForge 0.6.1; only GigaCode has no SkillForge runtime.
+  it('doctor says for gigacode that registry rules are not connected, and not for codex, qwen or claude', () => {
+    const p = project('claude,codex,qwen,gigacode');
     const doctor = p.cli(['doctor']);
     const said = doctor.stdout + doctor.stderr;
-    expect(said).toMatch(/registry rules are not connected[^\n]*Codex|Codex[^\n]*registry rules are not connected/i);
-    expect(said).toMatch(/registry rules are not connected[^\n]*Qwen|Qwen[^\n]*registry rules are not connected/i);
-    expect(said).not.toMatch(/registry rules are not connected[^\n]*Claude/i);
+    expect(said).toMatch(/registry rules are not connected[^\n]*GigaCode|GigaCode[^\n]*registry rules are not connected/i);
+    expect(said).not.toMatch(/registry rules are not connected[^\n]*(Codex|Qwen|Claude)/i);
   }, 240000);
 });
 

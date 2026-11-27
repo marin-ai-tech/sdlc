@@ -2,6 +2,7 @@ import type { SdlcConfig } from '../core/config.js';
 import { SdlcError } from '../core/errors.js';
 import { refreshGeneratedFiles } from '../integrations/install.js';
 import type { ApplyReport } from '../integrations/manifest.js';
+import { assertRolesReadable } from './accepted.js';
 import type { PackSource } from './pack-config.js';
 import { readPackContents, type PackContents, type PackProblem } from './pack-contents.js';
 import { fetchedCopy } from './pack-effect.js';
@@ -67,6 +68,8 @@ export function acceptPack(root: string, config: SdlcConfig, name: string, by: s
   if (!fetched) throw notSynced(name);
   const contents = readPackContents(fetched.dir, pack);
   if (contents.problems.length > 0) throw refused(name, contents.problems[0]);
+  // A refused role would fail the refresh after team.json was written (B249 review F3).
+  assertRolesReadable(root);
   const team = readTeam(root);
   const entry = entryFor(contents, fetched.source, by);
   team.packs = { ...(team.packs ?? {}), [name]: entry };

@@ -11,6 +11,7 @@ import { appendLog, LOG_PATH } from '../core/log.js';
 import { harnessPackageDir } from '../core/openspec-schema.js';
 import { assessLicense, detectProjectLicense } from '../core/project-license.js';
 import { refreshGeneratedFiles } from '../integrations/install.js';
+import { assertRolesReadable } from '../team/accepted.js';
 import { assertHuman } from './gates.js';
 
 export interface LicenseOptions {
@@ -116,6 +117,8 @@ function setLicense(typeArg: string | undefined, opts: LicenseOptions): void {
     }
     ctx.config.license = { type };
   }
+  // A refused role would fail the refresh after the license was saved (B249 review F3).
+  assertRolesReadable(ctx.root);
   saveConfig(ctx.paths.sdlcConfig, ctx.config);
   const stamp = harnessStamp(ctx.config);
   const files = refreshGeneratedFiles(ctx.root, ctx.config);

@@ -20,6 +20,7 @@ import { parseStages, type StagesConfig } from './stage-config.js';
 import { readConfigObject } from './config-read.js';
 import { updateYamlFile } from './yaml-update.js';
 import { assertCliValue } from './cli-value.js';
+import { reviewBase } from './base-ref.js';
 import { parsePlugins, parsePluginPolicies, type PluginPolicy } from '../plugins/config.js';
 import type { PluginSetting } from '../plugins/api.js';
 import { settingsWrite } from '../plugins/activation.js';
@@ -491,7 +492,7 @@ export function parseConfig(raw: Raw, file = 'openspec/sdlc.yaml'): SdlcConfig {
   config.review.requireLensCoverage = false;
   if (review) {
     config.review.policy = asString(review.policy, where('review.policy')) ?? config.review.policy;
-    config.review.base = asString(review.base, where('review.base')) ?? config.review.base;
+    config.review.base = reviewBase(review.base, where('review.base')) ?? config.review.base;
     config.review.blockOn = (asStringArray(review.block_on, where('review.block_on')) ?? config.review.blockOn)
       .map((s) => s.toLowerCase());
     for (const key of ['passes', 'lenses'] as const) {

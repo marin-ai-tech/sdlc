@@ -8,13 +8,18 @@ import {
   failure, listed, registryServer, RegistryItemError, RegistryToolsMissing, withRegistry, type RegistryCall,
 } from './registry-client.js';
 import { ROLE_ID } from './role-file.js';
+import { installedSkillforgeRules } from './skillforge-lock.js';
+import {
+  codexServesOpenCode, installRuleLines, ruleRuntimes, syncAllLine, uninstallRuleLine,
+} from './skillforge-runtimes.js';
 
 /**
  * Team rules from the registry (0.32.0): `list_rules` -> `{ rules: [{ id, version, tags?, paths?, checksum }] }` and
  * `get_rule { id }` -> `{ id, version, title?, description, paths?, tags, body, checksum }`, checksum = `sha256:` of
  * the body. A registry without these tools has no rules. `team sync` lists them and says which fit the project (tag
  * `sdlc`, a stack tag, a `paths` glob matching a file); `team check` checks each one. Since 0.32.1 (B317) SkillForge
- * installs them (`skillforge sync --type rule --runtime <tool>`) and sdlc writes no rule text anywhere.
+ * installs them and sdlc writes no rule text anywhere. Since B338 `team sync` names one `skillforge install rule/<id>`
+ * line per fitting rule, and `team check` names an installed rule that does not fit, with the line that removes it.
  */
 export const RULES_START = '<!-- sdlc:rules:start -->';
 export const RULES_END = '<!-- sdlc:rules:end -->';
@@ -98,11 +103,21 @@ function listing(item: Record<string, unknown>): RuleListing | undefined {
   return { id, version, tags: strings(item.tags), ...(paths.length > 0 ? { paths } : {}) };
 }
 
-/** The rules the registry lists; none when it has no rules tools. */
+/** Review F4: an id the registry lists twice is kept once, as first listed. */
+function firstOfEachId(rules: RuleListing[]): RuleListing[] {
+  const seen = new Set<string>();
+  return rules.filter((rule) => {
+    if (seen.has(rule.id)) return false;
+    seen.add(rule.id);
+    return true;
+  });
+}
+
+/** The rules the registry lists, one per id; none when it has no rules tools. */
 async function listRules(call: RegistryCall): Promise<RuleListing[]> {
   try {
     const answer = await call('list_rules');
-    return listed(answer, 'rules').flatMap((item) => listing(item) ?? []);
+    return firstOfEachId(listed(answer, 'rules').flatMap((item) => listing(item) ?? []));
   } catch (error) {
     if (error instanceof RegistryItemError) return [];
     throw error;
@@ -157,13 +172,9 @@ export function proposeRules(root: string, rules: RuleListing[]): RuleProposals 
   return proposals;
 }
 
-/** The tools SkillForge installs rules for, with its `--runtime` name (B317). */
-const SKILLFORGE_RUNTIMES = ['claude', 'cursor', 'opencode'] as const;
-
-/** The line a person runs to install the registry's rules for each configured tool SkillForge serves. */
+/** The lines that install every active rule of the registry, one per configured agent SkillForge serves. */
 export function installLines(config: SdlcConfig): string[] {
-  return SKILLFORGE_RUNTIMES.filter((tool) => config.tools.includes(tool))
-    .map((tool) => `skillforge sync --type rule --runtime ${tool}`);
+  return ruleRuntimes(config.tools).map(syncAllLine);
 }
 
 export interface RulesSync {
@@ -172,22 +183,39 @@ export interface RulesSync {
   rules: RuleListing[];
   proposed: RuleProposals['proposed'];
   other: RuleProposals['other'];
-  /** B317: SkillForge installs the rules; sdlc writes none. */
+  /** SkillForge installs the rules; sdlc writes none. One line per proposed rule and runtime. */
   install: string[];
+  /** The alternative: one line per runtime that installs every active rule, fitting or not. */
+  installAll: string[];
+  /** Rules are listed and OpenCode and Codex are both configured: the Codex lines serve OpenCode, through AGENTS.md. */
+  codexServesOpenCode: boolean;
   error?: string;
+}
+
+function syncResult(root: string, config: SdlcConfig, rules: RuleListing[]): Omit<RulesSync, 'server'> {
+  const proposals = proposeRules(root, rules);
+  const runtimes = rules.length > 0 ? ruleRuntimes(config.tools) : [];
+  const ids = proposals.proposed.map((item) => item.id);
+  return {
+    rules,
+    ...proposals,
+    install: installRuleLines(ids, runtimes),
+    installAll: runtimes.map(syncAllLine),
+    codexServesOpenCode: runtimes.length > 0 && codexServesOpenCode(config.tools),
+  };
 }
 
 /** For `team sync`: the registry's rules, which fit the project, and the install lines; nothing without a registry. */
 export async function syncRules(root: string, config: SdlcConfig): Promise<RulesSync | undefined> {
   const server = registryServer(config);
   if (!server) return undefined;
-  const install = installLines(config);
   try {
     const rules = await withRegistry(server, listRules);
-    return { server: server.name, rules, ...proposeRules(root, rules), install: rules.length > 0 ? install : [] };
+    return { server: server.name, ...syncResult(root, config, rules) };
   } catch (error) {
     if (error instanceof RegistryToolsMissing) throw error;
-    return { server: server.name, rules: [], proposed: [], other: [], install: [], error: failure(error) };
+    const empty = { proposed: [], other: [], install: [], installAll: [], codexServesOpenCode: false };
+    return { server: server.name, rules: [], ...empty, error: failure(error) };
   }
 }
 
@@ -210,18 +238,40 @@ async function checkOne(call: RegistryCall, item: RuleListing): Promise<RuleChec
   }
 }
 
-/** For `team check`: each registry rule read and checked (B317); writes nothing. Empty without a registry. */
-export async function checkRules(config: SdlcConfig): Promise<{ rules: RuleCheck[]; error?: string }> {
+/** An installed SkillForge rule that the registry lists but the fit notes do not propose for this project. */
+export interface InstalledNotFitting {
+  id: string;
+  runtime: string;
+  uninstall: string;
+}
+
+/** The installed rules (from SkillForge's lock files) whose registry rule does not fit the project. */
+function notFitting(root: string, listing: RuleListing[]): InstalledNotFitting[] {
+  const other = new Set(proposeRules(root, listing).other.map((item) => item.id));
+  return installedSkillforgeRules(root)
+    .filter((item) => other.has(item.id))
+    .map((item) => ({ ...item, uninstall: uninstallRuleLine(item.id, item.runtime) }));
+}
+
+export interface RulesCheck {
+  rules: RuleCheck[];
+  installedNotFitting: InstalledNotFitting[];
+  error?: string;
+}
+
+/** For `team check`: each registry rule read and checked, and the installed ones that do not fit; writes nothing. */
+export async function checkRules(root: string, config: SdlcConfig): Promise<RulesCheck> {
   const server = registryServer(config);
-  if (!server) return { rules: [] };
+  if (!server) return { rules: [], installedNotFitting: [] };
   try {
     return await withRegistry(server, async (call) => {
+      const listing = await listRules(call);
       const out: RuleCheck[] = [];
-      for (const item of await listRules(call)) out.push(await checkOne(call, item));
-      return { rules: out };
+      for (const item of listing) out.push(await checkOne(call, item));
+      return { rules: out, installedNotFitting: notFitting(root, listing) };
     });
   } catch (error) {
     if (error instanceof RegistryToolsMissing) throw error;
-    return { rules: [], error: failure(error) };
+    return { rules: [], installedNotFitting: [], error: failure(error) };
   }
 }

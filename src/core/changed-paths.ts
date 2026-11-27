@@ -25,7 +25,7 @@ export function parseChangedPaths(output: string): ChangedPaths {
  */
 export function readChangedPaths(root: string, base: string, branch: string): ChangedPaths {
   const diff = git(root, ['diff', '--name-status', '-z', '--no-renames', '--no-relative', '--ignore-submodules=none',
-    `${base}..${branch}`]);
+    '--end-of-options', `${base}..${branch}`]);
   if (!diff.ok) return { ok: false };
   const parsed = parseChangedPaths(diff.stdout);
   if (!parsed.ok) return parsed;
@@ -50,8 +50,9 @@ function parsePathNames(output: string): ChangedPaths {
 /** Committed, working and untracked names share exact NUL framing and refuse unavailable evidence. */
 export function readWorkingChangedPaths(root: string, base?: string): string[] {
   const options = ['--name-status', '-z', '--no-renames', '--no-relative', '--ignore-submodules=none'];
-  const range = base && git(root, ['cat-file', '-t', base]).stdout === 'tree' ? `${base}..HEAD` : `${base}...HEAD`;
-  const files = base ? requiredListing(root, ['diff', ...options, range], true) : [];
+  const tree = base && git(root, ['cat-file', '-t', '--end-of-options', base]).stdout === 'tree';
+  const range = tree ? `${base}..HEAD` : `${base}...HEAD`;
+  const files = base ? requiredListing(root, ['diff', ...options, '--end-of-options', range], true) : [];
   files.push(...requiredListing(root, ['diff', ...options, 'HEAD'], true));
   files.push(...requiredListing(root, ['ls-files', '-z', '--full-name', '--others', '--exclude-standard'], false));
   return [...new Set(files)].sort();

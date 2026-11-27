@@ -1,3 +1,4 @@
+import { assertBaseRef } from '../core/base-ref.js';
 import { loadConfig } from '../core/config.js';
 import { projectPaths } from '../core/project.js';
 import { listBoard, claimBoard, heartbeatBoard, releaseBoard, submitBoard, bidBoard, publicClaim } from '../core/board-service.js';
@@ -33,7 +34,9 @@ export async function callDirectTool(name: string, args: Record<string, string |
   if (name === 'board_release') return { claim: publicClaim(await releaseBoard(ctx,
     { ...claimInput, note: args.note }, actor)) };
   if (name === 'board_submit') {
-    const { claim, result } = await submitBoard(ctx, { ...claimInput, branch: required('branch'), base: args.base }, actor);
+    // The same refusal as `board submit --base` (B249 review F10): only a plain ref reaches git (round 2 F1).
+    const base = args.base === undefined ? undefined : assertBaseRef(args.base, 'base');
+    const { claim, result } = await submitBoard(ctx, { ...claimInput, branch: required('branch'), base }, actor);
     return { claim: publicClaim(claim), result };
   }
   return fail('unknown_tool', 'Unknown direct operation');

@@ -2,6 +2,7 @@ import { spawnSync } from 'node:child_process';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
+import { isPlainRef } from './base-ref.js';
 import { addEveryFile, clearIndexFlags, NO_STAT_TRUST, seedFingerprintIndex } from './fingerprint-index.js';
 
 export interface GitResult {
@@ -143,10 +144,13 @@ export function commitsTouching(cwd: string, paths: string[]): CommitInfo[] {
   });
 }
 
-/** Default branch guess for review diffs: origin/HEAD -> main -> master. */
+/**
+ * Default branch guess for review diffs: origin/HEAD -> main -> master. An origin/HEAD that is not a plain ref
+ * (it would read as an option, or carries text a plain ref may not) is not a guess (B249, review round 2 F1).
+ */
 export function defaultBaseRef(cwd: string): string | undefined {
   const originHead = git(cwd, ['symbolic-ref', '--quiet', '--short', 'refs/remotes/origin/HEAD']);
-  if (originHead.ok && originHead.stdout) return originHead.stdout;
+  if (originHead.ok && originHead.stdout && isPlainRef(originHead.stdout)) return originHead.stdout;
   for (const candidate of ['main', 'master', 'origin/main', 'origin/master']) {
     if (git(cwd, ['rev-parse', '--verify', '--quiet', candidate]).ok) return candidate;
   }

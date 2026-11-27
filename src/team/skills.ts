@@ -7,6 +7,7 @@ import { refreshGeneratedFiles } from '../integrations/install.js';
 import { sha256, type ApplyReport } from '../integrations/manifest.js';
 import { teamSkillRoots } from '../integrations/skills.js';
 import { TOOL_IDS, type ToolId } from '../integrations/types.js';
+import { assertRolesReadable } from './accepted.js';
 import type { PackSource } from './pack-config.js';
 import { packSkills } from './packs.js';
 import { readTeam, skillDirs, TEAM_PATH, writeTeam, type SkillEntry, type TeamRecord } from './record.js';
@@ -269,6 +270,8 @@ export async function installRoleSkills(
 ): Promise<SkillsOutcome> {
   const outcome: SkillsOutcome = { installed: [], unchanged: [], needsAcceptance: [], refused: [], unavailable: [] };
   if (ids.length === 0) return outcome;
+  // Skill files and team.json are written before the refresh: a refused role stops it first (B249 review F3).
+  assertRolesReadable(root);
   const fetched = await fetchSkills(root, config, ids);
   const team = readTeam(root);
   const place = { root, team, by, origins: fetched.origins, roots: teamSkillFolders(config) };
@@ -313,6 +316,7 @@ export async function acceptSkill(
   const fetched = await fetchSkills(root, config, [id]);
   const vetted = fetched.skills[id];
   if (!vetted || !('ok' in vetted)) throw skillError(config, id, fetched);
+  assertRolesReadable(root);
   const team = readTeam(root);
   const place = { root, team, by, origins: fetched.origins, roots: teamSkillFolders(config) };
   const problem = installSkill(place, vetted.ok);

@@ -17,12 +17,15 @@ export interface RulesFinding {
   fix?: string;
 }
 
-/** The folders and the AGENTS.md block where SkillForge's `sync --type rule` puts rules. */
-const SKILLFORGE_RULE_DIRS = ['.claude/rules', '.cursor/rules', '.opencode/rules'];
+/** The folders where SkillForge puts rule files, and the guides where it writes its rules block. */
+const SKILLFORGE_RULE_DIRS = [
+  '.claude/rules', '.cursor/rules', '.opencode/rules', '.codex/skillforge/rules', '.qwen/skillforge/rules',
+];
+const SKILLFORGE_BLOCK_GUIDES = ['QWEN.md', 'GEMINI.md'];
 const SKILLFORGE_BLOCK = '<!-- skillforge:rules:start -->';
 
-/** The agents SkillForge does not install registry rules for yet. */
-const RULES_NOT_CONNECTED: Record<string, string> = { codex: 'Codex CLI', qwen: 'Qwen Code', gigacode: 'GigaCode' };
+/** The agents SkillForge has no rules runtime for (Codex and Qwen Code have one since SkillForge 0.5.12). */
+const RULES_NOT_CONNECTED: Record<string, string> = { gigacode: 'GigaCode' };
 
 function hasRuleFile(root: string, dir: string): boolean {
   try {
@@ -32,9 +35,13 @@ function hasRuleFile(root: string, dir: string): boolean {
   }
 }
 
+function hasBlock(root: string, guide: string): boolean {
+  return (readText(path.join(root, guide)) ?? '').includes(SKILLFORGE_BLOCK);
+}
+
 function skillforgeRulesPresent(root: string, config: SdlcConfig): boolean {
-  const guide = readText(path.join(root, agentsGuidePath(config))) ?? '';
-  return SKILLFORGE_RULE_DIRS.some((dir) => hasRuleFile(root, dir)) || guide.includes(SKILLFORGE_BLOCK);
+  if (SKILLFORGE_RULE_DIRS.some((dir) => hasRuleFile(root, dir))) return true;
+  return [agentsGuidePath(config), ...SKILLFORGE_BLOCK_GUIDES].some((guide) => hasBlock(root, guide));
 }
 
 export function teamRulesFindings(root: string, config: SdlcConfig): RulesFinding[] {

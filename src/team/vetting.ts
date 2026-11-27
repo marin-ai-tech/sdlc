@@ -1,5 +1,7 @@
 import { createHash } from 'node:crypto';
+import { shownValue } from '../core/shown-value.js';
 import { ROLE_ID } from './role-file.js';
+import { roleToolsProblem } from './role-tools.js';
 
 /**
  * What a team registry answers is checked before anything of it reaches the agents (B71, B74). A role's checksum
@@ -137,19 +139,30 @@ function str(value: unknown): string | undefined {
 
 const bytes = (text: string) => Buffer.byteLength(text, 'utf8');
 
+/** A role's `tools` (B249): absent is none; anything but a list of tool entries refuses the role. */
+function vetTools(value: unknown): Vetted<string[]> {
+  if (value === undefined || value === null) return { ok: [] };
+  if (!Array.isArray(value)) return { reason: 'tools must be a list of tool names' };
+  const problem = roleToolsProblem(value);
+  return problem ? { reason: problem } : { ok: value as string[] };
+}
+
 function roleShape(raw: Record<string, unknown>, id: string): Vetted<RegistryRole> {
   const version = str(raw.version);
   const body = typeof raw.body === 'string' ? raw.body : undefined;
   const checksum = str(raw.checksum);
-  if (raw.id !== id) return { reason: `answer is for another id (${String(raw.id)})` };
+  // The id the answer carries is the registry's text: the reason is printed, so it is not repeated (B249 review F5).
+  if (raw.id !== id) return { reason: 'answer is for another id' };
   if (!version || body === undefined || !checksum) return { reason: 'version, body or checksum missing' };
   if (version.length > 64 || !/^[\w.+-]+$/.test(version)) return { reason: 'version is not a plain version string' };
   const skills = strings(raw.skills ?? []);
   if (!skills || skills.some((skill) => !isSkillId(skill))) return { reason: 'skills must be skill ids' };
+  const tools = vetTools(raw.tools);
+  if (!('ok' in tools)) return tools;
   const vettedMarker = raw.marker === undefined ? undefined : vetMarker(raw.marker);
   const role = {
     id, version, body, checksum, skills, title: str(raw.title) ?? id, stages: strings(raw.stages) ?? [],
-    tools: strings(raw.tools) ?? [], readonly: raw.readonly !== false,
+    tools: tools.ok, readonly: raw.readonly !== false,
     ...(str(raw.description) ? { description: str(raw.description)!.slice(0, 500) } : {}),
     ...(vettedMarker && 'ok' in vettedMarker ? { marker: vettedMarker.ok } : {}),
   };
@@ -178,8 +191,10 @@ function vetFiles(value: unknown): Vetted<SkillFile[]> {
     const raw = record(item);
     if (!raw || typeof raw.path !== 'string' || typeof raw.content !== 'string') return { reason: 'malformed file' };
     const unsafe = unsafeSkillPath(raw.path);
-    if (unsafe) return { reason: `file path ${JSON.stringify(raw.path)} leaves the skill folder: ${unsafe}` };
-    if (bytes(raw.content) > LIMITS.fileBytes) return { reason: `${raw.path} larger than ${LIMITS.fileBytes} bytes` };
+    // The path is the registry's text: printed through the one printer (B249 review round 2, F6).
+    const shown = shownValue(raw.path);
+    if (unsafe) return { reason: `file path ${shown} leaves the skill folder: ${unsafe}` };
+    if (bytes(raw.content) > LIMITS.fileBytes) return { reason: `${shown} larger than ${LIMITS.fileBytes} bytes` };
     files.push({ path: raw.path, content: raw.content });
   }
   return { ok: files };
@@ -198,7 +213,7 @@ function filesProblem(files: SkillFile[]): string | undefined {
 export function vetSkill(answer: unknown, id: string): Vetted<RegistrySkill> {
   const raw = record(answer);
   if (!raw) return { reason: 'answer is not an object' };
-  if (raw.id !== id) return { reason: `answer is for another id (${String(raw.id)})` };
+  if (raw.id !== id) return { reason: 'answer is for another id' };
   const version = str(raw.version);
   const checksum = str(raw.checksum);
   if (!version || !checksum) return { reason: 'version or checksum missing' };

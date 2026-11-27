@@ -320,7 +320,7 @@ function missingRole(roles: RolesFile, ctx: ApprovalContext, person: Person, hol
 export function changeAuthors(root: string, base: string | undefined): string[] {
   const ref = base ?? defaultBaseRef(root);
   if (!ref) return [];
-  const merge = git(root, ['merge-base', ref, 'HEAD']);
+  const merge = git(root, ['merge-base', '--end-of-options', ref, 'HEAD']);
   if (!merge.ok) return [];
   const log = git(root, [
     'log', '--format=%H%x1f%ae%x1f%B%x1e', `${merge.stdout}..HEAD`, '--', '.', ':(exclude)openspec/**',

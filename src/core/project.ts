@@ -1,6 +1,7 @@
 import * as path from 'node:path';
 import { SdlcError } from './errors.js';
 import { isDirectory, isFile } from './fs-utils.js';
+import { governingRoot } from './skill-root.js';
 
 /**
  * Filesystem layout of a project that uses the harness.
@@ -35,18 +36,23 @@ export function projectPaths(root: string): ProjectPaths {
   };
 }
 
+/** True when `dir` holds an `openspec/` planning directory (changes, specs or OpenSpec's config.yaml). */
+function holdsPlanning(dir: string): boolean {
+  const candidate = path.join(dir, 'openspec');
+  return isDirectory(candidate) && (isDirectory(path.join(candidate, 'changes')) ||
+    isDirectory(path.join(candidate, 'specs')) || isFile(path.join(candidate, 'config.yaml')));
+}
+
 /**
  * Finds the nearest ancestor of `start` that holds an `openspec/` planning
- * directory, the same "nearest root" rule OpenSpec applies.
+ * directory, the same "nearest root" rule OpenSpec applies. A planning
+ * directory inside an installed skill folder of an enclosing project does not
+ * move the root (B249).
  */
 export function findProjectRoot(start: string = process.cwd()): string | undefined {
   let current = path.resolve(start);
   for (;;) {
-    const candidate = path.join(current, 'openspec');
-    if (isDirectory(candidate) && (isDirectory(path.join(candidate, 'changes')) ||
-      isDirectory(path.join(candidate, 'specs')) || isFile(path.join(candidate, 'config.yaml')))) {
-      return current;
-    }
+    if (holdsPlanning(current)) return governingRoot(current, holdsPlanning);
     const parent = path.dirname(current);
     if (parent === current) return undefined;
     current = parent;

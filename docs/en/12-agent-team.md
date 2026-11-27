@@ -77,6 +77,18 @@ readonly: true
 ... responsibilities, how to work, the verdict rules, boundaries ...
 ```
 
+Each `tools` entry is a tool name with an optional pattern in parentheses, such as `read` or `Bash(git:*)`.
+The name holds letters, digits, `_` and `-`. The pattern holds no parentheses and no line break.
+Control and format characters are refused too.
+A role lists at most 64 entries, each at most 200 characters long.
+A registry role is checked by the same rule before its draft is written.
+
+An accepted role file that sdlc refuses stops the commands that rewrite the generated files before they write.
+Such commands are `sdlc update`, `sdlc init`, `sdlc doctor --fix`, `sdlc license set` and `sdlc team accept`.
+The error names the file. Fix it, then a person accepts the role again with `sdlc team accept <role>`.
+`sdlc team check` and `sdlc team skills` list such a role as refused and go on with the others.
+An edited or unrecorded file in `docs/agents/` never blocks a command: sdlc does not read it until it is accepted.
+
 The **body** says *how* the role works. sdlc adds two blocks:
 
 - **Where to write.** The artifacts of the role's stages:
@@ -199,17 +211,26 @@ for some files.
   registry without these tools simply has no rules.
 - `sdlc team sync` lists every rule with its version and paths, and says which fit the project. A rule fits when it
   has the tag `sdlc`, when one of its tags is a stack that `sdlc adopt` finds, or when one of its `paths` matches a
-  file of the project. The JSON answer has `rules: { rules, proposed, other, install }`.
+  file of the project. The JSON answer has `rules: { rules, proposed, other, install, installAll,
+  codexServesOpenCode }`.
 - `sdlc team check` reads each rule and shows whether its checksum matches. It writes nothing.
+- `sdlc team check` also reads SkillForge's lock files (`.claude`, `.cursor`, `.opencode`, `.codex`, `.qwen`). It
+  names each installed rule that the registry lists and the fit notes do not propose, with the line that removes it:
+  `skillforge uninstall rule/<id> --runtime <agent>`. An installed rule the registry does not list is not named. The
+  JSON answer has `rulesInstalledNotFitting`.
 
 ### Who installs registry rules
 
 SkillForge installs registry rules, and sdlc writes no rule text anywhere. If both placed them, an agent would read
 every rule twice.
 
-- **SkillForge installs them.** `team sync` prints the line a person runs for each configured tool SkillForge serves:
-  `skillforge sync --type rule --runtime claude`, `cursor` or `opencode`. SkillForge keeps a lock file, updates and
-  removes its rules, and checks local edits.
+- **SkillForge installs them.** `team sync` prints one line per rule that fits and per configured agent SkillForge
+  serves: `skillforge install rule/<id> --runtime <agent>`. The agent ids are SkillForge's: `claude-code`, `cursor`,
+  `opencode`, `codex` and `qwen`. A rule that does not fit gets no line. One more line per agent is the alternative:
+  `skillforge sync --type rule --runtime <agent>` installs every active rule, fitting or not. SkillForge keeps a lock
+  file, updates and removes its rules, and checks local edits.
+- **OpenCode with Codex.** OpenCode reads `AGENTS.md` too, where SkillForge puts the Codex rules. So `team sync` prints
+  the Codex lines only, and says why; an OpenCode line on top would show OpenCode every rule twice.
 - **`sdlc team accept --rule <id>` is refused** for everyone, with exit code 1 and that hint. Nothing is written.
 - **Rules sdlc placed earlier.** `sdlc update` empties the rules block of `AGENTS.md`, drops the rules section from
   the role subagents and removes the `.claude/rules/<id>.md` files sdlc wrote. A file changed since sdlc wrote it
@@ -217,8 +238,10 @@ every rule twice.
   Run `skillforge sync --type rule` once after that update. team.json `rules` is kept, so a downgrade restores them.
 - **The block between `<!-- sdlc:rules:start -->` and `<!-- sdlc:rules:end -->` stays sdlc's** and holds no registry
   rule. `sdlc doctor` names each rule still in it. sdlc never changes the text outside the markers.
-- **Codex, Qwen Code and GigaCode** get no registry rules from SkillForge yet. With a team registry, `sdlc doctor`
-  says so for each of them. sdlc has no Gemini CLI integration, so doctor does not name it.
+- **Codex and Qwen Code** get registry rules from SkillForge too: a block in `AGENTS.md` or `QWEN.md`, and copies
+  in `.codex/skillforge/rules/` or `.qwen/skillforge/rules/`. `sdlc doctor` sees both.
+- **GigaCode** gets no registry rules from SkillForge yet. With a team registry, `sdlc doctor` says so. sdlc has no
+  Gemini CLI integration, so doctor does not name it.
 
 ## 12.5. Packs from git or npm
 

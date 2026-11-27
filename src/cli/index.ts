@@ -72,6 +72,7 @@ import { projectPaths } from '../core/project.js';
 import { recordInvocation } from '../core/human-command.js';
 import { maskNoteArguments } from '../core/person-note.js';
 import { warn } from './output.js';
+import { baseOption } from './base-option.js';
 
 function cmdDesc(key: string): string {
   return t(key, undefined, 'en');
@@ -131,10 +132,12 @@ export function buildProgram(): Command {
     .action((id, opts) => dismissConfig(id, opts));
   const roles = program.command('roles').description(cmdDesc('cmd.roles'));
   roles.command('check').description(cmdDesc('cmd.roles.check'))
-    .option('--change <id>', 'change id').option('--base <ref>', 'base ref').option('--json', 'output JSON')
+    .option('--change <id>', 'change id').option('--base <ref>', 'base ref', baseOption)
+    .option('--json', 'output JSON')
     .action((opts) => rolesCheck(opts));
   roles.command('who <gate>').description(cmdDesc('cmd.roles.who'))
-    .requiredOption('--change <id>', 'change id').option('--base <ref>', 'base ref').option('--json', 'output JSON')
+    .requiredOption('--change <id>', 'change id').option('--base <ref>', 'base ref', baseOption)
+    .option('--json', 'output JSON')
     .action((gate, opts) => rolesWho(gate, opts));
   roles.command('migrate').description(cmdDesc('cmd.roles.migrate'))
     .option('--json', 'output JSON').action((opts) => rolesMigrate(opts));
@@ -539,7 +542,7 @@ export function buildProgram(): Command {
   task.command('check-result').description(cmdDesc('cmd.task.check-result'))
     .requiredOption('--change <id>', 'change id')
     .requiredOption('--branch <ref>', 'result branch to check')
-    .option('--base <ref>', 'base ref (default: merge-base of branch and HEAD)')
+    .option('--base <ref>', 'base ref (default: merge-base of branch and HEAD)', baseOption)
     .option('--json', 'output JSON')
     .action((opts) => taskCheckResultCommand(opts));
 
@@ -610,7 +613,7 @@ export function buildProgram(): Command {
     .requiredOption('--claim <id>', 'claim id from board claim')
     .option('--executor <id>', 'require the claim to belong to this executor')
     .requiredOption('--branch <ref>', 'result branch to check')
-    .option('--base <ref>', 'base ref (default: merge-base of branch and HEAD)')
+    .option('--base <ref>', 'base ref (default: merge-base of branch and HEAD)', baseOption)
     .option('--request <key>', 'idempotency key')
     .option('--json', 'output JSON')
     .action((opts) => boardSubmitCommand(opts));
@@ -639,7 +642,7 @@ export function buildProgram(): Command {
     .command('review <action>')
     .description(cmdDesc('cmd.review'))
     .option('--change <id>', 'change id')
-    .option('--base <ref>', 'base ref for the diff (default: review.base or origin/HEAD)')
+    .option('--base <ref>', 'base ref for the diff (default: review.base or origin/HEAD)', baseOption)
     .option('--json', 'output JSON')
     .action((action, opts) => reviewCommand(action, opts));
 

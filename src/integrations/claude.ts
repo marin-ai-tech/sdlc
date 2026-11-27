@@ -24,7 +24,8 @@ function agentFile(agent: { name: string; description: string; tools: string[]; 
     '---',
     `name: ${agent.name}`,
     `description: ${yamlString(agent.description)}`,
-    `tools: ${tools}`,
+    // B249: quoted when it is not plain, so no entry can end the line and add a key (the roles are parsed too).
+    `tools: ${yamlString(tools)}`,
     ...(agent.skills?.length ? ['skills:', ...agent.skills.map((id) => `  - ${yamlString(id)}`)] : []),
     ...sourceMarkerLine(marker),
     '---',

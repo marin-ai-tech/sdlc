@@ -994,7 +994,7 @@ addresses his note, and Paul approves.
      changed files: 2
      plan drift: 0 unplanned, 0 planned but untouched
      policy: REVIEW.md
-     diff: git diff main...HEAD && git diff HEAD
+     diff: git diff 4f1c2a9e8b7d6c5a4f3e2d1c0b9a8f7e6d5c4b3a...HEAD && git diff HEAD
    ```
 
 2. It delegates each pass (bugs, security, compliance) and each lens (adversarial, edge-cases, verification-gaps) to

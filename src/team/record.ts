@@ -119,6 +119,11 @@ type Raw = Record<string, unknown>;
 /** Where an installed skill may live: a folder of a tool's skills root (B86: every tool's). */
 const SKILL_DIR = /^\.(?:claude|opencode|cursor|agents|qwen|gigacode)\/skills\/[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/;
 
+/** `dir` is a folder a team.json skill record may name; test/b249-r2.test.ts holds it to the guard's roots (F7). */
+export function isTeamSkillDir(dir: string): boolean {
+  return SKILL_DIR.test(dir);
+}
+
 /** Every folder of an installed skill: its `dirs`, or the one `dir` of an older record. */
 export function skillDirs(entry: Pick<SkillEntry, 'dir' | 'dirs'>): string[] {
   return entry.dirs && entry.dirs.length > 0 ? [...entry.dirs] : [entry.dir];

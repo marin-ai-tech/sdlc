@@ -43,9 +43,13 @@ check and the next `sdlc update` updates the roles.
 
 ## Rules of the registry
 
-SkillForge installs the registry's rules with `skillforge sync --type rule --runtime <agent>`; `sdlc team sync`
-prints that line per tool, and `sdlc team check` shows each rule's checksum. sdlc writes no rule text, and
-`sdlc team accept --rule` is refused. The rules block of AGENTS.md stays empty; `sdlc doctor` names a rule left in it.
+SkillForge installs the registry's rules. `sdlc team sync` prints `skillforge install rule/<id> --runtime <agent>`
+for each rule that fits and each agent. `skillforge sync --type rule --runtime <agent>` is the alternative; it
+installs every active rule. The agent ids are `claude-code`, `cursor`, `opencode`, `codex` and `qwen`. With OpenCode
+and Codex both, only the Codex lines are printed: OpenCode reads `AGENTS.md` too. `sdlc team check` shows each
+rule's checksum. It names an installed rule that the registry lists and the fit notes do not propose, with its
+`skillforge uninstall` line. sdlc writes no rule text, and `sdlc team accept --rule` is refused. The rules block of
+AGENTS.md stays empty; `sdlc doctor` names a rule left in it.
 
 ## The skills of a stage
 

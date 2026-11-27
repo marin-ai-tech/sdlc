@@ -1,13 +1,16 @@
 import { parse } from 'yaml';
+import { SdlcError } from '../core/errors.js';
 import { normalizeNewlines } from '../core/fs-utils.js';
 import { STAGE_IDS, type StageConfigId } from '../core/stage-config.js';
+import { roleToolsProblem } from './role-tools.js';
 import type { SourceMarker } from './vetting.js';
 
 /**
  * A role of the agent team as a file (B69): YAML front matter (`id`, `title`, `description`, `stages`, `tools`,
  * `readonly`, and since 0.11.0 `skills` and `source`) and a Markdown body that may end with the placeholders
  * `{{artifacts}}` and `{{project}}`. Parse, don't validate: a missing or broken field gets a safe default
- * (read-only, read tools, no stages, no skills).
+ * (read-only, read tools, no stages, no skills). A `tools` list with an entry that is not a tool name refuses the
+ * file (B249): the entries reach a generated subagent's front matter.
  */
 export interface RoleFile {
   id: string;
@@ -47,6 +50,15 @@ function strings(value: unknown): string[] {
   return Array.isArray(value) ? value.map(String) : [];
 }
 
+/** The role's tools (B249): every entry a tool name with an optional `(pattern)`, or the role file is refused. */
+function roleTools(id: string, value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+  const reason = roleToolsProblem(value);
+  if (reason === undefined) return value as string[];
+  throw new SdlcError('invalid_role', { key: 'error.role_x_tools_refused', params: { role: id, reason } },
+    { key: 'fix.role_tools_entry' });
+}
+
 function isStage(value: string): value is StageConfigId {
   return (STAGE_IDS as readonly string[]).includes(value);
 }
@@ -63,7 +75,7 @@ function sourceKind(value: unknown): { sourceKind?: string } {
 /** The role in `text`, named `id` (its file name). */
 export function parseRoleFile(id: string, source: string): RoleFile {
   const { data, body } = frontMatter(normalizeNewlines(source).replace(/^\uFEFF/, ''));
-  const tools = strings(data.tools);
+  const tools = roleTools(id, data.tools);
   return {
     id,
     title: text(data.title, id),

@@ -1,6 +1,7 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import type { SdlcConfig } from '../core/config.js';
+import { SdlcError } from '../core/errors.js';
 import { normalizeNewlines } from '../core/fs-utils.js';
 import type { Locale } from '../core/i18n.js';
 import { packDraft, withoutSource } from './draft.js';
@@ -8,7 +9,7 @@ import { isGitPack, npmSpecFloats, type PackConfig, type PackSource } from './pa
 import { contentsReport, type PackContentsReport } from './pack-effect.js';
 import { cachedPack, fetchPack, type FetchedPack } from './pack-fetch.js';
 import { failure } from './registry-client.js';
-import { parseRoleFile, ROLE_ID } from './role-file.js';
+import { parseRoleFile, ROLE_ID, type RoleFile } from './role-file.js';
 import type { RoleDraft } from './sources.js';
 import type { Refused } from './sync.js';
 import {
@@ -94,9 +95,20 @@ function roleFiles(dir: string, locale: Locale): Map<string, string> {
   return files;
 }
 
+/** The role, or why its file is refused (B249: a tools entry that is not a tool name), so only that role is. */
+function parsedRole(id: string, text: string): RoleFile | string {
+  try {
+    return parseRoleFile(id, text);
+  } catch (error) {
+    if (error instanceof SdlcError) return error.message;
+    throw error;
+  }
+}
+
 function roleProblem(id: string, text: string): string | undefined {
   if (!/^---\n[\s\S]*?\n---\n/.test(text)) return 'no front matter';
-  const role = parseRoleFile(id, text);
+  const role = parsedRole(id, text);
+  if (typeof role === 'string') return role;
   if (role.declaredId !== undefined && role.declaredId !== id) return `declares the role id ${role.declaredId}`;
   if (role.skills.some((skill) => !isSkillId(skill))) return 'skills must be skill ids';
   return undefined;

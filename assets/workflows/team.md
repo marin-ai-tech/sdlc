@@ -46,6 +46,7 @@ Set up the agent team of this project: roles that fit the project, drafted by yo
    terminal: `sdlc team accept <role>` for each role, and `sdlc team accept --skill <id>` for skills with any
    non-Markdown file (JSON and YAML are reported as data, not scripts)
    (`sdlc team check --json` shows them). Registry rules are not accepted in sdlc: pass on the
-   `skillforge sync --type rule --runtime <tool>` lines that `team sync` printed, for the person to run.
+   `skillforge install rule/<id> --runtime <agent>` lines that `team sync` printed (one per rule that fits), for the
+   person to run.
    Accepting is a person's decision: never run it, and never edit an accepted
    role in `docs/agents/` (the hook will refuse; change the draft and ask for a new acceptance instead).

@@ -36,6 +36,8 @@ export interface StageResources {
   /** The skills `sdlc team skills --stage` prints: the configured ones, then the accepted roles' (B319). */
   stageSkills: string[];
   agents: string[];
+  /** The accepted role subagents of the stage that may write (`sdlc-<role>`), handed the stage work. */
+  roleAgents: string[];
   /** Registry server names, in the registry's order. */
   servers: string[];
   /** The build workflow's default simplifier step (B109). */
@@ -53,10 +55,51 @@ function simplifies(config: SdlcConfig, workflow: string): boolean {
   return workflow === 'build' && config.stages.build?.simplify !== false;
 }
 
+/** The accepted roles of the team for a stage. */
+function stageRoles(stage: StageConfigId, team: readonly RoleFile[]): RoleFile[] {
+  return team.filter((role) => role.stages.includes(stage));
+}
+
+/** The subagent of a role. */
+function roleAgentId(role: RoleFile): string {
+  return `sdlc-${role.id}`;
+}
+
+/**
+ * Review F1, F2, F6: the roles that may be handed the stage work. A read-only role checks and never writes; a role
+ * named like the simplifier runs only as the build's simplifier step.
+ */
+function writingRoleAgentIds(roles: readonly RoleFile[]): string[] {
+  return roles
+    .filter((role) => !role.readonly)
+    .map(roleAgentId)
+    .filter((agent) => agent !== SIMPLIFIER);
+}
+
 /** The subagents of a stage: the configured ones, then the accepted roles of the team for that stage (B70). */
-function stageAgents(configured: string[], stage: StageConfigId, team: readonly RoleFile[]): string[] {
-  const roles = team.filter((role) => role.stages.includes(stage)).map((role) => `sdlc-${role.id}`);
+function stageAgents(configured: string[], roles: string[]): string[] {
   return [...new Set([...configured, ...roles])];
+}
+
+/** Whom the hand-off line names: one subagent, or the one that fits each part of the work. */
+function handOffTarget(agents: string[]): string {
+  if (agents.length === 1) return `the role subagent ${list(agents)}`;
+  const names = agents.map((agent) => `\`${agent}\``);
+  const last = names.pop();
+  return `the role subagent that fits each part (${names.join(', ')} or ${last})`;
+}
+
+/**
+ * In team mode, the main agent hands the stage work to the role subagents that may write, keeps the questions to
+ * the person and the gate, or says in its final report why it did the work itself.
+ */
+function handOffStep(resources: StageResources): string[] {
+  if (resources.executionRole || resources.roleAgents.length === 0) return [];
+  return [
+    `- Main agent: hand the stage work to ${handOffTarget(resources.roleAgents)}; you keep the questions to the`
+      + ' person and the stop at the gate. If you do the work yourself, say in your final report why you did it'
+      + ' yourself.',
+  ];
 }
 
 /** The skills of a stage, without the solo execution role's: configured first, then the accepted roles' (B319). */
@@ -85,10 +128,13 @@ export function stageResources(
     : [...configuredSkills, ...soloSkill];
   const simplify = simplifies(config, workflow);
   const configured = [...(own?.agents ?? []), ...(simplify ? [SIMPLIFIER] : [])];
-  const agents = stageAgents(configured, stage, team);
+  const roles = stageRoles(stage, team);
+  const agents = stageAgents(configured, roles.map(roleAgentId));
+  const roleAgents = writingRoleAgentIds(roles);
   if (skills.length + agents.length + servers.length === 0) return undefined;
   const stageSkills = stageSkillIds(config, stage, team);
-  return { stage, skills, stageSkills, agents, servers, simplify, ...(executionRole ? { executionRole } : {}) };
+  const role = executionRole ? { executionRole } : {};
+  return { stage, skills, stageSkills, agents, roleAgents, servers, simplify, ...role };
 }
 
 /** `allowed-tools` of a Claude Code skill or command: the CLI, then the stage's MCP tools. */
@@ -153,6 +199,7 @@ export function stageSection(resources: StageResources | undefined, options: Sec
     lines.push('- In your final report, name the skills loaded and explain why any listed skill could not be loaded.');
   }
   if (resources.agents.length > 0) lines.push(`- Subagents for this stage: ${list(resources.agents)}.`);
+  lines.push(...handOffStep(resources));
   if (resources.simplify) lines.push(SIMPLIFY_STEP);
   if (resources.servers.length > 0) {
     const servers = resources.servers.map((name) => `\`${name}\` (tools \`mcp__${name}__*\`)`).join(', ');

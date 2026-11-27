@@ -316,7 +316,9 @@ Each generated workflow belongs to a stage:
 
 A workflow ends with a short **Stage resources** section listing its configured stage skills, the installed skills
 of accepted roles that own the stage, its subagents and MCP servers. A role's installed skills also appear in its
-generated subagent, which loads them before starting. Resources of other stages are omitted. The MCP servers of a
+generated subagent, which loads them before starting. When an accepted role that may write owns the stage, the
+section tells the main agent to hand it the stage work and keep the questions and the gate itself. Resources of
+other stages are omitted. The MCP servers of a
 stage come from the registry's `stages`, so they are written down only
 once. The Claude Code skill also pre-allows the tools of those servers (`allowed-tools: Bash(sdlc *), mcp__build__*`).
 In the commands of Claude Code and OpenCode, the section prints the stage's skill texts instead of asking the agent to

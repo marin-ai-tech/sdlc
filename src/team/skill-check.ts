@@ -1,10 +1,11 @@
 import * as path from 'node:path';
 import { parse } from 'yaml';
 import type { SdlcConfig } from '../core/config.js';
+import { SdlcError } from '../core/errors.js';
 import { listFilesRecursive, normalizeNewlines, readText } from '../core/fs-utils.js';
 import { t } from '../core/i18n.js';
 import { sha256 } from '../integrations/manifest.js';
-import { acceptedRoles } from './accepted.js';
+import { acceptedRolesReport, type RefusedRole } from './accepted.js';
 import { parseRoleFile } from './role-file.js';
 import { DRAFTS_DIR, draftPath, readTeam, roleIdsIn, skillDirs, type SkillEntry } from './record.js';
 import { fetchSkills, teamSkillTargets, type SkillFetch } from './skills.js';
@@ -36,6 +37,8 @@ export interface SkillCheck {
 export interface TeamCheck {
   skills: SkillCheck[];
   drafts: DraftCheck[];
+  /** Accepted roles whose file sdlc refuses (B249 review round 2, F4): listed, their skills not checked. */
+  refusedRoles: RefusedRole[];
   warnings: string[];
   error?: string;
 }
@@ -49,6 +52,8 @@ export type DraftSkill = { id: string; status: 'installable' }
 export interface DraftCheck {
   role: string;
   skills: DraftSkill[];
+  /** Why sdlc refuses the draft's file (B249 review F7): its skills are not checked, the other drafts are. */
+  refused?: string;
 }
 
 /** A grant without a limit: the tool alone, or with `*`, `**`, `:*` or `/**` as its only pattern. */
@@ -177,17 +182,26 @@ function draftSkill(id: string, fetched: SkillFetch, installed: boolean): DraftS
     : { id, status: 'installable' };
 }
 
-function draftRoles(root: string): Array<{ role: string; ids: string[] }> {
-  return roleIdsIn(root, DRAFTS_DIR).map((id) => {
-    const text = readText(path.join(root, draftPath(id))) ?? '';
+/** A draft's skills, or why its file is refused: one refused draft does not stop the check of the others. */
+function draftRole(root: string, id: string): { role: string; ids: string[]; refused?: string } {
+  const text = readText(path.join(root, draftPath(id))) ?? '';
+  try {
     return { role: id, ids: parseRoleFile(id, text).skills };
-  });
+  } catch (error) {
+    if (error instanceof SdlcError) return { role: id, ids: [], refused: error.localizedMessage() };
+    throw error;
+  }
+}
+
+function draftRoles(root: string): Array<{ role: string; ids: string[]; refused?: string }> {
+  return roleIdsIn(root, DRAFTS_DIR).map((id) => draftRole(root, id));
 }
 
 /** The check of every skill of the team; the registry (then the packs) is asked only for the skills not installed. */
 export async function checkTeamSkills(root: string, config: SdlcConfig): Promise<TeamCheck> {
   const team = readTeam(root);
-  const listedIds = acceptedRoles(root).flatMap((role) => role.skills);
+  const accepted = acceptedRolesReport(root);
+  const listedIds = accepted.roles.flatMap((role) => role.skills);
   const roles = draftRoles(root);
   const ids = [...new Set([...listedIds, ...Object.keys(team.skills)])].sort();
   const draftIds = roles.flatMap((role) => role.ids);
@@ -200,9 +214,11 @@ export async function checkTeamSkills(root: string, config: SdlcConfig): Promise
     return entry ? installedCheck(root, id, entry, teamSkillTargets(config, id)) : remoteCheck(id, fetched);
   };
   const skills = ids.map(check);
-  const drafts = roles.map(({ role, ids: roleIds }) => ({
+  const drafts = roles.map(({ role, ids: roleIds, refused }) => ({
     role, skills: roleIds.map((id) => draftSkill(id, fetched, Object.hasOwn(team.skills, id))),
+    ...(refused !== undefined ? { refused } : {}),
   }));
   const warnings = skills.flatMap((skill) => skill.warnings);
-  return { skills, drafts, warnings, ...(fetched.error ? { error: fetched.error } : {}) };
+  const refusedRoles = accepted.refused;
+  return { skills, drafts, refusedRoles, warnings, ...(fetched.error ? { error: fetched.error } : {}) };
 }

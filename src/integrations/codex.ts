@@ -30,9 +30,16 @@ function skillTarget(ctx: RenderContext): SkillTarget {
   return { root: SKILLS_ROOT, surface: 'codex-skill', tool: 'codex', extra: codexExtra, compatibility };
 }
 
-/** A TOML basic string: JSON's escapes (`\"`, `\\`, `\n`, `\uXXXX`) are TOML's too. */
+/** A lone surrogate: TOML holds Unicode scalar values only, so `\uD800` is not a TOML escape. */
+const LONE_SURROGATE = /[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/g;
+
+/**
+ * A TOML basic string: JSON's escapes (`\"`, `\\`, `\n`, `\uXXXX`) are TOML's too. JSON leaves U+007F raw, which a
+ * TOML basic string refuses, so it is escaped; a lone surrogate becomes U+FFFD (B249 review F6).
+ */
 export function tomlString(value: string): string {
-  return JSON.stringify(value);
+  const scalars = value.replace(LONE_SURROGATE, '�');
+  return JSON.stringify(scalars).replace(/\u007F/g, '\\u007F');
 }
 
 interface CodexAgent {

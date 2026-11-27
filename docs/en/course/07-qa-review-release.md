@@ -405,7 +405,7 @@ follow a change from intent to evidence in one command.
      plan drift: 1 unplanned, 0 planned but untouched
        + package.json (not in plan.md)
      policy: REVIEW.md
-     diff: git diff main...HEAD && git diff HEAD
+     diff: git diff 4f1c2a9e8b7d6c5a4f3e2d1c0b9a8f7e6d5c4b3a...HEAD && git diff HEAD
    ```
 
    **Plan drift** lists files changed but not named in `plan.md`, and planned files nobody touched. Here the test

@@ -100,13 +100,22 @@ A rule fits when it has the tag `sdlc`, a tag of the project's stack, or a path 
 checksum.
 
 The maintainer reads the drafts, adds the project's own rules to them, and accepts. SkillForge installs the
-registry's rules; `team sync` prints the line for each tool:
+registry's rules. `team sync` prints one install line per rule that fits, for each agent:
 
 ```bash
 sdlc team accept analyst
 sdlc team accept --skill plan-mode
-skillforge sync --type rule --runtime opencode
+skillforge install rule/people-decide-gates --runtime opencode
 ```
+
+A rule that does not fit gets no line. `skillforge sync --type rule --runtime opencode` is the alternative: it
+installs every active rule of the registry, fitting or not. SkillForge's agent ids are `claude-code`, `cursor`,
+`opencode`, `codex` and `qwen`. With OpenCode and Codex both, `team sync` prints the Codex lines only: OpenCode reads
+the Codex rules in `AGENTS.md` too. `team check` names an installed rule that the registry lists and the fit notes
+do not propose, with its `skillforge uninstall rule/<id> --runtime <agent>` line.
+
+`skillforge sync` refuses the MCP registry credential with `mcp_token_forbidden` (exit code 4). The person signs in
+with `skillforge login` first, or uses an ordinary API credential instead of the MCP one.
 
 A skill with only Markdown installs with its role. A skill with any other file waits for `--skill`. A skill over the
 limits is refused even when a person asks. A skill has at most 64 files; in the run, a 150-file skill was refused
@@ -124,8 +133,9 @@ this way. Each accepted role and skill is bound to its checksum in `openspec/.sd
 The `CLAUDE.md` that sdlc creates imports `AGENTS.md`; an existing `CLAUDE.md` needs an `@AGENTS.md` line. sdlc owns
 only the block between `<!-- sdlc:rules:start -->` and `<!-- sdlc:rules:end -->`, and since sdlc 0.32.1 that block
 holds no registry rule. With sdlc 0.32.0 both tools placed the rules, and agents read each one twice. After the first
-`sdlc update` on 0.32.1, run `skillforge sync --type rule` once: the update removes what 0.32.0 placed. For Codex,
-Qwen Code and GigaCode SkillForge installs no rules yet, and `sdlc doctor` says so.
+`sdlc update` on 0.32.1, run `skillforge sync --type rule` once: the update removes what 0.32.0 placed. SkillForge
+0.5.12 and newer install rules for Codex (a block in `AGENTS.md`) and Qwen Code (a block in `QWEN.md`) too. For
+GigaCode SkillForge installs no rules yet, and `sdlc doctor` says so.
 
 ## 35.5. A change from intent to archive
 

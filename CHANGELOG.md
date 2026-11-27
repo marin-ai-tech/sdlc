@@ -2,6 +2,48 @@
 
 All notable changes to sdlc. Versions follow [Semantic Versioning](https://semver.org/); while the major version is 0, a minor version may change behavior.
 
+## 0.35.0 — 2026-11-27
+
+### Fixed
+- The SkillForge lines for registry rules use SkillForge's agent ids: Claude Code is `--runtime claude-code`.
+  SkillForge refused the sdlc tool id `claude` as an unknown runtime. Codex and Qwen Code are served too: they get
+  their lines, and `sdlc doctor` no longer calls them not connected.
+- The `tools` of a registry role and of a role file are parsed: each entry is a tool name with an optional
+  `(pattern)`, and line breaks, control and format characters are refused. A role's tools can no longer add a key to
+  the front matter of a generated subagent.
+- A config inside an installed skill folder no longer becomes the project the hook judges: a folder under a skills
+  root belongs to its enclosing project, and the guard, the team record and the installers know the same skills
+  folders.
+- A base must be a plain git ref: letters, digits and `._/~^@{}:+-`, not starting with `-`, no commit-message search
+  (`^{/text}`), no spaces, at most 200 characters. `review.base`, every `--base` option and the `base` of
+  `board_submit` over MCP refuse any other value and name where it came from; the default guess skips such an
+  `origin/HEAD`. `sdlc review context` prints the diff command with the resolved commit, never the base text.
+- A registry id or skill file path in a refusal is printed escaped and cut to 64 characters.
+
+### Changed
+- A role's `tools` holds at most 64 entries of at most 200 characters each.
+- `sdlc update`, `sdlc init`, `sdlc doctor --fix`, `sdlc license set` and the team commands that write stop before
+  they write while an accepted role file is refused. The error names `docs/agents/<role>.md`; the fix is to correct
+  the file and accept the role again with `sdlc team accept <role>`. An edited or unrecorded file never blocks them.
+  `sdlc team check` and `sdlc team skills` list such a role as refused and go on.
+- `sdlc review context` fails with `unknown_ref` when its base does not resolve to a commit, instead of printing a
+  diff command that cannot run.
+- `sdlc team sync` prints one `skillforge install rule/<id> --runtime <agent>` line per rule that fits the project;
+  the line that installs every active rule is the alternative. `sdlc team check` names an installed rule that the
+  registry lists and the fit notes do not propose, with the line that removes it.
+- `sdlc team sync --json`: `rules.install` now holds the per-rule lines; the lines that install every active rule
+  moved to `rules.installAll`.
+- In team mode, a stage whose role has an accepted subagent tells the main agent to hand the stage's work to that
+  subagent, or to say in the final report why it did the work itself. Solo mode, a subagent configured without a
+  role and a stage without resources read as before.
+
+### Known limits
+- A session opened in a project that lies inside another sdlc project is judged by the nearest project only; the
+  outer project's rules do not reach the inner one's files. A later release lets every enclosing project judge.
+- On Linux, a writer that reads another writer's lock ticket while that ticket is being deleted can stop with
+  `writer_locked` ("Unsafe writer ownership metadata") instead of waiting; running the command again succeeds. The
+  same race on Windows is the known `EPERM` case. Both exist since 0.30.0.
+
 ## 0.34.1 — 2026-11-24
 
 ### Fixed

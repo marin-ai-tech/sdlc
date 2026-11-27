@@ -3,7 +3,7 @@ import { loadProject, recordChangeEvent, type ProjectContext } from '../cli/cont
 import { c, line, printJson, reportFailure } from '../cli/output.js';
 import { emitNextHint, resolveNext } from '../cli/next-hint.js';
 import { readChangeState } from '../core/change-state.js';
-import { changeBase } from '../core/change-base.js';
+import { changeBase, resolvedBase } from '../core/change-base.js';
 import { resolveChange } from '../core/changes.js';
 import { readChangeDeltas } from '../core/deltas.js';
 import { readDeferred } from '../core/deferred.js';
@@ -319,6 +319,11 @@ export async function verifyCommand(opts: VerifyOptions): Promise<void> {
   }
 }
 
+/** The diff command of the review context, from the resolved hash of its base (B249 review F2). */
+function diffCommand(hash: string, tree: boolean): string {
+  return `git diff ${hash}${tree ? '..' : '...'}HEAD && git diff HEAD`;
+}
+
 export async function reviewCommand(action: string, opts: { change?: string; base?: string; json?: boolean }): Promise<void> {
   try {
     if (action === 'suggest') return reviewSuggest(opts);
@@ -391,6 +396,7 @@ export async function reviewCommand(action: string, opts: { change?: string; bas
     const policyFile = path.join(ctx.root, ctx.config.review.policy);
     const policy = readText(policyFile) ?? readAsset('project', 'REVIEW.md');
     const rel = (f: string) => path.relative(ctx.root, path.join(ref.dir, f));
+    const treeBase = !!base && git(ctx.root, ['cat-file', '-t', '--end-of-options', base]).stdout === 'tree';
     const payload = {
       change: ref.id,
       base: base ?? null,
@@ -412,8 +418,7 @@ export async function reviewCommand(action: string, opts: { change?: string; bas
         verification: rel('verification.md'),
         review: rel('review.md'),
       },
-      diffCommand: base ? `git diff ${base}${git(ctx.root, ['cat-file', '-t', base]).stdout === 'tree'
-        ? '..' : '...'}HEAD && git diff HEAD` : 'git diff HEAD',
+      diffCommand: base ? diffCommand(resolvedBase(ctx.root, base, treeBase), treeBase) : 'git diff HEAD',
     };
     if (opts.json) return printJson(payload);
     const baseLabel = base ?? 'n/a';

@@ -5,7 +5,7 @@ import { SdlcError } from '../core/errors.js';
 import { formatIdentity, gitIdentity } from '../core/git.js';
 import { t } from '../core/i18n.js';
 import { DRAFTS_DIR } from '../team/record.js';
-import { checkTeamSkills, type DraftCheck, type SkillCheck } from '../team/skill-check.js';
+import { checkTeamSkills, type DraftCheck, type SkillCheck, type TeamCheck } from '../team/skill-check.js';
 import { acceptSkill, installRoleSkills, type SkillsOutcome } from '../team/skills.js';
 import type { PackReport } from '../team/packs.js';
 import { acceptPack, type PackAcceptResult } from '../team/pack-accept.js';
@@ -15,7 +15,7 @@ import { acceptRole, listTeam, syncTeam, type SyncResult, type TeamListRole } fr
 import { STAGE_IDS, type StageConfigId } from '../core/stage-config.js';
 import { assertRegistryTools } from '../team/registry-client.js';
 import { stageSkillTexts } from '../team/stage-skill-text.js';
-import { checkRules, syncRules, type RuleCheck, type RulesSync } from '../team/rules.js';
+import { checkRules, syncRules, type RulesCheck, type RulesSync } from '../team/rules.js';
 import { assertHuman } from './gates.js';
 
 /** `sdlc team sync | accept | list | check` (B69, B71, B72, B74): the agent team of the project. */
@@ -72,9 +72,21 @@ function printRules(rules: RulesSync | undefined): void {
     const fit = reason ? t('team.sync.ruleFits', { reason }) : t('team.sync.ruleOther');
     line(t('team.sync.rule', { id: rule.id, version: rule.version, paths: pathsText(rule.paths), fit }));
   }
-  if (rules.install.length === 0) return;
+  printInstallLines(rules);
+}
+
+/**
+ * B338: one line per fitting rule, then the blanket line that installs every active rule as the alternative. Review
+ * F7: the commands are printed bare, since cmd.exe passes an inline `#` comment on as arguments.
+ */
+function printInstallLines(rules: RulesSync): void {
+  if (rules.installAll.length === 0) return;
   line(t('team.sync.rulesInstall'));
   for (const command of rules.install) line(`  ${command}`);
+  if (rules.install.length === 0) line(`  ${t('team.sync.rulesNoneFit')}`);
+  line(t('team.sync.rulesInstallAll'));
+  for (const command of rules.installAll) line(`  ${command}`);
+  if (rules.codexServesOpenCode) line(t('team.sync.rulesCodexServesOpenCode'));
 }
 
 export async function teamSyncCommand(opts: Options): Promise<void> {
@@ -200,6 +212,9 @@ function printTable(roles: TeamListRole[]): void {
   for (const cells of rows) line(cells.map((cell, index) => cell.padEnd(widths[index])).join('  ').trimEnd());
   for (const role of roles.filter((r) => r.status === 'changed')) line(t('team.list.changed', { id: role.id }));
   for (const role of roles.filter((r) => r.newerDraft)) line(t('team.list.newerDraft', { id: role.id }));
+  for (const role of roles) {
+    if (role.refused !== undefined) line(t('team.list.refused', { id: role.id, reason: role.refused }));
+  }
 }
 
 function packLine(pack: PackListItem): string {
@@ -248,8 +263,12 @@ function urlLine(skill: SkillCheck): string {
   return t('team.check.urlsTotal', { list, total: skill.urlCount });
 }
 
-function printCheck(skills: SkillCheck[], drafts: DraftCheck[], warnings: string[]): void {
+function printCheck(check: TeamCheck): void {
+  const { skills, drafts, warnings } = check;
   if (skills.length === 0) line(t('team.check.empty'));
+  for (const refused of check.refusedRoles) {
+    line(t('team.check.acceptedRoleRefused', { role: refused.role, reason: refused.reason }));
+  }
   for (const skill of skills) {
     line(`${skill.id} ${skill.version ?? '?'} (${skill.source}): ${skillState(skill)}`);
     if (skill.scripts.length > 0) line(`  ${t('team.check.scripts', { list: skill.scripts.join(', ') })}`);
@@ -257,21 +276,26 @@ function printCheck(skills: SkillCheck[], drafts: DraftCheck[], warnings: string
     if (skill.allowedTools.length > 0) line(`  allowed-tools: ${skill.allowedTools.join(' ')}`);
     if (skill.urls.length > 0) line(`  ${urlLine(skill)}`);
   }
-  for (const draft of drafts) {
-    for (const skill of draft.skills) {
-      if (skill.status === 'waits-for-person') {
-        const scripts = [...skill.scripts, ...skill.data].join(', ');
-        line(`  ${t('team.check.draftWaits', { role: draft.role, id: skill.id, scripts })}`);
-      }
-      if (skill.status === 'unavailable') {
-        line(`  ${t('team.check.draftUnavailable', { role: draft.role, id: skill.id, reason: skill.reason })}`);
-      }
-      if (skill.status === 'refused') {
-        line(`  ${t('team.check.draftRefused', { role: draft.role, id: skill.id, reason: skill.reason })}`);
-      }
+  for (const draft of drafts) printDraftCheck(draft);
+  for (const warning of warnings) line(`${t('label.warning')}: ${warning}`);
+}
+
+function printDraftCheck(draft: DraftCheck): void {
+  if (draft.refused !== undefined) {
+    line(`  ${t('team.check.draftRoleRefused', { role: draft.role, reason: draft.refused })}`);
+  }
+  for (const skill of draft.skills) {
+    if (skill.status === 'waits-for-person') {
+      const scripts = [...skill.scripts, ...skill.data].join(', ');
+      line(`  ${t('team.check.draftWaits', { role: draft.role, id: skill.id, scripts })}`);
+    }
+    if (skill.status === 'unavailable') {
+      line(`  ${t('team.check.draftUnavailable', { role: draft.role, id: skill.id, reason: skill.reason })}`);
+    }
+    if (skill.status === 'refused') {
+      line(`  ${t('team.check.draftRefused', { role: draft.role, id: skill.id, reason: skill.reason })}`);
     }
   }
-  for (const warning of warnings) line(`${t('label.warning')}: ${warning}`);
 }
 
 /** `sdlc team skills --stage <stage> [--json]` (B319): the stage's skill texts that its commands inject. Read-only. */
@@ -283,7 +307,13 @@ export function teamSkillsCommand(opts: Options & { stage: string }): void {
       throw new SdlcError('usage', { key: 'error.team_skills_stage', params });
     }
     const result = stageSkillTexts(ctx.root, ctx.config, opts.stage as StageConfigId);
-    if (opts.json) return printJson({ stage: result.stage, skills: result.skills });
+    const refused = result.refusedRoles;
+    const refusedJson = refused.length > 0 ? { refusedRoles: refused } : {};
+    if (opts.json) return printJson({ stage: result.stage, skills: result.skills, ...refusedJson });
+    // A refused accepted role is skipped with a line on stderr; the injected text on stdout stays the skills only.
+    for (const { role, reason } of refused) {
+      process.stderr.write(`${t('team.skills.roleSkipped', { role, reason })}\n`);
+    }
     if (result.skills.length === 0) return line(t('team.skills.none', { stage: result.stage }));
     process.stdout.write(result.text);
   } catch (error) {
@@ -291,12 +321,16 @@ export function teamSkillsCommand(opts: Options & { stage: string }): void {
   }
 }
 
-/** B317: each registry rule with its checksum state; SkillForge installs them. */
-function printRuleChecks(rules: RuleCheck[], error: string | undefined): void {
-  if (error) line(t('team.check.rulesError', { error }));
-  for (const rule of rules) {
+/** B317: each registry rule with its checksum state; SkillForge installs them. B338: installed ones that do not fit. */
+function printRuleChecks(rules: RulesCheck): void {
+  if (rules.error) line(t('team.check.rulesError', { error: rules.error }));
+  for (const rule of rules.rules) {
     const state = rule.checksumOk ? t('team.check.ruleOk') : t('team.check.ruleRefused', { reason: rule.reason ?? '' });
     line(t('team.check.rule', { id: rule.id, version: rule.version, paths: pathsText(rule.paths), state }));
+  }
+  for (const item of rules.installedNotFitting) {
+    line(t('team.check.ruleNotFitting', { id: item.id, runtime: item.runtime }));
+    line(`  ${item.uninstall}`);
   }
 }
 
@@ -306,12 +340,13 @@ export async function teamCheckCommand(opts: Options): Promise<void> {
     const ctx = loadProject();
     await assertRegistryTools(ctx.config);
     const result = await checkTeamSkills(ctx.root, ctx.config);
-    const rules = await checkRules(ctx.config);
+    const rules = await checkRules(ctx.root, ctx.config);
     const rulesError = rules.error ? { rulesError: rules.error } : {};
-    if (opts.json) return printJson({ ...result, rules: rules.rules, ...rulesError });
-    printCheck(result.skills, result.drafts, result.warnings);
+    const installed = { rulesInstalledNotFitting: rules.installedNotFitting };
+    if (opts.json) return printJson({ ...result, rules: rules.rules, ...installed, ...rulesError });
+    printCheck(result);
     if (result.error) line(t('team.check.registryError', { error: result.error }));
-    printRuleChecks(rules.rules, rules.error);
+    printRuleChecks(rules);
   } catch (error) {
     reportFailure(error, opts.json);
   }

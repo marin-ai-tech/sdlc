@@ -124,11 +124,20 @@ const GUARD_TEXT_PATTERNS = textPatterns(GUARD_NAMES);
 
 const TEAM_FILE = 'openspec/.sdlc/team.json';
 const SKILL_ID = /^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/;
-/** The skills folders of every tool a team skill is installed for (B86). */
-const SKILL_ROOTS = ['.claude/skills', '.opencode/skills', '.cursor/skills', '.agents/skills', '.qwen/skills',
-  '.gigacode/skills'];
+/**
+ * The skills folders of every tool a team skill is installed for (B86). The guard keeps its own copy, next to the
+ * pattern below; test/b249-r1.test.ts proves it equals TEAM_SKILL_ROOTS of skill-root.ts (B249 review F8).
+ */
+export const GUARD_SKILL_ROOTS: readonly string[] = ['.claude/skills', '.opencode/skills', '.cursor/skills',
+  '.agents/skills', '.qwen/skills', '.gigacode/skills'];
 /** The same as a pattern: `.claude/skills`, ..., `.agents/skills`. */
 const SKILL_ROOT_NAME = String.raw`\.(?:claude|opencode|cursor|agents|qwen|gigacode)/skills`;
+const SKILL_ROOT_EXACT = new RegExp(`^${SKILL_ROOT_NAME}$`);
+
+/** `dir` is a skills root the guard's pattern knows; test/b249-r2.test.ts holds it to GUARD_SKILL_ROOTS (F7). */
+export function isGuardSkillRoot(dir: string): boolean {
+  return SKILL_ROOT_EXACT.test(dir);
+}
 
 /** The ids of the installed team skills in team.json; none when the file is missing or broken. */
 function teamSkillIds(root: string): string[] {
@@ -157,7 +166,7 @@ function skillPatterns(ids: string[]): GuardPatterns {
   return {
     file: new RegExp(`^(?:${names})$`, 'i'),
     ...textPatterns(names),
-    skillDirs: SKILL_ROOTS.flatMap((dir) => ids.map((id) => `${dir}/${id}`)),
+    skillDirs: GUARD_SKILL_ROOTS.flatMap((dir) => ids.map((id) => `${dir}/${id}`)),
   };
 }
 

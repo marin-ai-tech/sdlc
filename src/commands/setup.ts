@@ -34,6 +34,7 @@ import {
 import { DEFAULT_TOOLS, type ToolId } from '../integrations/types.js';
 import { installGitHook, removeGitHook, type GitHookResult } from '../integrations/git-hook.js';
 import { gitHookJson, printGitHookInstall, printGitHookRemoval } from './git-hook-output.js';
+import { codexServesOpenCode } from '../team/skillforge-runtimes.js';
 import { agentEnvironment } from '../core/agent-env.js';
 import { assertKeepsGuard } from '../core/guard-setup.js';
 import { humanCommandFix } from '../core/human-command.js';
@@ -63,6 +64,7 @@ import {
 } from './init-wizard.js';
 import { layoutOptions, printLayoutText } from './init-layout.js';
 import { parseExecutionMode } from '../team/team-config.js';
+import { assertRolesReadable } from '../team/accepted.js';
 
 export interface InitOptions {
   tools?: string;
@@ -470,6 +472,7 @@ async function setupProject(
   resolved: WizardResult,
   deps?: InitDeps,
 ): Promise<InitOutcome> {
+  assertRolesReadable(root);
   const { paths, openspecCreated, hadConfig, config, tools, detectedCommands } = writeSettings(root, opts);
   ensureHookIgnore(root);
   const rolesNote = resolved.roles ? `roles: ${writeStarterRoles(root)} openspec/roles.yaml` : undefined;
@@ -583,6 +586,8 @@ export function applyUpdate(
   tools: ToolId[],
   opts: { force?: boolean; dryRun?: boolean } = {},
 ): { result: InstallResult; gitHook: GitHookResult } {
+  // A refused role would fail the install after the first files changed (B249 review F3).
+  assertRolesReadable(root);
   if (!opts.dryRun) ensureHookIgnore(root);
   const previous = readManifest(root);
   const result = installIntegrations(root, config, tools, { force: opts.force, dryRun: opts.dryRun });
@@ -600,10 +605,16 @@ export function applyUpdate(
 }
 
 /** B317 review F1: registry rules sdlc had placed are gone; SkillForge installs them from now on. */
-function printRulesMoved(install: string[] | undefined): void {
+function printRulesMoved(install: string[] | undefined, tools: readonly string[]): void {
   if (!install) return;
   line(t('update.rulesMoved'));
   for (const command of install) line(`  ${command}`);
+  if (codexServesOpenCode(tools)) line(t('team.sync.rulesCodexServesOpenCode'));
+}
+
+function rulesMovedJson(result: InstallResult, tools: readonly string[]): Record<string, unknown> {
+  if (!result.rulesMoved) return {};
+  return { rulesMoved: { install: result.rulesMoved, codexServesOpenCode: codexServesOpenCode(tools) } };
 }
 
 export async function updateCommand(target: string | undefined, opts: UpdateOptions): Promise<void> {
@@ -624,6 +635,7 @@ export async function updateCommand(target: string | undefined, opts: UpdateOpti
     }
     const config = loadConfig(paths.sdlcConfig);
     const tools = parseTools(opts.tools, configuredTools(config));
+    assertRolesReadable(root);
     if (opts.tools !== undefined && !opts.dryRun) {
       // An agent may restore the configured tools, not drop one (B41); before anything is written.
       const fix = humanCommandFix('update', config.cli);
@@ -638,7 +650,7 @@ export async function updateCommand(target: string | undefined, opts: UpdateOpti
       const hook = gitHookJson(root, gitHook);
       const dryRun = !!opts.dryRun;
       const cursor = cursorHooksJson(result);
-      const rules = result.rulesMoved ? { rulesMoved: { install: result.rulesMoved } } : {};
+      const rules = rulesMovedJson(result, config.tools);
       printJson({ root, tools, dryRun, files, claudeHooks, ...cursor, ...mcpJson(result), ...hook, ...rules,
         harness: stamp });
       return;
@@ -646,7 +658,7 @@ export async function updateCommand(target: string | undefined, opts: UpdateOpti
     line(c.bold(t(opts.dryRun ? 'update.would' : 'update.done', { root })) + c.dim(` (${stampTextLocalized(stamp)})`));
     printGitHookInstall(root, gitHook);
     printInstall(result, config);
-    printRulesMoved(result.rulesMoved);
+    printRulesMoved(result.rulesMoved, config.tools);
   } catch (error) {
     reportFailure(error, opts.json);
   }

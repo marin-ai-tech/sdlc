@@ -6,14 +6,14 @@ import { readText, writeTextAtomic } from '../core/fs-utils.js';
 import type { Locale } from '../core/i18n.js';
 import { refreshGeneratedFiles } from '../integrations/install.js';
 import type { ApplyReport } from '../integrations/manifest.js';
-import { roleStatus, type RoleStatus } from './accepted.js';
+import { assertRolesReadable, roleStatus, type RoleStatus } from './accepted.js';
 import { unifiedDiff } from './diff.js';
 import { withoutSource } from './draft.js';
 import {
   acceptedPath, AGENTS_DIR, draftPath, DRAFTS_DIR, readTeam, roleDigest, roleIdsIn, TEAM_PATH, writeTeam,
   type TeamEntry, type TeamRecord,
 } from './record.js';
-import { parseRoleFile, ROLE_ID } from './role-file.js';
+import { parseRoleFile, ROLE_ID, type RoleFile } from './role-file.js';
 import { builtinRoleText, builtinVersion, isBuiltinRole, teamLocale } from './sources.js';
 import { subagentName } from './render.js';
 
@@ -103,6 +103,8 @@ function acceptedEntry(team: TeamRecord, id: string, text: string, by: string, f
 export function acceptRole(root: string, config: SdlcConfig, id: string, by: string): AcceptResult {
   const { text, fromDraft } = acceptText(root, id);
   assertRoleFile(id, text);
+  // Before the first write: a refused role elsewhere would fail the refresh after these files changed.
+  assertRolesReadable(root, id);
   const team = readTeam(root);
   const compared = compareWithSource(team, id, text, fromDraft, teamLocale(config));
   writeTextAtomic(path.join(root, acceptedPath(id)), text);
@@ -126,6 +128,18 @@ export interface TeamListRole {
   subagent: string | null;
   /** An accepted (or changed) role whose draft in docs/agents/drafts/ has a different text (B108). */
   newerDraft: boolean;
+  /** Why sdlc refuses the role's file (B249 review F7); the other roles still list. */
+  refused?: string;
+}
+
+/** The role in its file, or why it is refused: one refused file does not stop the list. */
+function readListed(id: string, text: string): { role: RoleFile } | { refused: string } {
+  try {
+    return { role: parseRoleFile(id, text) };
+  } catch (error) {
+    if (error instanceof SdlcError) return { refused: error.localizedMessage() };
+    throw error;
+  }
 }
 
 /** A draft waits next to the accepted file and its text differs from it. */
@@ -138,16 +152,18 @@ function hasNewerDraft(root: string, id: string): boolean {
 
 function listed(root: string, id: string, status: RoleStatus, team: TeamRecord): TeamListRole {
   const rel = status === 'draft' ? draftPath(id) : acceptedPath(id);
-  const role = parseRoleFile(id, readText(path.join(root, rel)) ?? '');
-  const source = status === 'draft' ? team.drafts[id]?.kind ?? role.sourceKind : team.roles[id]?.source;
+  const read = readListed(id, readText(path.join(root, rel)) ?? '');
+  const role = 'role' in read ? read.role : undefined;
+  const source = status === 'draft' ? team.drafts[id]?.kind ?? role?.sourceKind : team.roles[id]?.source;
   return {
     id,
-    title: role.title,
-    stages: role.stages,
+    title: role?.title ?? id,
+    stages: role?.stages ?? [],
     source: source ?? (isBuiltinRole(id) ? 'builtin' : 'local'),
     status,
-    subagent: status === 'accepted' ? subagentName(role) : null,
+    subagent: status === 'accepted' && role ? subagentName(role) : null,
     newerDraft: status !== 'draft' && hasNewerDraft(root, id),
+    ...('refused' in read ? { refused: read.refused } : {}),
   };
 }
 

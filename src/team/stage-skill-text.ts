@@ -5,7 +5,7 @@ import { isWithin, normalizeNewlines, readText } from '../core/fs-utils.js';
 import type { StageConfigId } from '../core/stage-config.js';
 import { roleSkills } from '../integrations/role-skills.js';
 import { stageSkillIds } from '../integrations/stage-resources.js';
-import { acceptedRoles } from './accepted.js';
+import { acceptedRolesReport, type RefusedRole } from './accepted.js';
 import { readTeam } from './record.js';
 import { teamSkillFolders } from './skills.js';
 
@@ -24,6 +24,8 @@ export interface StageSkillsText {
   stage: StageConfigId;
   skills: Array<{ name: string; status: StageSkillStatus }>;
   text: string;
+  /** Accepted roles whose file sdlc refuses (B249 review round 2, F4): skipped, their skills not listed. */
+  refusedRoles: RefusedRole[];
 }
 
 const NAME = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
@@ -72,9 +74,10 @@ function block(name: string, body: string): string {
 /** The texts of the stage's skills, within the cap. */
 export function stageSkillTexts(root: string, config: SdlcConfig, stage: StageConfigId): StageSkillsText {
   const installed = new Set(Object.keys(readTeam(root).skills));
-  const team = roleSkills(acceptedRoles(root), installed);
+  const accepted = acceptedRolesReport(root);
+  const team = roleSkills(accepted.roles, installed);
   const folders = teamSkillFolders(config);
-  const result: StageSkillsText = { stage, skills: [], text: '' };
+  const result: StageSkillsText = { stage, skills: [], text: '', refusedRoles: accepted.refused };
   let full = false;
   for (const name of stageSkillIds(config, stage, team)) {
     const body: string | undefined = full ? undefined : skillBody(root, folders, name);
